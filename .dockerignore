@@ -6,6 +6,7 @@ __pycache__/
 # Python virtual environments (uv creates .venv)
 .venv/
 .cache/
+.github/
 
 # UV lock and cache files
 .uv/
