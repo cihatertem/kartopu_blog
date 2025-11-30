@@ -1,0 +1,53 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Python virtual environments (uv creates .venv)
+.venv/
+.cache/
+
+# UV lock and cache files
+.uv/
+
+# Django static & media (dev environment)
+staticfiles/
+media/
+
+# Local environment files
+.env
+.env.*
+*.env
+
+# Logs
+*.log
+
+# OS junk files
+.DS_Store
+Thumbs.db
+
+# Editor / IDE settings
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Docker-specific ignored items
+Dockerfile
+docker-compose.yaml
+docker-compose.yml
+
+# Git directories
+.git/
+.gitignore
+
+# Python packaging output
+build/
+dist/
+*.egg-info/
+
+# Test coverage & pytest cache
+htmlcov/
+.coverage
+.coverage.*
+.pytest_cache/

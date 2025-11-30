@@ -1,0 +1,32 @@
+# docker-compose.prod.yml  (PROD)
+
+version: "3.9"
+
+services:
+  db:
+    image: postgres:17
+    init: true
+    restart: always
+    environment:
+      POSTGRES_DB: kartopu_db
+      POSTGRES_USER: kartopu_user
+      POSTGRES_PASSWORD: kartopu_pass
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+
+  kartopu:
+    build:
+      context: .
+      target: prod
+    init: true
+    restart: always
+    env_file:
+      - .env.prod
+    ports:
+      - "8000:8000"
+    depends_on:
+      db:
+        condition: service_started
+
+volumes:
+  pgdata:
