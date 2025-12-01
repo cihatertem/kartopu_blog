@@ -24,6 +24,7 @@ services:
     command: uv run python manage.py runserver 0.0.0.0:9002
     volumes:
       - .:/app
+      - kartopu_venv:/app/.venv
     ports:
       - "9002:9002"
     env_file:
@@ -34,3 +35,4 @@ services:
 
 volumes:
   pgdata:
+  kartopu_venv:

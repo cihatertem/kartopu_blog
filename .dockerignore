@@ -4,7 +4,6 @@ __pycache__/
 *$py.class
 
 # Python virtual environments (uv creates .venv)
-.venv/
 .cache/
 .github/
 
@@ -54,3 +53,4 @@ htmlcov/
 .pytest_cache/
 
 git_oncesi_notlar.md
+.venv/
