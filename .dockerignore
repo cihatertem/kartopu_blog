@@ -52,3 +52,5 @@ htmlcov/
 .coverage
 .coverage.*
 .pytest_cache/
+
+git_oncesi_notlar.md
