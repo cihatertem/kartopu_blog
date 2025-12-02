@@ -23,7 +23,7 @@ jobs:
 
       - name: Build Docker image
         run: |
-          docker build -t ndhakara/kartopu_blog:${{ env.IMAGE_TAG }} -t ndhakara/kartopu_blog:latest .
+          docker build --target prod -t ndhakara/kartopu_blog:${{ env.IMAGE_TAG }} -t ndhakara/kartopu_blog:latest .
 
       - name: Push Docker image
         run: |
