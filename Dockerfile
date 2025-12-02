@@ -14,10 +14,11 @@ RUN apt-get update && apt-get install -y --no-install-recommends curl \
     && apt clean -y \
     && apt autopurge -y
 
-RUN curl -LsSf https://astral.sh/uv/install.sh | sh \
-    && mv /root/.local/bin/uv /usr/local/bin/uv
+ENV UV_INSTALL_DIR=/usr/local/bin
 
 ENV UV_CACHE_DIR=/app/.cache/uv
+
+RUN curl -LsSf https://astral.sh/uv/install.sh | sh
 
 WORKDIR /app
 
