@@ -7,7 +7,8 @@ ENV PYTHONUNBUFFERED=1 \
     PIP_DISABLE_PIP_VERSION_CHECK=on \
     PYTHONDONTWRITEBYTECODE=1
 
-RUN groupadd -g 1000 -r app && useradd -u 1000 --no-create-home --no-log-init -r -g app app
+#RUN groupadd -g 1000 -r app && useradd -u 1000 --no-create-home --no-log-init -r -g app app
+RUN groupadd -r app && useradd --no-create-home --no-log-init -r -g app app
 
 RUN apt-get update && apt-get install -y --no-install-recommends curl \
     && rm -rf /var/lib/apt/lists/* \
@@ -16,7 +17,12 @@ RUN apt-get update && apt-get install -y --no-install-recommends curl \
 
 ENV UV_INSTALL_DIR=/usr/local/bin
 
-ENV UV_CACHE_DIR=/app/.cache/uv
+ENV UV_COMPILE_BYTECODE=1
+
+ENV UV_CACHE_DIR=/var/cache/uv
+
+RUN mkdir -p /var/cache/uv \
+    && chown -R app:app /var/cache/uv
 
 RUN curl -LsSf https://astral.sh/uv/install.sh | sh
 
