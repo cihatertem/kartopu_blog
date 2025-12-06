@@ -7,7 +7,13 @@ ENV PYTHONUNBUFFERED=1 \
     PIP_DISABLE_PIP_VERSION_CHECK=on \
     PYTHONDONTWRITEBYTECODE=1
 
-RUN groupadd -g 1000 -r app && useradd -u 1000 --no-create-home --no-log-init -r -g app app
+RUN groupadd -g 1000 -r app \
+    && useradd \
+    -u 1000 \
+    --no-create-home\
+    --shell "/sbin/nologin" \
+    --no-log-init \
+    -r -g app app
 
 RUN apt-get update && apt-get install -y --no-install-recommends curl \
     && rm -rf /var/lib/apt/lists/* \

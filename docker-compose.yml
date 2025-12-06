@@ -21,7 +21,10 @@ services:
       context: .
       target: dev
     init: true
-    command: uv run python manage.py runserver 0.0.0.0:9002
+    #command: uv run python manage.py runserver 0.0.0.0:9002
+    command: sh -c "uv run python manage.py makemigrations &&
+      uv run python manage.py migrate &&
+      uv run python manage.py runserver 0.0.0.0:9002"
     volumes:
       - .:/app
       - kartopu_venv:/app/.venv
