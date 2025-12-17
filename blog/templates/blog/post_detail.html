@@ -1,0 +1,44 @@
+{% load blog_extras %}
+
+<!doctype html>
+<html lang="tr">
+  <head>
+    <meta charset="utf-8" />
+    <title>{{ post.effective_meta_title|default:post.title }}</title>
+    <meta
+      name="description"
+      content="{{ post.effective_meta_description|default:post.excerpt }}"
+    />
+  </head>
+  <body>
+    <article>
+      <h1>{{ post.title }}</h1>
+
+      <p>
+        <strong>Yazar:</strong> {{ post.author.full_name }}<br />
+        <strong>Yayınlanma:</strong> {{ post.published_at|date:"d F Y" }}<br />
+        <strong>Okunma:</strong> {{ post.view_count }}
+      </p>
+
+      {% if post.cover_image %}
+      <figure>
+        <img
+          src="{{ post.image_1200.url }}"
+          srcset="
+            {{ post.cover_600.url }} 600w,
+            {{ post.cover_900.url }} 900w,
+            {{ post.cover_1200.url }} 1200w
+          "
+          sizes="(max-width: 768px) 100vw, 720px"
+          alt="{{ image.alt_text }}"
+          loading="lazy"
+        />
+      </figure>
+      {% endif %}
+
+      <hr />
+
+      <div>{{ post.content|render_post_content:post.images.all|safe }}</div>
+    </article>
+  </body>
+</html>

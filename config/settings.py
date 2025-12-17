@@ -39,6 +39,7 @@ INSTALLED_APPS = [
     "django.contrib.messages",
     "django.contrib.staticfiles",
     # third party apps
+    "imagekit",
     # project apps
     "core.apps.CoreConfig",
     "accounts.apps.AccountsConfig",
@@ -139,3 +140,6 @@ MEDIA_ROOT = BASE_DIR / "media"
 # https://docs.djangoproject.com/en/5.2/ref/settings/#default-auto-field
 
 AUTH_USER_MODEL = "accounts.User"
+
+# ImageKit settings
+IMAGEKIT_CACHEFILE_DIR = "cache"

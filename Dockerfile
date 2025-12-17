@@ -20,9 +20,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends curl \
     && apt clean -y \
     && apt autopurge -y
 
-ENV UV_INSTALL_DIR=/usr/local/bin
-ENV UV_COMPILE_BYTECODE=1
-ENV UV_CACHE_DIR=/var/cache/uv
+ENV UV_INSTALL_DIR=/usr/local/bin \
+    UV_COMPILE_BYTECODE=1 \
+    UV_CACHE_DIR=/var/cache/uv
 
 RUN mkdir -p /var/cache/uv \
     && chown -R app:app /var/cache/uv
