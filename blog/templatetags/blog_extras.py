@@ -22,7 +22,7 @@ def render_post_content(content, images):
         <figure>
           <img
             src="{image.image_1200.url}"
-            srcset="{image.image_600.url} 600w, {image.image_1200.url} 1200w"
+            srcset="{image.image_600.url} 600w, {image.image_900.url} 900w, {image.image_1200.url} 1200w"
             sizes="(max-width: 768px) 100vw, 720px"
             alt="{image.alt_text}"
             loading="lazy"
