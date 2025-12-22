@@ -2,6 +2,8 @@ import re
 
 from django import template
 
+from core.markdown import render_markdown
+
 register = template.Library()
 
 IMAGE_PATTERN = re.compile(r"\{\{\s*image:(\d+)\s*\}\}")
@@ -16,19 +18,27 @@ def render_post_content(content, images):
         if index < 0 or index >= len(images):
             return ""
 
-        image = images[index]
+        img = images[index]
 
-        return f"""
-        <figure>
-          <img
-            src="{image.image_1200.url}"
-            srcset="{image.image_600.url} 600w, {image.image_900.url} 900w, {image.image_1200.url} 1200w"
-            sizes="(max-width: 768px) 100vw, 720px"
-            alt="{image.alt_text}"
-            loading="lazy"
-          >
-          {f"<figcaption>{image.caption}</figcaption>" if image.caption else ""}
-        </figure>
-        """
+        # Markdown içinde "ham HTML" olarak kalacak bir figure döndürüyoruz
+        # srcset / sizes: senin ImageKit türevlerine göre
+        figure = f"""
+<figure>
+  <img
+    src="{img.image_1200.url}"
+    srcset="{img.image_600.url} 600w, {img.image_900.url} 900w, {img.image_1200.url} 1200w"
+    sizes="(max-width: 768px) 100vw, 720px"
+    alt="{img.alt_text}"
+    loading="lazy"
+  />
+"""
+        if img.caption:
+            figure += f"<figcaption>{img.caption}</figcaption>\n"
+        figure += "</figure>"
+        return figure
 
-    return IMAGE_PATTERN.sub(replacer, content)
+    # 1) Placeholder -> HTML figure
+    expanded = IMAGE_PATTERN.sub(replacer, content or "")
+
+    # 2) Markdown -> sanitize edilmiş HTML
+    return render_markdown(expanded)

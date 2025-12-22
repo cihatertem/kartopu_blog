@@ -2,6 +2,7 @@ import os
 
 from django.conf import settings
 from django.db import models
+from django.urls import reverse
 from django.utils.text import slugify
 from imagekit.models import ImageSpecField
 from imagekit.processors import ResizeToFit, Transpose
@@ -146,6 +147,9 @@ class BlogPost(
                 optimize_uploaded_image(self.cover_image.path)
             except Exception:
                 pass
+
+    def get_absolute_url(self) -> str:
+        return reverse("blog:post_detail", kwargs={"slug": self.slug})
 
     @property
     def effective_meta_title(self) -> str:

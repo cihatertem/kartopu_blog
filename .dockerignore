@@ -53,4 +53,5 @@ htmlcov/
 .pytest_cache/
 
 git_oncesi_notlar.md
+yol_haritasi.md
 .venv/
