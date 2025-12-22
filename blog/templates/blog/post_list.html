@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="tr">
+  <head>
+    <meta charset="utf-8" />
+    <title>Blog</title>
+  </head>
+  <body>
+    <header>
+      <h1>Blog</h1>
+      <hr />
+    </header>
+
+    <aside>
+      <h3>Kategoriler</h3>
+      <ul>
+        {% for c in categories %}
+        <li><a href="{{ c.get_absolute_url }}">{{ c.name }}</a></li>
+        {% empty %}
+        <li>Henüz kategori yok.</li>
+        {% endfor %}
+      </ul>
+      <hr />
+    </aside>
+
+    <main>
+      {% if page_obj %}
+      <ul>
+        {% for post in page_obj.object_list %}
+        <li>
+          <h2 style="margin-bottom: 0.25rem">
+            <a href="{{ post.get_absolute_url }}">{{ post.title }}</a>
+          </h2>
+
+          <p style="margin-top: 0">
+            <small>
+              {{ post.published_at|date:"d F Y" }} — {{ post.author.full_name }}
+              {% if post.category %} —
+              <a href="{{ post.category.get_absolute_url }}"
+                >{{ post.category.name }}</a
+              >
+              {% endif %}
+            </small>
+          </p>
+
+          {% if post.excerpt %}
+          <p>{{ post.excerpt }}</p>
+          {% endif %}
+        </li>
+        <hr />
+        {% endfor %}
+      </ul>
+
+      <nav>
+        {% if page_obj.has_previous %}
+        <a href="?page={{ page_obj.previous_page_number }}">← Önceki</a>
+        {% endif %}
+
+        <span>
+          Sayfa {{ page_obj.number }} / {{ page_obj.paginator.num_pages }}
+        </span>
+
+        {% if page_obj.has_next %}
+        <a href="?page={{ page_obj.next_page_number }}">Sonraki →</a>
+        {% endif %}
+      </nav>
+      {% else %}
+      <p>Henüz yayınlanmış yazı yok.</p>
+      {% endif %}
+    </main>
+  </body>
+</html>

@@ -11,6 +11,35 @@ from core.images import optimize_uploaded_image
 from core.mixins import TimeStampedModelMixin, UUIDModelMixin
 
 
+class Category(
+    UUIDModelMixin,
+    TimeStampedModelMixin,
+    models.Model,
+):
+    name = models.CharField(max_length=80, unique=True)
+    slug = models.SlugField(max_length=80, unique=True)
+    description = models.TextField(blank=True)
+
+    class Meta:  # pyright: ignore[reportIncompatibleVariableOverride]
+        verbose_name = "Kategori"
+        verbose_name_plural = "Kategoriler"
+        ordering = ["name"]
+        indexes = [
+            models.Index(fields=["slug"]),
+        ]
+
+    def __str__(self) -> str:
+        return str(self.name)
+
+    def save(self, *args, **kwargs):
+        if not self.slug:
+            self.slug = slugify(self.name)
+        super().save(*args, **kwargs)
+
+    def get_absolute_url(self) -> str:
+        return reverse("blog:category_detail", kwargs={"slug": self.slug})
+
+
 def post_cover_upload_path(instance: "BlogPost", filename: str) -> str:
     file_extension = filename.split(".")[-1].lower()
     slug = instance.slug or slugify(instance.title)
@@ -43,6 +72,14 @@ class BlogPost(
     )
 
     # --- İçerik ---
+    category = models.ForeignKey(
+        Category,
+        on_delete=models.SET_NULL,
+        related_name="posts",
+        blank=True,
+        null=True,
+    )
+
     title = models.CharField(max_length=255)
     slug = models.SlugField(
         max_length=255,
