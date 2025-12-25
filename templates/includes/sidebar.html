@@ -1,0 +1,35 @@
+<section style="border: 1px solid #eee; padding: 1rem; border-radius: 8px;">
+  <h3 style="margin-top: 0;">Ara</h3>
+
+  <form method="get" action="{% url 'blog:post_list' %}">
+    <input
+      type="search"
+      name="q"
+      placeholder="Başlık ve içerikte ara..."
+      value="{{ request.GET.q|default:'' }}"
+      style="width: 100%; padding: 0.5rem; border: 1px solid #ddd; border-radius: 6px;"
+    />
+  </form>
+</section>
+
+<div style="height: 1rem;"></div>
+
+<section style="border: 1px solid #eee; padding: 1rem; border-radius: 8px;">
+  <h3 style="margin-top: 0;">Kategoriler</h3>
+
+  <ul style="padding-left: 1.2rem; margin: 0;">
+    {% for c in nav_categories %}
+      <li class="{% if active_category_slug == c.slug %}active{% endif %}">
+        {% if active_category_slug == c.slug %}
+          <strong>
+            <a href="{{ c.get_absolute_url }}">{{ c.name }}</a>
+          </strong>
+        {% else %}
+          <a href="{{ c.get_absolute_url }}">{{ c.name }}</a>
+        {% endif %}
+      </li>
+    {% empty %}
+      <li>Henüz kategori yok.</li>
+    {% endfor %}
+  </ul>
+</section>

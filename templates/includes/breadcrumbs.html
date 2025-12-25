@@ -1,0 +1,14 @@
+{% if breadcrumbs %}
+<nav aria-label="breadcrumb" style="margin: 0 0 1rem;">
+  <small>
+    <a href="/">Ana sayfa</a>
+    {% for item in breadcrumbs %}
+      / {% if item.url %}
+          <a href="{{ item.url }}">{{ item.label }}</a>
+        {% else %}
+          <strong>{{ item.label }}</strong>
+        {% endif %}
+    {% endfor %}
+  </small>
+</nav>
+{% endif %}

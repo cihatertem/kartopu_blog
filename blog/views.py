@@ -1,6 +1,8 @@
+from django.contrib.postgres.search import SearchQuery, SearchRank, SearchVector
 from django.core.paginator import Paginator
 from django.db.models import F
 from django.shortcuts import get_object_or_404, render
+from django.urls import reverse
 
 from .models import BlogPost, Category
 
@@ -12,18 +14,35 @@ def post_list(request):
         .order_by("-published_at", "-created_at")
     )
 
-    paginator = Paginator(qs, 10)  # sayfa başına 10 yazı
+    q = (request.GET.get("q") or "").strip()
+
+    if q:
+        # Türkçe için config="turkish" (PostgreSQL default text search config)
+        vector = (
+            SearchVector("title", weight="A", config="turkish")
+            + SearchVector("excerpt", weight="B", config="turkish")
+            + SearchVector("content", weight="C", config="turkish")
+        )
+        query = SearchQuery(q, config="turkish")
+
+        qs = (
+            qs.annotate(rank=SearchRank(vector, query))
+            .filter(rank__gt=0.0)
+            .order_by("-rank", "-published_at", "-created_at")
+        )
+
+    paginator = Paginator(qs, 10)
     page_number = request.GET.get("page")
     page_obj = paginator.get_page(page_number)
-
-    categories = Category.objects.order_by("name")
 
     return render(
         request,
         "blog/post_list.html",
         {
             "page_obj": page_obj,
-            "categories": categories,  # navbar/sidebar için şimdiden
+            "active_category_slug": "",
+            "active_nav": "blog",
+            "q": q,
         },
     )
 
@@ -43,6 +62,7 @@ def post_detail(request, slug):
 
     context = {
         "post": post,
+        "active_nav": "blog",
     }
     return render(request, "blog/post_detail.html", context)
 
@@ -50,17 +70,23 @@ def post_detail(request, slug):
 def category_detail(request, slug: str):
     category = get_object_or_404(Category, slug=slug)
 
-    posts = (
+    qs = (
         BlogPost.objects.filter(category=category, status=BlogPost.Status.PUBLISHED)
         .select_related("author", "category")
         .order_by("-published_at", "-created_at")
     )
+
+    paginator = Paginator(qs, 10)
+    page_number = request.GET.get("page")
+    page_obj = paginator.get_page(page_number)
 
     return render(
         request,
         "blog/category_detail.html",
         {
             "category": category,
-            "posts": posts,
+            "page_obj": page_obj,
+            "active_category_slug": category.slug,
+            "active_nav": "blog",
         },
     )

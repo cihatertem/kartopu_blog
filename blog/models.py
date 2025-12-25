@@ -1,6 +1,8 @@
 import os
 
 from django.conf import settings
+from django.contrib.postgres.indexes import GinIndex
+from django.contrib.postgres.search import SearchVector
 from django.db import models
 from django.urls import reverse
 from django.utils.text import slugify
@@ -63,6 +65,15 @@ class BlogPost(
         DRAFT = "draft", "Taslak"  # pyright: ignore[reportAssignmentType]
         PUBLISHED = "published", "Yayınlandı"  # pyright: ignore[reportAssignmentType]
         ARCHIVED = "archived", "Arşivlendi"  # pyright: ignore[reportAssignmentType]
+
+    indexes = [
+        models.Index(fields=["slug"]),
+        models.Index(fields=["status", "published_at"]),
+        GinIndex(
+            SearchVector("title", "excerpt", "content", config="turkish"),
+            name="blogpost_fts_gin",
+        ),
+    ]
 
     # --- İlişkiler ---
     author = models.ForeignKey(
