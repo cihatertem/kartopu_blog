@@ -1,35 +1,84 @@
+from django.contrib.postgres.aggregates import StringAgg
 from django.contrib.postgres.search import SearchQuery, SearchRank, SearchVector
 from django.core.paginator import Paginator
 from django.db.models import F
 from django.shortcuts import get_object_or_404, render
 from django.urls import reverse
 
-from .models import BlogPost, Category
+from core import helpers
+
+from .models import BlogPost, Category, Tag
+
+
+def search_results(request):
+    q = (request.GET.get("q") or "").strip()
+    tokens = helpers.normalize_search_query(q)
+
+    base_qs = (
+        BlogPost.objects.filter(status=BlogPost.Status.PUBLISHED)
+        .select_related("author", "category")
+        .prefetch_related("tags")
+    )
+
+    # 🚨 1. guard: boş input veya boş token
+    if not q or not tokens:
+        qs = base_qs.none()
+    else:
+        base_qs = base_qs.annotate(
+            tag_names=StringAgg(
+                "tags__name",
+                delimiter=" ",
+                distinct=True,
+            )
+        )
+
+        vector = (
+            SearchVector("tag_names", weight="A", config="turkish")
+            + SearchVector("title", weight="B", config="turkish")
+            + SearchVector("excerpt", weight="C", config="turkish")
+            + SearchVector("content", weight="D", config="turkish")
+        )
+
+        query = SearchQuery(
+            " | ".join(tokens),  # 🔥 AND zorlaması
+            search_type="raw",
+            config="turkish",
+        )
+
+        qs = (
+            base_qs.annotate(rank=SearchRank(vector, query))
+            # 🚨 2. guard: rank NULL veya 0 ise ELİMİNE GEÇMESİN
+            .filter(rank__isnull=False, rank__gt=0)
+            .order_by("-rank", "-published_at")
+        )
+
+    paginator = Paginator(qs, 10)
+    page_obj = paginator.get_page(request.GET.get("page"))
+
+    breadcrumbs = [
+        {"label": "Blog", "url": reverse("blog:post_list")},
+        {"label": "Arama", "url": None},
+    ]
+
+    return render(
+        request,
+        "blog/search_results.html",
+        {
+            "page_obj": page_obj,
+            "q": q,
+            "active_nav": "blog",
+            "breadcrumbs": breadcrumbs,
+        },
+    )
 
 
 def post_list(request):
     qs = (
         BlogPost.objects.filter(status=BlogPost.Status.PUBLISHED)
         .select_related("author", "category")
+        .prefetch_related("tags")
         .order_by("-published_at", "-created_at")
     )
-
-    q = (request.GET.get("q") or "").strip()
-
-    if q:
-        # Türkçe için config="turkish" (PostgreSQL default text search config)
-        vector = (
-            SearchVector("title", weight="A", config="turkish")
-            + SearchVector("excerpt", weight="B", config="turkish")
-            + SearchVector("content", weight="C", config="turkish")
-        )
-        query = SearchQuery(q, config="turkish")
-
-        qs = (
-            qs.annotate(rank=SearchRank(vector, query))
-            .filter(rank__gt=0.0)
-            .order_by("-rank", "-published_at", "-created_at")
-        )
 
     paginator = Paginator(qs, 10)
     page_number = request.GET.get("page")
@@ -42,16 +91,18 @@ def post_list(request):
             "page_obj": page_obj,
             "active_category_slug": "",
             "active_nav": "blog",
-            "q": q,
+            "active_tag_slug": "",
         },
     )
 
 
-def post_detail(request, slug):
+def post_detail(request, slug: str):
     post = get_object_or_404(
-        BlogPost,
+        BlogPost.objects.select_related("category", "author").prefetch_related(
+            "tags", "images"
+        ),
         slug=slug,
-        # status=BlogPost.Status.PUBLISHED,
+        status=BlogPost.Status.PUBLISHED,
     )
 
     # View count (session bazlı)
@@ -60,11 +111,41 @@ def post_detail(request, slug):
         BlogPost.objects.filter(pk=post.pk).update(view_count=F("view_count") + 1)
         request.session[session_key] = True
 
-    context = {
-        "post": post,
-        "active_nav": "blog",
-    }
-    return render(request, "blog/post_detail.html", context)
+        post.view_count += 1
+
+    breadcrumbs: list[dict[str, str | None]] = [
+        {
+            "label": "Blog",
+            "url": reverse("blog:post_list"),
+        }
+    ]
+
+    if post.category:
+        breadcrumbs.append(
+            {
+                "label": post.category.name,
+                "url": post.category.get_absolute_url(),
+            }
+        )
+
+    breadcrumbs.append(
+        {
+            "label": post.title,
+            "url": None,
+        }
+    )
+
+    return render(
+        request,
+        "blog/post_detail.html",
+        {
+            "post": post,
+            "active_nav": "blog",
+            "active_category_slug": post.category.slug if post.category else "",
+            "active_tag_slug": "",
+            "breadcrumbs": breadcrumbs,
+        },
+    )
 
 
 def category_detail(request, slug: str):
@@ -80,6 +161,17 @@ def category_detail(request, slug: str):
     page_number = request.GET.get("page")
     page_obj = paginator.get_page(page_number)
 
+    breadcrumbs = [
+        {
+            "label": "Blog",
+            "url": reverse("blog:post_list"),
+        },
+        {
+            "label": category.name,
+            "url": None,
+        },
+    ]
+
     return render(
         request,
         "blog/category_detail.html",
@@ -88,5 +180,47 @@ def category_detail(request, slug: str):
             "page_obj": page_obj,
             "active_category_slug": category.slug,
             "active_nav": "blog",
+            "breadcrumbs": breadcrumbs,
+        },
+    )
+
+
+def tag_detail(request, slug: str):
+    tag = get_object_or_404(Tag, slug=slug)
+
+    qs = (
+        BlogPost.objects.filter(
+            tags=tag,
+            status=BlogPost.Status.PUBLISHED,
+        )
+        .select_related("author", "category")
+        .prefetch_related("tags")
+        .order_by("-published_at", "-created_at")
+    )
+
+    paginator = Paginator(qs, 10)
+    page_obj = paginator.get_page(request.GET.get("page"))
+
+    breadcrumbs = [
+        {
+            "label": "Blog",
+            "url": reverse("blog:post_list"),
+        },
+        {
+            "label": f"#{tag.name}",
+            "url": None,
+        },
+    ]
+
+    return render(
+        request,
+        "blog/tag_detail.html",
+        {
+            "tag": tag,
+            "page_obj": page_obj,
+            "active_nav": "blog",
+            "active_category_slug": "",
+            "active_tag_slug": tag.slug,
+            "breadcrumbs": breadcrumbs,
         },
     )

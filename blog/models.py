@@ -66,15 +66,6 @@ class BlogPost(
         PUBLISHED = "published", "Yayınlandı"  # pyright: ignore[reportAssignmentType]
         ARCHIVED = "archived", "Arşivlendi"  # pyright: ignore[reportAssignmentType]
 
-    indexes = [
-        models.Index(fields=["slug"]),
-        models.Index(fields=["status", "published_at"]),
-        GinIndex(
-            SearchVector("title", "excerpt", "content", config="turkish"),
-            name="blogpost_fts_gin",
-        ),
-    ]
-
     # --- İlişkiler ---
     author = models.ForeignKey(
         settings.AUTH_USER_MODEL,
@@ -89,6 +80,13 @@ class BlogPost(
         related_name="posts",
         blank=True,
         null=True,
+    )
+
+    tags = models.ManyToManyField(
+        "Tag",
+        related_name="posts",
+        blank=True,
+        help_text="Yazı ile ilişkili etiketler",
     )
 
     title = models.CharField(max_length=255)
@@ -168,9 +166,14 @@ class BlogPost(
         ordering = ["-published_at", "-created_at"]
         verbose_name = "Blog Yazısı"
         verbose_name_plural = "Blog Yazıları"
+
         indexes = [
             models.Index(fields=["slug"]),
             models.Index(fields=["status", "published_at"]),
+            GinIndex(
+                SearchVector("title", "excerpt", "content", config="turkish"),
+                name="blogpost_fts_gin",
+            ),
         ]
 
     def __str__(self) -> str:
@@ -282,3 +285,24 @@ class BlogPostImage(
 
     def __str__(self) -> str:
         return f"{self.post.title} - Görsel"  # pyright: ignore[reportAttributeAccessIssue]
+
+
+class Tag(TimeStampedModelMixin, UUIDModelMixin, models.Model):
+    name = models.CharField(max_length=50, unique=True)
+    slug = models.SlugField(max_length=60, unique=True)
+
+    class Meta:  # pyright: ignore[reportIncompatibleVariableOverride]
+        ordering = ["name"]
+        verbose_name = "Etiket"
+        verbose_name_plural = "Etiketler"
+
+    def __str__(self) -> str:
+        return self.name
+
+    def save(self, *args, **kwargs):
+        if not self.slug:
+            self.slug = slugify(self.name)
+        super().save(*args, **kwargs)
+
+    def get_absolute_url(self) -> str:
+        return reverse("blog:tag_detail", kwargs={"slug": self.slug})

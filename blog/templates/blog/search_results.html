@@ -1,0 +1,76 @@
+{% extends "base.html" %}
+
+{% block title %}
+  {% if q %}"{{ q }}" için arama sonuçları{% else %}Arama{% endif %}
+{% endblock %}
+
+{% block content %}
+{% include "includes/breadcrumbs.html" %}
+
+<h1>Arama</h1>
+
+{% if q and not page_obj.object_list %}
+  <p><strong>"{{ q }}"</strong> için sonuç bulunamadı.</p>
+
+{% elif page_obj.object_list %}
+  <p><strong>"{{ q }}"</strong> için {{ page_obj.paginator.count }} sonuç bulundu.</p>
+
+  <ul>
+    {% for post in page_obj %}
+      <li>
+        <h2>
+          <a href="{{ post.get_absolute_url }}">{{ post.title }}</a>
+        </h2>
+        {% if post.cover_image %}
+          <figure>
+            <img
+              src="{{ post.cover_1200.url }}"
+              srcset="
+                {{ post.cover_600.url }} 600w,
+                {{ post.cover_900.url }} 900w,
+                {{ post.cover_1200.url }} 1200w
+              "
+              sizes="(max-width: 768px) 100vw, 720px"
+              alt="{{ post.title }}"
+              loading="lazy"
+            />
+          </figure>
+        {% endif %}
+        <p>
+          <small>
+            {{ post.published_at|date:"d F Y" }}
+            — {{ post.author.full_name }}
+            {% if post.category %}
+              —
+              <a href="{{ post.category.get_absolute_url }}">
+                {{ post.category.name }}
+              </a>
+            {% endif %}
+          </small>
+        </p>
+
+        {% if post.excerpt %}
+          <p>{{ post.excerpt }}</p>
+        {% endif %}
+      </li>
+      <hr />
+    {% endfor %}
+  </ul>
+
+  <nav>
+    {% if page_obj.has_previous %}
+      <a href="?page={{ page_obj.previous_page_number }}{% if q %}&q={{ q|urlencode }}{% endif %}">← Önceki</a>
+    {% endif %}
+
+    <span> Sayfa {{ page_obj.number }} / {{ page_obj.paginator.num_pages }} </span>
+
+    {% if page_obj.has_next %}
+      <a href="?page={{ page_obj.next_page_number }}{% if q %}&q={{ q|urlencode }}{% endif %}">Sonraki →</a>
+
+    {% endif %}
+  </nav>
+
+{% else %}
+  <p>Arama yapmak için en az bir kelime gir.</p>
+{% endif %}
+{% endblock %}

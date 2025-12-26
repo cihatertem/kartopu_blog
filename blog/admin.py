@@ -3,7 +3,14 @@ from django.contrib import admin
 from django.utils.html import format_html
 from django.utils.safestring import SafeString
 
-from .models import BlogPost, BlogPostImage, Category
+from .models import BlogPost, BlogPostImage, Category, Tag
+
+
+@admin.register(Tag)
+class TagAdmin(admin.ModelAdmin):
+    list_display = ("name", "slug")
+    search_fields = ("name",)
+    prepopulated_fields = {"slug": ("name",)}
 
 
 @admin.register(Category)
@@ -54,10 +61,11 @@ class BlogPostAdmin(admin.ModelAdmin):
         "is_featured",
         "view_count",
     )
-    list_filter = ("status", "category", "is_featured", "created_at")
+    list_filter = ("status", "category", "tags", "is_featured", "created_at")
     search_fields = ("title", "excerpt", "content", "category__name", "slug")
     prepopulated_fields = {"slug": ("title",)}
     autocomplete_fields = ("author", "category")
+    filter_horizontal = ("tags",)
 
     def public_link(self, obj: BlogPost) -> SafeString:
         url = obj.get_absolute_url()

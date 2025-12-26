@@ -1,15 +1,16 @@
 <section style="border: 1px solid #eee; padding: 1rem; border-radius: 8px;">
   <h3 style="margin-top: 0;">Ara</h3>
 
-  <form method="get" action="{% url 'blog:post_list' %}">
+  <form method="get" action="{% url 'blog:search_results' %}">
     <input
       type="search"
       name="q"
-      placeholder="Başlık ve içerikte ara..."
-      value="{{ request.GET.q|default:'' }}"
+      placeholder="Blogda ara..."
+      value="{{ q|default:'' }}"
       style="width: 100%; padding: 0.5rem; border: 1px solid #ddd; border-radius: 6px;"
     />
   </form>
+
 </section>
 
 <div style="height: 1rem;"></div>

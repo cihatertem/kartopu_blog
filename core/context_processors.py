@@ -2,68 +2,25 @@ from __future__ import annotations
 
 from django.urls import reverse
 
-from blog.models import BlogPost, Category
+from blog.models import Category
 
 
 def breadcrumbs(request):
     """
-    Otomatik breadcrumb üretir.
-
-    Kurallar:
-    - Her zaman: Ana sayfa / ...
-    - Blog list: Ana sayfa / Blog
-    - Category detail: Ana sayfa / Blog / <Kategori>
-    - Post detail: Ana sayfa / Blog / <Kategori> / <Post>
+    Otomatik breadcrumb üretimi
     """
-    items: list[dict[str, str | None]] = []
+    breadcrumbs = []
 
-    match = getattr(request, "resolver_match", None)
-    if not match:
-        return {"breadcrumbs": items}
+    # Blog ile ilgili tüm sayfalar
+    if request.resolver_match and request.resolver_match.app_name == "blog":
+        breadcrumbs.append(
+            {
+                "label": "Blog",
+                "url": reverse("blog:post_list"),
+            }
+        )
 
-    view_name = match.view_name  # örn: "blog:post_list"
-    kwargs = match.kwargs or {}
-
-    blog_url = reverse("blog:post_list")
-
-    if view_name == "blog:post_list":
-        items.append({"label": "Blog", "url": None})
-        return {"breadcrumbs": items}
-
-    if view_name == "blog:category_detail":
-        items.append({"label": "Blog", "url": blog_url})
-
-        slug = kwargs.get("slug")
-        if slug:
-            category = Category.objects.only("name", "slug").filter(slug=slug).first()
-            if category:
-                items.append({"label": category.name, "url": None})
-        return {"breadcrumbs": items}
-
-    if view_name == "blog:post_detail":
-        items.append({"label": "Blog", "url": blog_url})
-
-        slug = kwargs.get("slug")
-        if slug:
-            post = (
-                BlogPost.objects.select_related("category")
-                .only("title", "slug", "category__name", "category__slug")
-                .filter(slug=slug)
-                .first()
-            )
-            if post:
-                if post.category:
-                    items.append(
-                        {
-                            "label": post.category.name,
-                            "url": post.category.get_absolute_url(),
-                        }
-                    )
-                items.append({"label": post.title, "url": None})
-        return {"breadcrumbs": items}
-
-    # Blog dışındaki sayfalarda breadcrumb istemiyorsan boş bırak:
-    return {"breadcrumbs": items}
+    return {"breadcrumbs": breadcrumbs}
 
 
 def categories(request):
