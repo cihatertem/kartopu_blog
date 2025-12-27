@@ -62,4 +62,65 @@
     </ul>
   </section>
   {% endif %}
+  <hr />
+
+    <section>
+      <h3>Yorumlar</h3>
+
+      {% if comments %}
+        <ul style="list-style: none; padding-left: 0;">
+          {% for comment in comments %}
+            <li style="margin-bottom: 1rem;">
+              <strong>{{ comment.author.full_name }}</strong>
+              <small>— {{ comment.created_at|date:"d F Y H:i" }}</small>
+              <p style="margin-top: 0.5rem;">{{ comment.body|linebreaksbr }}</p>
+            </li>
+          {% endfor %}
+        </ul>
+      {% else %}
+        <p>Henüz onaylanmış yorum yok.</p>
+      {% endif %}
+
+      <h4>Yorum Yaz</h4>
+      {% if can_comment %}
+        <form method="post" action="{% url 'comments:post_comment' post.id %}">
+          {% csrf_token %}
+          {{ comment_form.website }}
+          <div style="margin-bottom: 0.75rem;">
+            {{ comment_form.body }}
+          </div>
+          <div class="char-counter">
+              <span id="char-count">0</span> / {{ MAX_COMMENT_LENGTH }}
+          </div>
+          <button type="submit">Yorumu Gönder</button>
+        </form>
+        <p><small>Yorumlar moderasyon sonrası yayınlanır.</small></p>
+      {% elif requires_social_auth %}
+        <p>Yorum yapmak için sosyal hesap ile giriş yapmalısın.</p>
+      {% else %}
+        <p>Yorum yapmak için giriş yapmalısın.</p>
+      {% endif %}
+    </section>
+{% endblock %}
+
+{% block js_script %}
+document.addEventListener("DOMContentLoaded", function () {
+    const textarea = document.getElementById("id_body");
+    const counter = document.getElementById("char-count");
+    const max = textarea.getAttribute("maxlength");
+
+    function updateCounter() {
+        const len = textarea.value.length;
+        counter.textContent = len;
+
+        if (len >= max) {
+            counter.style.color = "red";
+        } else {
+            counter.style.color = "";
+        }
+    }
+
+    textarea.addEventListener("input", updateCounter);
+    updateCounter();
+});
 {% endblock %}

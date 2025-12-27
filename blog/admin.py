@@ -69,8 +69,6 @@ class BlogPostAdmin(admin.ModelAdmin):
     filter_horizontal = ("tags",)
 
     def public_link(self, obj: BlogPost) -> SafeString:
-        # url = obj.get_absolute_url()
-        # return format_html("<a href='{}' target='_blank' rel='noopener'>Aç</a>", url)
         if obj.status == BlogPost.Status.PUBLISHED:
             url = obj.get_absolute_url()
             label = "Yayını Gör"

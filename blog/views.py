@@ -1,3 +1,4 @@
+from allauth.socialaccount.models import SocialAccount
 from django.contrib.auth.decorators import login_required
 from django.contrib.postgres.aggregates import StringAgg
 from django.contrib.postgres.search import SearchQuery, SearchRank, SearchVector
@@ -7,6 +8,8 @@ from django.db.models import F
 from django.shortcuts import get_object_or_404, render
 from django.urls import reverse
 
+from comments.forms import CommentForm
+from comments.models import MAX_COMMENT_LENGTH, Comment
 from core import helpers
 
 from .models import BlogPost, Category, Tag
@@ -135,6 +138,13 @@ def post_detail(request, slug: str):
             "url": None,
         }
     )
+    approved_comments = post.comments.filter(  # pyright: ignore[reportAttributeAccessIssue]
+        status=Comment.Status.APPROVED
+    ).select_related("author")
+    comment_form = CommentForm()
+    has_social_account = False
+    if request.user.is_authenticated:
+        has_social_account = SocialAccount.objects.filter(user=request.user).exists()
 
     return render(
         request,
@@ -146,6 +156,12 @@ def post_detail(request, slug: str):
             "active_tag_slug": "",
             "breadcrumbs": breadcrumbs,
             "is_preview": False,
+            "comments": approved_comments,
+            "comment_form": comment_form,
+            "can_comment": request.user.is_authenticated and has_social_account,
+            "requires_social_auth": request.user.is_authenticated
+            and not has_social_account,
+            "MAX_COMMENT_LENGTH": MAX_COMMENT_LENGTH,
         },
     )
 
@@ -173,6 +189,11 @@ def post_preview(request, slug: str):
             "url": None,
         },
     ]
+    approved_comments = post.comments.filter(  # pyright: ignore[reportAttributeAccessIssue]
+        status=Comment.Status.APPROVED
+    ).select_related("author")
+    comment_form = CommentForm()
+    has_social_account = SocialAccount.objects.filter(user=request.user).exists()
 
     return render(
         request,
@@ -184,6 +205,10 @@ def post_preview(request, slug: str):
             "active_tag_slug": "",
             "breadcrumbs": breadcrumbs,
             "is_preview": True,
+            "comments": approved_comments,
+            "comment_form": comment_form,
+            "can_comment": has_social_account,
+            "requires_social_auth": not has_social_account,
         },
     )
 
