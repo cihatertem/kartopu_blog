@@ -3,8 +3,25 @@ from django.conf.urls.static import static
 from django.contrib import admin
 from django.urls import include, path
 
+from accounts import views as account_views
+
 urlpatterns = [
     path("admin/", admin.site.urls),
+    path(
+        "accounts/login/",
+        account_views.disabled_account_view,
+        name="account_login_disabled",
+    ),
+    path(
+        "accounts/signup/",
+        account_views.disabled_account_view,
+        name="account_signup_disabled",
+    ),
+    path(
+        "accounts/email/",
+        account_views.disabled_account_view,
+        name="account_email_disabled",
+    ),
     path("accounts/", include("allauth.urls")),
     path("", include("core.urls", namespace="core")),
     path("portfolio/", include("portfolio.urls", namespace="portfolio")),
