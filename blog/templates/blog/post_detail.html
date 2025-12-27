@@ -67,9 +67,9 @@
     <section>
       <h3>Yorumlar</h3>
 
-      {% if comments %}
+      {% if comment_page_obj.object_list %}
         <ul style="list-style: none; padding-left: 0;">
-          {% for comment in comments %}
+          {% for comment in comment_page_obj %}
             <li style="margin-bottom: 1rem;">
               <strong>{{ comment.author.full_name }}</strong>
               <small>— {{ comment.created_at|date:"d F Y H:i" }}</small>
@@ -77,6 +77,17 @@
             </li>
           {% endfor %}
         </ul>
+        {% if comment_page_obj.has_previous or comment_page_obj.has_next %}
+          <div>
+            {% if comment_page_obj.has_previous %}
+              <a href="?comments_page={{ comment_page_obj.previous_page_number }}">← Önceki</a>
+            {% endif %}
+            <span> Sayfa {{ comment_page_obj.number }} / {{ comment_page_obj.paginator.num_pages }} </span>
+            {% if comment_page_obj.has_next %}
+              <a href="?comments_page={{ comment_page_obj.next_page_number }}">Sonraki →</a>
+            {% endif %}
+          </div>
+        {% endif %}
       {% else %}
         <p>Henüz onaylanmış yorum yok.</p>
       {% endif %}
@@ -107,6 +118,9 @@
 document.addEventListener("DOMContentLoaded", function () {
     const textarea = document.getElementById("id_body");
     const counter = document.getElementById("char-count");
+    if (!textarea || !counter) {
+            return;
+        }
     const max = textarea.getAttribute("maxlength");
 
     function updateCounter() {

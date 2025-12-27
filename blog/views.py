@@ -14,6 +14,9 @@ from core import helpers
 
 from .models import BlogPost, Category, Tag
 
+COMMENT_PAGE_SIZE = 10
+POST_PAGE_SIZE = 10
+
 
 def search_results(request):
     q = (request.GET.get("q") or "").strip()
@@ -56,7 +59,7 @@ def search_results(request):
             .order_by("-rank", "-published_at")
         )
 
-    paginator = Paginator(qs, 10)
+    paginator = Paginator(qs, POST_PAGE_SIZE)
     page_obj = paginator.get_page(request.GET.get("page"))
 
     breadcrumbs = [
@@ -84,7 +87,7 @@ def post_list(request):
         .order_by("-published_at", "-created_at")
     )
 
-    paginator = Paginator(qs, 10)
+    paginator = Paginator(qs, POST_PAGE_SIZE)
     page_number = request.GET.get("page")
     page_obj = paginator.get_page(page_number)
 
@@ -142,9 +145,13 @@ def post_detail(request, slug: str):
         status=Comment.Status.APPROVED
     ).select_related("author")
     comment_form = CommentForm()
-    has_social_account = False
-    if request.user.is_authenticated:
-        has_social_account = SocialAccount.objects.filter(user=request.user).exists()
+
+    has_social_account = (
+        request.user.is_authenticated
+        and SocialAccount.objects.filter(user=request.user).exists()
+    )
+    paginator = Paginator(approved_comments, COMMENT_PAGE_SIZE)
+    comment_page_obj = paginator.get_page(request.GET.get("comments_page"))
 
     return render(
         request,
@@ -162,6 +169,7 @@ def post_detail(request, slug: str):
             "requires_social_auth": request.user.is_authenticated
             and not has_social_account,
             "MAX_COMMENT_LENGTH": MAX_COMMENT_LENGTH,
+            "comment_page_obj": comment_page_obj,
         },
     )
 
@@ -195,6 +203,9 @@ def post_preview(request, slug: str):
     comment_form = CommentForm()
     has_social_account = SocialAccount.objects.filter(user=request.user).exists()
 
+    paginator = Paginator(approved_comments, COMMENT_PAGE_SIZE)
+    comment_page_obj = paginator.get_page(request.GET.get("comments_page"))
+
     return render(
         request,
         "blog/post_detail.html",
@@ -209,6 +220,7 @@ def post_preview(request, slug: str):
             "comment_form": comment_form,
             "can_comment": has_social_account,
             "requires_social_auth": not has_social_account,
+            "comment_page_obj": comment_page_obj,
         },
     )
 
@@ -222,7 +234,7 @@ def category_detail(request, slug: str):
         .order_by("-published_at", "-created_at")
     )
 
-    paginator = Paginator(qs, 10)
+    paginator = Paginator(qs, POST_PAGE_SIZE)
     page_number = request.GET.get("page")
     page_obj = paginator.get_page(page_number)
 
@@ -263,7 +275,7 @@ def tag_detail(request, slug: str):
         .order_by("-published_at", "-created_at")
     )
 
-    paginator = Paginator(qs, 10)
+    paginator = Paginator(qs, POST_PAGE_SIZE)
     page_obj = paginator.get_page(request.GET.get("page"))
 
     breadcrumbs = [
