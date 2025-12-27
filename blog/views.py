@@ -1,5 +1,7 @@
+from django.contrib.auth.decorators import login_required
 from django.contrib.postgres.aggregates import StringAgg
 from django.contrib.postgres.search import SearchQuery, SearchRank, SearchVector
+from django.core.exceptions import PermissionDenied
 from django.core.paginator import Paginator
 from django.db.models import F
 from django.shortcuts import get_object_or_404, render
@@ -40,14 +42,13 @@ def search_results(request):
         )
 
         query = SearchQuery(
-            " | ".join(tokens),  # 🔥 AND zorlaması
+            " | ".join(tokens),
             search_type="raw",
             config="turkish",
         )
 
         qs = (
             base_qs.annotate(rank=SearchRank(vector, query))
-            # 🚨 2. guard: rank NULL veya 0 ise ELİMİNE GEÇMESİN
             .filter(rank__isnull=False, rank__gt=0)
             .order_by("-rank", "-published_at")
         )
@@ -144,6 +145,45 @@ def post_detail(request, slug: str):
             "active_category_slug": post.category.slug if post.category else "",
             "active_tag_slug": "",
             "breadcrumbs": breadcrumbs,
+            "is_preview": False,
+        },
+    )
+
+
+@login_required
+def post_preview(request, slug: str):
+    post = get_object_or_404(
+        BlogPost.objects.select_related("category", "author").prefetch_related(
+            "tags", "images"
+        ),
+        slug=slug,
+    )
+
+    if not request.user.is_staff and request.user != post.author:
+        raise PermissionDenied
+
+    breadcrumbs: list[dict[str, str | None]] = [
+        {
+            "label": "Blog",
+            "url": reverse("blog:post_list"),
+        },
+        {"label": "Önizleme", "url": None},
+        {
+            "label": post.title,
+            "url": None,
+        },
+    ]
+
+    return render(
+        request,
+        "blog/post_detail.html",
+        {
+            "post": post,
+            "active_nav": "blog",
+            "active_category_slug": post.category.slug if post.category else "",
+            "active_tag_slug": "",
+            "breadcrumbs": breadcrumbs,
+            "is_preview": True,
         },
     )
 

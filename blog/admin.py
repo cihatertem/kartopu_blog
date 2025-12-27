@@ -1,5 +1,6 @@
 # Register your models here.
 from django.contrib import admin
+from django.urls import reverse
 from django.utils.html import format_html
 from django.utils.safestring import SafeString
 
@@ -68,7 +69,19 @@ class BlogPostAdmin(admin.ModelAdmin):
     filter_horizontal = ("tags",)
 
     def public_link(self, obj: BlogPost) -> SafeString:
-        url = obj.get_absolute_url()
-        return format_html("<a href='{}' target='_blank' rel='noopener'>Aç</a>", url)
+        # url = obj.get_absolute_url()
+        # return format_html("<a href='{}' target='_blank' rel='noopener'>Aç</a>", url)
+        if obj.status == BlogPost.Status.PUBLISHED:
+            url = obj.get_absolute_url()
+            label = "Yayını Gör"
+        else:
+            url = reverse("blog:post_preview", kwargs={"slug": obj.slug})
+            label = "Önizleme"
+
+        return format_html(
+            "<a href='{}' target='_blank' rel='noopener'>{}</a>",
+            url,
+            label,
+        )
 
     public_link.short_description = "Bağlantı"  # pyright: ignore[ reportFunctionMemberAccess]

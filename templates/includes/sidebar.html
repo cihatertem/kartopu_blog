@@ -34,3 +34,29 @@
     {% endfor %}
   </ul>
 </section>
+<div style="height: 1rem;"></div>
+
+<section style="border: 1px solid #eee; padding: 1rem; border-radius: 8px;">
+  <h3 style="margin-top: 0;">Etiketler</h3>
+
+  <div style="display: flex; flex-wrap: wrap; gap: 0.5rem;">
+    {% for tag in nav_tags %}
+      <a
+        href="{{ tag.get_absolute_url }}"
+        style="
+          font-size: {{ tag.cloud_size }}rem;
+          padding: 0.2rem 0.45rem;
+          border: 1px solid #eee;
+          border-radius: 999px;
+          text-decoration: none;
+          color: inherit;
+          {% if active_tag_slug == tag.slug %}font-weight: 700; border-color: #bbb;{% endif %}
+        "
+      >
+        #{{ tag.name }}
+      </a>
+    {% empty %}
+      <span>Henüz etiket yok.</span>
+    {% endfor %}
+  </div>
+</section>

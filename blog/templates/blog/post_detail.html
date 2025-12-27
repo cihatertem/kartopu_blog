@@ -9,6 +9,11 @@
 
 {% block content %}
 {% include "includes/breadcrumbs.html" %}
+  {% if is_preview %}
+    <div style="padding: 0.75rem 1rem; background: #fff3cd; border: 1px solid #ffeeba; margin-bottom: 1rem;">
+      <strong>Önizleme:</strong> Bu sayfa sadece yetkili kullanıcılar için görünür.
+    </div>
+  {% endif %}
   <article>
     <h1>{{ post.title }}</h1>
 

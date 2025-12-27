@@ -71,8 +71,8 @@ TEMPLATES = [
                 "django.template.context_processors.request",
                 "django.contrib.auth.context_processors.auth",
                 "django.contrib.messages.context_processors.messages",
-                "core.context_processors.categories",  # navbar categories context
-                "core.context_processors.breadcrumbs",  # automatic breadcrumbs context
+                "core.context_processors.categories_tags_context",  # navbar/sidebar categories context
+                "core.context_processors.breadcrumbs_context",  # automatic breadcrumbs context
             ],
         },
     },
