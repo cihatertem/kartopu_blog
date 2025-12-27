@@ -1,5 +1,6 @@
 {% extends "base.html" %}
 {% load blog_extras %}
+{% load socialaccount %}
 
 {% block title %}{{ post.effective_meta_title }}{% endblock %}
 
@@ -106,35 +107,190 @@
           <button type="submit">Yorumu Gönder</button>
         </form>
         <p><small>Yorumlar moderasyon sonrası yayınlanır.</small></p>
-      {% elif requires_social_auth %}
-        <p>Yorum yapmak için sosyal hesap ile giriş yapmalısın.</p>
       {% else %}
-        <p>Yorum yapmak için giriş yapmalısın.</p>
+      <p>Yorum yapmak için sosyal hesap ile giriş yapmalısın.</p>
+      <button type="button" id="social-login-button">Sosyal Hesap ile Giriş Yap</button>
+      <div
+        id="social-login-modal"
+        style="
+          display: none;
+          position: fixed;
+          inset: 0;
+          background: rgba(0, 0, 0, 0.45);
+          align-items: center;
+          justify-content: center;
+          z-index: 9999;
+        "
+        aria-hidden="true"
+      >
+        <div
+          style="
+            background: #fff;
+            padding: 1.5rem;
+            max-width: 420px;
+            width: 90%;
+            border-radius: 8px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+          "
+          role="dialog"
+          aria-modal="true"
+        >
+          <h5 style="margin-top: 0;">Yorum için giriş yap</h5>
+          <p>Yorum yazmak için desteklenen bir sosyal hesap ile giriş yap.</p>
+          {% get_providers as socialaccount_providers %}
+          {% if "?" in request.get_full_path %}
+            {% with next_url=request.get_full_path|add:"&popup=1" %}
+              <div style="display: grid; gap: 0.75rem;">
+                {% for provider in socialaccount_providers %}
+                  <a
+                    class="social-login-link"
+                    href="{% provider_login_url provider.id process='login' next=next_url %}"
+                    style="
+                      display: inline-flex;
+                      align-items: center;
+                      justify-content: center;
+                      padding: 0.6rem 0.75rem;
+                      border: 1px solid #ddd;
+                      border-radius: 6px;
+                      text-decoration: none;
+                    "
+                  >
+                    {{ provider.name }} ile devam et
+                  </a>
+                {% empty %}
+                  <p>Şu anda desteklenen bir sağlayıcı bulunmuyor.</p>
+                {% endfor %}
+              </div>
+            {% endwith %}
+          {% else %}
+            {% with next_url=request.get_full_path|add:"?popup=1" %}
+              <div style="display: grid; gap: 0.75rem;">
+                {% for provider in socialaccount_providers %}
+                  <a
+                    class="social-login-link"
+                    href="{% provider_login_url provider.id process='login' next=next_url %}"
+                    style="
+                      display: inline-flex;
+                      align-items: center;
+                      justify-content: center;
+                      padding: 0.6rem 0.75rem;
+                      border: 1px solid #ddd;
+                      border-radius: 6px;
+                      text-decoration: none;
+                    "
+                  >
+                    {{ provider.name }} ile devam et
+                  </a>
+                {% empty %}
+                  <p>Şu anda desteklenen bir sağlayıcı bulunmuyor.</p>
+                {% endfor %}
+              </div>
+            {% endwith %}
+          {% endif %}
+          <div style="margin-top: 1rem; text-align: right;">
+            <button type="button" id="close-social-login">Kapat</button>
+          </div>
+        </div>
+      </div>
       {% endif %}
     </section>
 {% endblock %}
 
 {% block js_script %}
 document.addEventListener("DOMContentLoaded", function () {
-    const textarea = document.getElementById("id_body");
-    const counter = document.getElementById("char-count");
-    if (!textarea || !counter) {
-            return;
-        }
-    const max = textarea.getAttribute("maxlength");
+  const urlParams = new URLSearchParams(window.location.search);
+
+  if (urlParams.get("popup") === "1" && window.opener) {
+    window.opener.location.reload();
+    window.close();
+    return;
+  }
+
+  const textarea = document.getElementById("id_body");
+  const counter = document.getElementById("char-count");
+
+  const loginButton = document.getElementById("social-login-button");
+  const modal = document.getElementById("social-login-modal");
+  const closeButton = document.getElementById("close-social-login");
+
+  if (textarea && counter) {
+    const max = Number(textarea.getAttribute("maxlength"));
 
     function updateCounter() {
-        const len = textarea.value.length;
-        counter.textContent = len;
+      const len = textarea.value.length;
+      counter.textContent = len;
 
-        if (len >= max) {
-            counter.style.color = "red";
-        } else {
-            counter.style.color = "";
-        }
+      if (len >= max) {
+        counter.style.color = "red";
+      } else {
+        counter.style.color = "";
+      }
     }
 
     textarea.addEventListener("input", updateCounter);
     updateCounter();
+  }
+
+  if (loginButton && modal) {
+    const openModal = () => {
+      modal.style.display = "flex";
+      modal.setAttribute("aria-hidden", "false");
+    };
+    const closeModal = () => {
+      modal.style.display = "none";
+      modal.setAttribute("aria-hidden", "true");
+    };
+
+    loginButton.addEventListener("click", openModal);
+
+    if (closeButton) {
+      closeButton.addEventListener("click", closeModal);
+    }
+
+    modal.addEventListener("click", (event) => {
+      if (event.target === modal) {
+        closeModal();
+      }
+    });
+
+    document.querySelectorAll(".social-login-link").forEach((link) => {
+      link.addEventListener("click", (event) => {
+        event.preventDefault();
+        const url = link.getAttribute("href");
+        if (!url) return;
+
+        const popup = window.open(
+          url,
+          "socialLogin",
+          "width=600,height=700,menubar=no,toolbar=no"
+        );
+
+        closeModal();
+
+        if (!popup) {
+          window.location.href = url;
+          return;
+        }
+
+        const timer = window.setInterval(() => {
+          if (popup.closed) {
+            window.clearInterval(timer);
+            window.location.reload();
+          }
+        }, 500);
+      });
+    });
+  }
+  window.addEventListener("message", (event) => {
+         if (event.data === "social-auth:complete") {
+             window.location.reload();
+         }
+     });
+
+     window.addEventListener("storage", (event) => {
+         if (event.key === "social-auth-complete") {
+             window.location.reload();
+         }
+     });
 });
 {% endblock %}

@@ -1,0 +1,30 @@
+{% extends "account/base.html" %}
+
+{% block title %}Sosyal Hesapla Kayıt{% endblock %}
+
+{% block account_content %}
+  <section>
+    <h1>Sosyal Hesabını Tamamla</h1>
+    <p>Yorum yazabilmek için sosyal hesap doğrulamanı tamamla.</p>
+    <form method="post" action="{% url 'socialaccount_signup' %}">
+      {% csrf_token %}
+      {{ form.as_p }}
+      {% if redirect_field_value %}
+        {% if "popup=1" in redirect_field_value %}
+          {% with next_url=redirect_field_value %}
+            <input type="hidden" name="{{ redirect_field_name }}" value="{{ next_url }}" />
+          {% endwith %}
+        {% elif "?" in redirect_field_value %}
+          {% with next_url=redirect_field_value|add:"&popup=1" %}
+            <input type="hidden" name="{{ redirect_field_name }}" value="{{ next_url }}" />
+          {% endwith %}
+        {% else %}
+          {% with next_url=redirect_field_value|add:"?popup=1" %}
+            <input type="hidden" name="{{ redirect_field_name }}" value="{{ next_url }}" />
+          {% endwith %}
+        {% endif %}
+      {% endif %}
+      <button type="submit">Devam et</button>
+    </form>
+  </section>
+{% endblock %}

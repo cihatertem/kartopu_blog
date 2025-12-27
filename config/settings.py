@@ -158,12 +158,20 @@ AUTHENTICATION_BACKENDS = [
     "allauth.account.auth_backends.AuthenticationBackend",
 ]
 ACCOUNT_USER_MODEL_USERNAME_FIELD = None
+ACCOUNT_ALLOW_REGISTRATION = False
 ACCOUNT_LOGIN_METHODS = {"email"}
-ACCOUNT_SIGNUP_FIELDS = ["email*", "password1*", "password2*"]
+ACCOUNT_SIGNUP_FIELDS = ["email*"]
+ACCOUNT_EMAIL_VERIFICATION = "none"
+SOCIALACCOUNT_EMAIL_AUTHENTICATION = True
+SOCIALACCOUNT_EMAIL_AUTHENTICATION_AUTO_CONNECT = True
+
+ACCOUNT_LOGOUT_ON_GET = False
+# ACCOUNT_LOGIN_METHODS = {"email"}
+# ACCOUNT_SIGNUP_FIELDS = ["email*", "password1*", "password2*"]
 
 # Local/dev signup flow without SMTP dependency
-ACCOUNT_EMAIL_VERIFICATION = "none"
-EMAIL_BACKEND = "django.core.mail.backends.console.EmailBackend"
+# ACCOUNT_EMAIL_VERIFICATION = "none"
+# EMAIL_BACKEND = "django.core.mail.backends.console.EmailBackend"
 
 LOGIN_REDIRECT_URL = "/"
 ACCOUNT_SIGNUP_REDIRECT_URL = "/"
