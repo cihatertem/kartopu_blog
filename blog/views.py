@@ -1,3 +1,5 @@
+from datetime import date
+
 from allauth.socialaccount.models import SocialAccount
 from django.contrib.auth.decorators import login_required
 from django.contrib.postgres.aggregates import StringAgg
@@ -75,6 +77,7 @@ def search_results(request):
             "q": q,
             "active_nav": "blog",
             "breadcrumbs": breadcrumbs,
+            "active_archive_key": "",
         },
     )
 
@@ -99,6 +102,7 @@ def post_list(request):
             "active_category_slug": "",
             "active_nav": "blog",
             "active_tag_slug": "",
+            "active_archive_key": "",
         },
     )
 
@@ -161,6 +165,11 @@ def post_detail(request, slug: str):
             "active_nav": "blog",
             "active_category_slug": post.category.slug if post.category else "",
             "active_tag_slug": "",
+            "active_archive_key": (
+                f"{post.published_at.year:04d}-{post.published_at.month:02d}"
+                if post.published_at
+                else ""
+            ),
             "breadcrumbs": breadcrumbs,
             "is_preview": False,
             "comments": approved_comments,
@@ -214,6 +223,11 @@ def post_preview(request, slug: str):
             "active_nav": "blog",
             "active_category_slug": post.category.slug if post.category else "",
             "active_tag_slug": "",
+            "active_archive_key": (
+                f"{post.published_at.year:04d}-{post.published_at.month:02d}"
+                if post.published_at
+                else ""
+            ),
             "breadcrumbs": breadcrumbs,
             "is_preview": True,
             "comments": approved_comments,
@@ -221,6 +235,48 @@ def post_preview(request, slug: str):
             "can_comment": has_social_account,
             "requires_social_auth": not has_social_account,
             "comment_page_obj": comment_page_obj,
+        },
+    )
+
+
+def archive_detail(request, year: int, month: int):
+    archive_month = date(year, month, 1)
+    qs = (
+        BlogPost.objects.filter(
+            status=BlogPost.Status.PUBLISHED,
+            published_at__year=year,
+            published_at__month=month,
+        )
+        .select_related("author", "category")
+        .prefetch_related("tags")
+        .order_by("-published_at", "-created_at")
+    )
+
+    paginator = Paginator(qs, POST_PAGE_SIZE)
+    page_obj = paginator.get_page(request.GET.get("page"))
+
+    breadcrumbs = [
+        {
+            "label": "Blog",
+            "url": reverse("blog:post_list"),
+        },
+        {
+            "label": archive_month.strftime("%B %Y"),
+            "url": None,
+        },
+    ]
+
+    return render(
+        request,
+        "blog/archive_detail.html",
+        {
+            "page_obj": page_obj,
+            "archive_month": archive_month,
+            "active_nav": "blog",
+            "active_category_slug": "",
+            "active_tag_slug": "",
+            "active_archive_key": f"{year:04d}-{month:02d}",
+            "breadcrumbs": breadcrumbs,
         },
     )
 
@@ -257,6 +313,7 @@ def category_detail(request, slug: str):
             "page_obj": page_obj,
             "active_category_slug": category.slug,
             "active_nav": "blog",
+            "active_archive_key": "",
             "breadcrumbs": breadcrumbs,
         },
     )
@@ -298,6 +355,7 @@ def tag_detail(request, slug: str):
             "active_nav": "blog",
             "active_category_slug": "",
             "active_tag_slug": tag.slug,
+            "active_archive_key": "",
             "breadcrumbs": breadcrumbs,
         },
     )

@@ -1,0 +1,5 @@
+NAV_CATEGORIES_KEY = "nav_categories"
+NAV_TAGS_KEY = "nav_tags"
+NAV_ARCHIVES_KEY = "nav_archives"
+
+NAV_KEYS = [NAV_CATEGORIES_KEY, NAV_TAGS_KEY, NAV_ARCHIVES_KEY]

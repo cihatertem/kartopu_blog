@@ -61,3 +61,25 @@
     {% endfor %}
   </div>
 </section>
+
+<div style="height: 1rem;"></div>
+
+<section style="border: 1px solid #eee; padding: 1rem; border-radius: 8px;">
+  <h3 style="margin-top: 0;">Arşiv</h3>
+
+  <ul style="padding-left: 1.2rem; margin: 0;">
+    {% for archive in nav_archives %}
+      <li class="{% if active_archive_key == archive.key %}active{% endif %}">
+        {% if active_archive_key == archive.key %}
+          <strong>
+            <a href="{{ archive.url }}">{{ archive.month|date:"F Y" }} ({{ archive.post_count }})</a>
+          </strong>
+        {% else %}
+          <a href="{{ archive.url }}">{{ archive.month|date:"F Y" }} ({{ archive.post_count }})</a>
+        {% endif %}
+      </li>
+    {% empty %}
+      <li>Henüz arşiv yok.</li>
+    {% endfor %}
+  </ul>
+</section>
