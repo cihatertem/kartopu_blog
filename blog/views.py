@@ -172,7 +172,6 @@ def post_detail(request, slug: str):
             ),
             "breadcrumbs": breadcrumbs,
             "is_preview": False,
-            "comments": approved_comments,
             "comment_form": comment_form,
             "can_comment": request.user.is_authenticated and has_social_account,
             "requires_social_auth": request.user.is_authenticated
@@ -230,7 +229,6 @@ def post_preview(request, slug: str):
             ),
             "breadcrumbs": breadcrumbs,
             "is_preview": True,
-            "comments": approved_comments,
             "comment_form": comment_form,
             "can_comment": has_social_account,
             "requires_social_auth": not has_social_account,

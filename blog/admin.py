@@ -1,10 +1,14 @@
-# Register your models here.
 from django.contrib import admin
+from django.contrib.auth import get_user_model
+from django.db.models import Case, F, Value, When
 from django.urls import reverse
+from django.utils import timezone
 from django.utils.html import format_html
 from django.utils.safestring import SafeString
 
 from .models import BlogPost, BlogPostImage, Category, Tag
+
+User = get_user_model()
 
 
 @admin.register(Tag)
@@ -65,19 +69,44 @@ class BlogPostAdmin(admin.ModelAdmin):
     list_filter = ("status", "category", "tags", "is_featured", "created_at")
     search_fields = ("title", "excerpt", "content", "category__name", "slug")
     prepopulated_fields = {"slug": ("title",)}
-    autocomplete_fields = ("author", "category")
+    autocomplete_fields = ("category",)
     filter_horizontal = ("tags",)
 
     actions = ("publish_posts", "draft_posts", "archive_posts")
 
+    def formfield_for_foreignkey(self, db_field, request, **kwargs):
+        if db_field.name == "author":
+            qs = User.objects.all()
+
+            # 1) sadece staff
+            qs = qs.filter(is_staff=True)
+
+            # 2) social-auth kullanıcılarını çıkar
+            # (django-allauth kullanıyorsan: user.socialaccount_set üzerinden ilişki var)
+            qs = qs.filter(socialaccount__isnull=True)
+
+            # tekrarlar oluşmasın (join yüzünden)
+            qs = qs.distinct()
+
+            kwargs["queryset"] = qs
+
+        return super().formfield_for_foreignkey(db_field, request, **kwargs)
+
     def get_changeform_initial_data(self, request):
         initial = super().get_changeform_initial_data(request)
-        initial.setdefault("author", request.user)  # pyright: ignore[reportArgumentType]
+        if request.user.is_authenticated:
+            initial.setdefault("author", request.user.pk)  # pyright: ignore[reportArgumentType]
         return initial
 
     @admin.action(description="Seçili yazıları yayımla")
     def publish_posts(self, request, queryset):
-        queryset.update(status=BlogPost.Status.PUBLISHED)
+        queryset.update(
+            status=BlogPost.Status.PUBLISHED,
+            published_at=Case(
+                When(published_at__isnull=True, then=Value(timezone.now())),
+                default=F("published_at"),
+            ),
+        )
 
     @admin.action(description="Seçili yazıları taslak yap")
     def draft_posts(self, request, queryset):
