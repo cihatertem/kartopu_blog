@@ -16,7 +16,6 @@ from core.mixins import TimeStampedModelMixin, UUIDModelMixin
 class Category(
     UUIDModelMixin,
     TimeStampedModelMixin,
-    models.Model,
 ):
     name = models.CharField(max_length=80, unique=True)
     slug = models.SlugField(max_length=80, unique=True)
@@ -59,7 +58,6 @@ def post_image_upload_path(instance: "BlogPostImage", filename: str) -> str:
 class BlogPost(
     UUIDModelMixin,
     TimeStampedModelMixin,
-    models.Model,
 ):
     class Status(models.TextChoices):
         DRAFT = "draft", "Taslak"  # pyright: ignore[reportAssignmentType]
@@ -216,7 +214,6 @@ class BlogPost(
 class BlogPostImage(
     UUIDModelMixin,
     TimeStampedModelMixin,
-    models.Model,
 ):
     post = models.ForeignKey(
         BlogPost,
@@ -287,7 +284,10 @@ class BlogPostImage(
         return f"{self.post.title} - Görsel"  # pyright: ignore[reportAttributeAccessIssue]
 
 
-class Tag(TimeStampedModelMixin, UUIDModelMixin, models.Model):
+class Tag(
+    TimeStampedModelMixin,
+    UUIDModelMixin,
+):
     name = models.CharField(max_length=50, unique=True)
     slug = models.SlugField(max_length=60, unique=True)
 

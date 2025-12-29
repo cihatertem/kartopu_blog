@@ -6,7 +6,10 @@ from core.mixins import TimeStampedModelMixin, UUIDModelMixin
 MAX_COMMENT_LENGTH = 3000
 
 
-class Comment(UUIDModelMixin, TimeStampedModelMixin, models.Model):
+class Comment(
+    UUIDModelMixin,
+    TimeStampedModelMixin,
+):
     class Status(models.TextChoices):
         PENDING = "pending", "Onay Bekliyor"  # pyright: ignore[reportAssignmentType]
         APPROVED = "approved", "Onaylandı"  # pyright: ignore[reportAssignmentType]
