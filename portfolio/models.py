@@ -7,7 +7,7 @@ from django.db import models
 from django.utils import timezone
 
 from core.mixins import TimeStampedModelMixin, UUIDModelMixin
-from portfolio.services import fetch_yahoo_finance_price
+from portfolio.services import fetch_fx_rate, fetch_yahoo_finance_price
 
 
 class Asset(UUIDModelMixin, TimeStampedModelMixin):
@@ -31,7 +31,7 @@ class Asset(UUIDModelMixin, TimeStampedModelMixin):
     )
     price_updated_at = models.DateTimeField(null=True, blank=True)
 
-    class Meta:
+    class Meta:  # pyright: ignore[reportIncompatibleVariableOverride]
         verbose_name = "Varlık"
         verbose_name_plural = "Varlıklar"
 
@@ -53,19 +53,29 @@ class Asset(UUIDModelMixin, TimeStampedModelMixin):
         if self._state.adding and self.symbol and not self.current_price:
             self.refresh_price()
 
-        super().save(*args, **kwargs)
+        super().save(*args, **kwargs)  # pyright: ignore[reportArgumentType]
 
 
 class Portfolio(UUIDModelMixin, TimeStampedModelMixin):
+    class Currency(models.TextChoices):
+        TRY = "TRY", "TRY"
+        USD = "USD", "USD"
+        EUR = "EUR", "EUR"
+
     owner = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.CASCADE,
         related_name="portfolios",
     )
     name = models.CharField(max_length=200)
+    currency = models.CharField(
+        max_length=10,
+        choices=Currency.choices,
+        default=Currency.TRY,
+    )
     target_value = models.DecimalField(max_digits=20, decimal_places=2)
 
-    class Meta:
+    class Meta:  # pyright: ignore[reportIncompatibleVariableOverride]
         verbose_name = "Portföy"
         verbose_name_plural = "Portföyler"
 
@@ -75,13 +85,21 @@ class Portfolio(UUIDModelMixin, TimeStampedModelMixin):
     def get_positions(self) -> list[dict[str, Decimal | Asset]]:
         positions: dict[str, dict[str, Decimal | Asset]] = {}
         transactions = (
-            self.transactions.select_related("asset")
+            self.transactions.select_related("asset")  # pyright: ignore[reportAttributeAccessIssue]
             .all()
             .order_by("trade_date", "created_at")
         )
+        fx_rates: dict[tuple[str, str], Decimal] = {}
 
         for transaction in transactions:
             asset = transaction.asset
+            currency_pair = (asset.currency, self.currency)
+            if currency_pair not in fx_rates:
+                fx_rate = fetch_fx_rate(asset.currency, self.currency)
+                fx_rates[currency_pair] = (
+                    fx_rate if fx_rate is not None else Decimal("1")
+                )
+            fx_rate = fx_rates[currency_pair]
             data = positions.setdefault(
                 str(asset.id),
                 {
@@ -92,13 +110,14 @@ class Portfolio(UUIDModelMixin, TimeStampedModelMixin):
             )
             quantity = data["quantity"]
             cost_basis = data["cost_basis"]
+            transaction_cost = transaction.total_cost * fx_rate
 
             if transaction.transaction_type == PortfolioTransaction.TransactionType.BUY:
                 quantity += transaction.quantity
-                cost_basis += transaction.total_cost
+                cost_basis += transaction_cost
             else:
-                if quantity > 0:
-                    average_cost = cost_basis / quantity
+                if quantity > 0:  # pyright: ignore[reportOperatorIssue]
+                    average_cost = cost_basis / quantity  # pyright: ignore[reportOperatorIssue]
                     cost_basis -= average_cost * transaction.quantity
                 quantity -= transaction.quantity
 
@@ -113,38 +132,47 @@ class Portfolio(UUIDModelMixin, TimeStampedModelMixin):
         for data in positions.values():
             asset = data["asset"]
             quantity = data["quantity"]
-            current_price = asset.current_price or Decimal("0")
-            data["current_price"] = current_price
-            data["market_value"] = quantity * current_price
+            current_price = asset.current_price or Decimal("0")  # pyright: ignore[reportAttributeAccessIssue]
+            currency_pair = (asset.currency, self.currency)  # pyright: ignore[reportAttributeAccessIssue]
+            fx_rate = fx_rates.get(currency_pair)
+
+            if fx_rate is None:
+                fx_rate = fetch_fx_rate(asset.currency, self.currency)  # pyright: ignore[reportAttributeAccessIssue]
+                fx_rate = fx_rate if fx_rate is not None else Decimal("1")
+                fx_rates[currency_pair] = fx_rate
+
+            converted_price = current_price * fx_rate
+            data["current_price"] = converted_price
+            data["market_value"] = quantity * converted_price  # pyright: ignore[reportOperatorIssue]
             total_value += data["market_value"]
 
         for data in positions.values():
             cost_basis = data["cost_basis"]
             market_value = data["market_value"]
             data["average_cost"] = (
-                cost_basis / data["quantity"] if data["quantity"] > 0 else Decimal("0")
+                cost_basis / data["quantity"] if data["quantity"] > 0 else Decimal("0")  # pyright: ignore[reportOperatorIssue]
             )
-            data["gain_loss"] = market_value - cost_basis
+            data["gain_loss"] = market_value - cost_basis  # pyright: ignore[reportOperatorIssue]
             data["gain_loss_pct"] = (
-                (market_value - cost_basis) / cost_basis
-                if cost_basis > 0
+                (market_value - cost_basis) / cost_basis  # pyright: ignore[reportOperatorIssue]
+                if cost_basis > 0  # pyright: ignore[reportOperatorIssue]
                 else Decimal("0")
             )
             data["allocation_pct"] = (
-                market_value / total_value if total_value > 0 else Decimal("0")
+                market_value / total_value if total_value > 0 else Decimal("0")  # pyright: ignore[reportOperatorIssue]
             )
 
         return list(positions.values())
 
     def total_market_value(self) -> Decimal:
-        return sum(
-            (position["market_value"] for position in self.get_positions()),
+        return sum(  # pyright: ignore[reportCallIssue]
+            (position["market_value"] for position in self.get_positions()),  # pyright: ignore[reportArgumentType]
             Decimal("0"),
         )
 
     def total_cost_basis(self) -> Decimal:
-        return sum(
-            (position["cost_basis"] for position in self.get_positions()),
+        return sum(  # pyright: ignore[reportCallIssue]
+            (position["cost_basis"] for position in self.get_positions()),  # pyright: ignore[reportArgumentType]
             Decimal("0"),
         )
 
@@ -153,6 +181,8 @@ class PortfolioTransaction(UUIDModelMixin, TimeStampedModelMixin):
     class TransactionType(models.TextChoices):
         BUY = "buy", "Alım"
         SELL = "sell", "Satış"
+        DIVIDEND = "dividend", "Temettü"
+        COUPON = "coupon", "Kupon Ödemesi"
 
     portfolio = models.ForeignKey(
         Portfolio,
@@ -174,7 +204,7 @@ class PortfolioTransaction(UUIDModelMixin, TimeStampedModelMixin):
     price_per_unit = models.DecimalField(max_digits=20, decimal_places=4)
     notes = models.TextField(blank=True)
 
-    class Meta:
+    class Meta:  # pyright: ignore[reportIncompatibleVariableOverride]
         verbose_name = "Portföy İşlemi"
         verbose_name_plural = "Portföy İşlemleri"
 
@@ -185,7 +215,7 @@ class PortfolioTransaction(UUIDModelMixin, TimeStampedModelMixin):
                 update_fields=["current_price", "price_updated_at", "updated_at"]
             )
 
-        super().save(*args, **kwargs)
+        super().save(*args, **kwargs)  # pyright: ignore[reportArgumentType]
 
     def __str__(self) -> str:
         return f"{self.portfolio} - {self.asset}"
@@ -212,7 +242,7 @@ class PortfolioSnapshot(UUIDModelMixin, TimeStampedModelMixin):
     target_value = models.DecimalField(max_digits=20, decimal_places=2)
     total_return_pct = models.DecimalField(max_digits=10, decimal_places=4)
 
-    class Meta:
+    class Meta:  # pyright: ignore[reportIncompatibleVariableOverride]
         verbose_name = "Portföy Snapshot"
         verbose_name_plural = "Portföy Snapshotları"
 
@@ -227,7 +257,7 @@ class PortfolioSnapshot(UUIDModelMixin, TimeStampedModelMixin):
         period: str,
         snapshot_date: timezone.datetime | None = None,
     ) -> "PortfolioSnapshot":
-        snapshot_date = snapshot_date or timezone.now().date()
+        snapshot_date = snapshot_date or timezone.now().date()  # pyright: ignore[reportAssignmentType]
 
         assets = (
             Asset.objects.filter(transactions__portfolio=portfolio)
@@ -241,12 +271,12 @@ class PortfolioSnapshot(UUIDModelMixin, TimeStampedModelMixin):
             )
 
         positions = portfolio.get_positions()
-        total_value = sum(
-            (position["market_value"] for position in positions),
+        total_value = sum(  # pyright: ignore[reportCallIssue]
+            (position["market_value"] for position in positions),  # pyright: ignore[reportArgumentType]
             Decimal("0"),
         )
-        total_cost = sum(
-            (position["cost_basis"] for position in positions),
+        total_cost = sum(  # pyright: ignore[reportCallIssue]
+            (position["cost_basis"] for position in positions),  # pyright: ignore[reportArgumentType]
             Decimal("0"),
         )
         total_return_pct = (
@@ -296,7 +326,7 @@ class PortfolioSnapshotItem(UUIDModelMixin, TimeStampedModelMixin):
     gain_loss = models.DecimalField(max_digits=20, decimal_places=2)
     gain_loss_pct = models.DecimalField(max_digits=10, decimal_places=4)
 
-    class Meta:
+    class Meta:  # pyright: ignore[reportIncompatibleVariableOverride]
         verbose_name = "Snapshot Kalemi"
         verbose_name_plural = "Snapshot Kalemleri"
 

@@ -21,11 +21,11 @@ class AssetAdmin(admin.ModelAdmin):
 
 @admin.register(Portfolio)
 class PortfolioAdmin(admin.ModelAdmin):
-    list_display = ("name", "owner", "target_value")
+    list_display = ("name", "owner", "currency", "target_value")
     search_fields = ("name", "owner__email")
     list_filter = ("owner",)
 
-    actions = ["create_monthly_snapshot"]
+    actions = ("create_monthly_snapshot", "create_yearly_snapshot")
 
     @admin.action(description="Aylık snapshot oluştur")
     def create_monthly_snapshot(self, request, queryset):
@@ -34,7 +34,7 @@ class PortfolioAdmin(admin.ModelAdmin):
             PortfolioSnapshot.create_snapshot(
                 portfolio=p,
                 period=PortfolioSnapshot.Period.MONTHLY,
-                snapshot_date=timezone.now().date(),
+                snapshot_date=timezone.now().date(),  # pyright: ignore[reportArgumentType]
             )
             created += 1
         self.message_user(
@@ -48,7 +48,7 @@ class PortfolioAdmin(admin.ModelAdmin):
             PortfolioSnapshot.create_snapshot(
                 portfolio=p,
                 period=PortfolioSnapshot.Period.YEARLY,
-                snapshot_date=timezone.now().date(),
+                snapshot_date=timezone.now().date(),  # pyright: ignore[reportArgumentType]
             )
             created += 1
         self.message_user(
@@ -93,3 +93,15 @@ class PortfolioSnapshotAdmin(admin.ModelAdmin):
     list_filter = ("period", "snapshot_date")
     readonly_fields = ("total_value", "total_cost", "target_value", "total_return_pct")
     inlines = (PortfolioSnapshotItemInline,)
+
+    def save_model(self, request, obj, form, change):
+        if change:
+            super().save_model(request, obj, form, change)
+            return
+
+        snapshot = PortfolioSnapshot.create_snapshot(
+            portfolio=obj.portfolio,
+            period=obj.period,
+            snapshot_date=obj.snapshot_date,
+        )
+        obj.pk = snapshot.pk
