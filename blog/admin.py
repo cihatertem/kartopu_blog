@@ -68,6 +68,25 @@ class BlogPostAdmin(admin.ModelAdmin):
     autocomplete_fields = ("author", "category")
     filter_horizontal = ("tags",)
 
+    actions = ("publish_posts", "draft_posts", "archive_posts")
+
+    def get_changeform_initial_data(self, request):
+        initial = super().get_changeform_initial_data(request)
+        initial.setdefault("author", request.user)  # pyright: ignore[reportArgumentType]
+        return initial
+
+    @admin.action(description="Seçili yazıları yayımla")
+    def publish_posts(self, request, queryset):
+        queryset.update(status=BlogPost.Status.PUBLISHED)
+
+    @admin.action(description="Seçili yazıları taslak yap")
+    def draft_posts(self, request, queryset):
+        queryset.update(status=BlogPost.Status.DRAFT)
+
+    @admin.action(description="Seçili yazıları arşivle")
+    def archive_posts(self, request, queryset):
+        queryset.update(status=BlogPost.Status.ARCHIVED)
+
     def public_link(self, obj: BlogPost) -> SafeString:
         if obj.status == BlogPost.Status.PUBLISHED:
             url = obj.get_absolute_url()

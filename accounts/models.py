@@ -47,7 +47,7 @@ class UserManager(BaseUserManager):
         return self.create_user(email, password, **extra_fields)
 
 
-class User(
+class User(  # pyright: ignore[reportIncompatibleVariableOverride]
     UUIDModelMixin,
     TimeStampedModelMixin,
     AbstractUser,
@@ -64,7 +64,7 @@ class User(
     instagram = models.URLField(blank=True)
     youtube = models.URLField(blank=True)
     avatar = models.ImageField(
-        upload_to=user_avatar_upload_path,
+        upload_to=user_avatar_upload_path,  # pyright: ignore[reportArgumentType]
         storage=OverWriteAvatarStorage(),
         blank=True,
         null=True,
@@ -73,7 +73,7 @@ class User(
     USERNAME_FIELD = "email"
     REQUIRED_FIELDS: list[str] = []
 
-    objects = UserManager()
+    objects = UserManager()  # pyright: ignore[reportAssignmentType]
 
     MAX_AVATAR_SIZE = (800, 800)
 
@@ -82,7 +82,7 @@ class User(
         verbose_name_plural = "Kullanıcılar"
 
     def save(self, *args: object, **kwargs: object) -> None:
-        super().save(*args, **kwargs)
+        super().save(*args, **kwargs)  # pyright: ignore[reportArgumentType]
         if self.avatar:
             try:
                 self._resize_avatar()
