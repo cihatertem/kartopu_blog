@@ -19,8 +19,8 @@ media/
 .DS_Store
 
 # Env
-.env
-.env.*
+#.env
+#.env.*
 
 # Docker
 pgdata/
