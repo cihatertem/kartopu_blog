@@ -1,4 +1,5 @@
 from django.contrib import admin, messages
+from django.contrib.auth import get_user_model
 from django.utils import timezone
 
 # Register your models here.
@@ -9,6 +10,8 @@ from portfolio.models import (
     PortfolioSnapshotItem,
     PortfolioTransaction,
 )
+
+User = get_user_model()
 
 
 @admin.register(Asset)
@@ -27,6 +30,24 @@ class PortfolioAdmin(admin.ModelAdmin):
 
     actions = ("create_monthly_snapshot", "create_yearly_snapshot")
 
+    def formfield_for_foreignkey(self, db_field, request, **kwargs):
+        if db_field.name == "owner":
+            qs = User.objects.all()
+
+            qs = qs.filter(is_staff=True)
+            qs = qs.filter(socialaccount__isnull=True)
+            qs = qs.distinct()
+
+            kwargs["queryset"] = qs
+
+        return super().formfield_for_foreignkey(db_field, request, **kwargs)
+
+    def get_changeform_initial_data(self, request):
+        initial = super().get_changeform_initial_data(request)
+        if request.user.is_authenticated:
+            initial.setdefault("owner", request.user.pk)  # pyright: ignore[reportArgumentType]
+        return initial
+
     @admin.action(description="Aylık snapshot oluştur")
     def create_monthly_snapshot(self, request, queryset):
         created = 0
@@ -41,7 +62,7 @@ class PortfolioAdmin(admin.ModelAdmin):
             request, f"{created} adet snapshot oluşturuldu.", level=messages.SUCCESS
         )
 
-    @admin.action(description="Aylık snapshot oluştur")
+    @admin.action(description="Yıllık snapshot oluştur")
     def create_yearly_snapshot(self, request, queryset):
         created = 0
         for p in queryset:

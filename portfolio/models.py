@@ -19,10 +19,17 @@ class Asset(UUIDModelMixin, TimeStampedModelMixin):
         CASH = "cash", "Nakit"
         OTHER = "other", "Diğer"
 
+    class Currency(models.TextChoices):
+        TRY = "TRY", "TRY"
+        USD = "USD", "USD"
+        EUR = "EUR", "EUR"
+
     name = models.CharField(max_length=255)
     symbol = models.CharField(max_length=30, blank=True)
     asset_type = models.CharField(max_length=20, choices=AssetType.choices)
-    currency = models.CharField(max_length=10, default="TRY")
+    currency = models.CharField(
+        max_length=10, default=Currency.TRY, choices=Currency.choices
+    )
     current_price = models.DecimalField(
         max_digits=20,
         decimal_places=2,

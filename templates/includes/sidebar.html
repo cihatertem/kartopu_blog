@@ -15,6 +15,7 @@
 
 <div style="height: 1rem;"></div>
 
+<! -- Kategoriler Bölümü -->
 <section style="border: 1px solid #eee; padding: 1rem; border-radius: 8px;">
   <h3 style="margin-top: 0;">Kategoriler</h3>
 
@@ -23,10 +24,10 @@
       <li class="{% if active_category_slug == c.slug %}active{% endif %}">
         {% if active_category_slug == c.slug %}
           <strong>
-            <a href="{{ c.get_absolute_url }}">{{ c.name }}</a>
+            <a href="{{ c.get_absolute_url }}">{{ c.name }} ({{ c.post_count }})</a>
           </strong>
         {% else %}
-          <a href="{{ c.get_absolute_url }}">{{ c.name }}</a>
+          <a href="{{ c.get_absolute_url }}">{{ c.name }} ({{ c.post_count }})</a>
         {% endif %}
       </li>
     {% empty %}
@@ -37,13 +38,14 @@
 
 <div style="height: 1rem;"></div>
 
+<! -- Etiketler Bölümü -->
 <section style="border: 1px solid #eee; padding: 1rem; border-radius: 8px;">
   <h3 style="margin-top: 0;">Etiketler</h3>
 
   <div style="display: flex; flex-wrap: wrap; gap: 0.5rem;">
     {% for tag in nav_tags %}
       <a
-        href="{{ tag.get_absolute_url }}"
+        href="{% url 'blog:tag_detail' tag.slug %}"
         style="
           font-size: {{ tag.cloud_size }}rem;
           padding: 0.2rem 0.45rem;
@@ -64,6 +66,7 @@
 
 <div style="height: 1rem;"></div>
 
+<! -- Arşivler Bölümü -->
 <section style="border: 1px solid #eee; padding: 1rem; border-radius: 8px;">
   <h3 style="margin-top: 0;">Arşiv</h3>
 

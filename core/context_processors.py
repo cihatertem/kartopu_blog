@@ -30,7 +30,15 @@ def categories_tags_context(request):
     nav_categories = cache.get(cache_key)
 
     if nav_categories is None:
-        nav_categories = list(Category.objects.order_by("name"))
+        nav_categories = list(
+            Category.objects.order_by("name").annotate(
+                post_count=Count(
+                    "posts",
+                    filter=Q(posts__status=BlogPost.Status.PUBLISHED),
+                    distinct=True,
+                )
+            )
+        )
         cache.set(cache_key, nav_categories, timeout=600)
 
     tag_cache_key = "nav_tags"

@@ -78,14 +78,8 @@ class BlogPostAdmin(admin.ModelAdmin):
         if db_field.name == "author":
             qs = User.objects.all()
 
-            # 1) sadece staff
             qs = qs.filter(is_staff=True)
-
-            # 2) social-auth kullanıcılarını çıkar
-            # (django-allauth kullanıyorsan: user.socialaccount_set üzerinden ilişki var)
             qs = qs.filter(socialaccount__isnull=True)
-
-            # tekrarlar oluşmasın (join yüzünden)
             qs = qs.distinct()
 
             kwargs["queryset"] = qs
