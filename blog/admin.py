@@ -69,7 +69,7 @@ class BlogPostAdmin(admin.ModelAdmin):
     list_filter = ("status", "category", "tags", "is_featured", "created_at")
     search_fields = ("title", "excerpt", "content", "category__name", "slug")
     prepopulated_fields = {"slug": ("title",)}
-    autocomplete_fields = ("category",)
+    autocomplete_fields = ("category", "portfolio_snapshot")
     filter_horizontal = ("tags",)
 
     actions = ("publish_posts", "draft_posts", "archive_posts")

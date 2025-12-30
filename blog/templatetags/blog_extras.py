@@ -42,3 +42,12 @@ def render_post_content(content, images):
 
     # 2) Markdown -> sanitize edilmiş HTML
     return render_markdown(expanded)
+
+
+@register.filter
+def mul100(value):
+    """Decimal/float oranı yüzdeye çevirir. Örn: 0.12 -> 12.0"""
+    try:
+        return (value or 0) * 100
+    except TypeError:
+        return 0

@@ -15,7 +15,7 @@ RUN groupadd -g 1000 -r app \
     --no-log-init \
     -r -g app app
 
-RUN apt-get update && apt-get install -y --no-install-recommends curl \
+RUN apt-get update && apt-get install -y --no-install-recommends curl gettext \
     && rm -rf /var/lib/apt/lists/* \
     && apt clean -y \
     && apt autopurge -y

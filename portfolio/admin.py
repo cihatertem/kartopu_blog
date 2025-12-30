@@ -114,6 +114,8 @@ class PortfolioSnapshotAdmin(admin.ModelAdmin):
     list_filter = ("period", "snapshot_date")
     readonly_fields = ("total_value", "total_cost", "target_value", "total_return_pct")
     inlines = (PortfolioSnapshotItemInline,)
+    search_fields = ("portfolio__name", "portfolio__owner__email")
+    list_select_related = ("portfolio", "portfolio__owner")
 
     def save_model(self, request, obj, form, change):
         if change:

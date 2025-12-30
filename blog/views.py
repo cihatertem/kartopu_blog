@@ -9,6 +9,7 @@ from django.core.paginator import Paginator
 from django.db.models import F
 from django.shortcuts import get_object_or_404, render
 from django.urls import reverse
+from django.utils.formats import date_format
 
 from comments.forms import CommentForm
 from comments.models import MAX_COMMENT_LENGTH, Comment
@@ -109,9 +110,9 @@ def post_list(request):
 
 def post_detail(request, slug: str):
     post = get_object_or_404(
-        BlogPost.objects.select_related("category", "author").prefetch_related(
-            "tags", "images"
-        ),
+        BlogPost.objects.select_related(
+            "category", "author", "portfolio_snapshot"
+        ).prefetch_related("tags", "images"),
         slug=slug,
         status=BlogPost.Status.PUBLISHED,
     )
@@ -185,9 +186,9 @@ def post_detail(request, slug: str):
 @login_required
 def post_preview(request, slug: str):
     post = get_object_or_404(
-        BlogPost.objects.select_related("category", "author").prefetch_related(
-            "tags", "images"
-        ),
+        BlogPost.objects.select_related(
+            "category", "author", "portfolio_snapshot"
+        ).prefetch_related("tags", "images"),
         slug=slug,
     )
 
@@ -239,6 +240,7 @@ def post_preview(request, slug: str):
 
 def archive_detail(request, year: int, month: int):
     archive_month = date(year, month, 1)
+    archive_month = date_format(archive_month, "F Y")
     qs = (
         BlogPost.objects.filter(
             status=BlogPost.Status.PUBLISHED,
@@ -259,7 +261,7 @@ def archive_detail(request, year: int, month: int):
             "url": reverse("blog:post_list"),
         },
         {
-            "label": archive_month.strftime("%B %Y"),
+            "label": archive_month,
             "url": None,
         },
     ]

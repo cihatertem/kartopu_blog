@@ -15,6 +15,8 @@
       <strong>Önizleme:</strong> Bu sayfa sadece yetkili kullanıcılar için görünür.
     </div>
   {% endif %}
+
+  <!-- Blog Post Content Section -->
   <article>
     <h1>{{ post.title }}</h1>
 
@@ -46,6 +48,40 @@
       {{ post.content|render_post_content:post.images.all|safe }}
     </div>
   </article>
+
+  <!-- Portfolio Snapshot Section -->
+  {% if post.portfolio_snapshot %}
+    <hr />
+
+    {% if post.portfolio_snapshot %}
+    <section class="portfolio-snapshot">
+      <h3>Bu yazının portföy özeti</h3>
+
+      <div style="border: 1px solid #ddd; border-radius: 8px; padding: 1rem">
+        <p style="margin: 0 0 0.25rem 0">
+          <strong>Portföy:</strong> {{ post.portfolio_snapshot.portfolio.name }}
+        </p>
+        <p style="margin: 0 0 0.75rem 0">
+          <strong>Tarih:</strong> {{ post.portfolio_snapshot.snapshot_date }}
+          <span style="opacity: 0.7">({{ post.portfolio_snapshot.get_period_display }})</span>
+        </p>
+
+        <ul style="list-style: none; padding-left: 0; margin: 0">
+          <li><strong>Toplam Değer:</strong> {{ post.portfolio_snapshot.total_value }}</li>
+          <li><strong>Toplam Maliyet:</strong> {{ post.portfolio_snapshot.total_cost }}</li>
+          {% if post.portfolio_snapshot.target_value %}
+            <li><strong>Hedef Değer:</strong> {{ post.portfolio_snapshot.target_value }}</li>
+          {% endif %}
+          <li>
+            <strong>Toplam Getiri (%):</strong>
+            {{ post.portfolio_snapshot.total_return_pct|mul100|floatformat:2 }}
+          </li>
+        </ul>
+      </div>
+    </section>
+    {% endif %}
+
+  <!-- Tags Section -->
   {% if post.tags.exists %}
   <hr />
 
@@ -65,6 +101,7 @@
   {% endif %}
   <hr />
 
+  <!-- Comments Section -->
     <section>
       <h3>Yorumlar <span>({{ comment_page_obj.paginator.count }})</span> </h3>
 
