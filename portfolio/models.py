@@ -9,6 +9,9 @@ from django.utils import timezone
 from core.mixins import TimeStampedModelMixin, UUIDModelMixin
 from portfolio.services import fetch_fx_rate, fetch_yahoo_finance_price
 
+MAX_DICITS = 200
+MAX_DECIMAL_PLACES = 2
+
 
 class Asset(UUIDModelMixin, TimeStampedModelMixin):
     class AssetType(models.TextChoices):
@@ -31,8 +34,8 @@ class Asset(UUIDModelMixin, TimeStampedModelMixin):
         max_length=10, default=Currency.TRY, choices=Currency.choices
     )
     current_price = models.DecimalField(
-        max_digits=20,
-        decimal_places=2,
+        max_digits=MAX_DICITS,
+        decimal_places=MAX_DECIMAL_PLACES,
         null=True,
         blank=True,
     )
@@ -80,7 +83,9 @@ class Portfolio(UUIDModelMixin, TimeStampedModelMixin):
         choices=Currency.choices,
         default=Currency.TRY,
     )
-    target_value = models.DecimalField(max_digits=20, decimal_places=2)
+    target_value = models.DecimalField(
+        max_digits=MAX_DICITS, decimal_places=MAX_DECIMAL_PLACES
+    )
 
     class Meta:  # pyright: ignore[reportIncompatibleVariableOverride]
         verbose_name = "Portföy"
@@ -207,8 +212,12 @@ class PortfolioTransaction(UUIDModelMixin, TimeStampedModelMixin):
         default=TransactionType.BUY,
     )
     trade_date = models.DateField()
-    quantity = models.DecimalField(max_digits=20, decimal_places=6)
-    price_per_unit = models.DecimalField(max_digits=20, decimal_places=4)
+    quantity = models.DecimalField(
+        max_digits=MAX_DICITS, decimal_places=MAX_DECIMAL_PLACES
+    )
+    price_per_unit = models.DecimalField(
+        max_digits=MAX_DICITS, decimal_places=MAX_DECIMAL_PLACES
+    )
     notes = models.TextField(blank=True)
 
     class Meta:  # pyright: ignore[reportIncompatibleVariableOverride]
@@ -244,9 +253,15 @@ class PortfolioSnapshot(UUIDModelMixin, TimeStampedModelMixin):
     )
     period = models.CharField(max_length=10, choices=Period.choices)
     snapshot_date = models.DateField(default=timezone.now)
-    total_value = models.DecimalField(max_digits=20, decimal_places=2)
-    total_cost = models.DecimalField(max_digits=20, decimal_places=2)
-    target_value = models.DecimalField(max_digits=20, decimal_places=2)
+    total_value = models.DecimalField(
+        max_digits=MAX_DICITS, decimal_places=MAX_DECIMAL_PLACES
+    )
+    total_cost = models.DecimalField(
+        max_digits=MAX_DICITS, decimal_places=MAX_DECIMAL_PLACES
+    )
+    target_value = models.DecimalField(
+        max_digits=MAX_DICITS, decimal_places=MAX_DECIMAL_PLACES
+    )
     total_return_pct = models.DecimalField(max_digits=10, decimal_places=4)
 
     class Meta:  # pyright: ignore[reportIncompatibleVariableOverride]
@@ -324,13 +339,25 @@ class PortfolioSnapshotItem(UUIDModelMixin, TimeStampedModelMixin):
         related_name="items",
     )
     asset = models.ForeignKey(Asset, on_delete=models.PROTECT)
-    quantity = models.DecimalField(max_digits=20, decimal_places=6)
-    average_cost = models.DecimalField(max_digits=20, decimal_places=4)
-    cost_basis = models.DecimalField(max_digits=20, decimal_places=2)
-    current_price = models.DecimalField(max_digits=20, decimal_places=4)
-    market_value = models.DecimalField(max_digits=20, decimal_places=2)
+    quantity = models.DecimalField(
+        max_digits=MAX_DICITS, decimal_places=MAX_DECIMAL_PLACES
+    )
+    average_cost = models.DecimalField(
+        max_digits=MAX_DICITS, decimal_places=MAX_DECIMAL_PLACES
+    )
+    cost_basis = models.DecimalField(
+        max_digits=MAX_DICITS, decimal_places=MAX_DECIMAL_PLACES
+    )
+    current_price = models.DecimalField(
+        max_digits=MAX_DICITS, decimal_places=MAX_DECIMAL_PLACES
+    )
+    market_value = models.DecimalField(
+        max_digits=MAX_DICITS, decimal_places=MAX_DECIMAL_PLACES
+    )
     allocation_pct = models.DecimalField(max_digits=10, decimal_places=4)
-    gain_loss = models.DecimalField(max_digits=20, decimal_places=2)
+    gain_loss = models.DecimalField(
+        max_digits=MAX_DICITS, decimal_places=MAX_DECIMAL_PLACES
+    )
     gain_loss_pct = models.DecimalField(max_digits=10, decimal_places=4)
 
     class Meta:  # pyright: ignore[reportIncompatibleVariableOverride]

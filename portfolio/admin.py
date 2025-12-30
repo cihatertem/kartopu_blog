@@ -22,11 +22,17 @@ class AssetAdmin(admin.ModelAdmin):
     readonly_fields = ("price_updated_at",)
 
 
+class PortfolioTransactionInline(admin.TabularInline):
+    model = PortfolioTransaction
+    extra = 0
+
+
 @admin.register(Portfolio)
 class PortfolioAdmin(admin.ModelAdmin):
-    list_display = ("name", "owner", "currency", "target_value")
+    list_display = ("name", "owner", "currency", "target_value", "created_at")
     search_fields = ("name", "owner__email")
-    list_filter = ("owner",)
+    list_filter = ("owner", "created_at")
+    inlines = (PortfolioTransactionInline,)
 
     actions = ("create_monthly_snapshot", "create_yearly_snapshot")
 
@@ -44,7 +50,7 @@ class PortfolioAdmin(admin.ModelAdmin):
 
     def get_changeform_initial_data(self, request):
         initial = super().get_changeform_initial_data(request)
-        if request.user.is_authenticated:
+        if request.user.is_authenticated and request.user.is_staff:
             initial.setdefault("owner", request.user.pk)  # pyright: ignore[reportArgumentType]
         return initial
 
@@ -113,9 +119,9 @@ class PortfolioSnapshotAdmin(admin.ModelAdmin):
     list_display = ("portfolio", "period", "snapshot_date", "total_value")
     list_filter = ("period", "snapshot_date")
     readonly_fields = ("total_value", "total_cost", "target_value", "total_return_pct")
-    inlines = (PortfolioSnapshotItemInline,)
     search_fields = ("portfolio__name", "portfolio__owner__email")
     list_select_related = ("portfolio", "portfolio__owner")
+    inlines = (PortfolioSnapshotItemInline,)
 
     def save_model(self, request, obj, form, change):
         if change:
@@ -128,3 +134,7 @@ class PortfolioSnapshotAdmin(admin.ModelAdmin):
             snapshot_date=obj.snapshot_date,
         )
         obj.pk = snapshot.pk
+        obj.total_value = snapshot.total_value
+        obj.total_cost = snapshot.total_cost
+        obj.target_value = snapshot.target_value
+        obj.total_return_pct = snapshot.total_return_pct

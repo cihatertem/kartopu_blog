@@ -14,14 +14,14 @@ User = get_user_model()
 @admin.register(Tag)
 class TagAdmin(admin.ModelAdmin):
     list_display = ("name", "slug")
-    search_fields = ("name",)
+    search_fields = ("name", "slug")
     prepopulated_fields = {"slug": ("name",)}
 
 
 @admin.register(Category)
 class CategoryAdmin(admin.ModelAdmin):
-    list_display = ("name", "slug", "updated_at", "created_at")
-    search_fields = ("name", "slug", "description")
+    list_display = ("name", "slug", "created_at")
+    search_fields = ("name", "slug")
     prepopulated_fields = {"slug": ("name",)}
     ordering = ("name",)
 
@@ -54,7 +54,7 @@ class BlogPostImageInline(admin.TabularInline):
 
 @admin.register(BlogPost)
 class BlogPostAdmin(admin.ModelAdmin):
-    inlines = [BlogPostImageInline]
+    inlines = (BlogPostImageInline,)
 
     list_display = (
         "title",
@@ -71,6 +71,32 @@ class BlogPostAdmin(admin.ModelAdmin):
     prepopulated_fields = {"slug": ("title",)}
     autocomplete_fields = ("category", "portfolio_snapshot")
     filter_horizontal = ("tags",)
+    ordering = ("-published_at", "-created_at")
+
+    fieldsets = (
+        (
+            None,
+            {
+                "fields": (
+                    "title",
+                    "slug",
+                    "author",
+                    "category",
+                    "portfolio_snapshot",
+                    "cover_image",
+                    "excerpt",
+                    "content",
+                    "tags",
+                )
+            },
+        ),
+        (
+            "Yayın Ayarları",
+            {"fields": ("status", "published_at", "is_featured")},
+        ),
+        ("SEO", {"fields": ("meta_title", "meta_description", "canonical_url")}),
+        ("İstatistik", {"fields": ("view_count",), "classes": ("collapse",)}),
+    )
 
     actions = ("publish_posts", "draft_posts", "archive_posts")
 
@@ -88,7 +114,7 @@ class BlogPostAdmin(admin.ModelAdmin):
 
     def get_changeform_initial_data(self, request):
         initial = super().get_changeform_initial_data(request)
-        if request.user.is_authenticated:
+        if request.user.is_authenticated and request.user.is_staff:
             initial.setdefault("author", request.user.pk)  # pyright: ignore[reportArgumentType]
         return initial
 

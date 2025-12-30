@@ -2,8 +2,28 @@ from __future__ import annotations
 
 import bleach
 import markdown as md
+from bleach.css_sanitizer import CSSSanitizer
 
-# Basit ama yeterli whitelist (ihtiyaca göre genişletiriz)
+css_sanitizer = CSSSanitizer(
+    allowed_css_properties=[
+        "margin",
+        "margin-top",
+        "margin-bottom",
+        "padding",
+        "padding-left",
+        "border",
+        "border-radius",
+        "background",
+        "opacity",
+        "display",
+        "grid-template-columns",
+        "gap",
+        "max-width",
+        "height",
+        "font-size",
+    ]
+)
+
 ALLOWED_TAGS = bleach.sanitizer.ALLOWED_TAGS.union(
     {
         "p",
@@ -22,16 +42,31 @@ ALLOWED_TAGS = bleach.sanitizer.ALLOWED_TAGS.union(
         "figure",
         "figcaption",
         "span",
+        "div",
+        "section",
+        "canvas",
+        "article",
+        "main",
     }
 )
 
 ALLOWED_ATTRIBUTES = {
     **bleach.sanitizer.ALLOWED_ATTRIBUTES,
-    "a": ["href", "title", "rel"],
-    "img": ["src", "alt", "title", "loading", "sizes", "srcset"],
+    "a": ["href", "title", "rel", "id"],
+    "img": ["src", "alt", "title", "loading", "sizes", "srcset", "id"],
     "code": ["class"],
-    "span": ["class"],
+    "span": ["class", "style", "id"],
     "pre": ["class"],
+    "div": ["class", "id", "style", "id"],
+    "section": ["class", "id", "style"],
+    "canvas": ["id", "height", "width", "class"],
+    "h1": ["class", "style", "id"],
+    "h2": ["class", "style", "id"],
+    "h3": ["class", "style", "id"],
+    "h4": ["class", "style", "id"],
+    "h5": ["class", "style", "id"],
+    "h6": ["class", "style", "id"],
+    "p": ["class", "style", "id"],
 }
 
 ALLOWED_PROTOCOLS = ["http", "https", "mailto"]
@@ -59,6 +94,7 @@ def render_markdown(text: str) -> str:
         attributes=ALLOWED_ATTRIBUTES,
         protocols=ALLOWED_PROTOCOLS,
         strip=True,
+        css_sanitizer=css_sanitizer,
     )
 
     # linkleri daha güvenli yapalım

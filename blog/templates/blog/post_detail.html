@@ -1,5 +1,6 @@
 {% extends "base.html" %}
-{% socialaccount %}
+{% load socialaccount blog_extras %}
+
 {% block title %}{{ post.effective_meta_title }}{% endblock %}
 
 {% block head %}
@@ -7,7 +8,7 @@
 {% endblock %}
 
 {% block content %}
-{% include "includes/breadcrumbs.html" %}
+  {% include "includes/breadcrumbs.html" %}
   {% if is_preview %}
     <div style="padding: 0.75rem 1rem; background: #fff3cd; border: 1px solid #ffeeba; margin-bottom: 1rem;">
       <strong>Önizleme:</strong> Bu sayfa sadece yetkili kullanıcılar için görünür.
@@ -43,106 +44,77 @@
     <hr />
 
     <div>
+      <!--
       {{ post.content|render_post_content:post.images.all|safe }}
+      -->
+      {% render_post_body post %}
     </div>
   </article>
 
-  <!-- Portfolio Snapshot Section -->
-  {% if post.portfolio_snapshot %}
+   <!-- Tags Section -->
+  {% if post.tags.exists %}
     <hr />
 
-    {% if post.portfolio_snapshot %}
-    <section class="portfolio-snapshot">
-      <h3>Bu yazının portföy özeti</h3>
+    <section>
+      <h3>Etiketler</h3>
 
-      <div style="border: 1px solid #ddd; border-radius: 8px; padding: 1rem">
-        <p style="margin: 0 0 0.25rem 0">
-          <strong>Portföy:</strong> {{ post.portfolio_snapshot.portfolio.name }}
-        </p>
-        <p style="margin: 0 0 0.75rem 0">
-          <strong>Tarih:</strong> {{ post.portfolio_snapshot.snapshot_date }}
-          <span style="opacity: 0.7">({{ post.portfolio_snapshot.get_period_display }})</span>
-        </p>
-
-        <ul style="list-style: none; padding-left: 0; margin: 0">
-          <li><strong>Toplam Değer:</strong> {{ post.portfolio_snapshot.total_value }}</li>
-          <li><strong>Toplam Maliyet:</strong> {{ post.portfolio_snapshot.total_cost }}</li>
-          {% if post.portfolio_snapshot.target_value %}
-            <li><strong>Hedef Değer:</strong> {{ post.portfolio_snapshot.target_value }}</li>
-          {% endif %}
-          <li>
-            <strong>Toplam Getiri (%):</strong>
-            {{ post.portfolio_snapshot.total_return_pct|mul100|floatformat:2 }}
+      <ul style="list-style: none; padding-left: 0">
+        {% for tag in post.tags.all %}
+          <li style="display: inline-block; margin-right: 0.5rem">
+            <a href="{% url 'blog:tag_detail' tag.slug %}">
+              #{{ tag.name }}
+            </a>
           </li>
-        </ul>
-      </div>
+        {% endfor %}
+      </ul>
     </section>
-    {% endif %}
-
-  <!-- Tags Section -->
-  {% if post.tags.exists %}
-  <hr />
-
-  <section>
-    <h3>Etiketler</h3>
-
-    <ul style="list-style: none; padding-left: 0">
-      {% for tag in post.tags.all %}
-        <li style="display: inline-block; margin-right: 0.5rem">
-          <a href="{% url 'blog:tag_detail' tag.slug %}">
-            #{{ tag.name }}
-          </a>
-        </li>
-      {% endfor %}
-    </ul>
-  </section>
   {% endif %}
   <hr />
 
   <!-- Comments Section -->
-    <section>
-      <h3>Yorumlar <span>({{ comment_page_obj.paginator.count }})</span> </h3>
+  <section>
+    <h3>Yorumlar <span>({{ comment_page_obj.paginator.count }})</span> </h3>
 
-      {% if comment_page_obj.object_list %}
-        <ul style="list-style: none; padding-left: 0;">
-          {% for comment in comment_page_obj %}
-            <li style="margin-bottom: 1rem;">
-              <strong>{{ comment.author.full_name }}</strong>
-              <small>— {{ comment.created_at|date:"d F Y H:i" }}</small>
-              <p style="margin-top: 0.5rem;">{{ comment.body|linebreaksbr }}</p>
-            </li>
-          {% endfor %}
-        </ul>
-        {% if comment_page_obj.has_previous or comment_page_obj.has_next %}
-          <div>
-            {% if comment_page_obj.has_previous %}
-              <a href="?comments_page={{ comment_page_obj.previous_page_number }}">← Önceki</a>
-            {% endif %}
-            <span> Sayfa {{ comment_page_obj.number }} / {{ comment_page_obj.paginator.num_pages }} </span>
-            {% if comment_page_obj.has_next %}
-              <a href="?comments_page={{ comment_page_obj.next_page_number }}">Sonraki →</a>
-            {% endif %}
-          </div>
-        {% endif %}
-      {% else %}
-        <p>Henüz onaylanmış yorum yok.</p>
+    {% if comment_page_obj.object_list %}
+      <ul style="list-style: none; padding-left: 0;">
+        {% for comment in comment_page_obj %}
+          <li style="margin-bottom: 1rem;">
+            <strong>{{ comment.author.full_name }}</strong>
+            <small>— {{ comment.created_at|date:"d F Y H:i" }}</small>
+            <p style="margin-top: 0.5rem;">{{ comment.body|linebreaksbr }}</p>
+          </li>
+        {% endfor %}
+      </ul>
+      {% if comment_page_obj.has_previous or comment_page_obj.has_next %}
+        <div>
+          {% if comment_page_obj.has_previous %}
+            <a href="?comments_page={{ comment_page_obj.previous_page_number }}">← Önceki</a>
+          {% endif %}
+          <span> Sayfa {{ comment_page_obj.number }} / {{ comment_page_obj.paginator.num_pages }} </span>
+          {% if comment_page_obj.has_next %}
+            <a href="?comments_page={{ comment_page_obj.next_page_number }}">Sonraki →</a>
+          {% endif %}
+        </div>
       {% endif %}
+    {% else %}
+      <p>Henüz onaylanmış yorum yok.</p>
+    {% endif %}
 
-      <h4>Yorum Yaz</h4>
-      {% if can_comment %}
-        <form method="post" action="{% url 'comments:post_comment' post.id %}">
-          {% csrf_token %}
-          {{ comment_form.website }}
-          <div style="margin-bottom: 0.75rem;">
-            {{ comment_form.body }}
-          </div>
-          <div class="char-counter">
-              <span id="char-count">0</span> / {{ MAX_COMMENT_LENGTH }}
-          </div>
-          <button type="submit">Yorumu Gönder</button>
-        </form>
-        <p><small>Yorumlar moderasyon sonrası yayınlanır.</small></p>
-      {% else %}
+    <h4>Yorum Yaz</h4>
+    {% if can_comment %}
+      <form method="post" action="{% url 'comments:post_comment' post.id %}">
+        {% csrf_token %}
+        {{ comment_form.website }}
+        <div style="margin-bottom: 0.75rem;">
+          {{ comment_form.body }}
+        </div>
+        <div class="char-counter">
+            <span id="char-count">0</span> / {{ MAX_COMMENT_LENGTH }}
+        </div>
+        <button type="submit">Yorumu Gönder</button>
+      </form>
+      <p><small>Yorumlar moderasyon sonrası yayınlanır.</small></p>
+    {% else %}
       <p>Yorum yapmak için sosyal hesap ile giriş yapmalısın.</p>
       <button type="button" id="social-login-button">Sosyal Hesap ile Giriş Yap</button>
       <div
@@ -197,38 +169,38 @@
                 {% endfor %}
               </div>
             {% endwith %}
-          {% else %}
-            {% with next_url=request.get_full_path|add:"?popup=1" %}
-              <div style="display: grid; gap: 0.75rem;">
-                {% for provider in socialaccount_providers %}
-                  <a
-                    class="social-login-link"
-                    href="{% provider_login_url provider.id process='login' next=next_url %}"
-                    style="
-                      display: inline-flex;
-                      align-items: center;
-                      justify-content: center;
-                      padding: 0.6rem 0.75rem;
-                      border: 1px solid #ddd;
-                      border-radius: 6px;
-                      text-decoration: none;
-                    "
-                  >
-                    {{ provider.name }} ile devam et
-                  </a>
-                {% empty %}
-                  <p>Şu anda desteklenen bir sağlayıcı bulunmuyor.</p>
-                {% endfor %}
-              </div>
-            {% endwith %}
-          {% endif %}
+        {% else %}
+          {% with next_url=request.get_full_path|add:"?popup=1" %}
+            <div style="display: grid; gap: 0.75rem;">
+              {% for provider in socialaccount_providers %}
+                <a
+                  class="social-login-link"
+                  href="{% provider_login_url provider.id process='login' next=next_url %}"
+                  style="
+                    display: inline-flex;
+                    align-items: center;
+                    justify-content: center;
+                    padding: 0.6rem 0.75rem;
+                    border: 1px solid #ddd;
+                    border-radius: 6px;
+                    text-decoration: none;
+                  "
+                >
+                  {{ provider.name }} ile devam et
+                </a>
+              {% empty %}
+                <p>Şu anda desteklenen bir sağlayıcı bulunmuyor.</p>
+              {% endfor %}
+            </div>
+          {% endwith %}
+        {% endif %}
           <div style="margin-top: 1rem; text-align: right;">
             <button type="button" id="close-social-login">Kapat</button>
           </div>
         </div>
       </div>
-      {% endif %}
-    </section>
+    {% endif %}
+  </section>
 {% endblock %}
 
 {% block js_script %}
@@ -316,6 +288,53 @@ document.addEventListener("DOMContentLoaded", function () {
       });
     });
   }
+
+  // --- PortfolioSnapshot charts (Chart.js) ---
+  const allocation = {{ allocation_chart_json|safe }};
+  const timeseries = {{ timeseries_chart_json|safe }};
+
+  if (allocation && document.getElementById("allocationDonut")) {
+    new Chart(document.getElementById("allocationDonut"), {
+      type: "doughnut",
+      data: {
+        labels: allocation.labels,
+        datasets: [{ data: allocation.values }],
+      },
+      options: {
+        responsive: true,
+        plugins: {
+          legend: { position: "bottom" },
+          tooltip: {
+            callbacks: {
+              label: function (ctx) {
+                const v = ctx.parsed || 0;
+                return `${ctx.label}: ${v.toFixed(2)}%`;
+              },
+            },
+          },
+        },
+      },
+    });
+  }
+
+  if (timeseries && document.getElementById("valueSeries")) {
+    new Chart(document.getElementById("valueSeries"), {
+      type: "line",
+      data: {
+        labels: timeseries.labels,
+        datasets: [{ data: timeseries.values, fill: false, tension: 0.25 }],
+      },
+      options: {
+        responsive: true,
+        plugins: { legend: { display: false } },
+        scales: {
+          x: { ticks: { maxRotation: 0, autoSkip: true, maxTicksLimit: 8 } },
+        },
+      },
+    });
+  }
+
+
   window.addEventListener("message", (event) => {
          if (event.data === "social-auth:complete") {
              window.location.reload();

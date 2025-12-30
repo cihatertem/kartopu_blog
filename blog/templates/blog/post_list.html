@@ -38,7 +38,7 @@
           </p>
 
           {% if post.excerpt %}
-            <p>{{ post.excerpt }}</p>
+            <p>{{ post.excerpt }} <span><a href="{{ post.get_absolute_url }}"> Okumaya devam et...</a></span></p>
           {% endif %}
         </li>
         <hr />

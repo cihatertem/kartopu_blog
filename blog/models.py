@@ -24,10 +24,8 @@ class Category(
     class Meta:  # pyright: ignore[reportIncompatibleVariableOverride]
         verbose_name = "Kategori"
         verbose_name_plural = "Kategoriler"
-        ordering = ["name"]
-        indexes = [
-            models.Index(fields=["slug"]),
-        ]
+        ordering = ("name",)
+        indexes = (models.Index(fields=["slug"]),)
 
     def __str__(self) -> str:
         return str(self.name)
@@ -124,7 +122,7 @@ class BlogPost(
         blank=True,
     )
     meta_description = models.CharField(
-        max_length=300,
+        max_length=500,
         blank=True,
     )
     canonical_url = models.URLField(
@@ -174,14 +172,14 @@ class BlogPost(
         verbose_name = "Blog Yazısı"
         verbose_name_plural = "Blog Yazıları"
 
-        indexes = [
+        indexes = (
             models.Index(fields=["slug"]),
             models.Index(fields=["status", "published_at"]),
             GinIndex(
                 SearchVector("title", "excerpt", "content", config="turkish"),
                 name="blogpost_fts_gin",
             ),
-        ]
+        )
 
     def __str__(self) -> str:
         return str(self.title)
@@ -301,7 +299,7 @@ class Tag(
     slug = models.SlugField(max_length=60, unique=True)
 
     class Meta:  # pyright: ignore[reportIncompatibleVariableOverride]
-        ordering = ["name"]
+        ordering = ("name",)
         verbose_name = "Etiket"
         verbose_name_plural = "Etiketler"
 

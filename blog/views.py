@@ -1,3 +1,4 @@
+import json
 from datetime import date
 
 from allauth.socialaccount.models import SocialAccount
@@ -6,6 +7,7 @@ from django.contrib.postgres.aggregates import StringAgg
 from django.contrib.postgres.search import SearchQuery, SearchRank, SearchVector
 from django.core.exceptions import PermissionDenied
 from django.core.paginator import Paginator
+from django.core.serializers.json import DjangoJSONEncoder
 from django.db.models import F
 from django.shortcuts import get_object_or_404, render
 from django.urls import reverse
@@ -14,11 +16,35 @@ from django.utils.formats import date_format
 from comments.forms import CommentForm
 from comments.models import MAX_COMMENT_LENGTH, Comment
 from core import helpers
+from portfolio.models import PortfolioSnapshot
 
 from .models import BlogPost, Category, Tag
 
 COMMENT_PAGE_SIZE = 10
 POST_PAGE_SIZE = 10
+
+
+def archive_index(request):
+    # published_at bazlı yıl-ay listesi
+    qs = BlogPost.objects.filter(
+        status=BlogPost.Status.PUBLISHED, published_at__isnull=False
+    )
+
+    archives = (
+        qs.annotate(
+            year=F("published_at__year"),
+            month=F("published_at__month"),
+        )
+        .values("year", "month")
+        .annotate(count=F("id"))
+        .order_by("-year", "-month")
+    )
+
+    return render(
+        request,
+        "blog/archive_index.html",
+        {"archives": archives, "active_nav": "blog"},
+    )
 
 
 def search_results(request):
@@ -158,6 +184,31 @@ def post_detail(request, slug: str):
     paginator = Paginator(approved_comments, COMMENT_PAGE_SIZE)
     comment_page_obj = paginator.get_page(request.GET.get("comments_page"))
 
+    snapshot = post.portfolio_snapshot
+    allocation_chart_json = "null"
+    timeseries_chart_json = "null"
+    if snapshot:
+        items = snapshot.items.select_related("asset").order_by("-allocation_pct")
+        allocation = {
+            "labels": [(item.asset.symbol or item.asset.name) for item in items],
+            "values": [float(item.allocation_pct or 0) * 100 for item in items],
+        }
+        allocation_chart_json = json.dumps(allocation, cls=DjangoJSONEncoder)
+
+        snapshots_qs = (
+            PortfolioSnapshot.objects.filter(
+                portfolio=snapshot.portfolio,
+                period=snapshot.period,
+            )
+            .order_by("snapshot_date")
+            .values_list("snapshot_date", "total_value")
+        )
+        timeseries = {
+            "labels": [d.isoformat() for d, _ in snapshots_qs],
+            "values": [float(v) for _, v in snapshots_qs],
+        }
+        timeseries_chart_json = json.dumps(timeseries, cls=DjangoJSONEncoder)
+
     return render(
         request,
         "blog/post_detail.html",
@@ -179,6 +230,8 @@ def post_detail(request, slug: str):
             and not has_social_account,
             "MAX_COMMENT_LENGTH": MAX_COMMENT_LENGTH,
             "comment_page_obj": comment_page_obj,
+            "allocation_chart_json": allocation_chart_json,
+            "timeseries_chart_json": timeseries_chart_json,
         },
     )
 
@@ -215,6 +268,31 @@ def post_preview(request, slug: str):
     paginator = Paginator(approved_comments, COMMENT_PAGE_SIZE)
     comment_page_obj = paginator.get_page(request.GET.get("comments_page"))
 
+    snapshot = post.portfolio_snapshot
+    allocation_chart_json = "null"
+    timeseries_chart_json = "null"
+    if snapshot:
+        items = snapshot.items.select_related("asset").order_by("-allocation_pct")
+        allocation = {
+            "labels": [(item.asset.symbol or item.asset.name) for item in items],
+            "values": [float(item.allocation_pct or 0) * 100 for item in items],
+        }
+        allocation_chart_json = json.dumps(allocation, cls=DjangoJSONEncoder)
+
+        snapshots_qs = (
+            PortfolioSnapshot.objects.filter(
+                portfolio=snapshot.portfolio,
+                period=snapshot.period,
+            )
+            .order_by("snapshot_date")
+            .values_list("snapshot_date", "total_value")
+        )
+        timeseries = {
+            "labels": [d.isoformat() for d, _ in snapshots_qs],
+            "values": [float(v) for _, v in snapshots_qs],
+        }
+        timeseries_chart_json = json.dumps(timeseries, cls=DjangoJSONEncoder)
+
     return render(
         request,
         "blog/post_detail.html",
@@ -234,6 +312,8 @@ def post_preview(request, slug: str):
             "can_comment": has_social_account,
             "requires_social_auth": not has_social_account,
             "comment_page_obj": comment_page_obj,
+            "allocation_chart_json": allocation_chart_json,
+            "timeseries_chart_json": timeseries_chart_json,
         },
     )
 
@@ -287,6 +367,7 @@ def category_detail(request, slug: str):
     qs = (
         BlogPost.objects.filter(category=category, status=BlogPost.Status.PUBLISHED)
         .select_related("author", "category")
+        .prefetch_related("tags")
         .order_by("-published_at", "-created_at")
     )
 
@@ -312,6 +393,7 @@ def category_detail(request, slug: str):
             "category": category,
             "page_obj": page_obj,
             "active_category_slug": category.slug,
+            "active_tag_slug": "",
             "active_nav": "blog",
             "active_archive_key": "",
             "breadcrumbs": breadcrumbs,
