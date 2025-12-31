@@ -16,11 +16,37 @@ css_sanitizer = CSSSanitizer(
         "background",
         "opacity",
         "display",
+        "grid",
+        "grid-template-rows",
         "grid-template-columns",
         "gap",
         "max-width",
         "height",
         "font-size",
+        "flex",
+        "flex-direction",
+        "justify-content",
+        "align-items",
+        "text-indent",
+        "text-align",
+        "color",
+        "background-color",
+        "width",
+        "float",
+        "text-decoration",
+        "font-weight",
+        "font-family",
+        "box-shadow",
+        "line-height",
+        "overflow",
+        "white-space",
+        "vertical-align",
+        "list-style-type",
+        "text-transform",
+        "letter-spacing",
+        "box-sizing",
+        "object-fit",
+        "object-position",
     ]
 )
 
@@ -57,8 +83,10 @@ ALLOWED_ATTRIBUTES = {
     "code": ["class"],
     "span": ["class", "style", "id"],
     "pre": ["class"],
-    "div": ["class", "id", "style", "id"],
+    "div": ["class", "id", "style"],
+    "article": ["class", "id", "style"],
     "section": ["class", "id", "style"],
+    "main": ["class", "id", "style"],
     "canvas": ["id", "height", "width", "class"],
     "h1": ["class", "style", "id"],
     "h2": ["class", "style", "id"],
@@ -67,6 +95,8 @@ ALLOWED_ATTRIBUTES = {
     "h5": ["class", "style", "id"],
     "h6": ["class", "style", "id"],
     "p": ["class", "style", "id"],
+    "fig": ["class", "style", "id"],
+    "caption": ["class", "style", "id"],
 }
 
 ALLOWED_PROTOCOLS = ["http", "https", "mailto"]
@@ -97,6 +127,5 @@ def render_markdown(text: str) -> str:
         css_sanitizer=css_sanitizer,
     )
 
-    # linkleri daha güvenli yapalım
     cleaned = bleach.linkify(cleaned)
     return cleaned

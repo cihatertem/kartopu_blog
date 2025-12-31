@@ -9,7 +9,6 @@ from core.markdown import render_markdown
 register = template.Library()
 
 IMAGE_PATTERN = re.compile(r"\{\{\s*image:(\d+)\s*\}\}")
-# Markdown içindeki placeholder'lar
 PORTFOLIO_SUMMARY_PATTERN = re.compile(r"\{\{\s*portfolio_summary\s*\}\}")
 PORTFOLIO_CHARTS_PATTERN = re.compile(r"\{\{\s*portfolio_charts\s*\}\}")
 
@@ -25,8 +24,6 @@ def render_post_content(content, images):
 
         img = images[index]
 
-        # Markdown içinde "ham HTML" olarak kalacak bir figure döndürüyoruz
-        # srcset / sizes: senin ImageKit türevlerine göre
         figure = f"""
 <figure>
   <img
@@ -42,10 +39,8 @@ def render_post_content(content, images):
         figure += "</figure>"
         return figure
 
-    # 1) Placeholder -> HTML figure
     expanded = IMAGE_PATTERN.sub(replacer, content or "")
 
-    # 2) Markdown -> sanitize edilmiş HTML
     return render_markdown(expanded)
 
 
@@ -53,14 +48,12 @@ def _render_portfolio_summary_html(snapshot) -> str:
     if not snapshot:
         return ""
 
-    # Sayısal alanlar Decimal olabilir; string'e çeviriyoruz.
     total_return_pct = snapshot.total_return_pct
     try:
         total_return_pct = (total_return_pct or 0) * 100
     except TypeError:
         total_return_pct = 0
 
-    # escape: olası kullanıcı girdilerini güvenli hale getir
     portfolio_name = escape(getattr(snapshot.portfolio, "name", ""))
     period_display = escape(
         snapshot.get_period_display() if hasattr(snapshot, "get_period_display") else ""
@@ -101,7 +94,6 @@ def _render_portfolio_charts_html(snapshot) -> str:
     if not snapshot:
         return ""
 
-    # Canvas id'leri JS tarafında sabit bekleniyor.
     return """
 <section class="portfolio-charts" style="margin: 1rem 0">
   <div id="chartFallback" style="display:none; padding: 0.75rem 1rem; border: 1px solid #f2c2c2; background: #fff5f5; border-radius: 8px; margin-bottom: 1rem;">
@@ -152,12 +144,11 @@ def render_post_body(context, post):
       {{ portfolio_charts }}
     """
     images = list(
-        getattr(post, "images", []).all() if getattr(post, "images", None) else []
+        getattr(post, "images", []).all() if getattr(post, "images", None) else []  # pyright: ignore[reportAttributeAccessIssue]
     )
     snapshot = getattr(post, "portfolio_snapshot", None)
     content = getattr(post, "content", "") or ""
 
-    # 1) image placeholder -> <figure>
     def image_replacer(match):
         index = int(match.group(1)) - 1
         if index < 0 or index >= len(images):
@@ -181,7 +172,6 @@ def render_post_body(context, post):
 
     expanded = IMAGE_PATTERN.sub(image_replacer, content)
 
-    # 2) portfolio placeholders
     expanded = PORTFOLIO_SUMMARY_PATTERN.sub(
         _render_portfolio_summary_html(snapshot), expanded
     )
@@ -189,7 +179,6 @@ def render_post_body(context, post):
         _render_portfolio_charts_html(snapshot), expanded
     )
 
-    # 3) markdown -> sanitized html
     return mark_safe(render_markdown(expanded))
 
 

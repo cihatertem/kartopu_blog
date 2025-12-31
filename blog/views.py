@@ -8,7 +8,7 @@ from django.contrib.postgres.search import SearchQuery, SearchRank, SearchVector
 from django.core.exceptions import PermissionDenied
 from django.core.paginator import Paginator
 from django.core.serializers.json import DjangoJSONEncoder
-from django.db.models import F
+from django.db.models import Count, F
 from django.shortcuts import get_object_or_404, render
 from django.urls import reverse
 from django.utils.formats import date_format
@@ -24,8 +24,60 @@ COMMENT_PAGE_SIZE = 10
 POST_PAGE_SIZE = 10
 
 
+def _build_comment_context(request, post):
+    approved_comments = post.comments.filter(  # pyright: ignore[reportAttributeAccessIssue]
+        status=Comment.Status.APPROVED
+    ).select_related("author")
+    comment_form = CommentForm()
+    has_social_account = (
+        request.user.is_authenticated
+        and SocialAccount.objects.filter(user=request.user).exists()
+    )
+    paginator = Paginator(approved_comments, COMMENT_PAGE_SIZE)
+    comment_page_obj = paginator.get_page(request.GET.get("comments_page"))
+
+    return {
+        "comment_form": comment_form,
+        "comment_page_obj": comment_page_obj,
+        "has_social_account": has_social_account,
+    }
+
+
+def _build_portfolio_snapshot_context(snapshot):
+    if not snapshot:
+        return {
+            "allocation_chart_json": "null",
+            "timeseries_chart_json": "null",
+        }
+
+    items = snapshot.items.select_related("asset").order_by("-allocation_pct")
+    allocation = {
+        "labels": [(item.asset.symbol or item.asset.name) for item in items],
+        "values": [float(item.allocation_pct or 0) * 100 for item in items],
+    }
+    allocation_chart_json = json.dumps(allocation, cls=DjangoJSONEncoder)
+
+    snapshots_qs = (
+        PortfolioSnapshot.objects.filter(
+            portfolio=snapshot.portfolio,
+            period=snapshot.period,
+        )
+        .order_by("snapshot_date")
+        .values_list("snapshot_date", "total_value")
+    )
+    timeseries = {
+        "labels": [d.isoformat() for d, _ in snapshots_qs],
+        "values": [float(v) for _, v in snapshots_qs],
+    }
+    timeseries_chart_json = json.dumps(timeseries, cls=DjangoJSONEncoder)
+
+    return {
+        "allocation_chart_json": allocation_chart_json,
+        "timeseries_chart_json": timeseries_chart_json,
+    }
+
+
 def archive_index(request):
-    # published_at bazlı yıl-ay listesi
     qs = BlogPost.objects.filter(
         status=BlogPost.Status.PUBLISHED, published_at__isnull=False
     )
@@ -36,7 +88,7 @@ def archive_index(request):
             month=F("published_at__month"),
         )
         .values("year", "month")
-        .annotate(count=F("id"))
+        .annotate(count=Count("id"))
         .order_by("-year", "-month")
     )
 
@@ -57,7 +109,6 @@ def search_results(request):
         .prefetch_related("tags")
     )
 
-    # 🚨 1. guard: boş input veya boş token
     if not q or not tokens:
         qs = base_qs.none()
     else:
@@ -143,7 +194,6 @@ def post_detail(request, slug: str):
         status=BlogPost.Status.PUBLISHED,
     )
 
-    # View count (session bazlı)
     session_key = f"viewed_post_{post.pk}"
     if not request.session.get(session_key):
         BlogPost.objects.filter(pk=post.pk).update(view_count=F("view_count") + 1)
@@ -172,42 +222,10 @@ def post_detail(request, slug: str):
             "url": None,
         }
     )
-    approved_comments = post.comments.filter(  # pyright: ignore[reportAttributeAccessIssue]
-        status=Comment.Status.APPROVED
-    ).select_related("author")
-    comment_form = CommentForm()
 
-    has_social_account = (
-        request.user.is_authenticated
-        and SocialAccount.objects.filter(user=request.user).exists()
-    )
-    paginator = Paginator(approved_comments, COMMENT_PAGE_SIZE)
-    comment_page_obj = paginator.get_page(request.GET.get("comments_page"))
-
-    snapshot = post.portfolio_snapshot
-    allocation_chart_json = "null"
-    timeseries_chart_json = "null"
-    if snapshot:
-        items = snapshot.items.select_related("asset").order_by("-allocation_pct")
-        allocation = {
-            "labels": [(item.asset.symbol or item.asset.name) for item in items],
-            "values": [float(item.allocation_pct or 0) * 100 for item in items],
-        }
-        allocation_chart_json = json.dumps(allocation, cls=DjangoJSONEncoder)
-
-        snapshots_qs = (
-            PortfolioSnapshot.objects.filter(
-                portfolio=snapshot.portfolio,
-                period=snapshot.period,
-            )
-            .order_by("snapshot_date")
-            .values_list("snapshot_date", "total_value")
-        )
-        timeseries = {
-            "labels": [d.isoformat() for d, _ in snapshots_qs],
-            "values": [float(v) for _, v in snapshots_qs],
-        }
-        timeseries_chart_json = json.dumps(timeseries, cls=DjangoJSONEncoder)
+    comment_context = _build_comment_context(request, post)
+    has_social_account = comment_context["has_social_account"]
+    snapshot_context = _build_portfolio_snapshot_context(post.portfolio_snapshot)
 
     return render(
         request,
@@ -224,14 +242,14 @@ def post_detail(request, slug: str):
             ),
             "breadcrumbs": breadcrumbs,
             "is_preview": False,
-            "comment_form": comment_form,
+            "comment_form": comment_context["comment_form"],
             "can_comment": request.user.is_authenticated and has_social_account,
             "requires_social_auth": request.user.is_authenticated
             and not has_social_account,
             "MAX_COMMENT_LENGTH": MAX_COMMENT_LENGTH,
-            "comment_page_obj": comment_page_obj,
-            "allocation_chart_json": allocation_chart_json,
-            "timeseries_chart_json": timeseries_chart_json,
+            "comment_page_obj": comment_context["comment_page_obj"],
+            "allocation_chart_json": snapshot_context["allocation_chart_json"],
+            "timeseries_chart_json": snapshot_context["timeseries_chart_json"],
         },
     )
 
@@ -259,39 +277,10 @@ def post_preview(request, slug: str):
             "url": None,
         },
     ]
-    approved_comments = post.comments.filter(  # pyright: ignore[reportAttributeAccessIssue]
-        status=Comment.Status.APPROVED
-    ).select_related("author")
-    comment_form = CommentForm()
-    has_social_account = SocialAccount.objects.filter(user=request.user).exists()
 
-    paginator = Paginator(approved_comments, COMMENT_PAGE_SIZE)
-    comment_page_obj = paginator.get_page(request.GET.get("comments_page"))
-
-    snapshot = post.portfolio_snapshot
-    allocation_chart_json = "null"
-    timeseries_chart_json = "null"
-    if snapshot:
-        items = snapshot.items.select_related("asset").order_by("-allocation_pct")
-        allocation = {
-            "labels": [(item.asset.symbol or item.asset.name) for item in items],
-            "values": [float(item.allocation_pct or 0) * 100 for item in items],
-        }
-        allocation_chart_json = json.dumps(allocation, cls=DjangoJSONEncoder)
-
-        snapshots_qs = (
-            PortfolioSnapshot.objects.filter(
-                portfolio=snapshot.portfolio,
-                period=snapshot.period,
-            )
-            .order_by("snapshot_date")
-            .values_list("snapshot_date", "total_value")
-        )
-        timeseries = {
-            "labels": [d.isoformat() for d, _ in snapshots_qs],
-            "values": [float(v) for _, v in snapshots_qs],
-        }
-        timeseries_chart_json = json.dumps(timeseries, cls=DjangoJSONEncoder)
+    comment_context = _build_comment_context(request, post)
+    has_social_account = comment_context["has_social_account"]
+    snapshot_context = _build_portfolio_snapshot_context(post.portfolio_snapshot)
 
     return render(
         request,
@@ -308,12 +297,12 @@ def post_preview(request, slug: str):
             ),
             "breadcrumbs": breadcrumbs,
             "is_preview": True,
-            "comment_form": comment_form,
+            "comment_form": comment_context["comment_form"],
             "can_comment": has_social_account,
             "requires_social_auth": not has_social_account,
-            "comment_page_obj": comment_page_obj,
-            "allocation_chart_json": allocation_chart_json,
-            "timeseries_chart_json": timeseries_chart_json,
+            "comment_page_obj": comment_context["comment_page_obj"],
+            "allocation_chart_json": snapshot_context["allocation_chart_json"],
+            "timeseries_chart_json": snapshot_context["timeseries_chart_json"],
         },
     )
 
