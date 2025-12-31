@@ -77,6 +77,44 @@ def _build_portfolio_snapshot_context(snapshot):
     }
 
 
+def _build_portfolio_comparison_context(comparison):
+    if not comparison:
+        return {"comparison_chart_json": "null"}
+
+    base = comparison.base_snapshot
+    compare = comparison.compare_snapshot
+
+    def safe_float(value):
+        try:
+            return float(value or 0)
+        except TypeError:
+            return 0.0
+
+    base_label = f"{base.snapshot_date}"
+    compare_label = f"{compare.snapshot_date}"
+
+    payload = {
+        "labels": [
+            "Toplam Değer",
+            "Toplam Maliyet",
+        ],
+        "base": [
+            safe_float(base.total_value),
+            safe_float(base.total_cost),
+        ],
+        "compare": [
+            safe_float(compare.total_value),
+            safe_float(compare.total_cost),
+        ],
+        "base_label": base_label,
+        "compare_label": compare_label,
+    }
+
+    return {
+        "comparison_chart_json": json.dumps(payload, cls=DjangoJSONEncoder),
+    }
+
+
 def archive_index(request):
     qs = BlogPost.objects.filter(
         status=BlogPost.Status.PUBLISHED, published_at__isnull=False
@@ -188,7 +226,12 @@ def post_list(request):
 def post_detail(request, slug: str):
     post = get_object_or_404(
         BlogPost.objects.select_related(
-            "category", "author", "portfolio_snapshot"
+            "category",
+            "author",
+            "portfolio_snapshot",
+            "portfolio_comparison",
+            "portfolio_comparison__base_snapshot",
+            "portfolio_comparison__compare_snapshot",
         ).prefetch_related("tags", "images"),
         slug=slug,
         status=BlogPost.Status.PUBLISHED,
@@ -226,6 +269,7 @@ def post_detail(request, slug: str):
     comment_context = _build_comment_context(request, post)
     has_social_account = comment_context["has_social_account"]
     snapshot_context = _build_portfolio_snapshot_context(post.portfolio_snapshot)
+    comparison_context = _build_portfolio_comparison_context(post.portfolio_comparison)
 
     return render(
         request,
@@ -250,6 +294,7 @@ def post_detail(request, slug: str):
             "comment_page_obj": comment_context["comment_page_obj"],
             "allocation_chart_json": snapshot_context["allocation_chart_json"],
             "timeseries_chart_json": snapshot_context["timeseries_chart_json"],
+            "comparison_chart_json": comparison_context["comparison_chart_json"],
         },
     )
 
@@ -258,7 +303,12 @@ def post_detail(request, slug: str):
 def post_preview(request, slug: str):
     post = get_object_or_404(
         BlogPost.objects.select_related(
-            "category", "author", "portfolio_snapshot"
+            "category",
+            "author",
+            "portfolio_snapshot",
+            "portfolio_comparison",
+            "portfolio_comparison__base_snapshot",
+            "portfolio_comparison__compare_snapshot",
         ).prefetch_related("tags", "images"),
         slug=slug,
     )
@@ -281,6 +331,7 @@ def post_preview(request, slug: str):
     comment_context = _build_comment_context(request, post)
     has_social_account = comment_context["has_social_account"]
     snapshot_context = _build_portfolio_snapshot_context(post.portfolio_snapshot)
+    comparison_context = _build_portfolio_comparison_context(post.portfolio_comparison)
 
     return render(
         request,
@@ -303,6 +354,7 @@ def post_preview(request, slug: str):
             "comment_page_obj": comment_context["comment_page_obj"],
             "allocation_chart_json": snapshot_context["allocation_chart_json"],
             "timeseries_chart_json": snapshot_context["timeseries_chart_json"],
+            "comparison_chart_json": comparison_context["comparison_chart_json"],
         },
     )
 

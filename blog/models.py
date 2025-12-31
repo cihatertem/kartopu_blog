@@ -167,6 +167,15 @@ class BlogPost(
         help_text="Bu yazı ile ilişkili portföy özeti (snapshot)",
     )
 
+    portfolio_comparison = models.ForeignKey(
+        "portfolio.PortfolioComparison",
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="blog_posts",
+        help_text="Bu yazı ile ilişkili portföy karşılaştırması",
+    )
+
     class Meta:  # pyright: ignore[reportIncompatibleVariableOverride]
         ordering = ["-published_at", "-created_at"]
         verbose_name = "Blog Yazısı"

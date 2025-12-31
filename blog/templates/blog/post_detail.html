@@ -292,6 +292,7 @@ document.addEventListener("DOMContentLoaded", function () {
   // --- PortfolioSnapshot charts (Chart.js) ---
   const allocation = {{ allocation_chart_json|safe }};
   const timeseries = {{ timeseries_chart_json|safe }};
+  const comparison = {{ comparison_chart_json|safe }};
 
   if (allocation && document.getElementById("allocationDonut")) {
     new Chart(document.getElementById("allocationDonut"), {
@@ -333,7 +334,32 @@ document.addEventListener("DOMContentLoaded", function () {
       },
     });
   }
-
+  if (comparison && document.getElementById("comparisonChart")) {
+    new Chart(document.getElementById("comparisonChart"), {
+      type: "bar",
+      data: {
+        labels: comparison.labels,
+        datasets: [
+          {
+            label: comparison.base_label || "Base",
+            data: comparison.base,
+          },
+          {
+            label: comparison.compare_label || "Compare",
+            data: comparison.compare,
+          },
+        ],
+      },
+      options: {
+        responsive: true,
+        plugins: { legend: { position: "bottom" } },
+        scales: {
+          x: { ticks: { maxRotation: 0, autoSkip: true } },
+          y: { beginAtZero: true },
+        },
+      },
+    });
+  }
 
   window.addEventListener("message", (event) => {
          if (event.data === "social-auth:complete") {

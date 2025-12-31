@@ -3,6 +3,7 @@ from __future__ import annotations
 from decimal import Decimal
 
 from django.conf import settings
+from django.core.exceptions import ValidationError
 from django.db import models
 from django.utils import timezone
 
@@ -16,10 +17,14 @@ MAX_DECIMAL_PLACES = 2
 class Asset(UUIDModelMixin, TimeStampedModelMixin):
     class AssetType(models.TextChoices):
         STOCK = "stock", "Hisse"
+        BES = "bes", "BES"
         ETF = "etf", "ETF"
-        CRYPTO = "crypto", "Kripto"
+        FON = "fon", "Yatırım Fonu"
+        BOND = "bond", "Tahvil"
         EUROBOND = "eurobond", "Eurobond"
+        VIOP = "viop", "VİOP"
         CASH = "cash", "Nakit"
+        CRYPTO = "crypto", "Kripto"
         OTHER = "other", "Diğer"
 
     class Currency(models.TextChoices):
@@ -64,6 +69,36 @@ class Asset(UUIDModelMixin, TimeStampedModelMixin):
             self.refresh_price()
 
         super().save(*args, **kwargs)  # pyright: ignore[reportArgumentType]
+
+
+class PortfolioComparison(UUIDModelMixin, TimeStampedModelMixin):
+    base_snapshot = models.ForeignKey(
+        "PortfolioSnapshot",
+        on_delete=models.CASCADE,
+        related_name="base_comparisons",
+    )
+    compare_snapshot = models.ForeignKey(
+        "PortfolioSnapshot",
+        on_delete=models.CASCADE,
+        related_name="compare_comparisons",
+    )
+
+    class Meta:  # pyright: ignore[reportIncompatibleVariableOverride]
+        verbose_name = "Portföy Karşılaştırması"
+        verbose_name_plural = "Portföy Karşılaştırmaları"
+
+    def __str__(self) -> str:
+        return f"{self.base_snapshot} → {self.compare_snapshot}"
+
+    def clean(self) -> None:
+        if (
+            self.base_snapshot
+            and self.compare_snapshot
+            and self.base_snapshot.portfolio_id != self.compare_snapshot.portfolio_id
+        ):
+            raise ValidationError(
+                "Karşılaştırma snapshotları aynı portföye ait olmalıdır."
+            )
 
 
 class Portfolio(UUIDModelMixin, TimeStampedModelMixin):

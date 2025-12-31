@@ -69,7 +69,7 @@ class BlogPostAdmin(admin.ModelAdmin):
     list_filter = ("status", "category", "tags", "is_featured", "created_at")
     search_fields = ("title", "excerpt", "content", "category__name", "slug")
     prepopulated_fields = {"slug": ("title",)}
-    autocomplete_fields = ("category", "portfolio_snapshot")
+    autocomplete_fields = ("category", "portfolio_snapshot", "portfolio_comparison")
     filter_horizontal = ("tags",)
     ordering = ("-published_at", "-created_at")
 
@@ -83,6 +83,7 @@ class BlogPostAdmin(admin.ModelAdmin):
                     "author",
                     "category",
                     "portfolio_snapshot",
+                    "portfolio_comparison",
                     "cover_image",
                     "excerpt",
                     "content",

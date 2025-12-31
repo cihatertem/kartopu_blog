@@ -1,4 +1,5 @@
 import re
+from decimal import Decimal
 
 from django import template
 from django.utils.html import escape
@@ -11,6 +12,12 @@ register = template.Library()
 IMAGE_PATTERN = re.compile(r"\{\{\s*image:(\d+)\s*\}\}")
 PORTFOLIO_SUMMARY_PATTERN = re.compile(r"\{\{\s*portfolio_summary\s*\}\}")
 PORTFOLIO_CHARTS_PATTERN = re.compile(r"\{\{\s*portfolio_charts\s*\}\}")
+PORTFOLIO_COMPARISON_SUMMARY_PATTERN = re.compile(
+    r"\{\{\s*portfolio_comparison_summary\s*\}\}"
+)
+PORTFOLIO_COMPARISON_CHARTS_PATTERN = re.compile(
+    r"\{\{\s*portfolio_comparison_charts\s*\}\}"
+)
 
 
 @register.filter
@@ -115,6 +122,92 @@ def _render_portfolio_charts_html(snapshot) -> str:
 """
 
 
+def _safe_decimal(value) -> Decimal:
+    try:
+        return value or Decimal("0")
+    except TypeError:
+        return Decimal("0")
+
+
+def _render_portfolio_comparison_summary_html(comparison) -> str:
+    if not comparison:
+        return ""
+
+    base = comparison.base_snapshot
+    compare = comparison.compare_snapshot
+
+    base_label = escape(str(base.snapshot_date))
+    compare_label = escape(str(compare.snapshot_date))
+    base_period = escape(
+        base.get_period_display() if hasattr(base, "get_period_display") else ""
+    )
+    compare_period = escape(
+        compare.get_period_display() if hasattr(compare, "get_period_display") else ""
+    )
+
+    base_value = _safe_decimal(base.total_value)
+    compare_value = _safe_decimal(compare.total_value)
+    base_cost = _safe_decimal(base.total_cost)
+    compare_cost = _safe_decimal(compare.total_cost)
+    base_return = _safe_decimal(base.total_return_pct) * Decimal("100")
+    compare_return = _safe_decimal(compare.total_return_pct) * Decimal("100")
+
+    value_delta = compare_value - base_value
+    return_delta = compare_return - base_return
+
+    html = f"""
+<section class="portfolio-comparison">
+  <h3>Portföy Karşılaştırması</h3>
+  <div style="border: 1px solid #ddd; border-radius: 8px; padding: 1rem; margin: 1rem 0">
+    <div style="display:grid; gap: 1rem; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));">
+      <div>
+        <p style="margin: 0 0 0.25rem 0"><strong>Tarih:</strong> {base_label}
+          <span style="opacity: 0.7">({base_period})</span>
+        </p>
+        <ul style="list-style: none; padding-left: 0; margin: 0">
+          <li><strong>Toplam Değer:</strong> {escape(str(base_value))}</li>
+          <li><strong>Toplam Maliyet:</strong> {escape(str(base_cost))}</li>
+          <li><strong>Toplam Getiri (%):</strong> {escape(f"{float(base_return):.2f}")}</li>
+        </ul>
+      </div>
+      <div>
+        <p style="margin: 0 0 0.25rem 0"><strong>Tarih:</strong> {compare_label}
+          <span style="opacity: 0.7">({compare_period})</span>
+        </p>
+        <ul style="list-style: none; padding-left: 0; margin: 0">
+          <li><strong>Toplam Değer:</strong> {escape(str(compare_value))}</li>
+          <li><strong>Toplam Maliyet:</strong> {escape(str(compare_cost))}</li>
+          <li><strong>Toplam Getiri (%):</strong> {escape(f"{float(compare_return):.2f}")}</li>
+        </ul>
+      </div>
+    </div>
+    <div style="margin-top: 0.75rem; padding-top: 0.75rem; border-top: 1px solid #eee">
+      <p style="margin: 0"><strong>Değişim:</strong> Toplam Değer {escape(str(value_delta))},
+        Getiri {escape(f"{float(return_delta):.2f}")}%</p>
+    </div>
+  </div>
+</section>
+"""
+    return html
+
+
+def _render_portfolio_comparison_charts_html(comparison) -> str:
+    if not comparison:
+        return ""
+
+    return """
+<section class="portfolio-comparison-charts" style="margin: 1rem 0">
+  <div id="comparisonChartFallback" style="display:none; padding: 0.75rem 1rem; border: 1px solid #f2c2c2; background: #fff5f5; border-radius: 8px; margin-bottom: 1rem;">
+    Grafikler yüklenemedi. (Tarayıcı eklentisi / ağ politikası / CSP engelliyor olabilir.)
+  </div>
+  <div style="border: 1px solid #eee; border-radius: 8px; padding: 1rem">
+    <h4 style="margin-top: 0">Karşılaştırma Özeti</h4>
+    <canvas id="comparisonChart" height="260"></canvas>
+  </div>
+</section>
+"""
+
+
 @register.simple_tag(takes_context=True)
 def portfolio_summary(context):
     """Post içindeki snapshot özetini HTML olarak döndürür."""
@@ -132,6 +225,22 @@ def portfolio_charts(context):
 
 
 @register.simple_tag(takes_context=True)
+def portfolio_comparison_summary(context):
+    """Post içindeki karşılaştırma özetini HTML olarak döndürür."""
+    post = context.get("post")
+    comparison = getattr(post, "portfolio_comparison", None) if post else None
+    return mark_safe(_render_portfolio_comparison_summary_html(comparison))
+
+
+@register.simple_tag(takes_context=True)
+def portfolio_comparison_charts(context):
+    """Post içindeki karşılaştırma grafik alanını HTML olarak döndürür."""
+    post = context.get("post")
+    comparison = getattr(post, "portfolio_comparison", None) if post else None
+    return mark_safe(_render_portfolio_comparison_charts_html(comparison))
+
+
+@register.simple_tag(takes_context=True)
 def render_post_body(context, post):
     """BlogPost içeriğini (markdown) render eder; image + portfolio placeholder'larını genişletir.
 
@@ -142,6 +251,8 @@ def render_post_body(context, post):
       {{ image:1 }}  (1-based)
       {{ portfolio_summary }}
       {{ portfolio_charts }}
+      {{ portfolio_comparison_summary }}
+      {{ portfolio_comparison_charts }}
     """
     images = list(
         getattr(post, "images", []).all() if getattr(post, "images", None) else []  # pyright: ignore[reportAttributeAccessIssue]
@@ -177,6 +288,13 @@ def render_post_body(context, post):
     )
     expanded = PORTFOLIO_CHARTS_PATTERN.sub(
         _render_portfolio_charts_html(snapshot), expanded
+    )
+    comparison = getattr(post, "portfolio_comparison", None)
+    expanded = PORTFOLIO_COMPARISON_SUMMARY_PATTERN.sub(
+        _render_portfolio_comparison_summary_html(comparison), expanded
+    )
+    expanded = PORTFOLIO_COMPARISON_CHARTS_PATTERN.sub(
+        _render_portfolio_comparison_charts_html(comparison), expanded
     )
 
     return mark_safe(render_markdown(expanded))

@@ -6,6 +6,7 @@ from django.utils import timezone
 from portfolio.models import (
     Asset,
     Portfolio,
+    PortfolioComparison,
     PortfolioSnapshot,
     PortfolioSnapshotItem,
     PortfolioTransaction,
@@ -138,3 +139,34 @@ class PortfolioSnapshotAdmin(admin.ModelAdmin):
         obj.total_cost = snapshot.total_cost
         obj.target_value = snapshot.target_value
         obj.total_return_pct = snapshot.total_return_pct
+
+
+@admin.register(PortfolioComparison)
+class PortfolioComparisonAdmin(admin.ModelAdmin):
+    list_display = ("base_snapshot", "compare_snapshot", "created_at")
+    list_filter = ("created_at",)
+    search_fields = (
+        "base_snapshot__portfolio__name",
+        "compare_snapshot__portfolio__name",
+    )
+    autocomplete_fields = ("base_snapshot", "compare_snapshot")
+    list_select_related = ("base_snapshot", "compare_snapshot")
+    actions = ("swap_snapshots",)
+
+    @admin.action(description="Base/Compare snapshotlarını değiştir")
+    def swap_snapshots(self, request, queryset):
+        updated = 0
+        for comparison in queryset:
+            comparison.base_snapshot, comparison.compare_snapshot = (
+                comparison.compare_snapshot,
+                comparison.base_snapshot,
+            )
+            comparison.save(
+                update_fields=["base_snapshot", "compare_snapshot", "updated_at"]
+            )
+            updated += 1
+        self.message_user(
+            request,
+            f"{updated} karşılaştırma güncellendi.",
+            level=messages.SUCCESS,
+        )
