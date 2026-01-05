@@ -4,6 +4,10 @@ from .models import MAX_COMMENT_LENGTH, Comment
 
 
 class CommentForm(forms.ModelForm):
+    parent_id = forms.UUIDField(
+        required=False,
+        widget=forms.HiddenInput,
+    )
     website = forms.CharField(
         required=False,
         label="Website",

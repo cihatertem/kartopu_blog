@@ -95,7 +95,15 @@ class BlogPost(
         blank=True,
         help_text="Listeleme sayfalarında gösterilecek kısa özet.",
     )
-    content = models.TextField(help_text="Blog içeriği (Markdown veya HTML).")
+    content = models.TextField(
+        help_text="""Blog içeriği (Markdown veya HTML).
+        Markdown içinde kullanılabilen marker'lar:<br>
+          {{ image:1 }}  (1-based)<br>
+          {{ portfolio_summary }}<br>
+          {{ portfolio_charts }}<br>
+          {{ portfolio_comparison_summary }}<br>
+          {{ portfolio_comparison_charts }}"""
+    )
 
     # --- Yayın durumu ---
     status = models.CharField(

@@ -25,20 +25,31 @@ POST_PAGE_SIZE = 10
 
 
 def _build_comment_context(request, post):
-    approved_comments = post.comments.filter(  # pyright: ignore[reportAttributeAccessIssue]
-        status=Comment.Status.APPROVED
-    ).select_related("author")
+    approved_comments = list(
+        post.comments.filter(  # pyright: ignore[reportAttributeAccessIssue]
+            status=Comment.Status.APPROVED
+        )
+        .select_related("author")
+        .order_by("-created_at")
+    )
+    replies_by_parent = {}
+    for comment in approved_comments:
+        replies_by_parent.setdefault(comment.parent_id, []).append(comment)
+    for comment in approved_comments:
+        comment.nested_replies = replies_by_parent.get(comment.id, [])  # type: ignore[attr-defined]
+    top_level_comments = replies_by_parent.get(None, [])
     comment_form = CommentForm()
     has_social_account = (
         request.user.is_authenticated
         and SocialAccount.objects.filter(user=request.user).exists()
     )
-    paginator = Paginator(approved_comments, COMMENT_PAGE_SIZE)
+    paginator = Paginator(top_level_comments, COMMENT_PAGE_SIZE)
     comment_page_obj = paginator.get_page(request.GET.get("comments_page"))
 
     return {
         "comment_form": comment_form,
         "comment_page_obj": comment_page_obj,
+        "comment_total": len(approved_comments),
         "has_social_account": has_social_account,
     }
 

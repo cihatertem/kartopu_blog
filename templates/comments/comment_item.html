@@ -1,0 +1,32 @@
+<li style="margin-bottom: 1rem;">
+  <strong>{{ comment.author.full_name }}</strong>
+  <small>— {{ comment.created_at|date:"d F Y H:i" }}</small>
+  <p style="margin-top: 0.5rem;">{{ comment.body|linebreaksbr }}</p>
+
+  {% if can_comment %}
+    <details style="margin-top: 0.5rem;">
+      <summary>Yanıtla</summary>
+      <form method="post" action="{% url 'comments:post_comment' comment.post_id %}">
+        {% csrf_token %}
+        <input type="hidden" name="parent_id" value="{{ comment.id }}">
+        <div style="margin-top: 0.5rem;">
+          <textarea
+            name="body"
+            rows="3"
+            placeholder="Yanıtınızı yazın...(Maksimum 3000 karakter)"
+            required
+          ></textarea>
+        </div>
+        <button type="submit">Yanıtı Gönder</button>
+      </form>
+    </details>
+  {% endif %}
+
+  {% if comment.nested_replies %}
+    <ul style="list-style: none; padding-left: 1.5rem; margin-top: 1rem;">
+      {% for reply in comment.nested_replies %}
+        {% include "comments/comment_item.html" with comment=reply can_comment=can_comment %}
+      {% endfor %}
+    </ul>
+  {% endif %}
+</li>

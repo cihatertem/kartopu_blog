@@ -73,16 +73,12 @@
 
   <!-- Comments Section -->
   <section>
-    <h3>Yorumlar <span>({{ comment_page_obj.paginator.count }})</span> </h3>
+    <h3>Yorumlar <span>({{ comment_total }})</span> </h3>
 
     {% if comment_page_obj.object_list %}
       <ul style="list-style: none; padding-left: 0;">
         {% for comment in comment_page_obj %}
-          <li style="margin-bottom: 1rem;">
-            <strong>{{ comment.author.full_name }}</strong>
-            <small>— {{ comment.created_at|date:"d F Y H:i" }}</small>
-            <p style="margin-top: 0.5rem;">{{ comment.body|linebreaksbr }}</p>
-          </li>
+          {% include "comments/comment_item.html" with comment=comment can_comment=can_comment %}
         {% endfor %}
       </ul>
       {% if comment_page_obj.has_previous or comment_page_obj.has_next %}

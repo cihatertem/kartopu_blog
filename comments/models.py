@@ -28,6 +28,14 @@ class Comment(
         related_name="comments",
     )
 
+    parent = models.ForeignKey(
+        "self",
+        on_delete=models.CASCADE,
+        related_name="replies",
+        blank=True,
+        null=True,
+    )
+
     body = models.TextField(max_length=MAX_COMMENT_LENGTH)
 
     status = models.CharField(

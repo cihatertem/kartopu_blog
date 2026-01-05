@@ -52,10 +52,26 @@ def post_comment(request, post_id):
     if form.cleaned_data.get("website"):
         status = Comment.Status.SPAM
 
+    parent = None
+    parent_id = form.cleaned_data.get("parent_id")
+    if parent_id:
+        parent = Comment.objects.filter(
+            id=parent_id,
+            post=post,
+            status=Comment.Status.APPROVED,
+        ).first()
+        if parent is None:
+            messages.error(
+                request,
+                "Yanıtlamak istediğiniz yorum bulunamadı.",
+            )
+            return redirect(post.get_absolute_url())
+
     comment = form.save(commit=False)
     comment.post = post
     comment.author = request.user
     comment.status = status
+    comment.parent = parent
     comment.ip_address = request.META.get("REMOTE_ADDR")
     comment.user_agent = request.META.get("HTTP_USER_AGENT", "")[:500]
     comment.social_provider = social_account.provider
