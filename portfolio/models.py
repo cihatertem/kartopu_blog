@@ -1,10 +1,13 @@
 from __future__ import annotations
 
+import calendar
+from datetime import date
 from decimal import Decimal
 
 from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.db import models
+from django.db.models import Sum
 from django.utils import timezone
 
 from core.mixins import TimeStampedModelMixin, UUIDModelMixin
@@ -401,3 +404,184 @@ class PortfolioSnapshotItem(UUIDModelMixin, TimeStampedModelMixin):
 
     def __str__(self) -> str:
         return f"{self.snapshot} - {self.asset}"
+
+
+class CashFlow(UUIDModelMixin, TimeStampedModelMixin):
+    class Currency(models.TextChoices):
+        TRY = "TRY", "TRY"
+        USD = "USD", "USD"
+        EUR = "EUR", "EUR"
+
+    owner = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="cashflows",
+    )
+    name = models.CharField(max_length=200)
+    currency = models.CharField(
+        max_length=10,
+        choices=Currency.choices,
+        default=Currency.TRY,
+    )
+
+    class Meta:  # pyright: ignore[reportIncompatibleVariableOverride]
+        verbose_name = "Nakit Akışı"
+        verbose_name_plural = "Nakit Akışları"
+
+    def __str__(self) -> str:
+        return self.name
+
+
+class CashFlowEntry(UUIDModelMixin, TimeStampedModelMixin):
+    class Category(models.TextChoices):
+        DIVIDEND = "dividend", "Temettü"
+        INTEREST = "interest", "Faiz/Nema"
+        EUROBOND_COUPON = "eurobond_coupon", "Eurobond Kupon"
+        CREDIT_CARD_BONUS = "credit_card_bonus", "Kredi Kartı Bonus"
+        OTHER = "other", "Diğer"
+
+    cashflow = models.ForeignKey(
+        CashFlow,
+        on_delete=models.CASCADE,
+        related_name="entries",
+    )
+    entry_date = models.DateField()
+    category = models.CharField(max_length=30, choices=Category.choices)
+    amount = models.DecimalField(
+        max_digits=MAX_DICITS, decimal_places=MAX_DECIMAL_PLACES
+    )
+    notes = models.TextField(blank=True)
+
+    class Meta:  # pyright: ignore[reportIncompatibleVariableOverride]
+        verbose_name = "Nakit Akışı Girişi"
+        verbose_name_plural = "Nakit Akışı Girişleri"
+
+    def __str__(self) -> str:
+        return f"{self.cashflow} - {self.get_category_display()}"  # pyright: ignore[reportAttributeAccessIssue]
+
+
+class CashFlowSnapshot(UUIDModelMixin, TimeStampedModelMixin):
+    class Period(models.TextChoices):
+        MONTHLY = "monthly", "Aylık"
+        YEARLY = "yearly", "Yıllık"
+
+    cashflow = models.ForeignKey(
+        CashFlow,
+        on_delete=models.CASCADE,
+        related_name="snapshots",
+    )
+    period = models.CharField(max_length=10, choices=Period.choices)
+    snapshot_date = models.DateField(default=timezone.now)
+    total_amount = models.DecimalField(
+        max_digits=MAX_DICITS, decimal_places=MAX_DECIMAL_PLACES
+    )
+
+    class Meta:  # pyright: ignore[reportIncompatibleVariableOverride]
+        verbose_name = "Nakit Akışı Snapshot"
+        verbose_name_plural = "Nakit Akışı Snapshotları"
+
+    def __str__(self) -> str:
+        return f"{self.cashflow} - {self.snapshot_date}"
+
+    @classmethod
+    def create_snapshot(
+        cls,
+        *,
+        cashflow: CashFlow,
+        period: str,
+        snapshot_date: date | None = None,
+    ) -> "CashFlowSnapshot":
+        snapshot_date = snapshot_date or timezone.now().date()  # pyright: ignore[reportAssignmentType]
+
+        if period == cls.Period.MONTHLY:
+            start_date = snapshot_date.replace(day=1)
+            last_day = calendar.monthrange(snapshot_date.year, snapshot_date.month)[1]
+            end_date = snapshot_date.replace(day=last_day)
+        else:
+            start_date = snapshot_date.replace(month=1, day=1)
+            end_date = snapshot_date.replace(month=12, day=31)
+
+        category_totals = (
+            CashFlowEntry.objects.filter(
+                cashflow=cashflow,
+                entry_date__gte=start_date,
+                entry_date__lte=end_date,
+            )
+            .values("category")
+            .annotate(total=Sum("amount"))
+            .order_by("category")
+        )
+
+        total_amount = sum(  # pyright: ignore[reportCallIssue]
+            (row["total"] or Decimal("0") for row in category_totals),  # pyright: ignore[reportArgumentType]
+            Decimal("0"),
+        )
+
+        snapshot = cls.objects.create(
+            cashflow=cashflow,
+            period=period,
+            snapshot_date=snapshot_date,
+            total_amount=total_amount,
+        )
+
+        for row in category_totals:
+            amount = row["total"] or Decimal("0")
+            allocation_pct = amount / total_amount if total_amount > 0 else Decimal("0")
+            CashFlowSnapshotItem.objects.create(
+                snapshot=snapshot,
+                category=row["category"],
+                amount=amount,
+                allocation_pct=allocation_pct,
+            )
+
+        return snapshot
+
+
+class CashFlowSnapshotItem(UUIDModelMixin, TimeStampedModelMixin):
+    snapshot = models.ForeignKey(
+        CashFlowSnapshot,
+        on_delete=models.CASCADE,
+        related_name="items",
+    )
+    category = models.CharField(max_length=30, choices=CashFlowEntry.Category.choices)
+    amount = models.DecimalField(
+        max_digits=MAX_DICITS, decimal_places=MAX_DECIMAL_PLACES
+    )
+    allocation_pct = models.DecimalField(max_digits=10, decimal_places=4)
+
+    class Meta:  # pyright: ignore[reportIncompatibleVariableOverride]
+        verbose_name = "Nakit Akışı Snapshot Kalemi"
+        verbose_name_plural = "Nakit Akışı Snapshot Kalemleri"
+
+    def __str__(self) -> str:
+        return f"{self.snapshot} - {self.get_category_display()}"  # pyright: ignore[reportAttributeAccessIssue]
+
+
+class CashFlowComparison(UUIDModelMixin, TimeStampedModelMixin):
+    base_snapshot = models.ForeignKey(
+        CashFlowSnapshot,
+        on_delete=models.CASCADE,
+        related_name="base_comparisons",
+    )
+    compare_snapshot = models.ForeignKey(
+        CashFlowSnapshot,
+        on_delete=models.CASCADE,
+        related_name="compare_comparisons",
+    )
+
+    class Meta:  # pyright: ignore[reportIncompatibleVariableOverride]
+        verbose_name = "Nakit Akışı Karşılaştırması"
+        verbose_name_plural = "Nakit Akışı Karşılaştırmaları"
+
+    def __str__(self) -> str:
+        return f"{self.base_snapshot} → {self.compare_snapshot}"
+
+    def clean(self) -> None:
+        if (
+            self.base_snapshot
+            and self.compare_snapshot
+            and self.base_snapshot.cashflow_id != self.compare_snapshot.cashflow_id  # pyright: ignore[reportAttributeAccessIssue]
+        ):
+            raise ValidationError(
+                "Karşılaştırma snapshotları aynı nakit akışına ait olmalıdır."
+            )

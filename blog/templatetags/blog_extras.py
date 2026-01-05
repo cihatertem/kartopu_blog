@@ -18,6 +18,14 @@ PORTFOLIO_COMPARISON_SUMMARY_PATTERN = re.compile(
 PORTFOLIO_COMPARISON_CHARTS_PATTERN = re.compile(
     r"\{\{\s*portfolio_comparison_charts\s*\}\}"
 )
+CASHFLOW_SUMMARY_PATTERN = re.compile(r"\{\{\s*cashflow_summary\s*\}\}")
+CASHFLOW_CHARTS_PATTERN = re.compile(r"\{\{\s*cashflow_charts\s*\}\}")
+CASHFLOW_COMPARISON_SUMMARY_PATTERN = re.compile(
+    r"\{\{\s*cashflow_comparison_summary\s*\}\}"
+)
+CASHFLOW_COMPARISON_CHARTS_PATTERN = re.compile(
+    r"\{\{\s*cashflow_comparison_charts\s*\}\}"
+)
 
 
 @register.filter
@@ -208,6 +216,130 @@ def _render_portfolio_comparison_charts_html(comparison) -> str:
 """
 
 
+def _render_cashflow_summary_html(snapshot) -> str:
+    if not snapshot:
+        return ""
+
+    cashflow_name = escape(getattr(snapshot.cashflow, "name", ""))
+    period_display = escape(
+        snapshot.get_period_display() if hasattr(snapshot, "get_period_display") else ""
+    )
+    snapshot_date = escape(str(snapshot.snapshot_date))
+    total_amount = escape(str(snapshot.total_amount))
+
+    html = f"""
+<section class="cashflow-snapshot">
+  <h3>Bu yazının nakit akışı özeti</h3>
+  <div style="border: 1px solid #ddd; border-radius: 8px; padding: 1rem; margin: 1rem 0">
+    <p style="margin: 0 0 0.25rem 0"><strong>Nakit Akışı:</strong> {cashflow_name}</p>
+    <p style="margin: 0 0 0.75rem 0"><strong>Tarih:</strong> {snapshot_date}
+      <span style="opacity: 0.7">({period_display})</span>
+    </p>
+    <ul style="list-style: none; padding-left: 0; margin: 0">
+      <li><strong>Toplam Nakit Akışı:</strong> {total_amount}</li>
+    </ul>
+  </div>
+</section>
+"""
+    return html
+
+
+def _render_cashflow_charts_html(snapshot) -> str:
+    if not snapshot:
+        return ""
+
+    return """
+<section class="cashflow-charts" style="margin: 1rem 0">
+  <div id="cashflowChartFallback" style="display:none; padding: 0.75rem 1rem; border: 1px solid #f2c2c2; background: #fff5f5; border-radius: 8px; margin-bottom: 1rem;">
+    Grafikler yüklenemedi. (Tarayıcı eklentisi / ağ politikası / CSP engelliyor olabilir.)
+  </div>
+
+  <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 1rem">
+    <div style="border: 1px solid #eee; border-radius: 8px; padding: 1rem">
+      <h4 style="margin-top: 0">Nakit Akışı Dağılımı</h4>
+      <canvas id="cashflowAllocationDonut" height="220"></canvas>
+    </div>
+
+    <div style="border: 1px solid #eee; border-radius: 8px; padding: 1rem">
+      <h4 style="margin-top: 0">Nakit Akışı (Zaman Serisi)</h4>
+      <canvas id="cashflowSeries" height="220"></canvas>
+    </div>
+  </div>
+</section>
+"""
+
+
+def _render_cashflow_comparison_summary_html(comparison) -> str:
+    if not comparison:
+        return ""
+
+    base = comparison.base_snapshot
+    compare = comparison.compare_snapshot
+
+    base_label = escape(str(base.snapshot_date))
+    compare_label = escape(str(compare.snapshot_date))
+    base_period = escape(
+        base.get_period_display() if hasattr(base, "get_period_display") else ""
+    )
+    compare_period = escape(
+        compare.get_period_display() if hasattr(compare, "get_period_display") else ""
+    )
+
+    base_amount = _safe_decimal(base.total_amount)
+    compare_amount = _safe_decimal(compare.total_amount)
+    delta = compare_amount - base_amount
+    pct_change = (
+        (delta / base_amount) * Decimal("100") if base_amount > 0 else Decimal("0")
+    )
+
+    html = f"""
+<section class="cashflow-comparison">
+  <h3>Nakit Akışı Karşılaştırması</h3>
+  <div style="border: 1px solid #ddd; border-radius: 8px; padding: 1rem; margin: 1rem 0">
+    <div style="display:grid; gap: 1rem; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));">
+      <div>
+        <p style="margin: 0 0 0.25rem 0"><strong>Tarih:</strong> {base_label}
+          <span style="opacity: 0.7">({base_period})</span>
+        </p>
+        <ul style="list-style: none; padding-left: 0; margin: 0">
+          <li><strong>Toplam Nakit Akışı:</strong> {escape(str(base_amount))}</li>
+        </ul>
+      </div>
+      <div>
+        <p style="margin: 0 0 0.25rem 0"><strong>Tarih:</strong> {compare_label}
+          <span style="opacity: 0.7">({compare_period})</span>
+        </p>
+        <ul style="list-style: none; padding-left: 0; margin: 0">
+          <li><strong>Toplam Nakit Akışı:</strong> {escape(str(compare_amount))}</li>
+        </ul>
+      </div>
+    </div>
+    <div style="margin-top: 0.75rem; padding-top: 0.75rem; border-top: 1px solid #eee">
+      <p style="margin: 0"><strong>Değişim:</strong> {escape(str(delta))} ({escape(f"{float(pct_change):.2f}")}%)</p>
+    </div>
+  </div>
+</section>
+"""
+    return html
+
+
+def _render_cashflow_comparison_charts_html(comparison) -> str:
+    if not comparison:
+        return ""
+
+    return """
+<section class="cashflow-comparison-charts" style="margin: 1rem 0">
+  <div id="cashflowComparisonChartFallback" style="display:none; padding: 0.75rem 1rem; border: 1px solid #f2c2c2; background: #fff5f5; border-radius: 8px; margin-bottom: 1rem;">
+    Grafikler yüklenemedi. (Tarayıcı eklentisi / ağ politikası / CSP engelliyor olabilir.)
+  </div>
+  <div style="border: 1px solid #eee; border-radius: 8px; padding: 1rem">
+    <h4 style="margin-top: 0">Nakit Akışı Karşılaştırma Özeti</h4>
+    <canvas id="cashflowComparisonChart" height="260"></canvas>
+  </div>
+</section>
+"""
+
+
 @register.simple_tag(takes_context=True)
 def portfolio_summary(context):
     """Post içindeki snapshot özetini HTML olarak döndürür."""
@@ -241,6 +373,38 @@ def portfolio_comparison_charts(context):
 
 
 @register.simple_tag(takes_context=True)
+def cashflow_summary(context):
+    """Post içindeki nakit akışı snapshot özetini HTML olarak döndürür."""
+    post = context.get("post")
+    snapshot = getattr(post, "cashflow_snapshot", None) if post else None
+    return mark_safe(_render_cashflow_summary_html(snapshot))
+
+
+@register.simple_tag(takes_context=True)
+def cashflow_charts(context):
+    """Post içindeki nakit akışı snapshot grafik alanını HTML olarak döndürür."""
+    post = context.get("post")
+    snapshot = getattr(post, "cashflow_snapshot", None) if post else None
+    return mark_safe(_render_cashflow_charts_html(snapshot))
+
+
+@register.simple_tag(takes_context=True)
+def cashflow_comparison_summary(context):
+    """Post içindeki nakit akışı karşılaştırma özetini HTML olarak döndürür."""
+    post = context.get("post")
+    comparison = getattr(post, "cashflow_comparison", None) if post else None
+    return mark_safe(_render_cashflow_comparison_summary_html(comparison))
+
+
+@register.simple_tag(takes_context=True)
+def cashflow_comparison_charts(context):
+    """Post içindeki nakit akışı karşılaştırma grafik alanını HTML olarak döndürür."""
+    post = context.get("post")
+    comparison = getattr(post, "cashflow_comparison", None) if post else None
+    return mark_safe(_render_cashflow_comparison_charts_html(comparison))
+
+
+@register.simple_tag(takes_context=True)
 def render_post_body(context, post):
     """BlogPost içeriğini (markdown) render eder; image + portfolio placeholder'larını genişletir.
 
@@ -253,6 +417,10 @@ def render_post_body(context, post):
       {{ portfolio_charts }}
       {{ portfolio_comparison_summary }}
       {{ portfolio_comparison_charts }}
+      {{ cashflow_summary }}
+      {{ cashflow_charts }}
+      {{ cashflow_comparison_summary }}
+      {{ cashflow_comparison_charts }}
     """
     images = list(
         getattr(post, "images", []).all() if getattr(post, "images", None) else []  # pyright: ignore[reportAttributeAccessIssue]
@@ -295,6 +463,20 @@ def render_post_body(context, post):
     )
     expanded = PORTFOLIO_COMPARISON_CHARTS_PATTERN.sub(
         _render_portfolio_comparison_charts_html(comparison), expanded
+    )
+    cashflow_snapshot = getattr(post, "cashflow_snapshot", None)
+    expanded = CASHFLOW_SUMMARY_PATTERN.sub(
+        _render_cashflow_summary_html(cashflow_snapshot), expanded
+    )
+    expanded = CASHFLOW_CHARTS_PATTERN.sub(
+        _render_cashflow_charts_html(cashflow_snapshot), expanded
+    )
+    cashflow_comparison = getattr(post, "cashflow_comparison", None)
+    expanded = CASHFLOW_COMPARISON_SUMMARY_PATTERN.sub(
+        _render_cashflow_comparison_summary_html(cashflow_comparison), expanded
+    )
+    expanded = CASHFLOW_COMPARISON_CHARTS_PATTERN.sub(
+        _render_cashflow_comparison_charts_html(cashflow_comparison), expanded
     )
 
     return mark_safe(render_markdown(expanded))
