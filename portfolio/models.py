@@ -291,6 +291,7 @@ class PortfolioSnapshot(UUIDModelMixin, TimeStampedModelMixin):
     )
     period = models.CharField(max_length=10, choices=Period.choices)
     snapshot_date = models.DateField(default=timezone.now)
+    name = models.CharField(max_length=200, blank=True)
     total_value = models.DecimalField(
         max_digits=MAX_DICITS, decimal_places=MAX_DECIMAL_PLACES
     )
@@ -307,6 +308,8 @@ class PortfolioSnapshot(UUIDModelMixin, TimeStampedModelMixin):
         verbose_name_plural = "Portföy Snapshotları"
 
     def __str__(self) -> str:
+        if self.name:
+            return self.name
         return f"{self.portfolio} - {self.snapshot_date}"
 
     @classmethod
@@ -472,6 +475,7 @@ class CashFlowSnapshot(UUIDModelMixin, TimeStampedModelMixin):
     )
     period = models.CharField(max_length=10, choices=Period.choices)
     snapshot_date = models.DateField(default=timezone.now)
+    name = models.CharField(max_length=200, blank=True)
     total_amount = models.DecimalField(
         max_digits=MAX_DICITS, decimal_places=MAX_DECIMAL_PLACES
     )
@@ -481,6 +485,8 @@ class CashFlowSnapshot(UUIDModelMixin, TimeStampedModelMixin):
         verbose_name_plural = "Nakit Akışı Snapshotları"
 
     def __str__(self) -> str:
+        if self.name:
+            return self.name
         return f"{self.cashflow} - {self.snapshot_date}"
 
     @classmethod

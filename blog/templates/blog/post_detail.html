@@ -209,12 +209,11 @@ document.addEventListener("DOMContentLoaded", function () {
     return;
   }
 
+  // -------------------------
+  // Textarea character counter
+  // -------------------------
   const textarea = document.getElementById("id_body");
   const counter = document.getElementById("char-count");
-
-  const loginButton = document.getElementById("social-login-button");
-  const modal = document.getElementById("social-login-modal");
-  const closeButton = document.getElementById("close-social-login");
 
   if (textarea && counter) {
     const max = Number(textarea.getAttribute("maxlength"));
@@ -222,23 +221,26 @@ document.addEventListener("DOMContentLoaded", function () {
     function updateCounter() {
       const len = textarea.value.length;
       counter.textContent = len;
-
-      if (len >= max) {
-        counter.style.color = "red";
-      } else {
-        counter.style.color = "";
-      }
+      counter.style.color = len >= max ? "red" : "";
     }
 
     textarea.addEventListener("input", updateCounter);
     updateCounter();
   }
 
+  // -------------------------
+  // Social login modal
+  // -------------------------
+  const loginButton = document.getElementById("social-login-button");
+  const modal = document.getElementById("social-login-modal");
+  const closeButton = document.getElementById("close-social-login");
+
   if (loginButton && modal) {
     const openModal = () => {
       modal.style.display = "flex";
       modal.setAttribute("aria-hidden", "false");
     };
+
     const closeModal = () => {
       modal.style.display = "none";
       modal.setAttribute("aria-hidden", "true");
@@ -285,14 +287,12 @@ document.addEventListener("DOMContentLoaded", function () {
     });
   }
 
-  // --- PortfolioSnapshot charts (Chart.js) ---
+  // -------------------------
+  // PortfolioSnapshot charts
+  // -------------------------
   const allocation = {{ allocation_chart_json|safe }};
   const timeseries = {{ timeseries_chart_json|safe }};
   const comparison = {{ comparison_chart_json|safe }};
-  const cashflowAllocation = {{ cashflow_allocation_chart_json|safe }};
-  const cashflowTimeseries = {{ cashflow_timeseries_chart_json|safe }};
-  const cashflowComparison = {{ cashflow_comparison_chart_json|safe }};
-
 
   if (allocation && document.getElementById("allocationDonut")) {
     new Chart(document.getElementById("allocationDonut"), {
@@ -307,7 +307,7 @@ document.addEventListener("DOMContentLoaded", function () {
           legend: { position: "bottom" },
           tooltip: {
             callbacks: {
-              label: function (ctx) {
+              label(ctx) {
                 const v = ctx.parsed || 0;
                 return `${ctx.label}: ${v.toFixed(2)}%`;
               },
@@ -329,11 +329,14 @@ document.addEventListener("DOMContentLoaded", function () {
         responsive: true,
         plugins: { legend: { display: false } },
         scales: {
-          x: { ticks: { maxRotation: 0, autoSkip: true, maxTicksLimit: 8 } },
+          x: {
+            ticks: { maxRotation: 0, autoSkip: true, maxTicksLimit: 8 },
+          },
         },
       },
     });
   }
+
   if (comparison && document.getElementById("comparisonChart")) {
     new Chart(document.getElementById("comparisonChart"), {
       type: "bar",
@@ -361,86 +364,136 @@ document.addEventListener("DOMContentLoaded", function () {
     });
   }
 
-  if (cashflowAllocation && document.getElementById("cashflowAllocationDonut")) {
-    new Chart(document.getElementById("cashflowAllocationDonut"), {
-      type: "doughnut",
-      data: {
-        labels: cashflowAllocation.labels,
-        datasets: [{ data: cashflowAllocation.values }],
-      },
-      options: {
-        responsive: true,
-        plugins: {
-          legend: { position: "bottom" },
-          tooltip: {
-            callbacks: {
-              label: function (ctx) {
-                const v = ctx.parsed || 0;
-                return `${ctx.label}: ${v.toFixed(2)}%`;
+  // -------------------------
+  // Cashflow charts
+  // -------------------------
+  document.querySelectorAll(".cashflow-charts").forEach((section) => {
+    const allocationRaw = section.dataset.cashflowAllocation;
+    const timeseriesRaw = section.dataset.cashflowTimeseries;
+    if (!allocationRaw || !timeseriesRaw) return;
+
+    let allocationData, timeseriesData;
+    try {
+      allocationData = JSON.parse(allocationRaw);
+      timeseriesData = JSON.parse(timeseriesRaw);
+    } catch {
+      return;
+    }
+
+    const allocationCanvas = section.querySelector(
+      'canvas[data-chart-kind="cashflow-allocation"]'
+    );
+    const timeseriesCanvas = section.querySelector(
+      'canvas[data-chart-kind="cashflow-timeseries"]'
+    );
+
+    if (allocationData && allocationCanvas) {
+      new Chart(allocationCanvas, {
+        type: "doughnut",
+        data: {
+          labels: allocationData.labels,
+          datasets: [{ data: allocationData.values }],
+        },
+        options: {
+          responsive: true,
+          plugins: {
+            legend: { position: "bottom" },
+            tooltip: {
+              callbacks: {
+                label(ctx) {
+                  const v = ctx.parsed || 0;
+                  return `${ctx.label}: ${v.toFixed(2)}%`;
+                },
               },
             },
           },
         },
-      },
-    });
-  }
+      });
+    }
 
-  if (cashflowTimeseries && document.getElementById("cashflowSeries")) {
-    new Chart(document.getElementById("cashflowSeries"), {
-      type: "line",
-      data: {
-        labels: cashflowTimeseries.labels,
-        datasets: [
-          { data: cashflowTimeseries.values, fill: false, tension: 0.25 },
-        ],
-      },
-      options: {
-        responsive: true,
-        plugins: { legend: { display: false } },
-        scales: {
-          x: { ticks: { maxRotation: 0, autoSkip: true, maxTicksLimit: 8 } },
+    if (timeseriesData && timeseriesCanvas) {
+      new Chart(timeseriesCanvas, {
+        type: "line",
+        data: {
+          labels: timeseriesData.labels,
+          datasets: [
+            { data: timeseriesData.values, fill: false, tension: 0.25 },
+          ],
         },
-      },
-    });
-  }
-
-  if (cashflowComparison && document.getElementById("cashflowComparisonChart")) {
-    new Chart(document.getElementById("cashflowComparisonChart"), {
-      type: "bar",
-      data: {
-        labels: cashflowComparison.labels,
-        datasets: [
-          {
-            label: cashflowComparison.base_label || "Base",
-            data: cashflowComparison.base,
+        options: {
+          responsive: true,
+          plugins: { legend: { display: false } },
+          scales: {
+            x: {
+              ticks: { maxRotation: 0, autoSkip: true, maxTicksLimit: 8 },
+            },
           },
-          {
-            label: cashflowComparison.compare_label || "Compare",
-            data: cashflowComparison.compare,
-          },
-        ],
-      },
-      options: {
-        responsive: true,
-        plugins: { legend: { position: "bottom" } },
-        scales: {
-          x: { ticks: { maxRotation: 0, autoSkip: true } },
-          y: { beginAtZero: true },
         },
-      },
-    });
-  }
+      });
+    }
+  });
 
+  // -------------------------
+  // Cashflow comparison charts
+  // -------------------------
+  document
+    .querySelectorAll(".cashflow-comparison-charts")
+    .forEach((section) => {
+      const comparisonRaw = section.dataset.cashflowComparison;
+      if (!comparisonRaw) return;
+
+      let comparisonData;
+      try {
+        comparisonData = JSON.parse(comparisonRaw);
+      } catch {
+        return;
+      }
+
+      const comparisonCanvas = section.querySelector(
+        'canvas[data-chart-kind="cashflow-comparison"]'
+      );
+
+      if (comparisonData && comparisonCanvas) {
+        new Chart(comparisonCanvas, {
+          type: "bar",
+          data: {
+            labels: comparisonData.labels,
+            datasets: [
+              {
+                label: comparisonData.base_label || "Base",
+                data: comparisonData.base,
+              },
+              {
+                label: comparisonData.compare_label || "Compare",
+                data: comparisonData.compare,
+              },
+            ],
+          },
+          options: {
+            responsive: true,
+            plugins: { legend: { position: "bottom" } },
+            scales: {
+              x: { ticks: { maxRotation: 0, autoSkip: true } },
+              y: { beginAtZero: true },
+            },
+          },
+        });
+      }
+    });
+
+  // -------------------------
+  // Social auth callbacks
+  // -------------------------
   window.addEventListener("message", (event) => {
-         if (event.data === "social-auth:complete") {
-             window.location.reload();
-         }
-     });
+    if (event.data === "social-auth:complete") {
+      window.location.reload();
+    }
+  });
 
-     window.addEventListener("storage", (event) => {
-         if (event.key === "social-auth-complete") {
-             window.location.reload();
-         }
-     });
+  window.addEventListener("storage", (event) => {
+    if (event.key === "social-auth-complete") {
+      window.location.reload();
+    }
+  });
 });
 {% endblock %}

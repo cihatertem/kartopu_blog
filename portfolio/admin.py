@@ -122,10 +122,10 @@ class PortfolioSnapshotItemInline(admin.TabularInline):
 
 @admin.register(PortfolioSnapshot)
 class PortfolioSnapshotAdmin(admin.ModelAdmin):
-    list_display = ("portfolio", "period", "snapshot_date", "total_value")
+    list_display = ("name", "portfolio", "period", "snapshot_date", "total_value")
     list_filter = ("period", "snapshot_date")
     readonly_fields = ("total_value", "total_cost", "target_value", "total_return_pct")
-    search_fields = ("portfolio__name", "portfolio__owner__email")
+    search_fields = ("name", "portfolio__name", "portfolio__owner__email")
     list_select_related = ("portfolio", "portfolio__owner")
     inlines = (PortfolioSnapshotItemInline,)
 
@@ -257,10 +257,10 @@ class CashFlowSnapshotItemInline(admin.TabularInline):
 
 @admin.register(CashFlowSnapshot)
 class CashFlowSnapshotAdmin(admin.ModelAdmin):
-    list_display = ("cashflow", "period", "snapshot_date", "total_amount")
+    list_display = ("name", "cashflow", "period", "snapshot_date", "total_amount")
     list_filter = ("period", "snapshot_date")
     readonly_fields = ("total_amount",)
-    search_fields = ("cashflow__name", "cashflow__owner__email")
+    search_fields = ("name", "cashflow__name", "cashflow__owner__email")
     list_select_related = ("cashflow", "cashflow__owner")
     inlines = (CashFlowSnapshotItemInline,)
 

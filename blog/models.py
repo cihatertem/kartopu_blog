@@ -103,10 +103,10 @@ class BlogPost(
           {{ portfolio_charts }}<br>
           {{ portfolio_comparison_summary }}<br>
           {{ portfolio_comparison_charts }}<br>
-          {{ cashflow_summary }}<br>
-          {{ cashflow_charts }}<br>
-          {{ cashflow_comparison_summary }}<br>
-          {{ cashflow_comparison_charts }}<br>"""
+          {{ cashflow_summary:1 }}<br>
+          {{ cashflow_charts:1 }}<br>
+          {{ cashflow_comparison_summary:1 }}<br>
+          {{ cashflow_comparison_charts:1 }}<br>"""
     )
 
     # --- Yayın durumu ---
@@ -188,22 +188,18 @@ class BlogPost(
         help_text="Bu yazı ile ilişkili portföy karşılaştırması",
     )
 
-    cashflow_snapshot = models.ForeignKey(
+    cashflow_snapshots = models.ManyToManyField(
         "portfolio.CashFlowSnapshot",
-        null=True,
         blank=True,
-        on_delete=models.SET_NULL,
         related_name="blog_posts",
-        help_text="Bu yazı ile ilişkili nakit akışı özeti (snapshot)",
+        help_text="Bu yazı ile ilişkili nakit akışı snapshotları",
     )
 
-    cashflow_comparison = models.ForeignKey(
+    cashflow_comparisons = models.ManyToManyField(
         "portfolio.CashFlowComparison",
-        null=True,
         blank=True,
-        on_delete=models.SET_NULL,
         related_name="blog_posts",
-        help_text="Bu yazı ile ilişkili nakit akışı karşılaştırması",
+        help_text="Bu yazı ile ilişkili nakit akışı karşılaştırmaları",
     )
 
     class Meta:  # pyright: ignore[reportIncompatibleVariableOverride]

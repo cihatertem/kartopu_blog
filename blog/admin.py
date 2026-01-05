@@ -73,8 +73,8 @@ class BlogPostAdmin(admin.ModelAdmin):
         "category",
         "portfolio_snapshot",
         "portfolio_comparison",
-        "cashflow_snapshot",
-        "cashflow_comparison",
+        "cashflow_snapshots",
+        "cashflow_comparisons",
     )
     filter_horizontal = ("tags",)
     ordering = ("-published_at", "-created_at")
@@ -90,8 +90,8 @@ class BlogPostAdmin(admin.ModelAdmin):
                     "category",
                     "portfolio_snapshot",
                     "portfolio_comparison",
-                    "cashflow_snapshot",
-                    "cashflow_comparison",
+                    "cashflow_snapshots",
+                    "cashflow_comparisons",
                     "cover_image",
                     "excerpt",
                     "content",
