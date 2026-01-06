@@ -243,8 +243,8 @@ class CashFlowAdmin(admin.ModelAdmin):
 
 @admin.register(CashFlowEntry)
 class CashFlowEntryAdmin(admin.ModelAdmin):
-    list_display = ("cashflow", "category", "entry_date", "amount")
-    list_filter = ("category", "entry_date")
+    list_display = ("cashflow", "category", "entry_date", "amount", "currency")
+    list_filter = ("category", "entry_date", "currency")
     search_fields = ("cashflow__name",)
 
 

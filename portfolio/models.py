@@ -7,7 +7,6 @@ from decimal import Decimal
 from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.db import models
-from django.db.models import Sum
 from django.utils import timezone
 
 from core.mixins import TimeStampedModelMixin, UUIDModelMixin
@@ -459,6 +458,11 @@ class CashFlowEntry(UUIDModelMixin, TimeStampedModelMixin):
     amount = models.DecimalField(
         max_digits=MAX_DICITS, decimal_places=MAX_DECIMAL_PLACES
     )
+    currency = models.CharField(
+        max_length=10,
+        choices=CashFlow.Currency.choices,
+        default=CashFlow.Currency.TRY,
+    )
     notes = models.TextField(blank=True)
 
     class Meta:  # pyright: ignore[reportIncompatibleVariableOverride]
@@ -514,19 +518,33 @@ class CashFlowSnapshot(UUIDModelMixin, TimeStampedModelMixin):
             start_date = snapshot_date.replace(month=1, day=1)
             end_date = snapshot_date.replace(month=12, day=31)
 
-        category_totals = (
-            CashFlowEntry.objects.filter(
-                cashflow=cashflow,
-                entry_date__gte=start_date,
-                entry_date__lte=end_date,
+        entries = CashFlowEntry.objects.filter(
+            cashflow=cashflow,
+            entry_date__gte=start_date,
+            entry_date__lte=end_date,
+        ).values("category", "amount", "currency")
+
+        category_totals: dict[str, Decimal] = {}
+        fx_rates: dict[tuple[str, str], Decimal] = {}
+
+        for entry in entries:
+            amount = entry["amount"] or Decimal("0")
+            entry_currency = entry["currency"]
+            fx_rate = Decimal("1")
+            if entry_currency != cashflow.currency:
+                currency_pair = (entry_currency, cashflow.currency)
+                fx_rate = fx_rates.get(currency_pair)
+                if fx_rate is None:
+                    fetched_rate = fetch_fx_rate(entry_currency, cashflow.currency)
+                    fx_rate = fetched_rate if fetched_rate is not None else Decimal("1")
+                    fx_rates[currency_pair] = fx_rate
+            converted_amount = amount * fx_rate
+            category_totals[entry["category"]] = (
+                category_totals.get(entry["category"], Decimal("0")) + converted_amount
             )
-            .values("category")
-            .annotate(total=Sum("amount"))
-            .order_by("category")
-        )
 
         total_amount = sum(  # pyright: ignore[reportCallIssue]
-            (row["total"] or Decimal("0") for row in category_totals),  # pyright: ignore[reportArgumentType]
+            category_totals.values(),  # pyright: ignore[reportArgumentType]
             Decimal("0"),
         )
 
@@ -537,12 +555,11 @@ class CashFlowSnapshot(UUIDModelMixin, TimeStampedModelMixin):
             total_amount=total_amount,
         )
 
-        for row in category_totals:
-            amount = row["total"] or Decimal("0")
+        for category, amount in sorted(category_totals.items()):
             allocation_pct = amount / total_amount if total_amount > 0 else Decimal("0")
             CashFlowSnapshotItem.objects.create(
                 snapshot=snapshot,
-                category=row["category"],
+                category=category,
                 amount=amount,
                 allocation_pct=allocation_pct,
             )
