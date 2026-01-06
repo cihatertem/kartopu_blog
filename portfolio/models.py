@@ -234,9 +234,8 @@ class PortfolioTransaction(UUIDModelMixin, TimeStampedModelMixin):
         DIVIDEND = "dividend", "Temettü"
         COUPON = "coupon", "Kupon Ödemesi"
 
-    portfolio = models.ForeignKey(
+    portfolios = models.ManyToManyField(
         Portfolio,
-        on_delete=models.CASCADE,
         related_name="transactions",
     )
     asset = models.ForeignKey(
@@ -272,7 +271,12 @@ class PortfolioTransaction(UUIDModelMixin, TimeStampedModelMixin):
         super().save(*args, **kwargs)  # pyright: ignore[reportArgumentType]
 
     def __str__(self) -> str:
-        return f"{self.portfolio} - {self.asset}"
+        portfolio_names = list(
+            self.portfolios.values_list("name", flat=True).order_by("name")
+        )
+        if portfolio_names:
+            return f"{', '.join(portfolio_names)} - {self.asset}"
+        return f"{self.asset}"
 
     @property
     def total_cost(self) -> Decimal:
@@ -323,7 +327,7 @@ class PortfolioSnapshot(UUIDModelMixin, TimeStampedModelMixin):
         snapshot_date = snapshot_date or timezone.now().date()  # pyright: ignore[reportAssignmentType]
 
         assets = (
-            Asset.objects.filter(transactions__portfolio=portfolio)
+            Asset.objects.filter(transactions__portfolios=portfolio)
             .distinct()
             .order_by("name")
         )

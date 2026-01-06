@@ -28,17 +28,12 @@ class AssetAdmin(admin.ModelAdmin):
     readonly_fields = ("price_updated_at",)
 
 
-class PortfolioTransactionInline(admin.TabularInline):
-    model = PortfolioTransaction
-    extra = 0
-
-
 @admin.register(Portfolio)
 class PortfolioAdmin(admin.ModelAdmin):
     list_display = ("name", "owner", "currency", "target_value", "created_at")
     search_fields = ("name", "owner__email")
     list_filter = ("owner", "created_at")
-    inlines = (PortfolioTransactionInline,)
+    inlines = ()
 
     actions = ("create_monthly_snapshot", "create_yearly_snapshot")
 
@@ -92,15 +87,20 @@ class PortfolioAdmin(admin.ModelAdmin):
 @admin.register(PortfolioTransaction)
 class PortfolioTransactionAdmin(admin.ModelAdmin):
     list_display = (
-        "portfolio",
+        "portfolio_list",
         "asset",
         "transaction_type",
         "trade_date",
         "quantity",
         "price_per_unit",
     )
-    list_filter = ("transaction_type", "trade_date")
-    search_fields = ("portfolio__name", "asset__name", "asset__symbol")
+    list_filter = ("portfolios", "transaction_type", "trade_date")
+    search_fields = ("portfolios__name", "asset__name", "asset__symbol")
+    autocompolete_fields = ("portfolios",)
+
+    @admin.display(description="Portföyler")
+    def portfolio_list(self, obj):
+        return ", ".join(obj.portfolios.values_list("name", flat=True).order_by("name"))
 
 
 class PortfolioSnapshotItemInline(admin.TabularInline):
