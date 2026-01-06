@@ -89,6 +89,7 @@ class PortfolioComparison(UUIDModelMixin, TimeStampedModelMixin):
     class Meta:  # pyright: ignore[reportIncompatibleVariableOverride]
         verbose_name = "Portföy Karşılaştırması"
         verbose_name_plural = "Portföy Karşılaştırmaları"
+        ordering = ("-created_at",)
 
     def __str__(self) -> str:
         return f"{self.base_snapshot} → {self.compare_snapshot}"
@@ -310,6 +311,7 @@ class PortfolioSnapshot(UUIDModelMixin, TimeStampedModelMixin):
     class Meta:  # pyright: ignore[reportIncompatibleVariableOverride]
         verbose_name = "Portföy Snapshot"
         verbose_name_plural = "Portföy Snapshotları"
+        ordering = ("-snapshot_date", "-created_at")
 
     def __str__(self) -> str:
         if self.name:
@@ -487,6 +489,7 @@ class CashFlowSnapshot(UUIDModelMixin, TimeStampedModelMixin):
     class Meta:  # pyright: ignore[reportIncompatibleVariableOverride]
         verbose_name = "Nakit Akışı Snapshot"
         verbose_name_plural = "Nakit Akışı Snapshotları"
+        ordering = ("-snapshot_date", "-created_at")
 
     def __str__(self) -> str:
         if self.name:
@@ -582,6 +585,7 @@ class CashFlowComparison(UUIDModelMixin, TimeStampedModelMixin):
     class Meta:  # pyright: ignore[reportIncompatibleVariableOverride]
         verbose_name = "Nakit Akışı Karşılaştırması"
         verbose_name_plural = "Nakit Akışı Karşılaştırmaları"
+        ordering = ("-created_at",)
 
     def __str__(self) -> str:
         return f"{self.base_snapshot} → {self.compare_snapshot}"
