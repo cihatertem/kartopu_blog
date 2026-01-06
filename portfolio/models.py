@@ -128,6 +128,7 @@ class Portfolio(UUIDModelMixin, TimeStampedModelMixin):
     class Meta:  # pyright: ignore[reportIncompatibleVariableOverride]
         verbose_name = "Portföy"
         verbose_name_plural = "Portföyler"
+        ordering = ("name",)
 
     def __str__(self) -> str:
         return f"{self.name}"

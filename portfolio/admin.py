@@ -96,7 +96,7 @@ class PortfolioTransactionAdmin(admin.ModelAdmin):
     )
     list_filter = ("portfolios", "transaction_type", "trade_date")
     search_fields = ("portfolios__name", "asset__name", "asset__symbol")
-    autocompolete_fields = ("portfolios",)
+    autocomplete_fields = ("portfolios",)
 
     @admin.display(description="Portföyler")
     def portfolio_list(self, obj):

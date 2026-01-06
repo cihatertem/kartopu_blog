@@ -75,11 +75,7 @@ class BlogPostAdmin(admin.ModelAdmin):
         "portfolio_comparisons",
         "cashflow_snapshots",
         "cashflow_comparisons",
-    )
-    filter_horizontal = (
         "tags",
-        "portfolio_snapshots",
-        "portfolio_comparisons",
     )
     ordering = ("-published_at", "-created_at")
 
