@@ -99,10 +99,10 @@ class BlogPost(
         help_text="""Blog içeriği (Markdown veya HTML).
         Markdown içinde kullanılabilen marker'lar:<br>
           {{ image:1 }}  (1-based)<br>
-          {{ portfolio_summary }}<br>
-          {{ portfolio_charts }}<br>
-          {{ portfolio_comparison_summary }}<br>
-          {{ portfolio_comparison_charts }}<br>
+          {{ portfolio_summary:1 }}<br>
+          {{ portfolio_charts:1 }}<br>
+          {{ portfolio_comparison_summary:1 }}<br>
+          {{ portfolio_comparison_charts:1 }}<br>
           {{ cashflow_summary:1 }}<br>
           {{ cashflow_charts:1 }}<br>
           {{ cashflow_comparison_summary:1 }}<br>
@@ -170,22 +170,18 @@ class BlogPost(
         options={"quality": 85},
     )
 
-    portfolio_snapshot = models.ForeignKey(
+    portfolio_snapshots = models.ManyToManyField(
         "portfolio.PortfolioSnapshot",
-        null=True,
         blank=True,
-        on_delete=models.SET_NULL,
         related_name="blog_posts",
-        help_text="Bu yazı ile ilişkili portföy özeti (snapshot)",
+        help_text="Bu yazı ile ilişkili portföy özetleri (snapshot)",
     )
 
-    portfolio_comparison = models.ForeignKey(
+    portfolio_comparisons = models.ManyToManyField(
         "portfolio.PortfolioComparison",
-        null=True,
         blank=True,
-        on_delete=models.SET_NULL,
         related_name="blog_posts",
-        help_text="Bu yazı ile ilişkili portföy karşılaştırması",
+        help_text="Bu yazı ile ilişkili portföy karşılaştırmaları",
     )
 
     cashflow_snapshots = models.ManyToManyField(

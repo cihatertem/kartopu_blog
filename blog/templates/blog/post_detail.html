@@ -290,79 +290,113 @@ document.addEventListener("DOMContentLoaded", function () {
   // -------------------------
   // PortfolioSnapshot charts
   // -------------------------
-  const allocation = {{ allocation_chart_json|safe }};
-  const timeseries = {{ timeseries_chart_json|safe }};
-  const comparison = {{ comparison_chart_json|safe }};
+  document.querySelectorAll(".portfolio-charts").forEach((section) => {
+    const allocationRaw = section.dataset.portfolioAllocation;
+    const timeseriesRaw = section.dataset.portfolioTimeseries;
+    if (!allocationRaw || !timeseriesRaw) return;
 
-  if (allocation && document.getElementById("allocationDonut")) {
-    new Chart(document.getElementById("allocationDonut"), {
-      type: "doughnut",
-      data: {
-        labels: allocation.labels,
-        datasets: [{ data: allocation.values }],
-      },
-      options: {
-        responsive: true,
-        plugins: {
-          legend: { position: "bottom" },
-          tooltip: {
-            callbacks: {
-              label(ctx) {
-                const v = ctx.parsed || 0;
-                return `${ctx.label}: ${v.toFixed(2)}%`;
+    let allocationData, timeseriesData;
+    try {
+      allocationData = JSON.parse(allocationRaw);
+      timeseriesData = JSON.parse(timeseriesRaw);
+    } catch {
+      return;
+    }
+
+    const allocationCanvas = section.querySelector(
+      'canvas[data-chart-kind="portfolio-allocation"]'
+    );
+    if (allocationData && allocationCanvas) {
+      new Chart(allocationCanvas, {
+        type: "doughnut",
+        data: {
+          labels: allocationData.labels,
+          datasets: [{ data: allocationData.values }],
+        },
+        options: {
+          responsive: true,
+          plugins: {
+            legend: { position: "bottom" },
+            tooltip: {
+              callbacks: {
+                label(ctx) {
+                  const v = ctx.parsed || 0;
+                  return `${ctx.label}: ${v.toFixed(2)}%`;
+                },
               },
             },
           },
         },
-      },
-    });
-  }
+      });
+    }
 
-  if (timeseries && document.getElementById("valueSeries")) {
-    new Chart(document.getElementById("valueSeries"), {
-      type: "line",
-      data: {
-        labels: timeseries.labels,
-        datasets: [{ data: timeseries.values, fill: false, tension: 0.25 }],
-      },
-      options: {
-        responsive: true,
-        plugins: { legend: { display: false } },
-        scales: {
-          x: {
-            ticks: { maxRotation: 0, autoSkip: true, maxTicksLimit: 8 },
+    const timeseriesCanvas = section.querySelector(
+      'canvas[data-chart-kind="portfolio-timeseries"]'
+    );
+    if (timeseriesData && timeseriesCanvas) {
+      new Chart(timeseriesCanvas, {
+        type: "line",
+        data: {
+          labels: timeseriesData.labels,
+          datasets: [
+            { data: timeseriesData.values, fill: false, tension: 0.25 },
+          ],
+        },
+        options: {
+          responsive: true,
+          plugins: { legend: { display: false } },
+          scales: {
+            x: {
+              ticks: { maxRotation: 0, autoSkip: true, maxTicksLimit: 8 },
+            },
           },
         },
-      },
-    });
-  }
+      });
+    }
+  });
 
-  if (comparison && document.getElementById("comparisonChart")) {
-    new Chart(document.getElementById("comparisonChart"), {
-      type: "bar",
-      data: {
-        labels: comparison.labels,
-        datasets: [
-          {
-            label: comparison.base_label || "Base",
-            data: comparison.base,
+  document.querySelectorAll(".portfolio-comparison-charts").forEach((section) => {
+      const comparisonRaw = section.dataset.portfolioComparison;
+      if (!comparisonRaw) return;
+
+      let comparisonData;
+      try {
+        comparisonData = JSON.parse(comparisonRaw);
+      } catch {
+        return;
+      }
+
+      const comparisonCanvas = section.querySelector(
+        'canvas[data-chart-kind="portfolio-comparison"]'
+      );
+      if (comparisonData && comparisonCanvas) {
+        new Chart(comparisonCanvas, {
+          type: "bar",
+          data: {
+            labels: comparisonData.labels,
+            datasets: [
+              {
+                label: comparisonData.base_label || "Base",
+                data: comparisonData.base,
+              },
+              {
+                label: comparisonData.compare_label || "Compare",
+                data: comparisonData.compare,
+              },
+            ],
           },
-          {
-            label: comparison.compare_label || "Compare",
-            data: comparison.compare,
+          options: {
+            responsive: true,
+            plugins: { legend: { position: "bottom" } },
+            scales: {
+              x: { ticks: { maxRotation: 0, autoSkip: true } },
+              y: { beginAtZero: true },
           },
-        ],
-      },
-      options: {
-        responsive: true,
-        plugins: { legend: { position: "bottom" } },
-        scales: {
-          x: { ticks: { maxRotation: 0, autoSkip: true } },
-          y: { beginAtZero: true },
         },
-      },
-    });
-  }
+      });
+    }
+  });
+
 
   // -------------------------
   // Cashflow charts

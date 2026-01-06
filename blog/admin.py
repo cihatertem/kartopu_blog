@@ -71,12 +71,16 @@ class BlogPostAdmin(admin.ModelAdmin):
     prepopulated_fields = {"slug": ("title",)}
     autocomplete_fields = (
         "category",
-        "portfolio_snapshot",
-        "portfolio_comparison",
+        "portfolio_snapshots",
+        "portfolio_comparisons",
         "cashflow_snapshots",
         "cashflow_comparisons",
     )
-    filter_horizontal = ("tags",)
+    filter_horizontal = (
+        "tags",
+        "portfolio_snapshots",
+        "portfolio_comparisons",
+    )
     ordering = ("-published_at", "-created_at")
 
     fieldsets = (
@@ -88,8 +92,8 @@ class BlogPostAdmin(admin.ModelAdmin):
                     "slug",
                     "author",
                     "category",
-                    "portfolio_snapshot",
-                    "portfolio_comparison",
+                    "portfolio_snapshots",
+                    "portfolio_comparisons",
                     "cashflow_snapshots",
                     "cashflow_comparisons",
                     "cover_image",

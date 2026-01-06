@@ -1,4 +1,3 @@
-import json
 from datetime import date
 
 from allauth.socialaccount.models import SocialAccount
@@ -7,7 +6,6 @@ from django.contrib.postgres.aggregates import StringAgg
 from django.contrib.postgres.search import SearchQuery, SearchRank, SearchVector
 from django.core.exceptions import PermissionDenied
 from django.core.paginator import Paginator
-from django.core.serializers.json import DjangoJSONEncoder
 from django.db.models import Count, F, Prefetch
 from django.shortcuts import get_object_or_404, render
 from django.urls import reverse
@@ -16,7 +14,12 @@ from django.utils.formats import date_format
 from comments.forms import CommentForm
 from comments.models import MAX_COMMENT_LENGTH, Comment
 from core import helpers
-from portfolio.models import CashFlowComparison, CashFlowSnapshot, PortfolioSnapshot
+from portfolio.models import (
+    CashFlowComparison,
+    CashFlowSnapshot,
+    PortfolioComparison,
+    PortfolioSnapshot,
+)
 
 from .models import BlogPost, Category, Tag
 
@@ -51,78 +54,6 @@ def _build_comment_context(request, post):
         "comment_page_obj": comment_page_obj,
         "comment_total": len(approved_comments),
         "has_social_account": has_social_account,
-    }
-
-
-def _build_portfolio_snapshot_context(snapshot):
-    if not snapshot:
-        return {
-            "allocation_chart_json": "null",
-            "timeseries_chart_json": "null",
-        }
-
-    items = snapshot.items.select_related("asset").order_by("-allocation_pct")
-    allocation = {
-        "labels": [(item.asset.symbol or item.asset.name) for item in items],
-        "values": [float(item.allocation_pct or 0) * 100 for item in items],
-    }
-    allocation_chart_json = json.dumps(allocation, cls=DjangoJSONEncoder)
-
-    snapshots_qs = (
-        PortfolioSnapshot.objects.filter(
-            portfolio=snapshot.portfolio,
-            period=snapshot.period,
-        )
-        .order_by("snapshot_date")
-        .values_list("snapshot_date", "total_value")
-    )
-    timeseries = {
-        "labels": [d.isoformat() for d, _ in snapshots_qs],
-        "values": [float(v) for _, v in snapshots_qs],
-    }
-    timeseries_chart_json = json.dumps(timeseries, cls=DjangoJSONEncoder)
-
-    return {
-        "allocation_chart_json": allocation_chart_json,
-        "timeseries_chart_json": timeseries_chart_json,
-    }
-
-
-def _build_portfolio_comparison_context(comparison):
-    if not comparison:
-        return {"comparison_chart_json": "null"}
-
-    base = comparison.base_snapshot
-    compare = comparison.compare_snapshot
-
-    def safe_float(value):
-        try:
-            return float(value or 0)
-        except TypeError:
-            return 0.0
-
-    base_label = f"{base.snapshot_date}"
-    compare_label = f"{compare.snapshot_date}"
-
-    payload = {
-        "labels": [
-            "Toplam Değer",
-            "Toplam Maliyet",
-        ],
-        "base": [
-            safe_float(base.total_value),
-            safe_float(base.total_cost),
-        ],
-        "compare": [
-            safe_float(compare.total_value),
-            safe_float(compare.total_cost),
-        ],
-        "base_label": base_label,
-        "compare_label": compare_label,
-    }
-
-    return {
-        "comparison_chart_json": json.dumps(payload, cls=DjangoJSONEncoder),
     }
 
 
@@ -239,13 +170,24 @@ def post_detail(request, slug: str):
         BlogPost.objects.select_related(
             "category",
             "author",
-            "portfolio_snapshot",
-            "portfolio_comparison",
-            "portfolio_comparison__base_snapshot",
-            "portfolio_comparison__compare_snapshot",
         ).prefetch_related(
             "tags",
             "images",
+            Prefetch(
+                "portfolio_snapshots",
+                queryset=PortfolioSnapshot.objects.select_related("portfolio").order_by(
+                    "snapshot_date"
+                ),
+            ),
+            Prefetch(
+                "portfolio_comparisons",
+                queryset=PortfolioComparison.objects.select_related(
+                    "base_snapshot",
+                    "compare_snapshot",
+                    "base_snapshot__portfolio",
+                    "compare_snapshot__portfolio",
+                ).order_by("created_at"),
+            ),
             Prefetch(
                 "cashflow_snapshots",
                 queryset=CashFlowSnapshot.objects.select_related("cashflow").order_by(
@@ -297,8 +239,6 @@ def post_detail(request, slug: str):
 
     comment_context = _build_comment_context(request, post)
     has_social_account = comment_context["has_social_account"]
-    snapshot_context = _build_portfolio_snapshot_context(post.portfolio_snapshot)
-    comparison_context = _build_portfolio_comparison_context(post.portfolio_comparison)
 
     return render(
         request,
@@ -322,9 +262,6 @@ def post_detail(request, slug: str):
             "MAX_COMMENT_LENGTH": MAX_COMMENT_LENGTH,
             "comment_page_obj": comment_context["comment_page_obj"],
             "comment_total": comment_context["comment_total"],
-            "allocation_chart_json": snapshot_context["allocation_chart_json"],
-            "timeseries_chart_json": snapshot_context["timeseries_chart_json"],
-            "comparison_chart_json": comparison_context["comparison_chart_json"],
         },
     )
 
@@ -335,13 +272,24 @@ def post_preview(request, slug: str):
         BlogPost.objects.select_related(
             "category",
             "author",
-            "portfolio_snapshot",
-            "portfolio_comparison",
-            "portfolio_comparison__base_snapshot",
-            "portfolio_comparison__compare_snapshot",
         ).prefetch_related(
             "tags",
             "images",
+            Prefetch(
+                "portfolio_snapshots",
+                queryset=PortfolioSnapshot.objects.select_related("portfolio").order_by(
+                    "snapshot_date"
+                ),
+            ),
+            Prefetch(
+                "portfolio_comparisons",
+                queryset=PortfolioComparison.objects.select_related(
+                    "base_snapshot",
+                    "compare_snapshot",
+                    "base_snapshot__portfolio",
+                    "compare_snapshot__portfolio",
+                ).order_by("created_at"),
+            ),
             Prefetch(
                 "cashflow_snapshots",
                 queryset=CashFlowSnapshot.objects.select_related("cashflow").order_by(
@@ -378,8 +326,6 @@ def post_preview(request, slug: str):
 
     comment_context = _build_comment_context(request, post)
     has_social_account = comment_context["has_social_account"]
-    snapshot_context = _build_portfolio_snapshot_context(post.portfolio_snapshot)
-    comparison_context = _build_portfolio_comparison_context(post.portfolio_comparison)
 
     return render(
         request,
@@ -401,9 +347,6 @@ def post_preview(request, slug: str):
             "requires_social_auth": not has_social_account,
             "comment_page_obj": comment_context["comment_page_obj"],
             "comment_total": comment_context["comment_total"],
-            "allocation_chart_json": snapshot_context["allocation_chart_json"],
-            "timeseries_chart_json": snapshot_context["timeseries_chart_json"],
-            "comparison_chart_json": comparison_context["comparison_chart_json"],
         },
     )
 

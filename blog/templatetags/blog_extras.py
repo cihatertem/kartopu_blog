@@ -13,13 +13,13 @@ from portfolio.models import CashFlowSnapshot
 register = template.Library()
 
 IMAGE_PATTERN = re.compile(r"\{\{\s*image:(\d+)\s*\}\}")
-PORTFOLIO_SUMMARY_PATTERN = re.compile(r"\{\{\s*portfolio_summary\s*\}\}")
-PORTFOLIO_CHARTS_PATTERN = re.compile(r"\{\{\s*portfolio_charts\s*\}\}")
+PORTFOLIO_SUMMARY_PATTERN = re.compile(r"\{\{\s*portfolio_summary(?::(\d+))?\s*\}\}")
+PORTFOLIO_CHARTS_PATTERN = re.compile(r"\{\{\s*portfolio_charts(?::(\d+))?\s*\}\}")
 PORTFOLIO_COMPARISON_SUMMARY_PATTERN = re.compile(
-    r"\{\{\s*portfolio_comparison_summary\s*\}\}"
+    r"\{\{\s*portfolio_comparison_summary(?::(\d+))?\s*\}\}"
 )
 PORTFOLIO_COMPARISON_CHARTS_PATTERN = re.compile(
-    r"\{\{\s*portfolio_comparison_charts\s*\}\}"
+    r"\{\{\s*portfolio_comparison_charts(?::(\d+))?\s*\}\}"
 )
 CASHFLOW_SUMMARY_PATTERN = re.compile(r"\{\{\s*cashflow_summary(?::(\d+))?\s*\}\}")
 CASHFLOW_CHARTS_PATTERN = re.compile(r"\{\{\s*cashflow_charts(?::(\d+))?\s*\}\}")
@@ -112,25 +112,48 @@ def _render_portfolio_charts_html(snapshot) -> str:
     if not snapshot:
         return ""
 
+    items = snapshot.items.select_related("asset").order_by("-allocation_pct")
+    allocation = {
+        "labels": [(item.asset.symbol or item.asset.name) for item in items],
+        "values": [float(item.allocation_pct or 0) * 100 for item in items],
+    }
+    snapshots_qs = (
+        snapshot.__class__.objects.filter(
+            portfolio=snapshot.portfolio,
+            period=snapshot.period,
+        )
+        .order_by("snapshot_date")
+        .values_list("snapshot_date", "total_value")
+    )
+    timeseries = {
+        "labels": [d.isoformat() for d, _ in snapshots_qs],
+        "values": [float(v) for _, v in snapshots_qs],
+    }
+    allocation_json = escape(json.dumps(allocation, cls=DjangoJSONEncoder))
+    timeseries_json = escape(json.dumps(timeseries, cls=DjangoJSONEncoder))
+
     return """
-<section class="portfolio-charts" style="margin: 1rem 0">
-  <div id="chartFallback" style="display:none; padding: 0.75rem 1rem; border: 1px solid #f2c2c2; background: #fff5f5; border-radius: 8px; margin-bottom: 1rem;">
+<section class="portfolio-charts" style="margin: 1rem 0" data-portfolio-allocation="{allocation_json}" data-portfolio-timeseries="{timeseries_json}">
+  <div class="portfolio-chart-fallback" style="display:none; padding: 0.75rem 1rem; border: 1px solid #f2c2c2; background: #fff5f5; border-radius: 8px; margin-bottom: 1rem;">
     Grafikler yüklenemedi. (Tarayıcı eklentisi / ağ politikası / CSP engelliyor olabilir.)
   </div>
 
   <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 1rem">
     <div style="border: 1px solid #eee; border-radius: 8px; padding: 1rem">
       <h4 style="margin-top: 0">Dağılım</h4>
-      <canvas id="allocationDonut" height="220"></canvas>
+      <canvas data-chart-kind="portfolio-allocation" height="220"></canvas>
     </div>
 
     <div style="border: 1px solid #eee; border-radius: 8px; padding: 1rem">
       <h4 style="margin-top: 0">Portföy Değeri (Zaman Serisi)</h4>
-      <canvas id="valueSeries" height="220"></canvas>
+      <canvas data-chart-kind="portfolio-timeseries" height="220"></canvas>
     </div>
   </div>
 </section>
-"""
+""".format(
+        allocation_json=allocation_json,
+        timeseries_json=timeseries_json,
+    )
 
 
 def _safe_decimal(value) -> Decimal:
@@ -185,6 +208,33 @@ def _get_cashflow_comparisons(post):
             "compare_snapshot",
             "base_snapshot__cashflow",
             "compare_snapshot__cashflow",
+        ).order_by("created_at"),
+    )
+
+
+def _get_portfolio_snapshots(post):
+    if not post:
+        return []
+
+    return _get_prefetched_list(
+        post,
+        "portfolio_snapshots",
+        post.portfolio_snapshots.select_related("portfolio").order_by("snapshot_date"),
+    )
+
+
+def _get_portfolio_comparisons(post):
+    if not post:
+        return []
+
+    return _get_prefetched_list(
+        post,
+        "portfolio_comparisons",
+        post.portfolio_comparisons.select_related(
+            "base_snapshot",
+            "compare_snapshot",
+            "base_snapshot__portfolio",
+            "compare_snapshot__portfolio",
         ).order_by("created_at"),
     )
 
@@ -255,17 +305,43 @@ def _render_portfolio_comparison_charts_html(comparison) -> str:
     if not comparison:
         return ""
 
+    base = comparison.base_snapshot
+    compare = comparison.compare_snapshot
+
+    def safe_float(value):
+        try:
+            return float(value or 0)
+        except TypeError:
+            return 0.0
+
+    payload = {
+        "labels": ["Toplam Değer", "Toplam Maliyet"],
+        "base": [
+            safe_float(base.total_value),
+            safe_float(base.total_cost),
+        ],
+        "compare": [
+            safe_float(compare.total_value),
+            safe_float(compare.total_cost),
+        ],
+        "base_label": f"{base.snapshot_date}",
+        "compare_label": f"{compare.snapshot_date}",
+    }
+    comparison_json = escape(json.dumps(payload, cls=DjangoJSONEncoder))
+
     return """
-<section class="portfolio-comparison-charts" style="margin: 1rem 0">
-  <div id="comparisonChartFallback" style="display:none; padding: 0.75rem 1rem; border: 1px solid #f2c2c2; background: #fff5f5; border-radius: 8px; margin-bottom: 1rem;">
+<section class="portfolio-comparison-charts" style="margin: 1rem 0" data-portfolio-comparison="{comparison_json}">
+  <div class="portfolio-comparison-chart-fallback" style="display:none; padding: 0.75rem 1rem; border: 1px solid #f2c2c2; background: #fff5f5; border-radius: 8px; margin-bottom: 1rem;">
     Grafikler yüklenemedi. (Tarayıcı eklentisi / ağ politikası / CSP engelliyor olabilir.)
   </div>
   <div style="border: 1px solid #eee; border-radius: 8px; padding: 1rem">
     <h4 style="margin-top: 0">Karşılaştırma Özeti</h4>
-    <canvas id="comparisonChart" height="260"></canvas>
+    <canvas data-chart-kind="portfolio-comparison" height="260"></canvas>
   </div>
 </section>
-"""
+""".format(
+        comparison_json=comparison_json,
+    )
 
 
 def _render_cashflow_summary_html(snapshot) -> str:
@@ -435,34 +511,34 @@ def _render_cashflow_comparison_charts_html(comparison) -> str:
 
 
 @register.simple_tag(takes_context=True)
-def portfolio_summary(context):
+def portfolio_summary(context, index=None):
     """Post içindeki snapshot özetini HTML olarak döndürür."""
     post = context.get("post")
-    snapshot = getattr(post, "portfolio_snapshot", None) if post else None
+    snapshot = _get_indexed_item(_get_portfolio_snapshots(post), index)
     return mark_safe(_render_portfolio_summary_html(snapshot))
 
 
 @register.simple_tag(takes_context=True)
-def portfolio_charts(context):
+def portfolio_charts(context, index=None):
     """Post içindeki snapshot grafik alanını HTML olarak döndürür."""
     post = context.get("post")
-    snapshot = getattr(post, "portfolio_snapshot", None) if post else None
+    snapshot = _get_indexed_item(_get_portfolio_snapshots(post), index)
     return mark_safe(_render_portfolio_charts_html(snapshot))
 
 
 @register.simple_tag(takes_context=True)
-def portfolio_comparison_summary(context):
+def portfolio_comparison_summary(context, index=None):
     """Post içindeki karşılaştırma özetini HTML olarak döndürür."""
     post = context.get("post")
-    comparison = getattr(post, "portfolio_comparison", None) if post else None
+    comparison = _get_indexed_item(_get_portfolio_comparisons(post), index)
     return mark_safe(_render_portfolio_comparison_summary_html(comparison))
 
 
 @register.simple_tag(takes_context=True)
-def portfolio_comparison_charts(context):
+def portfolio_comparison_charts(context, index=None):
     """Post içindeki karşılaştırma grafik alanını HTML olarak döndürür."""
     post = context.get("post")
-    comparison = getattr(post, "portfolio_comparison", None) if post else None
+    comparison = _get_indexed_item(_get_portfolio_comparisons(post), index)
     return mark_safe(_render_portfolio_comparison_charts_html(comparison))
 
 
@@ -507,10 +583,10 @@ def render_post_body(context, post):
 
     Markdown içinde kullanılabilen marker'lar:
       {{ image:1 }}  (1-based)
-      {{ portfolio_summary }}
-      {{ portfolio_charts }}
-      {{ portfolio_comparison_summary }}
-      {{ portfolio_comparison_charts }}
+      {{ portfolio_summary:1 }}
+      {{ portfolio_charts:1 }}
+      {{ portfolio_comparison_summary:1 }}
+      {{ portfolio_comparison_charts:1 }}
       {{ cashflow_summary:1 }}
       {{ cashflow_charts:1 }}
       {{ cashflow_comparison_summary:1 }}
@@ -519,7 +595,6 @@ def render_post_body(context, post):
     images = list(
         getattr(post, "images", []).all() if getattr(post, "images", None) else []  # pyright: ignore[reportAttributeAccessIssue]
     )
-    snapshot = getattr(post, "portfolio_snapshot", None)
     content = getattr(post, "content", "") or ""
 
     def image_replacer(match):
@@ -545,18 +620,36 @@ def render_post_body(context, post):
 
     expanded = IMAGE_PATTERN.sub(image_replacer, content)
 
-    expanded = PORTFOLIO_SUMMARY_PATTERN.sub(
-        _render_portfolio_summary_html(snapshot), expanded
-    )
-    expanded = PORTFOLIO_CHARTS_PATTERN.sub(
-        _render_portfolio_charts_html(snapshot), expanded
-    )
-    comparison = getattr(post, "portfolio_comparison", None)
+    portfolio_snapshots = _get_portfolio_snapshots(post)
+    portfolio_comparisons = _get_portfolio_comparisons(post)
+
+    def portfolio_summary_replacer(match):
+        index = int(match.group(1)) if match.group(1) else None
+        snapshot = _get_indexed_item(portfolio_snapshots, index)
+        return _render_portfolio_summary_html(snapshot)
+
+    def portfolio_charts_replacer(match):
+        index = int(match.group(1)) if match.group(1) else None
+        snapshot = _get_indexed_item(portfolio_snapshots, index)
+        return _render_portfolio_charts_html(snapshot)
+
+    def portfolio_comparison_summary_replacer(match):
+        index = int(match.group(1)) if match.group(1) else None
+        comparison = _get_indexed_item(portfolio_comparisons, index)
+        return _render_portfolio_comparison_summary_html(comparison)
+
+    def portfolio_comparison_charts_replacer(match):
+        index = int(match.group(1)) if match.group(1) else None
+        comparison = _get_indexed_item(portfolio_comparisons, index)
+        return _render_portfolio_comparison_charts_html(comparison)
+
+    expanded = PORTFOLIO_SUMMARY_PATTERN.sub(portfolio_summary_replacer, expanded)
+    expanded = PORTFOLIO_CHARTS_PATTERN.sub(portfolio_charts_replacer, expanded)
     expanded = PORTFOLIO_COMPARISON_SUMMARY_PATTERN.sub(
-        _render_portfolio_comparison_summary_html(comparison), expanded
+        portfolio_comparison_summary_replacer, expanded
     )
     expanded = PORTFOLIO_COMPARISON_CHARTS_PATTERN.sub(
-        _render_portfolio_comparison_charts_html(comparison), expanded
+        portfolio_comparison_charts_replacer, expanded
     )
     cashflow_snapshots = _get_cashflow_snapshots(post)
     cashflow_comparisons = _get_cashflow_comparisons(post)
