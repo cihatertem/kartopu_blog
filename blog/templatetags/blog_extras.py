@@ -415,11 +415,12 @@ def _render_cashflow_summary_html(snapshot) -> str:
         return ""
 
     cashflow_name = escape(getattr(snapshot.cashflow, "name", ""))
+    cashflow_currency = getattr(snapshot.cashflow, "currency", None)
     period_display = escape(
         snapshot.get_period_display() if hasattr(snapshot, "get_period_display") else ""
     )
     snapshot_date = escape(str(snapshot.snapshot_date))
-    total_amount = escape(str(snapshot.total_amount))
+    total_amount = _format_currency(snapshot.total_amount, cashflow_currency)
 
     html = f"""
 <section class="cashflow-snapshot">
@@ -492,6 +493,7 @@ def _render_cashflow_comparison_summary_html(comparison) -> str:
 
     base = comparison.base_snapshot
     compare = comparison.compare_snapshot
+    cashflow_currency = getattr(base.cashflow, "currency", None)
 
     base_label = escape(str(base.snapshot_date))
     compare_label = escape(str(compare.snapshot_date))
@@ -519,7 +521,7 @@ def _render_cashflow_comparison_summary_html(comparison) -> str:
           <span style="opacity: 0.7">({base_period})</span>
         </p>
         <ul style="list-style: none; padding-left: 0; margin: 0">
-          <li><strong>Toplam Nakit Akışı:</strong> {escape(str(base_amount))}</li>
+          <li><strong>Toplam Nakit Akışı:</strong> {_format_currency(base_amount, cashflow_currency)}</li>
         </ul>
       </div>
       <div>
@@ -527,7 +529,7 @@ def _render_cashflow_comparison_summary_html(comparison) -> str:
           <span style="opacity: 0.7">({compare_period})</span>
         </p>
         <ul style="list-style: none; padding-left: 0; margin: 0">
-          <li><strong>Toplam Nakit Akışı:</strong> {escape(str(compare_amount))}</li>
+          <li><strong>Toplam Nakit Akışı:</strong> {_format_currency(compare_amount, cashflow_currency)}</li>
         </ul>
       </div>
     </div>
