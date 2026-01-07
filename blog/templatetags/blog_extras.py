@@ -315,14 +315,14 @@ def _render_portfolio_comparison_charts_html(comparison) -> str:
             return 0.0
 
     payload = {
-        "labels": ["Toplam Değer", "Toplam Maliyet"],
+        "labels": ["Toplam Maliyet", "Toplam Değer"],
         "base": [
-            safe_float(base.total_value),
             safe_float(base.total_cost),
+            safe_float(base.total_value),
         ],
         "compare": [
-            safe_float(compare.total_value),
             safe_float(compare.total_cost),
+            safe_float(compare.total_value),
         ],
         "base_label": f"{base.snapshot_date}",
         "compare_label": f"{compare.snapshot_date}",
