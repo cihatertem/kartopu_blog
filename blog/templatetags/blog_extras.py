@@ -77,10 +77,13 @@ def _render_portfolio_summary_html(snapshot) -> str:
         snapshot.get_period_display() if hasattr(snapshot, "get_period_display") else ""
     )
     snapshot_date = escape(str(snapshot.snapshot_date))
-    total_value = escape(str(snapshot.total_value))
-    total_cost = escape(str(snapshot.total_cost))
+    portfolio_currency = getattr(snapshot.portfolio, "currency", None)
+    total_value = _format_currency(snapshot.total_value, portfolio_currency)
+    total_cost = _format_currency(snapshot.total_cost, portfolio_currency)
     target_value = (
-        escape(str(snapshot.target_value)) if snapshot.target_value is not None else ""
+        _format_currency(snapshot.target_value, portfolio_currency)
+        if snapshot.target_value is not None
+        else ""
     )
     total_return_pct_s = escape(f"{float(total_return_pct):.2f}")
 
@@ -161,6 +164,21 @@ def _safe_decimal(value) -> Decimal:
         return value or Decimal("0")
     except TypeError:
         return Decimal("0")
+
+
+def _currency_symbol(currency_code: str | None) -> str:
+    symbols = {
+        "TRY": "₺",
+        "USD": "$",
+        "EUR": "€",
+    }
+    return symbols.get(currency_code or "", "")
+
+
+def _format_currency(value, currency_code: str | None) -> str:
+    value_str = escape(str(value))
+    symbol = _currency_symbol(currency_code)
+    return f"{value_str} {symbol}".rstrip()
 
 
 def _get_prefetched_list(post, attr_name, fallback_queryset):
@@ -261,6 +279,7 @@ def _render_portfolio_comparison_summary_html(comparison) -> str:
     compare_cost = _safe_decimal(compare.total_cost)
     base_return = _safe_decimal(base.total_return_pct) * Decimal("100")
     compare_return = _safe_decimal(compare.total_return_pct) * Decimal("100")
+    portfolio_currency = getattr(base.portfolio, "currency", None)
 
     value_delta = compare_value - base_value
     return_delta = compare_return - base_return
@@ -275,8 +294,8 @@ def _render_portfolio_comparison_summary_html(comparison) -> str:
           <span style="opacity: 0.7">({base_period})</span>
         </p>
         <ul style="list-style: none; padding-left: 0; margin: 0">
-          <li><strong>Toplam Değer:</strong> {escape(str(base_value))}</li>
-          <li><strong>Toplam Maliyet:</strong> {escape(str(base_cost))}</li>
+          <li><strong>Toplam Değer:</strong> {_format_currency(base_value, portfolio_currency)}</li>
+          <li><strong>Toplam Maliyet:</strong> {_format_currency(base_cost, portfolio_currency)}</li>
           <li><strong>Toplam Getiri (%):</strong> {escape(f"{float(base_return):.2f}")}</li>
         </ul>
       </div>
@@ -285,14 +304,14 @@ def _render_portfolio_comparison_summary_html(comparison) -> str:
           <span style="opacity: 0.7">({compare_period})</span>
         </p>
         <ul style="list-style: none; padding-left: 0; margin: 0">
-          <li><strong>Toplam Değer:</strong> {escape(str(compare_value))}</li>
-          <li><strong>Toplam Maliyet:</strong> {escape(str(compare_cost))}</li>
+          <li><strong>Toplam Değer:</strong> {_format_currency(compare_value, portfolio_currency)}</li>
+          <li><strong>Toplam Maliyet:</strong> {_format_currency(compare_cost, portfolio_currency)}</li>
           <li><strong>Toplam Getiri (%):</strong> {escape(f"{float(compare_return):.2f}")}</li>
         </ul>
       </div>
     </div>
     <div style="margin-top: 0.75rem; padding-top: 0.75rem; border-top: 1px solid #eee">
-      <p style="margin: 0"><strong>Değişim:</strong> Toplam Değer {escape(str(value_delta))},
+      <p style="margin: 0"><strong>Değişim:</strong> Toplam Değer {_format_currency(value_delta, portfolio_currency)},
         Getiri {escape(f"{float(return_delta):.2f}")}%</p>
     </div>
   </div>
