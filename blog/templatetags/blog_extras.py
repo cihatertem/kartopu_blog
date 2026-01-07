@@ -80,15 +80,29 @@ def _render_portfolio_summary_html(snapshot) -> str:
     portfolio_currency = getattr(snapshot.portfolio, "currency", None)
     total_value = _format_currency(snapshot.total_value, portfolio_currency)
     total_cost = _format_currency(snapshot.total_cost, portfolio_currency)
+    target_value_raw = snapshot.target_value
     target_value = (
-        _format_currency(snapshot.target_value, portfolio_currency)
-        if snapshot.target_value is not None
+        _format_currency(target_value_raw, portfolio_currency)
+        if target_value_raw is not None
         else ""
     )
+    target_ratio_pct = ""
+    if target_value_raw is not None:
+        target_value_decimal = _safe_decimal(target_value_raw)
+        if target_value_decimal:
+            total_value_decimal = _safe_decimal(snapshot.total_value)
+            target_ratio_pct = escape(
+                f"{float((total_value_decimal / target_value_decimal) * Decimal('100')):.2f}"
+            )
     total_return_pct_s = escape(f"{float(total_return_pct):.2f}")
 
     target_li = (
         f"<li><strong>Hedef Değer:</strong> {target_value}</li>" if target_value else ""
+    )
+    target_ratio_li = (
+        f"<li><strong>Hedef Gerçekleşme (%):</strong> {target_ratio_pct}</li>"
+        if target_ratio_pct
+        else ""
     )
 
     html = f"""
@@ -103,6 +117,7 @@ def _render_portfolio_summary_html(snapshot) -> str:
       <li><strong>Toplam Değer:</strong> {total_value}</li>
       <li><strong>Toplam Maliyet:</strong> {total_cost}</li>
       {target_li}
+      {target_ratio_li}
       <li><strong>Toplam Getiri (%):</strong> {total_return_pct_s}</li>
     </ul>
   </div>
