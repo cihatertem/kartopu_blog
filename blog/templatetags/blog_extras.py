@@ -8,7 +8,7 @@ from django.utils.html import escape
 from django.utils.safestring import mark_safe
 
 from core.markdown import render_markdown
-from portfolio.models import CashFlowSnapshot
+from portfolio.models import CashFlowEntry, CashFlowSnapshot
 
 register = template.Library()
 
@@ -421,6 +421,12 @@ def _render_cashflow_summary_html(snapshot) -> str:
     )
     snapshot_date = escape(str(snapshot.snapshot_date))
     total_amount = _format_currency(snapshot.total_amount, cashflow_currency)
+    category_items = snapshot.items.order_by("-amount")
+    category_rows = "\n".join(
+        f"<li><strong>{escape(item.get_category_display())}:</strong> "
+        f"{_format_currency(item.amount, cashflow_currency)}</li>"
+        for item in category_items
+    )
 
     html = f"""
 <section class="cashflow-snapshot">
@@ -432,6 +438,7 @@ def _render_cashflow_summary_html(snapshot) -> str:
     </p>
     <ul style="list-style: none; padding-left: 0; margin: 0">
       <li><strong>Toplam Nakit Akışı:</strong> {total_amount}</li>
+      {category_rows}
     </ul>
   </div>
 </section>
@@ -511,6 +518,32 @@ def _render_cashflow_comparison_summary_html(comparison) -> str:
         (delta / base_amount) * Decimal("100") if base_amount > 0 else Decimal("0")
     )
 
+    base_items = {
+        item.category: _safe_decimal(item.amount) for item in base.items.all()
+    }
+    compare_items = {
+        item.category: _safe_decimal(item.amount) for item in compare.items.all()
+    }
+    categories = sorted(set(base_items.keys()) | set(compare_items.keys()))
+    category_label_map = dict(CashFlowEntry.Category.choices)
+    base_category_rows = "\n".join(
+        f"<li><strong>{escape(category_label_map.get(category, category))}:</strong> "
+        f"{_format_currency(base_items.get(category, Decimal('0')), cashflow_currency)}</li>"
+        for category in categories
+    )
+    compare_category_rows = "\n".join(
+        f"<li><strong>{escape(category_label_map.get(category, category))}:</strong> "
+        f"{_format_currency(compare_items.get(category, Decimal('0')), cashflow_currency)}</li>"
+        for category in categories
+    )
+    category_delta_rows = "\n".join(
+        f"<li><strong>{escape(category_label_map.get(category, category))}:</strong> "
+        f"{_format_currency(base_items.get(category, Decimal('0')), cashflow_currency)} → "
+        f"{_format_currency(compare_items.get(category, Decimal('0')), cashflow_currency)} "
+        f'(<span style="opacity: 0.8">{_format_currency(compare_items.get(category, Decimal("0")) - base_items.get(category, Decimal("0")), cashflow_currency)}</span>)</li>'
+        for category in categories
+    )
+
     html = f"""
 <section class="cashflow-comparison">
   <h3>Nakit Akışı Karşılaştırması</h3>
@@ -522,6 +555,7 @@ def _render_cashflow_comparison_summary_html(comparison) -> str:
         </p>
         <ul style="list-style: none; padding-left: 0; margin: 0">
           <li><strong>Toplam Nakit Akışı:</strong> {_format_currency(base_amount, cashflow_currency)}</li>
+          {base_category_rows}
         </ul>
       </div>
       <div>
@@ -530,11 +564,15 @@ def _render_cashflow_comparison_summary_html(comparison) -> str:
         </p>
         <ul style="list-style: none; padding-left: 0; margin: 0">
           <li><strong>Toplam Nakit Akışı:</strong> {_format_currency(compare_amount, cashflow_currency)}</li>
+          {compare_category_rows}
         </ul>
       </div>
     </div>
     <div style="margin-top: 0.75rem; padding-top: 0.75rem; border-top: 1px solid #eee">
-      <p style="margin: 0"><strong>Değişim:</strong> {escape(str(delta))} ({escape(f"{float(pct_change):.2f}")}%)</p>
+      <p style="margin: 0"><strong>Değişim:</strong> {_format_currency(delta, cashflow_currency)} ({escape(f"{float(pct_change):.2f}")}%)</p>
+      <ul style="list-style: none; padding-left: 0; margin: 0.5rem 0 0 0">
+        {category_delta_rows}
+      </ul>
     </div>
   </div>
 </section>
