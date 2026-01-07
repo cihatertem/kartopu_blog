@@ -180,8 +180,9 @@ class PortfolioComparisonAdmin(admin.ModelAdmin):
 
 
 class CashFlowEntryInline(admin.TabularInline):
-    model = CashFlowEntry
+    model = CashFlowEntry.cashflows.through
     extra = 0
+    autocomplete_fields = ("cashflowentry",)
 
 
 @admin.register(CashFlow)
@@ -245,9 +246,14 @@ class CashFlowAdmin(admin.ModelAdmin):
 
 @admin.register(CashFlowEntry)
 class CashFlowEntryAdmin(admin.ModelAdmin):
-    list_display = ("cashflow", "category", "entry_date", "amount", "currency")
-    list_filter = ("category", "entry_date", "currency")
-    search_fields = ("cashflow__name",)
+    list_display = ("cashflows_display", "category", "entry_date", "amount", "currency")
+    list_filter = ("category", "entry_date", "currency", "cashflows")
+    search_fields = ("cashflows__name",)
+    autocomplete_fields = ("cashflows",)
+
+    @admin.display(description="Nakit Akışları")
+    def cashflows_display(self, obj):
+        return ", ".join(obj.cashflows.values_list("name", flat=True).order_by("name"))
 
 
 class CashFlowSnapshotItemInline(admin.TabularInline):

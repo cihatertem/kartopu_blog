@@ -439,6 +439,7 @@ class CashFlow(UUIDModelMixin, TimeStampedModelMixin):
     class Meta:  # pyright: ignore[reportIncompatibleVariableOverride]
         verbose_name = "Nakit Akışı"
         verbose_name_plural = "Nakit Akışları"
+        ordering = ("-created_at",)
 
     def __str__(self) -> str:
         return self.name
@@ -452,9 +453,8 @@ class CashFlowEntry(UUIDModelMixin, TimeStampedModelMixin):
         CREDIT_CARD_BONUS = "credit_card_bonus", "Kredi Kartı Bonus"
         OTHER = "other", "Diğer"
 
-    cashflow = models.ForeignKey(
+    cashflows = models.ManyToManyField(
         CashFlow,
-        on_delete=models.CASCADE,
         related_name="entries",
     )
     entry_date = models.DateField()
@@ -472,9 +472,13 @@ class CashFlowEntry(UUIDModelMixin, TimeStampedModelMixin):
     class Meta:  # pyright: ignore[reportIncompatibleVariableOverride]
         verbose_name = "Nakit Akışı Girişi"
         verbose_name_plural = "Nakit Akışı Girişleri"
+        ordering = ("-created_at", "-entry_date")
 
     def __str__(self) -> str:
-        return f"{self.cashflow} - {self.get_category_display()}"  # pyright: ignore[reportAttributeAccessIssue]
+        cashflows = ", ".join(
+            self.cashflows.values_list("name", flat=True).order_by("name")
+        )
+        return f"{cashflows or 'Nakit Akışı Yok'} - {self.get_category_display()}"  # pyright: ignore[reportAttributeAccessIssue]
 
 
 class CashFlowSnapshot(UUIDModelMixin, TimeStampedModelMixin):
@@ -489,7 +493,11 @@ class CashFlowSnapshot(UUIDModelMixin, TimeStampedModelMixin):
     )
     period = models.CharField(max_length=10, choices=Period.choices)
     snapshot_date = models.DateField(default=timezone.now)
-    name = models.CharField(max_length=200, blank=True)
+    name = models.CharField(
+        max_length=200,
+        blank=True,
+        help_text="İsimlendirme yapılmazsa CashFlow adı kullanılır.",
+    )
     total_amount = models.DecimalField(
         max_digits=MAX_DICITS, decimal_places=MAX_DECIMAL_PLACES
     )
@@ -524,7 +532,7 @@ class CashFlowSnapshot(UUIDModelMixin, TimeStampedModelMixin):
             end_date = snapshot_date.replace(month=12, day=31)
 
         entries = CashFlowEntry.objects.filter(
-            cashflow=cashflow,
+            cashflows=cashflow,
             entry_date__gte=start_date,
             entry_date__lte=end_date,
         ).values("category", "amount", "currency")
@@ -557,7 +565,7 @@ class CashFlowSnapshot(UUIDModelMixin, TimeStampedModelMixin):
             cashflow=cashflow,
             period=period,
             snapshot_date=snapshot_date,
-            name=name or "",
+            name=name or cashflow.name,
             total_amount=total_amount,
         )
 
