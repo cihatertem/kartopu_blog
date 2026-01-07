@@ -296,8 +296,38 @@ def _render_portfolio_comparison_summary_html(comparison) -> str:
     compare_return = _safe_decimal(compare.total_return_pct) * Decimal("100")
     portfolio_currency = getattr(base.portfolio, "currency", None)
 
+    base_target_value = _safe_decimal(base.target_value)
+    compare_target_value = _safe_decimal(compare.target_value)
+    base_target_ratio = (
+        (base_value / base_target_value) * Decimal("100") if base_target_value else None
+    )
+    compare_target_ratio = (
+        (compare_value / compare_target_value) * Decimal("100")
+        if compare_target_value
+        else None
+    )
+
     value_delta = compare_value - base_value
     return_delta = compare_return - base_return
+    target_ratio_delta = None
+    if base_target_ratio is not None and compare_target_ratio is not None:
+        target_ratio_delta = compare_target_ratio - base_target_ratio
+
+    base_target_ratio_html = (
+        f"<li><strong>Hedef Gerçekleşme (%):</strong> {escape(f'{float(base_target_ratio):.2f}')}</li>"
+        if base_target_ratio is not None
+        else ""
+    )
+    compare_target_ratio_html = (
+        f"<li><strong>Hedef Gerçekleşme (%):</strong> {escape(f'{float(compare_target_ratio):.2f}')}</li>"
+        if compare_target_ratio is not None
+        else ""
+    )
+    target_ratio_delta_html = (
+        f", Hedef Gerçekleşme {escape(f'{float(target_ratio_delta):.2f}')}%"
+        if target_ratio_delta is not None
+        else ""
+    )
 
     html = f"""
 <section class="portfolio-comparison">
@@ -311,6 +341,7 @@ def _render_portfolio_comparison_summary_html(comparison) -> str:
         <ul style="list-style: none; padding-left: 0; margin: 0">
           <li><strong>Toplam Değer:</strong> {_format_currency(base_value, portfolio_currency)}</li>
           <li><strong>Toplam Maliyet:</strong> {_format_currency(base_cost, portfolio_currency)}</li>
+          {base_target_ratio_html}
           <li><strong>Toplam Getiri (%):</strong> {escape(f"{float(base_return):.2f}")}</li>
         </ul>
       </div>
@@ -321,13 +352,14 @@ def _render_portfolio_comparison_summary_html(comparison) -> str:
         <ul style="list-style: none; padding-left: 0; margin: 0">
           <li><strong>Toplam Değer:</strong> {_format_currency(compare_value, portfolio_currency)}</li>
           <li><strong>Toplam Maliyet:</strong> {_format_currency(compare_cost, portfolio_currency)}</li>
+          {compare_target_ratio_html}
           <li><strong>Toplam Getiri (%):</strong> {escape(f"{float(compare_return):.2f}")}</li>
         </ul>
       </div>
     </div>
     <div style="margin-top: 0.75rem; padding-top: 0.75rem; border-top: 1px solid #eee">
       <p style="margin: 0"><strong>Değişim:</strong> Toplam Değer {_format_currency(value_delta, portfolio_currency)},
-        Getiri {escape(f"{float(return_delta):.2f}")}%</p>
+        Getiri {escape(f"{float(return_delta):.2f}")}%{target_ratio_delta_html}</p>
     </div>
   </div>
 </section>
