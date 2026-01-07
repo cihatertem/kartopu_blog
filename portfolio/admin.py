@@ -138,8 +138,10 @@ class PortfolioSnapshotAdmin(admin.ModelAdmin):
             portfolio=obj.portfolio,
             period=obj.period,
             snapshot_date=obj.snapshot_date,
+            name=obj.name,
         )
         obj.pk = snapshot.pk
+        obj.name = snapshot.name
         obj.total_value = snapshot.total_value
         obj.total_cost = snapshot.total_cost
         obj.target_value = snapshot.target_value
@@ -273,8 +275,10 @@ class CashFlowSnapshotAdmin(admin.ModelAdmin):
             cashflow=obj.cashflow,
             period=obj.period,
             snapshot_date=obj.snapshot_date,
+            name=obj.name,
         )
         obj.pk = snapshot.pk
+        obj.name = snapshot.name
         obj.total_amount = snapshot.total_amount
 
 

@@ -14,6 +14,7 @@ from portfolio.services import fetch_fx_rate, fetch_yahoo_finance_price
 
 MAX_DICITS = 200
 MAX_DECIMAL_PLACES = 2
+MAX_DECIMAL_PLACES_FOR_QUANTITY = 5
 
 
 class Asset(UUIDModelMixin, TimeStampedModelMixin):
@@ -251,7 +252,7 @@ class PortfolioTransaction(UUIDModelMixin, TimeStampedModelMixin):
     )
     trade_date = models.DateField()
     quantity = models.DecimalField(
-        max_digits=MAX_DICITS, decimal_places=MAX_DECIMAL_PLACES
+        max_digits=MAX_DICITS, decimal_places=MAX_DECIMAL_PLACES_FOR_QUANTITY
     )
     price_per_unit = models.DecimalField(
         max_digits=MAX_DICITS, decimal_places=MAX_DECIMAL_PLACES
@@ -325,6 +326,7 @@ class PortfolioSnapshot(UUIDModelMixin, TimeStampedModelMixin):
         portfolio: Portfolio,
         period: str,
         snapshot_date: timezone.datetime | None = None,
+        name: str | None = None,
     ) -> "PortfolioSnapshot":
         snapshot_date = snapshot_date or timezone.now().date()  # pyright: ignore[reportAssignmentType]
 
@@ -356,6 +358,7 @@ class PortfolioSnapshot(UUIDModelMixin, TimeStampedModelMixin):
             portfolio=portfolio,
             period=period,
             snapshot_date=snapshot_date,
+            name=name or "",
             total_value=total_value,
             total_cost=total_cost,
             target_value=portfolio.target_value,
@@ -387,7 +390,7 @@ class PortfolioSnapshotItem(UUIDModelMixin, TimeStampedModelMixin):
     )
     asset = models.ForeignKey(Asset, on_delete=models.PROTECT)
     quantity = models.DecimalField(
-        max_digits=MAX_DICITS, decimal_places=MAX_DECIMAL_PLACES
+        max_digits=MAX_DICITS, decimal_places=MAX_DECIMAL_PLACES_FOR_QUANTITY
     )
     average_cost = models.DecimalField(
         max_digits=MAX_DICITS, decimal_places=MAX_DECIMAL_PLACES
@@ -508,6 +511,7 @@ class CashFlowSnapshot(UUIDModelMixin, TimeStampedModelMixin):
         cashflow: CashFlow,
         period: str,
         snapshot_date: date | None = None,
+        name: str | None = None,
     ) -> "CashFlowSnapshot":
         snapshot_date = snapshot_date or timezone.now().date()  # pyright: ignore[reportAssignmentType]
 
@@ -553,6 +557,7 @@ class CashFlowSnapshot(UUIDModelMixin, TimeStampedModelMixin):
             cashflow=cashflow,
             period=period,
             snapshot_date=snapshot_date,
+            name=name or "",
             total_amount=total_amount,
         )
 
