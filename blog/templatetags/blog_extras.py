@@ -312,7 +312,7 @@ def _get_dividend_comparison_pair(snapshots, currency_code=None):
             break
 
     if len(unique_years) < 2:
-        return None, None
+        return filtered[1], filtered[0]
 
     return unique_years[1], unique_years[0]
 
