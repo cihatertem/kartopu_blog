@@ -814,12 +814,10 @@ class DividendSnapshot(UUIDModelMixin, TimeStampedModelMixin):
             yield_on_payment = (
                 per_share / last_close if last_close > 0 else Decimal("0")
             )
-            yield_on_average = (
-                per_share / avg_cost if avg_cost > 0 else Decimal("0")
-            )
+            yield_on_average = per_share / avg_cost if avg_cost > 0 else Decimal("0")
             total_amount += total_payment
             asset_entry = asset_totals.setdefault(
-                str(payment.asset_id),
+                str(payment.asset_id),  # pyright: ignore[reportAttributeAccessIssue]
                 {"asset": payment.asset, "total_amount": Decimal("0")},
             )
             asset_entry["total_amount"] = (
@@ -846,7 +844,7 @@ class DividendSnapshot(UUIDModelMixin, TimeStampedModelMixin):
 
         for asset_entry in asset_totals.values():
             amount = asset_entry["total_amount"]
-            allocation_pct = amount / total_amount if total_amount > 0 else Decimal("0")
+            allocation_pct = amount / total_amount if total_amount > 0 else Decimal("0")  # pyright: ignore[reportOperatorIssue]
             DividendSnapshotAssetItem.objects.create(
                 snapshot=snapshot,
                 asset=asset_entry["asset"],
