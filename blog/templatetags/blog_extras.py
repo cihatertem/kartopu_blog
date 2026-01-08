@@ -640,29 +640,30 @@ def _render_dividend_summary_html(snapshot) -> str:
         "payment_date"
     )
 
+    cell_style = "padding: 0.5rem; border-bottom: 1px solid #f2f2f2; text-align: left;"
     rows = "\n".join(
         "<tr>"
-        f"<td>{escape(item.asset.name)}</td>"
-        f"<td>{escape(str(item.payment_date))}</td>"
-        f"<td>{_format_currency(item.per_share_net_amount, snapshot.currency)}</td>"
-        f"<td>{escape(f'{float((item.dividend_yield_on_payment_price or 0) * 100):.2f}')}%</td>"
-        f"<td>{escape(f'{float((item.dividend_yield_on_average_cost or 0) * 100):.2f}')}%</td>"
-        f"<td>{_format_currency(item.total_net_amount, snapshot.currency)}</td>"
+        f"<td style=\"{cell_style}\">{escape(item.asset.name)}</td>"
+        f"<td style=\"{cell_style}\">{escape(str(item.payment_date))}</td>"
+        f"<td style=\"{cell_style}\">{_format_currency(item.per_share_net_amount, snapshot.currency)}</td>"
+        f"<td style=\"{cell_style}\">{escape(f'{float((item.dividend_yield_on_payment_price or 0) * 100):.2f}')}%</td>"
+        f"<td style=\"{cell_style}\">{escape(f'{float((item.dividend_yield_on_average_cost or 0) * 100):.2f}')}%</td>"
+        f"<td style=\"{cell_style}\">{_format_currency(item.total_net_amount, snapshot.currency)}</td>"
         "</tr>"
         for item in payment_items
     )
 
     table_html = f"""
     <div style="overflow-x: auto; margin-top: 1rem;">
-      <table style="width: 100%; border-collapse: collapse; min-width: 640px;">
+      <table style="width: 100%; border-collapse: collapse; min-width: 640px; font-size: 0.95rem;">
         <thead>
           <tr>
-            <th style="text-align:left; border-bottom: 1px solid #eee; padding: 0.5rem;">Varlık</th>
-            <th style="text-align:left; border-bottom: 1px solid #eee; padding: 0.5rem;">Ödeme Tarihi</th>
-            <th style="text-align:left; border-bottom: 1px solid #eee; padding: 0.5rem;">Hisse Başına Net Temettü</th>
-            <th style="text-align:left; border-bottom: 1px solid #eee; padding: 0.5rem;">Ödeme Günü Temettü Verimi</th>
-            <th style="text-align:left; border-bottom: 1px solid #eee; padding: 0.5rem;">Ortalama Maliyet Temettü Verimi</th>
-            <th style="text-align:left; border-bottom: 1px solid #eee; padding: 0.5rem;">Toplam Net Temettü</th>
+            <th style="text-align:left; border-bottom: 1px solid #eee; padding: 0.5rem; background: #fafafa;">Varlık</th>
+            <th style="text-align:left; border-bottom: 1px solid #eee; padding: 0.5rem; background: #fafafa;">Ödeme Tarihi</th>
+            <th style="text-align:left; border-bottom: 1px solid #eee; padding: 0.5rem; background: #fafafa;">Hisse Başına Net Temettü</th>
+            <th style="text-align:left; border-bottom: 1px solid #eee; padding: 0.5rem; background: #fafafa;">Ödeme Günü Temettü Verimi</th>
+            <th style="text-align:left; border-bottom: 1px solid #eee; padding: 0.5rem; background: #fafafa;">Ortalama Maliyet Temettü Verimi</th>
+            <th style="text-align:left; border-bottom: 1px solid #eee; padding: 0.5rem; background: #fafafa;">Toplam Net Temettü</th>
           </tr>
         </thead>
         <tbody>
