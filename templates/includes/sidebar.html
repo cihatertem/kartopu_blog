@@ -15,6 +15,40 @@
 
 <div style="height: 1rem;"></div>
 
+<! -- Son Yazılar Bölümü -->
+<section style="border: 1px solid #eee; padding: 1rem; border-radius: 8px;">
+  <h3 style="margin-top: 0;">Son Yazılar</h3>
+
+  <ul style="padding-left: 1.2rem; margin: 0;">
+    {% for post in nav_recent_posts %}
+      <li>
+        <a href="{{ post.get_absolute_url }}">{{ post.title }}</a>
+      </li>
+    {% empty %}
+      <li>Henüz yazı yok.</li>
+    {% endfor %}
+  </ul>
+</section>
+
+<div style="height: 1rem;"></div>
+
+<! -- Popüler Yazılar Bölümü -->
+<section style="border: 1px solid #eee; padding: 1rem; border-radius: 8px;">
+  <h3 style="margin-top: 0;">Popüler Yazılar</h3>
+
+  <ul style="padding-left: 1.2rem; margin: 0;">
+    {% for post in nav_popular_posts %}
+      <li>
+        <a href="{{ post.get_absolute_url }}">{{ post.title }}</a>
+      </li>
+    {% empty %}
+      <li>Henüz yazı yok.</li>
+    {% endfor %}
+  </ul>
+</section>
+
+<div style="height: 1rem;"></div>
+
 <! -- Kategoriler Bölümü -->
 <section style="border: 1px solid #eee; padding: 1rem; border-radius: 8px;">
   <h3 style="margin-top: 0;">Kategoriler</h3>

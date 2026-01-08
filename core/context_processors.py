@@ -1,11 +1,22 @@
 from __future__ import annotations
 
 from django.core.cache import cache
-from django.db.models import Count, Q
+from django.db.models import Count, F, IntegerField, Q
+from django.db.models.expressions import ExpressionWrapper
 from django.db.models.functions import TruncMonth
 from django.urls import reverse
 
+from blog.cache_keys import (
+    NAV_ARCHIVES_KEY,
+    NAV_CATEGORIES_KEY,
+    NAV_POPULAR_POSTS_KEY,
+    NAV_RECENT_POSTS_KEY,
+    NAV_TAGS_KEY,
+)
 from blog.models import BlogPost, Category, Tag
+from comments.models import Comment
+
+CACHE_TIMEOUT = 600  # 10 minutes
 
 
 def breadcrumbs_context(request):
@@ -26,8 +37,7 @@ def breadcrumbs_context(request):
 
 
 def categories_tags_context(request):
-    cache_key = "nav_categories"
-    nav_categories = cache.get(cache_key)
+    nav_categories = cache.get(NAV_CATEGORIES_KEY)
 
     if nav_categories is None:
         nav_categories = list(
@@ -39,10 +49,9 @@ def categories_tags_context(request):
                 )
             )
         )
-        cache.set(cache_key, nav_categories, timeout=600)
+        cache.set(NAV_CATEGORIES_KEY, nav_categories, timeout=CACHE_TIMEOUT)
 
-    tag_cache_key = "nav_tags"
-    nav_tags = cache.get(tag_cache_key)
+    nav_tags = cache.get(NAV_TAGS_KEY)
 
     if nav_tags is None:
         qs = (
@@ -70,10 +79,9 @@ def categories_tags_context(request):
                 normalized = (t["post_count"] - min_count) / (max_count - min_count)
                 t["cloud_size"] = round(0.85 + normalized * 0.75, 2)
 
-        cache.set(tag_cache_key, nav_tags, timeout=600)
+        cache.set(NAV_TAGS_KEY, nav_tags, timeout=600)
 
-    archive_cache_key = "nav_archives"
-    nav_archives = cache.get(archive_cache_key)
+    nav_archives = cache.get(NAV_ARCHIVES_KEY)
 
     if nav_archives is None:
         archive_rows = (
@@ -101,10 +109,51 @@ def categories_tags_context(request):
                     ),
                 }
             )
-        cache.set(archive_cache_key, nav_archives, timeout=600)
+            cache.set(NAV_ARCHIVES_KEY, nav_archives, timeout=600)
+
+    nav_recent_posts = cache.get(NAV_RECENT_POSTS_KEY)
+
+    if nav_recent_posts is None:
+        nav_recent_posts = list(
+            BlogPost.objects.filter(
+                status=BlogPost.Status.PUBLISHED,
+                published_at__isnull=False,
+            )
+            .order_by("-published_at")
+            .only("title", "slug")[:5]
+        )
+        cache.set(NAV_RECENT_POSTS_KEY, nav_recent_posts, timeout=600)
+
+    nav_popular_posts = cache.get(NAV_POPULAR_POSTS_KEY)
+
+    if nav_popular_posts is None:
+        nav_popular_posts = list(
+            BlogPost.objects.filter(
+                status=BlogPost.Status.PUBLISHED,
+                published_at__isnull=False,
+            )
+            .annotate(
+                approved_comment_count=Count(
+                    "comments",
+                    filter=Q(comments__status=Comment.Status.APPROVED),
+                    distinct=True,
+                ),
+            )
+            .annotate(
+                popularity_score=ExpressionWrapper(
+                    F("approved_comment_count") * 5 + F("view_count"),
+                    output_field=IntegerField(),
+                )
+            )
+            .order_by("-popularity_score", "-view_count", "-published_at")
+            .only("title", "slug", "view_count")[:5]
+        )
+        cache.set(NAV_POPULAR_POSTS_KEY, nav_popular_posts, timeout=600)
 
     return {
         "nav_categories": nav_categories,
         "nav_tags": nav_tags,
         "nav_archives": nav_archives,
+        "nav_recent_posts": nav_recent_posts,
+        "nav_popular_posts": nav_popular_posts,
     }
