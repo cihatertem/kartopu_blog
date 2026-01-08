@@ -108,7 +108,9 @@ class BlogPost(
           {{ cashflow_comparison_summary:1 }}<br>
           {{ cashflow_comparison_charts:1 }}<br>
           {{ dividend_summary:1 }}<br>
-          {{ dividend_charts:1 }}<br>"""
+          {{ dividend_charts:1 }}<br>
+          {{ dividend_comparison:TRY }}<br>
+          {{ dividend_comparison:USD }}<br>"""
     )
 
     # --- Yayın durumu ---

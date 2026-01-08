@@ -31,6 +31,9 @@ CASHFLOW_COMPARISON_CHARTS_PATTERN = re.compile(
 )
 DIVIDEND_SUMMARY_PATTERN = re.compile(r"\{\{\s*dividend_summary(?::(\d+))?\s*\}\}")
 DIVIDEND_CHARTS_PATTERN = re.compile(r"\{\{\s*dividend_charts(?::(\d+))?\s*\}\}")
+DIVIDEND_COMPARISON_PATTERN = re.compile(
+    r"\{\{\s*dividend_comparison(?::([A-Za-z]{3,10}))?\s*\}\}"
+)
 
 
 @register.filter
@@ -281,8 +284,37 @@ def _get_dividend_snapshots(post):
     return _get_prefetched_list(
         post,
         "dividend_snapshots",
-        post.dividend_snapshots.order_by("-year"),
+        post.dividend_snapshots.order_by("-year", "-created_at"),
     )
+
+
+def _get_dividend_comparison_pair(snapshots, currency_code=None):
+    if not snapshots:
+        return None, None
+
+    normalized_currency = currency_code.upper() if currency_code else None
+    filtered = [
+        snapshot
+        for snapshot in snapshots
+        if not normalized_currency or snapshot.currency == normalized_currency
+    ]
+    if len(filtered) < 2:
+        return None, None
+
+    unique_years = []
+    seen_years = set()
+    for snapshot in filtered:
+        if snapshot.year in seen_years:
+            continue
+        unique_years.append(snapshot)
+        seen_years.add(snapshot.year)
+        if len(unique_years) == 2:
+            break
+
+    if len(unique_years) < 2:
+        return None, None
+
+    return unique_years[1], unique_years[0]
 
 
 def _render_portfolio_comparison_summary_html(comparison) -> str:
@@ -713,6 +745,54 @@ def _render_dividend_charts_html(snapshot) -> str:
     )
 
 
+def _render_dividend_comparison_html(base_snapshot, compare_snapshot) -> str:
+    if not base_snapshot or not compare_snapshot:
+        return ""
+
+    base_year = escape(str(base_snapshot.year))
+    compare_year = escape(str(compare_snapshot.year))
+    base_total = _safe_decimal(base_snapshot.total_amount)
+    compare_total = _safe_decimal(compare_snapshot.total_amount)
+    delta = compare_total - base_total
+    pct_change = (
+        (delta / base_total) * Decimal("100") if base_total > 0 else Decimal("0")
+    )
+
+    base_total_display = _format_currency(base_total, base_snapshot.currency)
+    compare_total_display = _format_currency(compare_total, compare_snapshot.currency)
+    delta_display = _format_currency(delta, compare_snapshot.currency)
+
+    html = f"""
+<section class="dividend-comparison">
+  <h3>Temettü Karşılaştırması</h3>
+  <div style="border: 1px solid #ddd; border-radius: 8px; padding: 1rem; margin: 1rem 0">
+    <div style="overflow-x: auto;">
+      <table style="width: 100%; border-collapse: collapse; min-width: 360px; font-size: 0.95rem;">
+        <thead>
+          <tr>
+            <th style="text-align:left; border-bottom: 1px solid #eee; padding: 0.5rem; background: #fafafa;">Yıl</th>
+            <th style="text-align:left; border-bottom: 1px solid #eee; padding: 0.5rem; background: #fafafa;">Toplam Temettü</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td style="padding: 0.5rem; border-bottom: 1px solid #f2f2f2;">{base_year}</td>
+            <td style="padding: 0.5rem; border-bottom: 1px solid #f2f2f2;">{base_total_display}</td>
+          </tr>
+          <tr>
+            <td style="padding: 0.5rem; border-bottom: 1px solid #f2f2f2;">{compare_year}</td>
+            <td style="padding: 0.5rem; border-bottom: 1px solid #f2f2f2;">{compare_total_display}</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    <p style="margin: 0.75rem 0 0 0"><strong>Değişim:</strong> {delta_display} ({escape(f"{float(pct_change):.2f}")}%)</p>
+  </div>
+</section>
+"""
+    return html
+
+
 @register.simple_tag(takes_context=True)
 def portfolio_summary(context, index=None):
     """Post içindeki snapshot özetini HTML olarak döndürür."""
@@ -794,6 +874,17 @@ def dividend_charts(context, index=None):
 
 
 @register.simple_tag(takes_context=True)
+def dividend_comparison(context, currency_code=None):
+    """Post içindeki temettü karşılaştırma tablosunu HTML olarak döndürür."""
+    post = context.get("post")
+    snapshots = _get_dividend_snapshots(post)
+    base_snapshot, compare_snapshot = _get_dividend_comparison_pair(
+        snapshots, currency_code
+    )
+    return mark_safe(_render_dividend_comparison_html(base_snapshot, compare_snapshot))
+
+
+@register.simple_tag(takes_context=True)
 def render_post_body(context, post):
     """BlogPost içeriğini (markdown) render eder; image + portfolio placeholder'larını genişletir.
 
@@ -812,6 +903,8 @@ def render_post_body(context, post):
       {{ cashflow_comparison_charts:1 }}
       {{ dividend_summary:1 }}
       {{ dividend_charts:1 }}
+      {{ dividend_comparison:TRY }}
+      {{ dividend_comparison:USD }}
     """
     images = list(
         getattr(post, "images", []).all() if getattr(post, "images", None) else []  # pyright: ignore[reportAttributeAccessIssue]
@@ -917,6 +1010,15 @@ def render_post_body(context, post):
 
     expanded = DIVIDEND_SUMMARY_PATTERN.sub(dividend_summary_replacer, expanded)
     expanded = DIVIDEND_CHARTS_PATTERN.sub(dividend_charts_replacer, expanded)
+
+    def dividend_comparison_replacer(match):
+        currency_code = match.group(1) if match.group(1) else None
+        base_snapshot, compare_snapshot = _get_dividend_comparison_pair(
+            dividend_snapshots, currency_code
+        )
+        return _render_dividend_comparison_html(base_snapshot, compare_snapshot)
+
+    expanded = DIVIDEND_COMPARISON_PATTERN.sub(dividend_comparison_replacer, expanded)
 
     return mark_safe(render_markdown(expanded))
 
