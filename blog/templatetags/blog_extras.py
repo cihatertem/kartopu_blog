@@ -29,6 +29,8 @@ CASHFLOW_COMPARISON_SUMMARY_PATTERN = re.compile(
 CASHFLOW_COMPARISON_CHARTS_PATTERN = re.compile(
     r"\{\{\s*cashflow_comparison_charts(?::(\d+))?\s*\}\}"
 )
+DIVIDEND_SUMMARY_PATTERN = re.compile(r"\{\{\s*dividend_summary(?::(\d+))?\s*\}\}")
+DIVIDEND_CHARTS_PATTERN = re.compile(r"\{\{\s*dividend_charts(?::(\d+))?\s*\}\}")
 
 
 @register.filter
@@ -269,6 +271,17 @@ def _get_portfolio_comparisons(post):
             "base_snapshot__portfolio",
             "compare_snapshot__portfolio",
         ).order_by("created_at"),
+    )
+
+
+def _get_dividend_snapshots(post):
+    if not post:
+        return []
+
+    return _get_prefetched_list(
+        post,
+        "dividend_snapshots",
+        post.dividend_snapshots.order_by("-year"),
     )
 
 
@@ -616,6 +629,89 @@ def _render_cashflow_comparison_charts_html(comparison) -> str:
     )
 
 
+def _render_dividend_summary_html(snapshot) -> str:
+    if not snapshot:
+        return ""
+
+    total_amount = _format_currency(snapshot.total_amount, snapshot.currency)
+    year = escape(str(snapshot.year))
+    currency = escape(snapshot.currency)
+    payment_items = snapshot.payment_items.select_related("asset").order_by(
+        "payment_date"
+    )
+
+    rows = "\n".join(
+        "<tr>"
+        f"<td>{escape(item.asset.name)}</td>"
+        f"<td>{escape(str(item.payment_date))}</td>"
+        f"<td>{_format_currency(item.per_share_net_amount, snapshot.currency)}</td>"
+        f"<td>{escape(f'{float((item.dividend_yield_on_payment_price or 0) * 100):.2f}')}%</td>"
+        f"<td>{escape(f'{float((item.dividend_yield_on_average_cost or 0) * 100):.2f}')}%</td>"
+        f"<td>{_format_currency(item.total_net_amount, snapshot.currency)}</td>"
+        "</tr>"
+        for item in payment_items
+    )
+
+    table_html = f"""
+    <div style="overflow-x: auto; margin-top: 1rem;">
+      <table style="width: 100%; border-collapse: collapse; min-width: 640px;">
+        <thead>
+          <tr>
+            <th style="text-align:left; border-bottom: 1px solid #eee; padding: 0.5rem;">Varlık</th>
+            <th style="text-align:left; border-bottom: 1px solid #eee; padding: 0.5rem;">Ödeme Tarihi</th>
+            <th style="text-align:left; border-bottom: 1px solid #eee; padding: 0.5rem;">Hisse Başına Net Temettü</th>
+            <th style="text-align:left; border-bottom: 1px solid #eee; padding: 0.5rem;">Ödeme Günü Temettü Verimi</th>
+            <th style="text-align:left; border-bottom: 1px solid #eee; padding: 0.5rem;">Ortalama Maliyet Temettü Verimi</th>
+            <th style="text-align:left; border-bottom: 1px solid #eee; padding: 0.5rem;">Toplam Net Temettü</th>
+          </tr>
+        </thead>
+        <tbody>
+          {rows}
+        </tbody>
+      </table>
+    </div>
+    """
+
+    html = f"""
+<section class="dividend-summary">
+  <h3>Bu yazının temettü özeti</h3>
+  <div style="border: 1px solid #ddd; border-radius: 8px; padding: 1rem; margin: 1rem 0">
+    <p style="margin: 0 0 0.25rem 0"><strong>Yıl:</strong> {year}</p>
+    <p style="margin: 0 0 0.75rem 0"><strong>Para Birimi:</strong> {currency}</p>
+    <p style="margin: 0"><strong>Toplam Temettü:</strong> {total_amount}</p>
+    {table_html}
+  </div>
+</section>
+"""
+    return html
+
+
+def _render_dividend_charts_html(snapshot) -> str:
+    if not snapshot:
+        return ""
+
+    items = snapshot.asset_items.select_related("asset").order_by("-allocation_pct")
+    allocation = {
+        "labels": [(item.asset.symbol or item.asset.name) for item in items],
+        "values": [float(item.allocation_pct or 0) * 100 for item in items],
+    }
+    allocation_json = escape(json.dumps(allocation, cls=DjangoJSONEncoder))
+
+    return """
+<section class="dividend-charts" style="margin: 1rem 0" data-dividend-allocation="{allocation_json}">
+  <div class="dividend-chart-fallback" style="display:none; padding: 0.75rem 1rem; border: 1px solid #f2c2c2; background: #fff5f5; border-radius: 8px; margin-bottom: 1rem;">
+    Grafikler yüklenemedi. (Tarayıcı eklentisi / ağ politikası / CSP engelliyor olabilir.)
+  </div>
+  <div style="border: 1px solid #eee; border-radius: 8px; padding: 1rem">
+    <h4 style="margin-top: 0">Temettü Dağılımı</h4>
+    <canvas data-chart-kind="dividend-allocation" height="220"></canvas>
+  </div>
+</section>
+""".format(
+        allocation_json=allocation_json,
+    )
+
+
 @register.simple_tag(takes_context=True)
 def portfolio_summary(context, index=None):
     """Post içindeki snapshot özetini HTML olarak döndürür."""
@@ -681,6 +777,22 @@ def cashflow_comparison_charts(context):
 
 
 @register.simple_tag(takes_context=True)
+def dividend_summary(context, index=None):
+    """Post içindeki temettü snapshot özetini HTML olarak döndürür."""
+    post = context.get("post")
+    snapshot = _get_indexed_item(_get_dividend_snapshots(post), index)
+    return mark_safe(_render_dividend_summary_html(snapshot))
+
+
+@register.simple_tag(takes_context=True)
+def dividend_charts(context, index=None):
+    """Post içindeki temettü snapshot grafik alanını HTML olarak döndürür."""
+    post = context.get("post")
+    snapshot = _get_indexed_item(_get_dividend_snapshots(post), index)
+    return mark_safe(_render_dividend_charts_html(snapshot))
+
+
+@register.simple_tag(takes_context=True)
 def render_post_body(context, post):
     """BlogPost içeriğini (markdown) render eder; image + portfolio placeholder'larını genişletir.
 
@@ -697,6 +809,8 @@ def render_post_body(context, post):
       {{ cashflow_charts:1 }}
       {{ cashflow_comparison_summary:1 }}
       {{ cashflow_comparison_charts:1 }}
+      {{ dividend_summary:1 }}
+      {{ dividend_charts:1 }}
     """
     images = list(
         getattr(post, "images", []).all() if getattr(post, "images", None) else []  # pyright: ignore[reportAttributeAccessIssue]
@@ -788,6 +902,20 @@ def render_post_body(context, post):
     expanded = CASHFLOW_COMPARISON_CHARTS_PATTERN.sub(
         cashflow_comparison_charts_replacer, expanded
     )
+    dividend_snapshots = _get_dividend_snapshots(post)
+
+    def dividend_summary_replacer(match):
+        index = int(match.group(1)) if match.group(1) else None
+        snapshot = _get_indexed_item(dividend_snapshots, index)
+        return _render_dividend_summary_html(snapshot)
+
+    def dividend_charts_replacer(match):
+        index = int(match.group(1)) if match.group(1) else None
+        snapshot = _get_indexed_item(dividend_snapshots, index)
+        return _render_dividend_charts_html(snapshot)
+
+    expanded = DIVIDEND_SUMMARY_PATTERN.sub(dividend_summary_replacer, expanded)
+    expanded = DIVIDEND_CHARTS_PATTERN.sub(dividend_charts_replacer, expanded)
 
     return mark_safe(render_markdown(expanded))
 

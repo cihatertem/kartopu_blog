@@ -95,6 +95,7 @@ ALLOWED_ATTRIBUTES = {
         "data-portfolio-allocation",
         "data-portfolio-timeseries",
         "data-portfolio-comparison",
+        "data-dividend-allocation",
     ],
     "main": ["class", "id", "style"],
     "canvas": ["id", "height", "width", "class", "data-chart-kind"],

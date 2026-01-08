@@ -630,3 +630,260 @@ class CashFlowComparison(UUIDModelMixin, TimeStampedModelMixin):
             raise ValidationError(
                 "Karşılaştırma snapshotları aynı nakit akışına ait olmalıdır."
             )
+
+
+class DividendPayment(UUIDModelMixin, TimeStampedModelMixin):
+    asset = models.ForeignKey(
+        Asset,
+        on_delete=models.PROTECT,
+        related_name="dividend_payments",
+    )
+    payment_date = models.DateField()
+    share_count = models.DecimalField(
+        max_digits=MAX_DICITS, decimal_places=MAX_DECIMAL_PLACES_FOR_QUANTITY
+    )
+    net_dividend_per_share = models.DecimalField(
+        max_digits=MAX_DICITS, decimal_places=MAX_DECIMAL_PLACES
+    )
+    average_cost = models.DecimalField(
+        max_digits=MAX_DICITS, decimal_places=MAX_DECIMAL_PLACES
+    )
+    last_close_price = models.DecimalField(
+        max_digits=MAX_DICITS, decimal_places=MAX_DECIMAL_PLACES
+    )
+    notes = models.TextField(blank=True)
+
+    class Meta:  # pyright: ignore[reportIncompatibleVariableOverride]
+        verbose_name = "Temettü Ödemesi"
+        verbose_name_plural = "Temettü Ödemeleri"
+        ordering = ("-payment_date", "-created_at")
+
+    def __str__(self) -> str:
+        return f"{self.asset} - {self.payment_date}"
+
+    @property
+    def total_net_amount(self) -> Decimal:
+        return self.share_count * self.net_dividend_per_share
+
+    @property
+    def dividend_yield_on_payment_price(self) -> Decimal:
+        if self.last_close_price:
+            return self.net_dividend_per_share / self.last_close_price
+        return Decimal("0")
+
+    @property
+    def dividend_yield_on_average_cost(self) -> Decimal:
+        if self.average_cost:
+            return self.net_dividend_per_share / self.average_cost
+        return Decimal("0")
+
+    def sync_dividend_currencies(self) -> None:
+        base_currency = self.asset.currency
+        total_amount = self.total_net_amount
+        for currency, _ in Asset.Currency.choices:
+            fx_rate = Decimal("1")
+            if base_currency != currency:
+                fetched_rate = fetch_fx_rate(base_currency, currency)
+                fx_rate = fetched_rate if fetched_rate is not None else Decimal("1")
+            per_share = self.net_dividend_per_share * fx_rate
+            total_converted = total_amount * fx_rate
+            Dividend.objects.update_or_create(
+                payment=self,
+                currency=currency,
+                defaults={
+                    "per_share_net_amount": per_share,
+                    "total_net_amount": total_converted,
+                },
+            )
+
+    def save(self, *args: object, **kwargs: object) -> None:
+        super().save(*args, **kwargs)  # pyright: ignore[reportArgumentType]
+        self.sync_dividend_currencies()
+
+
+class Dividend(UUIDModelMixin, TimeStampedModelMixin):
+    payment = models.ForeignKey(
+        DividendPayment,
+        on_delete=models.CASCADE,
+        related_name="dividends",
+    )
+    currency = models.CharField(
+        max_length=10,
+        choices=Asset.Currency.choices,
+        default=Asset.Currency.TRY,
+    )
+    per_share_net_amount = models.DecimalField(
+        max_digits=MAX_DICITS, decimal_places=MAX_DECIMAL_PLACES
+    )
+    total_net_amount = models.DecimalField(
+        max_digits=MAX_DICITS, decimal_places=MAX_DECIMAL_PLACES
+    )
+
+    class Meta:  # pyright: ignore[reportIncompatibleVariableOverride]
+        verbose_name = "Temettü"
+        verbose_name_plural = "Temettüler"
+        constraints = [
+            models.UniqueConstraint(
+                fields=("payment", "currency"),
+                name="unique_dividend_payment_currency",
+            )
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.payment} ({self.currency})"
+
+
+class DividendSnapshot(UUIDModelMixin, TimeStampedModelMixin):
+    year = models.PositiveIntegerField()
+    currency = models.CharField(
+        max_length=10,
+        choices=Asset.Currency.choices,
+        default=Asset.Currency.TRY,
+    )
+    name = models.CharField(max_length=200, blank=True)
+    total_amount = models.DecimalField(
+        max_digits=MAX_DICITS, decimal_places=MAX_DECIMAL_PLACES
+    )
+
+    class Meta:  # pyright: ignore[reportIncompatibleVariableOverride]
+        verbose_name = "Temettü Snapshot"
+        verbose_name_plural = "Temettü Snapshotları"
+        ordering = ("-year", "-created_at")
+
+    def __str__(self) -> str:
+        return self.name or f"{self.year} Temettü"
+
+    @classmethod
+    def create_snapshot(
+        cls,
+        *,
+        year: int,
+        currency: str,
+        name: str | None = None,
+    ) -> "DividendSnapshot":
+        payments = (
+            DividendPayment.objects.select_related("asset")
+            .filter(payment_date__year=year)
+            .order_by("payment_date", "created_at")
+        )
+
+        total_amount = Decimal("0")
+        asset_totals: dict[str, dict[str, Decimal | Asset]] = {}
+        payment_rows: list[dict[str, object]] = []
+
+        for payment in payments:
+            fx_rate = Decimal("1")
+            if payment.asset.currency != currency:
+                fetched_rate = fetch_fx_rate(payment.asset.currency, currency)
+                fx_rate = fetched_rate if fetched_rate is not None else Decimal("1")
+            per_share = payment.net_dividend_per_share * fx_rate
+            total_payment = payment.total_net_amount * fx_rate
+            avg_cost = payment.average_cost * fx_rate
+            last_close = payment.last_close_price * fx_rate
+            yield_on_payment = (
+                per_share / last_close if last_close > 0 else Decimal("0")
+            )
+            yield_on_average = (
+                per_share / avg_cost if avg_cost > 0 else Decimal("0")
+            )
+            total_amount += total_payment
+            asset_entry = asset_totals.setdefault(
+                str(payment.asset_id),
+                {"asset": payment.asset, "total_amount": Decimal("0")},
+            )
+            asset_entry["total_amount"] = (
+                asset_entry["total_amount"] + total_payment  # pyright: ignore[reportOperatorIssue]
+            )
+            payment_rows.append(
+                {
+                    "asset": payment.asset,
+                    "payment": payment,
+                    "payment_date": payment.payment_date,
+                    "per_share_net_amount": per_share,
+                    "dividend_yield_on_payment_price": yield_on_payment,
+                    "dividend_yield_on_average_cost": yield_on_average,
+                    "total_net_amount": total_payment,
+                }
+            )
+
+        snapshot = cls.objects.create(
+            year=year,
+            currency=currency,
+            name=name or f"{year} Temettü Özeti",
+            total_amount=total_amount,
+        )
+
+        for asset_entry in asset_totals.values():
+            amount = asset_entry["total_amount"]
+            allocation_pct = amount / total_amount if total_amount > 0 else Decimal("0")
+            DividendSnapshotAssetItem.objects.create(
+                snapshot=snapshot,
+                asset=asset_entry["asset"],
+                total_amount=amount,
+                allocation_pct=allocation_pct,
+            )
+
+        for row in payment_rows:
+            DividendSnapshotPaymentItem.objects.create(
+                snapshot=snapshot,
+                asset=row["asset"],
+                payment=row["payment"],
+                payment_date=row["payment_date"],
+                per_share_net_amount=row["per_share_net_amount"],
+                dividend_yield_on_payment_price=row["dividend_yield_on_payment_price"],
+                dividend_yield_on_average_cost=row["dividend_yield_on_average_cost"],
+                total_net_amount=row["total_net_amount"],
+            )
+
+        return snapshot
+
+
+class DividendSnapshotAssetItem(UUIDModelMixin, TimeStampedModelMixin):
+    snapshot = models.ForeignKey(
+        DividendSnapshot,
+        on_delete=models.CASCADE,
+        related_name="asset_items",
+    )
+    asset = models.ForeignKey(Asset, on_delete=models.PROTECT)
+    total_amount = models.DecimalField(
+        max_digits=MAX_DICITS, decimal_places=MAX_DECIMAL_PLACES
+    )
+    allocation_pct = models.DecimalField(max_digits=10, decimal_places=4)
+
+    class Meta:  # pyright: ignore[reportIncompatibleVariableOverride]
+        verbose_name = "Temettü Snapshot Varlığı"
+        verbose_name_plural = "Temettü Snapshot Varlıkları"
+
+    def __str__(self) -> str:
+        return f"{self.snapshot} - {self.asset}"
+
+
+class DividendSnapshotPaymentItem(UUIDModelMixin, TimeStampedModelMixin):
+    snapshot = models.ForeignKey(
+        DividendSnapshot,
+        on_delete=models.CASCADE,
+        related_name="payment_items",
+    )
+    asset = models.ForeignKey(Asset, on_delete=models.PROTECT)
+    payment = models.ForeignKey(DividendPayment, on_delete=models.CASCADE)
+    payment_date = models.DateField()
+    per_share_net_amount = models.DecimalField(
+        max_digits=MAX_DICITS, decimal_places=MAX_DECIMAL_PLACES
+    )
+    dividend_yield_on_payment_price = models.DecimalField(
+        max_digits=10, decimal_places=4
+    )
+    dividend_yield_on_average_cost = models.DecimalField(
+        max_digits=10, decimal_places=4
+    )
+    total_net_amount = models.DecimalField(
+        max_digits=MAX_DICITS, decimal_places=MAX_DECIMAL_PLACES
+    )
+
+    class Meta:  # pyright: ignore[reportIncompatibleVariableOverride]
+        verbose_name = "Temettü Snapshot Ödeme Kalemi"
+        verbose_name_plural = "Temettü Snapshot Ödeme Kalemleri"
+        ordering = ("payment_date", "created_at")
+
+    def __str__(self) -> str:
+        return f"{self.snapshot} - {self.asset} - {self.payment_date}"

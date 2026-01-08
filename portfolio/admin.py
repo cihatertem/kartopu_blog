@@ -10,6 +10,11 @@ from portfolio.models import (
     CashFlowEntry,
     CashFlowSnapshot,
     CashFlowSnapshotItem,
+    Dividend,
+    DividendPayment,
+    DividendSnapshot,
+    DividendSnapshotAssetItem,
+    DividendSnapshotPaymentItem,
     Portfolio,
     PortfolioComparison,
     PortfolioSnapshot,
@@ -317,3 +322,70 @@ class CashFlowComparisonAdmin(admin.ModelAdmin):
             f"{updated} karşılaştırma güncellendi.",
             level=messages.SUCCESS,
         )
+
+
+@admin.register(DividendPayment)
+class DividendPaymentAdmin(admin.ModelAdmin):
+    list_display = (
+        "asset",
+        "payment_date",
+        "share_count",
+        "net_dividend_per_share",
+        "average_cost",
+        "last_close_price",
+    )
+    list_filter = ("payment_date", "asset")
+    search_fields = ("asset__name", "asset__symbol")
+
+
+@admin.register(Dividend)
+class DividendAdmin(admin.ModelAdmin):
+    list_display = ("payment", "currency", "per_share_net_amount", "total_net_amount")
+    list_filter = ("currency", "payment__payment_date")
+    search_fields = ("payment__asset__name", "payment__asset__symbol")
+    autocomplete_fields = ("payment",)
+
+
+class DividendSnapshotAssetInline(admin.TabularInline):
+    model = DividendSnapshotAssetItem
+    extra = 0
+    readonly_fields = ("asset", "total_amount", "allocation_pct")
+    can_delete = False
+
+
+class DividendSnapshotPaymentInline(admin.TabularInline):
+    model = DividendSnapshotPaymentItem
+    extra = 0
+    readonly_fields = (
+        "asset",
+        "payment",
+        "payment_date",
+        "per_share_net_amount",
+        "dividend_yield_on_payment_price",
+        "dividend_yield_on_average_cost",
+        "total_net_amount",
+    )
+    can_delete = False
+
+
+@admin.register(DividendSnapshot)
+class DividendSnapshotAdmin(admin.ModelAdmin):
+    list_display = ("name", "year", "currency", "total_amount")
+    list_filter = ("year", "currency")
+    readonly_fields = ("total_amount",)
+    search_fields = ("name",)
+    inlines = (DividendSnapshotAssetInline, DividendSnapshotPaymentInline)
+
+    def save_model(self, request, obj, form, change):
+        if change:
+            super().save_model(request, obj, form, change)
+            return
+
+        snapshot = DividendSnapshot.create_snapshot(
+            year=obj.year,
+            currency=obj.currency,
+            name=obj.name,
+        )
+        obj.pk = snapshot.pk
+        obj.name = snapshot.name
+        obj.total_amount = snapshot.total_amount

@@ -106,7 +106,9 @@ class BlogPost(
           {{ cashflow_summary:1 }}<br>
           {{ cashflow_charts:1 }}<br>
           {{ cashflow_comparison_summary:1 }}<br>
-          {{ cashflow_comparison_charts:1 }}<br>"""
+          {{ cashflow_comparison_charts:1 }}<br>
+          {{ dividend_summary:1 }}<br>
+          {{ dividend_charts:1 }}<br>"""
     )
 
     # --- Yayın durumu ---
@@ -196,6 +198,14 @@ class BlogPost(
         blank=True,
         related_name="blog_posts",
         help_text="Bu yazı ile ilişkili nakit akışı karşılaştırmaları",
+    )
+
+
+    dividend_snapshots = models.ManyToManyField(
+        "portfolio.DividendSnapshot",
+        blank=True,
+        related_name="blog_posts",
+        help_text="Bu yazı ile ilişkili temettü snapshotları",
     )
 
     class Meta:  # pyright: ignore[reportIncompatibleVariableOverride]

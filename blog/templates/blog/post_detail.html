@@ -514,7 +514,48 @@ document.addEventListener("DOMContentLoaded", function () {
         });
       }
     });
+    // -------------------------
+    // Dividend charts
+    // -------------------------
+    document.querySelectorAll(".dividend-charts").forEach((section) => {
+      const allocationRaw = section.dataset.dividendAllocation;
+      if (!allocationRaw) return;
 
+      let allocationData;
+      try {
+        allocationData = JSON.parse(allocationRaw);
+      } catch {
+        return;
+      }
+
+      const allocationCanvas = section.querySelector(
+        'canvas[data-chart-kind="dividend-allocation"]'
+      );
+
+      if (allocationData && allocationCanvas) {
+        new Chart(allocationCanvas, {
+          type: "doughnut",
+          data: {
+            labels: allocationData.labels,
+            datasets: [{ data: allocationData.values }],
+          },
+          options: {
+            responsive: true,
+            plugins: {
+              legend: { position: "bottom" },
+              tooltip: {
+                callbacks: {
+                  label(ctx) {
+                    const v = ctx.parsed || 0;
+                    return `${ctx.label}: ${v.toFixed(2)}%`;
+                  },
+                },
+              },
+            },
+          },
+        });
+      }
+    });
   // -------------------------
   // Social auth callbacks
   // -------------------------
