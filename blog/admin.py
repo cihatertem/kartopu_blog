@@ -76,6 +76,7 @@ class BlogPostAdmin(admin.ModelAdmin):
         "cashflow_snapshots",
         "cashflow_comparisons",
         "dividend_snapshots",
+        "dividend_comparisons",
         "tags",
     )
     ordering = ("-published_at", "-created_at")
@@ -94,6 +95,7 @@ class BlogPostAdmin(admin.ModelAdmin):
                     "cashflow_snapshots",
                     "cashflow_comparisons",
                     "dividend_snapshots",
+                    "dividend_comparisons",
                     "cover_image",
                     "excerpt",
                     "content",

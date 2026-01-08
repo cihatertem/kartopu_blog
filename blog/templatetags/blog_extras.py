@@ -32,7 +32,7 @@ CASHFLOW_COMPARISON_CHARTS_PATTERN = re.compile(
 DIVIDEND_SUMMARY_PATTERN = re.compile(r"\{\{\s*dividend_summary(?::(\d+))?\s*\}\}")
 DIVIDEND_CHARTS_PATTERN = re.compile(r"\{\{\s*dividend_charts(?::(\d+))?\s*\}\}")
 DIVIDEND_COMPARISON_PATTERN = re.compile(
-    r"\{\{\s*dividend_comparison(?::([A-Za-z]{3,10}))?\s*\}\}"
+    r"\{\{\s*dividend_comparison(?::(\d+))?\s*\}\}"
 )
 
 
@@ -288,33 +288,18 @@ def _get_dividend_snapshots(post):
     )
 
 
-def _get_dividend_comparison_pair(snapshots, currency_code=None):
-    if not snapshots:
-        return None, None
+def _get_dividend_comparisons(post):
+    if not post:
+        return []
 
-    normalized_currency = currency_code.upper() if currency_code else None
-    filtered = [
-        snapshot
-        for snapshot in snapshots
-        if not normalized_currency or snapshot.currency == normalized_currency
-    ]
-    if len(filtered) < 2:
-        return None, None
-
-    unique_years = []
-    seen_years = set()
-    for snapshot in filtered:
-        if snapshot.year in seen_years:
-            continue
-        unique_years.append(snapshot)
-        seen_years.add(snapshot.year)
-        if len(unique_years) == 2:
-            break
-
-    if len(unique_years) < 2:
-        return filtered[1], filtered[0]
-
-    return unique_years[1], unique_years[0]
+    return _get_prefetched_list(
+        post,
+        "dividend_comparisons",
+        post.dividend_comparisons.select_related(
+            "base_snapshot",
+            "compare_snapshot",
+        ).order_by("created_at"),
+    )
 
 
 def _render_portfolio_comparison_summary_html(comparison) -> str:
@@ -745,10 +730,12 @@ def _render_dividend_charts_html(snapshot) -> str:
     )
 
 
-def _render_dividend_comparison_html(base_snapshot, compare_snapshot) -> str:
-    if not base_snapshot or not compare_snapshot:
+def _render_dividend_comparison_html(comparison) -> str:
+    if not comparison:
         return ""
 
+    base_snapshot = comparison.base_snapshot
+    compare_snapshot = comparison.compare_snapshot
     base_year = escape(str(base_snapshot.year))
     compare_year = escape(str(compare_snapshot.year))
     base_total = _safe_decimal(base_snapshot.total_amount)
@@ -874,14 +861,11 @@ def dividend_charts(context, index=None):
 
 
 @register.simple_tag(takes_context=True)
-def dividend_comparison(context, currency_code=None):
+def dividend_comparison(context, index=None):
     """Post içindeki temettü karşılaştırma tablosunu HTML olarak döndürür."""
     post = context.get("post")
-    snapshots = _get_dividend_snapshots(post)
-    base_snapshot, compare_snapshot = _get_dividend_comparison_pair(
-        snapshots, currency_code
-    )
-    return mark_safe(_render_dividend_comparison_html(base_snapshot, compare_snapshot))
+    comparison = _get_indexed_item(_get_dividend_comparisons(post), index)
+    return mark_safe(_render_dividend_comparison_html(comparison))
 
 
 @register.simple_tag(takes_context=True)
@@ -903,8 +887,7 @@ def render_post_body(context, post):
       {{ cashflow_comparison_charts:1 }}
       {{ dividend_summary:1 }}
       {{ dividend_charts:1 }}
-      {{ dividend_comparison:TRY }}
-      {{ dividend_comparison:USD }}
+      {{ dividend_comparison:1 }}
     """
     images = list(
         getattr(post, "images", []).all() if getattr(post, "images", None) else []  # pyright: ignore[reportAttributeAccessIssue]
@@ -997,6 +980,7 @@ def render_post_body(context, post):
         cashflow_comparison_charts_replacer, expanded
     )
     dividend_snapshots = _get_dividend_snapshots(post)
+    dividend_comparisons = _get_dividend_comparisons(post)
 
     def dividend_summary_replacer(match):
         index = int(match.group(1)) if match.group(1) else None
@@ -1012,11 +996,9 @@ def render_post_body(context, post):
     expanded = DIVIDEND_CHARTS_PATTERN.sub(dividend_charts_replacer, expanded)
 
     def dividend_comparison_replacer(match):
-        currency_code = match.group(1) if match.group(1) else None
-        base_snapshot, compare_snapshot = _get_dividend_comparison_pair(
-            dividend_snapshots, currency_code
-        )
-        return _render_dividend_comparison_html(base_snapshot, compare_snapshot)
+        index = int(match.group(1)) if match.group(1) else None
+        comparison = _get_indexed_item(dividend_comparisons, index)
+        return _render_dividend_comparison_html(comparison)
 
     expanded = DIVIDEND_COMPARISON_PATTERN.sub(dividend_comparison_replacer, expanded)
 

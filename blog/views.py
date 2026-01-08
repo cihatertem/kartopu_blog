@@ -17,6 +17,8 @@ from core import helpers
 from portfolio.models import (
     CashFlowComparison,
     CashFlowSnapshot,
+    DividendComparison,
+    DividendSnapshot,
     PortfolioComparison,
     PortfolioSnapshot,
 )
@@ -203,6 +205,17 @@ def post_detail(request, slug: str):
                     "compare_snapshot__cashflow",
                 ).order_by("created_at"),
             ),
+            Prefetch(
+                "dividend_snapshots",
+                queryset=DividendSnapshot.objects.order_by("-year", "-created_at"),
+            ),
+            Prefetch(
+                "dividend_comparisons",
+                queryset=DividendComparison.objects.select_related(
+                    "base_snapshot",
+                    "compare_snapshot",
+                ).order_by("created_at"),
+            ),
         ),
         slug=slug,
         status=BlogPost.Status.PUBLISHED,
@@ -303,6 +316,17 @@ def post_preview(request, slug: str):
                     "compare_snapshot",
                     "base_snapshot__cashflow",
                     "compare_snapshot__cashflow",
+                ).order_by("created_at"),
+            ),
+            Prefetch(
+                "dividend_snapshots",
+                queryset=DividendSnapshot.objects.order_by("-year", "-created_at"),
+            ),
+            Prefetch(
+                "dividend_comparisons",
+                queryset=DividendComparison.objects.select_related(
+                    "base_snapshot",
+                    "compare_snapshot",
                 ).order_by("created_at"),
             ),
         ),

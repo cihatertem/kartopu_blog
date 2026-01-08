@@ -632,6 +632,37 @@ class CashFlowComparison(UUIDModelMixin, TimeStampedModelMixin):
             )
 
 
+class DividendComparison(UUIDModelMixin, TimeStampedModelMixin):
+    base_snapshot = models.ForeignKey(
+        "DividendSnapshot",
+        on_delete=models.CASCADE,
+        related_name="base_comparisons",
+    )
+    compare_snapshot = models.ForeignKey(
+        "DividendSnapshot",
+        on_delete=models.CASCADE,
+        related_name="compare_comparisons",
+    )
+
+    class Meta:  # pyright: ignore[reportIncompatibleVariableOverride]
+        verbose_name = "Temettü Karşılaştırması"
+        verbose_name_plural = "Temettü Karşılaştırmaları"
+        ordering = ("-created_at",)
+
+    def __str__(self) -> str:
+        return f"{self.base_snapshot} → {self.compare_snapshot}"
+
+    def clean(self) -> None:
+        if (
+            self.base_snapshot
+            and self.compare_snapshot
+            and self.base_snapshot.currency != self.compare_snapshot.currency
+        ):
+            raise ValidationError(
+                "Karşılaştırma snapshotlarının para birimleri aynı olmalıdır."
+            )
+
+
 class DividendPayment(UUIDModelMixin, TimeStampedModelMixin):
     asset = models.ForeignKey(
         Asset,

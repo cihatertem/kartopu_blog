@@ -109,8 +109,7 @@ class BlogPost(
           {{ cashflow_comparison_charts:1 }}<br>
           {{ dividend_summary:1 }}<br>
           {{ dividend_charts:1 }}<br>
-          {{ dividend_comparison:TRY }}<br>
-          {{ dividend_comparison:USD }}<br>"""
+          {{ dividend_comparison:1 }}<br>"""
     )
 
     # --- Yayın durumu ---
@@ -202,12 +201,18 @@ class BlogPost(
         help_text="Bu yazı ile ilişkili nakit akışı karşılaştırmaları",
     )
 
-
     dividend_snapshots = models.ManyToManyField(
         "portfolio.DividendSnapshot",
         blank=True,
         related_name="blog_posts",
         help_text="Bu yazı ile ilişkili temettü snapshotları",
+    )
+
+    dividend_comparisons = models.ManyToManyField(
+        "portfolio.DividendComparison",
+        blank=True,
+        related_name="blog_posts",
+        help_text="Bu yazı ile ilişkili temettü karşılaştırmaları",
     )
 
     class Meta:  # pyright: ignore[reportIncompatibleVariableOverride]

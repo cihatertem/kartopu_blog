@@ -11,6 +11,7 @@ from portfolio.models import (
     CashFlowSnapshot,
     CashFlowSnapshotItem,
     Dividend,
+    DividendComparison,
     DividendPayment,
     DividendSnapshot,
     DividendSnapshotAssetItem,
@@ -301,6 +302,34 @@ class CashFlowComparisonAdmin(admin.ModelAdmin):
         "base_snapshot__cashflow__name",
         "compare_snapshot__cashflow__name",
     )
+    autocomplete_fields = ("base_snapshot", "compare_snapshot")
+    list_select_related = ("base_snapshot", "compare_snapshot")
+    actions = ("swap_snapshots",)
+
+    @admin.action(description="Base/Compare snapshotlarını değiştir")
+    def swap_snapshots(self, request, queryset):
+        updated = 0
+        for comparison in queryset:
+            comparison.base_snapshot, comparison.compare_snapshot = (
+                comparison.compare_snapshot,
+                comparison.base_snapshot,
+            )
+            comparison.save(
+                update_fields=["base_snapshot", "compare_snapshot", "updated_at"]
+            )
+            updated += 1
+        self.message_user(
+            request,
+            f"{updated} karşılaştırma güncellendi.",
+            level=messages.SUCCESS,
+        )
+
+
+@admin.register(DividendComparison)
+class DividendComparisonAdmin(admin.ModelAdmin):
+    list_display = ("base_snapshot", "compare_snapshot", "created_at")
+    list_filter = ("created_at",)
+    search_fields = ("base_snapshot__name", "compare_snapshot__name")
     autocomplete_fields = ("base_snapshot", "compare_snapshot")
     list_select_related = ("base_snapshot", "compare_snapshot")
     actions = ("swap_snapshots",)
