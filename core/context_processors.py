@@ -8,6 +8,7 @@ from django.db.models.expressions import ExpressionWrapper
 from django.db.models.functions import TruncMonth
 from django.urls import reverse
 from django.utils.formats import date_format
+from django.utils.translation import get_language
 
 from blog.cache_keys import (
     NAV_ARCHIVES_KEY,
@@ -87,7 +88,8 @@ def categories_tags_context(request):
 
         cache.set(NAV_TAGS_KEY, nav_tags, timeout=600)
 
-    nav_archives = cache.get(NAV_ARCHIVES_KEY)
+    nav_archives_key = f"{NAV_ARCHIVES_KEY}:{get_language() or 'tr'}"
+    nav_archives = cache.get(nav_archives_key)
 
     if nav_archives is None:
         archive_rows = (
@@ -116,7 +118,7 @@ def categories_tags_context(request):
                     ),
                 }
             )
-            cache.set(NAV_ARCHIVES_KEY, nav_archives, timeout=600)
+            cache.set(nav_archives_key, nav_archives, timeout=600)
 
     nav_recent_posts = cache.get(NAV_RECENT_POSTS_KEY)
 
