@@ -18,19 +18,39 @@
   --color-warning-bg: #fff4d6;
   --color-warning-border: #ffe3a3;
   --shadow-soft: 0 10px 24px rgba(31, 42, 55, 0.08);
-  --tag-color-1-bg: var(--color-primary-soft);
+  --tag-color-1-bg: linear(
+    45deg,
+    rgba(47, 109, 161, 0.18),
+    rgba(124, 175, 74, 0.22)
+  );
   --tag-color-1-text: var(--color-primary-dark);
   --tag-color-1-border: var(--color-primary);
-  --tag-color-2-bg: var(--color-accent-soft);
+  --tag-color-2-bg: linear-gradient(
+    45deg,
+    rgba(124, 175, 74, 0.2),
+    rgba(91, 63, 139, 0.22)
+  );
   --tag-color-2-text: var(--color-accent-dark);
   --tag-color-2-border: var(--color-accent);
-  --tag-color-3-bg: var(--color-lilac-soft);
+  --tag-color-3-bg: linear-gradient(
+    45deg,
+    rgba(91, 63, 139, 0.18),
+    rgba(47, 109, 161, 0.18)
+  );
   --tag-color-3-text: var(--color-lilac-dark);
   --tag-color-3-border: var(--color-lilac-dark);
-  --tag-color-4-bg: var(--color-sky-soft);
+  --tag-color-4-bg: linear-gradient(
+    45deg,
+    rgba(43, 95, 138, 0.16),
+    rgba(124, 175, 74, 0.18)
+  );
   --tag-color-4-text: var(--color-sky-dark);
   --tag-color-4-border: var(--color-sky-dark);
-  --tag-color-5-bg: var(--color-warning-soft);
+  --tag-color-5-bg: linear-gradient(
+    45deg,
+    rgba(255, 240, 194, 0.95),
+    rgba(226, 237, 247, 0.9)
+  );
   --tag-color-5-text: var(--color-primary-dark);
   --tag-color-5-border: var(--color-warning-border);
 }
