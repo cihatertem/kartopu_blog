@@ -1,25 +1,34 @@
 <nav class="site-nav">
-  <span class="site-nav__date" id="site-date" aria-live="polite"></span>
-  <a href="/" class="site-nav__brand">kartopu.money</a>
+  <div class="site-nav__top">
+      <span class="site-nav__date" id="site-date" aria-live="polite"></span>
+      <a href="/" class="site-nav__brand">
+        <span class="site-nav__brand-primary">kartopu</span>
+        <span class="site-nav__brand-dot">.</span>
+        <span class="site-nav__brand-accent">money</span>
+      </a>
+      <span class="site-nav__spacer" aria-hidden="true"></span>
+    </div>
 
-  <a
-    href="{% url 'blog:post_list' %}"
-    class="site-nav__link {% if active_nav == 'blog' %}is-active{% endif %}"
-  >
-    Blog
-  </a>
+    <div class="site-nav__links">
+        <a
+          href="{% url 'blog:post_list' %}"
+          class="site-nav__link {% if active_nav == 'blog' %}is-active{% endif %}"
+        >
+          Blog
+        </a>
 
-  <a
-    href="/hakkimda/"
-    class="site-nav__link {% if active_nav == 'about' %}is-active{% endif %}"
-  >
-    Hakkımda
-  </a>
+        <a
+          href="/hakkimda/"
+          class="site-nav__link {% if active_nav == 'about' %}is-active{% endif %}"
+        >
+          Hakkımda
+        </a>
 
-  <a
-    href="/iletisim/"
-    class="site-nav__link {% if active_nav == 'contact' %}is-active{% endif %}"
-  >
-    İletişim
-  </a>
+        <a
+          href="/iletisim/"
+          class="site-nav__link {% if active_nav == 'contact' %}is-active{% endif %}"
+        >
+              İletişim
+        </a>
+    </div>
 </nav>
