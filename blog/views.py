@@ -1,6 +1,7 @@
 from datetime import date
 
 from allauth.socialaccount.models import SocialAccount
+from core.tag_colors import build_tag_items
 from django.contrib.auth.decorators import login_required
 from django.contrib.postgres.aggregates import StringAgg
 from django.contrib.postgres.search import SearchQuery, SearchRank, SearchVector
@@ -258,6 +259,7 @@ def post_detail(request, slug: str):
         "blog/post_detail.html",
         {
             "post": post,
+            "post_tag_items": build_tag_items(post.tags.all()),
             "active_nav": "blog",
             "active_category_slug": post.category.slug if post.category else "",
             "active_tag_slug": "",
@@ -356,6 +358,7 @@ def post_preview(request, slug: str):
         "blog/post_detail.html",
         {
             "post": post,
+            "post_tag_items": build_tag_items(post.tags.all()),
             "active_nav": "blog",
             "active_category_slug": post.category.slug if post.category else "",
             "active_tag_slug": "",

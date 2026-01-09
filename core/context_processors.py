@@ -18,6 +18,7 @@ from blog.cache_keys import (
 )
 from blog.models import BlogPost, Category, Tag
 from comments.models import Comment
+from core.tag_colors import get_tag_color_class
 from portfolio.models import PortfolioSnapshot
 
 CACHE_TIMEOUT = 600  # 10 minutes
@@ -82,6 +83,7 @@ def categories_tags_context(request):
             else:
                 normalized = (t["post_count"] - min_count) / (max_count - min_count)
                 t["cloud_size"] = round(0.85 + normalized * 0.75, 2)
+            t["color_class"] = get_tag_color_class(t["slug"])
 
         cache.set(NAV_TAGS_KEY, nav_tags, timeout=600)
 
