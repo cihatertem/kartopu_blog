@@ -1,4 +1,6 @@
 {% extends "base.html" %}
+{% load static %}
+
 {% block title %}Blog - kartopu.money{% endblock %}
 
 {% block content %}
@@ -22,6 +24,14 @@
                 "
                 sizes="(max-width: 768px) 100vw, 720px"
                 alt="{{ post.title }}"
+                loading="lazy"
+              />
+            </figure>
+          {% else %}
+            <figure class="home-portfolio__placeholder">
+              <img
+                src="{% static 'images/home/portfolio-coins.svg' %}"
+                alt="Portföy görseli"
                 loading="lazy"
               />
             </figure>

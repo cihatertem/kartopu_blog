@@ -35,11 +35,7 @@
       </aside>
     </div>
 
-    <footer class="site-footer">
-      <div class="site-footer__inner">
-        <small>© {% now "Y" %} kartopu.money</small>
-      </div>
-    </footer>
+    {% include "includes/footer.html" %}
   </body>
   {% block js_script %}{% endblock %}
   <script src="{% static 'js/base.js' %}"></script>
