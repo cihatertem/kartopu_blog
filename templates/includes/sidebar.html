@@ -1,3 +1,5 @@
+{% load static %}
+
 <div class="sidebar">
   <section class="sidebar-card">
     <h3 class="sidebar-title">Ara</h3>
@@ -19,10 +21,22 @@
   <section class="sidebar-card">
     <h3 class="sidebar-title">Son Yazılar</h3>
 
-    <ul class="sidebar-list">
+    <ul class="sidebar-post-list">
       {% for post in nav_recent_posts %}
-        <li>
-          <a href="{{ post.get_absolute_url }}">{{ post.title }}</a>
+        <li class="sidebar-post-item">
+          <a class="sidebar-post-link" href="{{ post.get_absolute_url }}">
+            <span class="sidebar-post-thumb">
+              {% if post.cover_image %}
+                <img src="{{ post.cover_600.url }}" alt="{{ post.title }}" loading="lazy" />
+              {% else %}
+                <img src="{% static 'images/home/portfolio-coins.svg' %}" alt="{{ post.title }}" loading="lazy" />
+              {% endif %}
+            </span>
+            <span class="sidebar-post-meta">
+              <span class="sidebar-post-title">{{ post.title }}</span>
+              <span class="sidebar-post-date">{{ post.published_at|date:"d F Y" }}</span>
+            </span>
+          </a>
         </li>
       {% empty %}
         <li>Henüz yazı yok.</li>
@@ -34,10 +48,22 @@
   <section class="sidebar-card">
     <h3 class="sidebar-title">Popüler Yazılar</h3>
 
-    <ul class="sidebar-list">
+    <ul class="sidebar-post-list">
       {% for post in nav_popular_posts %}
-        <li>
-          <a href="{{ post.get_absolute_url }}">{{ post.title }}</a>
+        <li class="sidebar-post-item">
+          <a class="sidebar-post-link" href="{{ post.get_absolute_url }}">
+            <span class="sidebar-post-thumb">
+              {% if post.cover_image %}
+                <img src="{{ post.cover_600.url }}" alt="{{ post.title }}" loading="lazy" />
+              {% else %}
+                <img src="{% static 'images/home/portfolio-coins.svg' %}" alt="{{ post.title }}" loading="lazy" />
+              {% endif %}
+            </span>
+            <span class="sidebar-post-meta">
+              <span class="sidebar-post-title">{{ post.title }}</span>
+              <span class="sidebar-post-date">{{ post.published_at|date:"d F Y" }}</span>
+            </span>
+          </a>
         </li>
       {% empty %}
         <li>Henüz yazı yok.</li>
