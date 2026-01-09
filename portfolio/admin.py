@@ -128,8 +128,15 @@ class PortfolioSnapshotItemInline(admin.TabularInline):
 
 @admin.register(PortfolioSnapshot)
 class PortfolioSnapshotAdmin(admin.ModelAdmin):
-    list_display = ("name", "portfolio", "period", "snapshot_date", "total_value")
-    list_filter = ("period", "snapshot_date")
+    list_display = (
+        "name",
+        "portfolio",
+        "period",
+        "snapshot_date",
+        "total_value",
+        "is_featured",
+    )
+    list_filter = ("period", "snapshot_date", "is_featured")
     readonly_fields = ("total_value", "total_cost", "target_value", "total_return_pct")
     search_fields = ("name", "portfolio__name", "portfolio__owner__email")
     list_select_related = ("portfolio", "portfolio__owner")

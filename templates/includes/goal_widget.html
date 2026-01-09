@@ -1,11 +1,32 @@
 <section class="sidebar-card goal-widget">
   <h3 class="sidebar-title">Hedefim</h3>
-  <p class="goal-widget__text"><strong>F.I.R.E</strong> için 1.000.000 ₺ portföy hedefi.</p>
-  <div class="goal-widget__bar" role="progressbar" aria-valuenow="45" aria-valuemin="0" aria-valuemax="100">
-    <span style="width: 45%"></span>
-  </div>
-  <div class="goal-widget__meta">
-    <span>Mevcut: 450.000 ₺</span>
-    <span>Hedef: 1.000.000 ₺</span>
-  </div>
+  {% if goal_widget_snapshot %}
+      <p class="goal-widget__text">
+        <strong>{{ goal_widget_snapshot.name }}</strong> için {{ goal_widget_snapshot.target_display }} portföy hedefi.
+      </p>
+      <div
+        class="goal-widget__bar"
+        role="progressbar"
+        aria-valuenow="{{ goal_widget_snapshot.remaining_pct.value }}"
+        aria-valuemin="0"
+        aria-valuemax="100"
+        title="Hedefe %{{ goal_widget_snapshot.remaining_pct.display }} kaldı!"
+      >
+        <span style="width: {{ goal_widget_snapshot.remaining_pct.value }}%"></span>
+      </div>
+      <div class="goal-widget__meta">
+        <span>Mevcut: {{ goal_widget_snapshot.current_display }}</span>
+        <span>Hedef: {{ goal_widget_snapshot.target_display }}</span>
+      </div>
+    {% else %}
+      <p class="goal-widget__text"><strong>F.I.R.E</strong> için 1.000.000 ₺ portföy hedefi.</p>
+      <div class="goal-widget__bar" role="progressbar" aria-valuenow="45" aria-valuemin="0" aria-valuemax="100">
+        <span style="width: 45%"></span>
+      </div>
+      <div class="goal-widget__meta">
+        <span>Mevcut: 450.000 ₺</span>
+        <span>Hedef: 1.000.000 ₺</span>
+      </div>
+    {% endif %}
+  <!--<p class="goal-widget__text"><strong>F.I.R.E.</strong> için 1.000.000 ₺ portföy hedefi.</p>-->
 </section>

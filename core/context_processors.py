@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from decimal import ROUND_HALF_UP, Decimal
+
 from django.core.cache import cache
 from django.db.models import Count, F, IntegerField, Q
 from django.db.models.expressions import ExpressionWrapper
@@ -15,6 +17,7 @@ from blog.cache_keys import (
 )
 from blog.models import BlogPost, Category, Tag
 from comments.models import Comment
+from portfolio.models import PortfolioSnapshot
 
 CACHE_TIMEOUT = 600  # 10 minutes
 
@@ -150,10 +153,48 @@ def categories_tags_context(request):
         )
         cache.set(NAV_POPULAR_POSTS_KEY, nav_popular_posts, timeout=600)
 
+    featured_snapshot = (
+        PortfolioSnapshot.objects.select_related("portfolio")
+        .filter(is_featured=True)
+        .order_by("-snapshot_date", "-created_at")
+        .first()
+    )
+
+    goal_widget_snapshot = None
+    if featured_snapshot:
+        target_value = featured_snapshot.target_value
+        total_value = featured_snapshot.total_value
+        remaining_value = max(target_value - total_value, Decimal("0"))
+        if target_value > 0:
+            remaining_pct = (remaining_value / target_value) * Decimal("100")
+        else:
+            remaining_pct = Decimal("0")
+        remaining_pct = max(Decimal("0"), min(remaining_pct, Decimal("100")))
+        remaining_pct_display = int(
+            remaining_pct.quantize(Decimal("1"), rounding=ROUND_HALF_UP)
+        )
+
+        formatted_target = f"{target_value:,.0f}".replace(",", ".")
+        formatted_current = f"{total_value:,.0f}".replace(",", ".")
+        target_pct = {
+            "value": 100 - remaining_pct_display,
+            "display": remaining_pct_display,
+        }
+
+        goal_widget_snapshot = {
+            "name": featured_snapshot.name or featured_snapshot.portfolio.name,
+            "current_value": total_value,
+            "target_value": target_value,
+            "current_display": f"{formatted_current} ₺",
+            "target_display": f"{formatted_target} ₺",
+            "remaining_pct": target_pct,
+        }
+
     return {
         "nav_categories": nav_categories,
         "nav_tags": nav_tags,
         "nav_archives": nav_archives,
         "nav_recent_posts": nav_recent_posts,
         "nav_popular_posts": nav_popular_posts,
+        "goal_widget_snapshot": goal_widget_snapshot,
     }

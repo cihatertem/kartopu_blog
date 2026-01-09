@@ -308,6 +308,7 @@ class PortfolioSnapshot(UUIDModelMixin, TimeStampedModelMixin):
         max_digits=MAX_DICITS, decimal_places=MAX_DECIMAL_PLACES
     )
     total_return_pct = models.DecimalField(max_digits=10, decimal_places=4)
+    is_featured = models.BooleanField(default=False)
 
     class Meta:  # pyright: ignore[reportIncompatibleVariableOverride]
         verbose_name = "Portföy Snapshot"
