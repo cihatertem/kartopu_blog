@@ -138,7 +138,7 @@ class PortfolioSnapshotAdmin(admin.ModelAdmin):
     )
     list_filter = ("period", "snapshot_date", "is_featured")
     readonly_fields = ("total_value", "total_cost", "target_value", "total_return_pct")
-    search_fields = ("name", "portfolio__name", "portfolio__owner__email")
+    search_fields = ("name", "slug", "portfolio__name", "portfolio__owner__email")
     list_select_related = ("portfolio", "portfolio__owner")
     inlines = (PortfolioSnapshotItemInline,)
 
@@ -166,6 +166,8 @@ class PortfolioComparisonAdmin(admin.ModelAdmin):
     list_display = ("base_snapshot", "compare_snapshot", "created_at")
     list_filter = ("created_at",)
     search_fields = (
+        "name",
+        "slug",
         "base_snapshot__portfolio__name",
         "compare_snapshot__portfolio__name",
     )
@@ -281,7 +283,7 @@ class CashFlowSnapshotAdmin(admin.ModelAdmin):
     list_display = ("name", "cashflow", "period", "snapshot_date", "total_amount")
     list_filter = ("period", "snapshot_date")
     readonly_fields = ("total_amount",)
-    search_fields = ("name", "cashflow__name", "cashflow__owner__email")
+    search_fields = ("name", "slug", "cashflow__name", "cashflow__owner__email")
     list_select_related = ("cashflow", "cashflow__owner")
     inlines = (CashFlowSnapshotItemInline,)
 
@@ -306,6 +308,8 @@ class CashFlowComparisonAdmin(admin.ModelAdmin):
     list_display = ("base_snapshot", "compare_snapshot", "created_at")
     list_filter = ("created_at",)
     search_fields = (
+        "name",
+        "slug",
         "base_snapshot__cashflow__name",
         "compare_snapshot__cashflow__name",
     )
@@ -336,7 +340,7 @@ class CashFlowComparisonAdmin(admin.ModelAdmin):
 class DividendComparisonAdmin(admin.ModelAdmin):
     list_display = ("base_snapshot", "compare_snapshot", "created_at")
     list_filter = ("created_at",)
-    search_fields = ("base_snapshot__name", "compare_snapshot__name")
+    search_fields = ("name", "slug", "base_snapshot__name", "compare_snapshot__name")
     autocomplete_fields = ("base_snapshot", "compare_snapshot")
     list_select_related = ("base_snapshot", "compare_snapshot")
     actions = ("swap_snapshots",)
@@ -409,7 +413,7 @@ class DividendSnapshotAdmin(admin.ModelAdmin):
     list_display = ("name", "year", "currency", "total_amount")
     list_filter = ("year", "currency")
     readonly_fields = ("total_amount",)
-    search_fields = ("name",)
+    search_fields = ("name", "slug")
     inlines = (DividendSnapshotAssetInline, DividendSnapshotPaymentInline)
 
     def save_model(self, request, obj, form, change):

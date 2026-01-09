@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import calendar
+import secrets
+import string
 from datetime import date
 from decimal import Decimal
 
@@ -8,6 +10,7 @@ from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.db import models
 from django.utils import timezone
+from django.utils.text import slugify
 
 from core.mixins import TimeStampedModelMixin, UUIDModelMixin
 from portfolio.services import fetch_fx_rate, fetch_yahoo_finance_price
@@ -15,6 +18,29 @@ from portfolio.services import fetch_fx_rate, fetch_yahoo_finance_price
 MAX_DICITS = 200
 MAX_DECIMAL_PLACES = 2
 MAX_DECIMAL_PLACES_FOR_QUANTITY = 5
+SLUG_HASH_LENGTH = 6
+SLUG_HASH_ALPHABET = string.ascii_lowercase + string.digits
+
+
+def _build_slug_base(name: str, max_length: int) -> str:
+    base = slugify(name, allow_unicode=True)
+    if not base:
+        base = "snapshot"
+    max_base_length = max_length - (SLUG_HASH_LENGTH + 1)
+    if max_base_length < 1:
+        return base
+    return base[:max_base_length]
+
+
+def _generate_unique_slug(model_cls: type[models.Model], name: str) -> str:
+    base = _build_slug_base(name, max_length=255)
+    while True:
+        hash_part = "".join(
+            secrets.choice(SLUG_HASH_ALPHABET) for _ in range(SLUG_HASH_LENGTH)
+        )
+        slug = f"{base}#{hash_part}"
+        if not model_cls.objects.filter(slug=slug).exists():
+            return slug
 
 
 class Asset(UUIDModelMixin, TimeStampedModelMixin):
@@ -75,6 +101,14 @@ class Asset(UUIDModelMixin, TimeStampedModelMixin):
 
 
 class PortfolioComparison(UUIDModelMixin, TimeStampedModelMixin):
+    name = models.CharField(max_length=255, blank=True)
+    slug = models.CharField(
+        max_length=255,
+        unique=True,
+        blank=True,
+        null=True,
+        editable=False,
+    )
     base_snapshot = models.ForeignKey(
         "PortfolioSnapshot",
         on_delete=models.CASCADE,
@@ -92,6 +126,10 @@ class PortfolioComparison(UUIDModelMixin, TimeStampedModelMixin):
         ordering = ("-created_at",)
 
     def __str__(self) -> str:
+        if self.slug:
+            return self.slug
+        if self.name:
+            return self.name
         return f"{self.base_snapshot} → {self.compare_snapshot}"
 
     def clean(self) -> None:
@@ -103,6 +141,26 @@ class PortfolioComparison(UUIDModelMixin, TimeStampedModelMixin):
             raise ValidationError(
                 "Karşılaştırma snapshotları aynı portföye ait olmalıdır."
             )
+
+    def save(self, *args: object, **kwargs: object) -> None:
+        if not self.name:
+            base_label = (
+                self.base_snapshot.name
+                if self.base_snapshot and self.base_snapshot.name
+                else f"{self.base_snapshot}"
+            )
+            compare_label = (
+                self.compare_snapshot.name
+                if self.compare_snapshot and self.compare_snapshot.name
+                else f"{self.compare_snapshot}"
+            )
+            if base_label and compare_label:
+                self.name = f"{base_label} → {compare_label}"
+            else:
+                self.name = base_label or compare_label
+        if not self.slug and self.name:
+            self.slug = _generate_unique_slug(self.__class__, self.name)
+        super().save(*args, **kwargs)  # pyright: ignore[reportArgumentType]
 
 
 class Portfolio(UUIDModelMixin, TimeStampedModelMixin):
@@ -298,6 +356,13 @@ class PortfolioSnapshot(UUIDModelMixin, TimeStampedModelMixin):
     period = models.CharField(max_length=10, choices=Period.choices)
     snapshot_date = models.DateField(default=timezone.now)
     name = models.CharField(max_length=200, blank=True)
+    slug = models.CharField(
+        max_length=255,
+        unique=True,
+        blank=True,
+        null=True,
+        editable=False,
+    )
     total_value = models.DecimalField(
         max_digits=MAX_DICITS, decimal_places=MAX_DECIMAL_PLACES
     )
@@ -316,9 +381,18 @@ class PortfolioSnapshot(UUIDModelMixin, TimeStampedModelMixin):
         ordering = ("-snapshot_date", "-created_at")
 
     def __str__(self) -> str:
+        if self.slug:
+            return self.slug
         if self.name:
             return self.name
         return f"{self.portfolio} - {self.snapshot_date}"
+
+    def save(self, *args: object, **kwargs: object) -> None:
+        if not self.name and self.portfolio_id and self.snapshot_date:
+            self.name = f"{self.portfolio} - {self.snapshot_date}"
+        if not self.slug and self.name:
+            self.slug = _generate_unique_slug(self.__class__, self.name)
+        super().save(*args, **kwargs)  # pyright: ignore[reportArgumentType]
 
     @classmethod
     def create_snapshot(
@@ -499,6 +573,13 @@ class CashFlowSnapshot(UUIDModelMixin, TimeStampedModelMixin):
         blank=True,
         help_text="İsimlendirme yapılmazsa CashFlow adı kullanılır.",
     )
+    slug = models.CharField(
+        max_length=255,
+        unique=True,
+        blank=True,
+        null=True,
+        editable=False,
+    )
     total_amount = models.DecimalField(
         max_digits=MAX_DICITS, decimal_places=MAX_DECIMAL_PLACES
     )
@@ -509,9 +590,21 @@ class CashFlowSnapshot(UUIDModelMixin, TimeStampedModelMixin):
         ordering = ("-snapshot_date", "-created_at")
 
     def __str__(self) -> str:
+        if self.slug:
+            return self.slug
         if self.name:
             return self.name
         return f"{self.cashflow} - {self.snapshot_date}"
+
+    def save(self, *args: object, **kwargs: object) -> None:
+        if not self.name and self.cashflow_id:
+            if self.snapshot_date:
+                self.name = f"{self.cashflow} - {self.snapshot_date}"
+            else:
+                self.name = f"{self.cashflow}"
+        if not self.slug and self.name:
+            self.slug = _generate_unique_slug(self.__class__, self.name)
+        super().save(*args, **kwargs)  # pyright: ignore[reportArgumentType]
 
     @classmethod
     def create_snapshot(
@@ -603,6 +696,14 @@ class CashFlowSnapshotItem(UUIDModelMixin, TimeStampedModelMixin):
 
 
 class CashFlowComparison(UUIDModelMixin, TimeStampedModelMixin):
+    name = models.CharField(max_length=255, blank=True)
+    slug = models.CharField(
+        max_length=255,
+        unique=True,
+        blank=True,
+        null=True,
+        editable=False,
+    )
     base_snapshot = models.ForeignKey(
         CashFlowSnapshot,
         on_delete=models.CASCADE,
@@ -620,6 +721,10 @@ class CashFlowComparison(UUIDModelMixin, TimeStampedModelMixin):
         ordering = ("-created_at",)
 
     def __str__(self) -> str:
+        if self.slug:
+            return self.slug
+        if self.name:
+            return self.name
         return f"{self.base_snapshot} → {self.compare_snapshot}"
 
     def clean(self) -> None:
@@ -632,8 +737,36 @@ class CashFlowComparison(UUIDModelMixin, TimeStampedModelMixin):
                 "Karşılaştırma snapshotları aynı nakit akışına ait olmalıdır."
             )
 
+    def save(self, *args: object, **kwargs: object) -> None:
+        if not self.name:
+            base_label = (
+                self.base_snapshot.name
+                if self.base_snapshot and self.base_snapshot.name
+                else f"{self.base_snapshot}"
+            )
+            compare_label = (
+                self.compare_snapshot.name
+                if self.compare_snapshot and self.compare_snapshot.name
+                else f"{self.compare_snapshot}"
+            )
+            if base_label and compare_label:
+                self.name = f"{base_label} → {compare_label}"
+            else:
+                self.name = base_label or compare_label
+        if not self.slug and self.name:
+            self.slug = _generate_unique_slug(self.__class__, self.name)
+        super().save(*args, **kwargs)  # pyright: ignore[reportArgumentType]
+
 
 class DividendComparison(UUIDModelMixin, TimeStampedModelMixin):
+    name = models.CharField(max_length=255, blank=True)
+    slug = models.CharField(
+        max_length=255,
+        unique=True,
+        blank=True,
+        null=True,
+        editable=False,
+    )
     base_snapshot = models.ForeignKey(
         "DividendSnapshot",
         on_delete=models.CASCADE,
@@ -651,6 +784,10 @@ class DividendComparison(UUIDModelMixin, TimeStampedModelMixin):
         ordering = ("-created_at",)
 
     def __str__(self) -> str:
+        if self.slug:
+            return self.slug
+        if self.name:
+            return self.name
         return f"{self.base_snapshot} → {self.compare_snapshot}"
 
     def clean(self) -> None:
@@ -662,6 +799,26 @@ class DividendComparison(UUIDModelMixin, TimeStampedModelMixin):
             raise ValidationError(
                 "Karşılaştırma snapshotlarının para birimleri aynı olmalıdır."
             )
+
+    def save(self, *args: object, **kwargs: object) -> None:
+        if not self.name:
+            base_label = (
+                self.base_snapshot.name
+                if self.base_snapshot and self.base_snapshot.name
+                else f"{self.base_snapshot}"
+            )
+            compare_label = (
+                self.compare_snapshot.name
+                if self.compare_snapshot and self.compare_snapshot.name
+                else f"{self.compare_snapshot}"
+            )
+            if base_label and compare_label:
+                self.name = f"{base_label} → {compare_label}"
+            else:
+                self.name = base_label or compare_label
+        if not self.slug and self.name:
+            self.slug = _generate_unique_slug(self.__class__, self.name)
+        super().save(*args, **kwargs)  # pyright: ignore[reportArgumentType]
 
 
 class DividendPayment(UUIDModelMixin, TimeStampedModelMixin):
@@ -773,6 +930,13 @@ class DividendSnapshot(UUIDModelMixin, TimeStampedModelMixin):
         default=Asset.Currency.TRY,
     )
     name = models.CharField(max_length=200, blank=True)
+    slug = models.CharField(
+        max_length=255,
+        unique=True,
+        blank=True,
+        null=True,
+        editable=False,
+    )
     total_amount = models.DecimalField(
         max_digits=MAX_DICITS, decimal_places=MAX_DECIMAL_PLACES
     )
@@ -783,7 +947,16 @@ class DividendSnapshot(UUIDModelMixin, TimeStampedModelMixin):
         ordering = ("-year", "-created_at")
 
     def __str__(self) -> str:
+        if self.slug:
+            return self.slug
         return self.name or f"{self.year} Temettü"
+
+    def save(self, *args: object, **kwargs: object) -> None:
+        if not self.name and self.year:
+            self.name = f"{self.year} Temettü Özeti"
+        if not self.slug and self.name:
+            self.slug = _generate_unique_slug(self.__class__, self.name)
+        super().save(*args, **kwargs)  # pyright: ignore[reportArgumentType]
 
     @classmethod
     def create_snapshot(

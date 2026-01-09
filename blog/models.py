@@ -99,17 +99,17 @@ class BlogPost(
         help_text="""Blog içeriği (Markdown veya HTML).
         Markdown içinde kullanılabilen marker'lar:<br>
           {{ image:1 }}  (1-based)<br>
-          {{ portfolio_summary:1 }}<br>
-          {{ portfolio_charts:1 }}<br>
-          {{ portfolio_comparison_summary:1 }}<br>
-          {{ portfolio_comparison_charts:1 }}<br>
-          {{ cashflow_summary:1 }}<br>
-          {{ cashflow_charts:1 }}<br>
-          {{ cashflow_comparison_summary:1 }}<br>
-          {{ cashflow_comparison_charts:1 }}<br>
-          {{ dividend_summary:1 }}<br>
-          {{ dividend_charts:1 }}<br>
-          {{ dividend_comparison:1 }}<br>"""
+          {{ portfolio_summary:slug_or_hash }}<br>
+          {{ portfolio_charts:slug_or_hash }}<br>
+          {{ portfolio_comparison_summary:slug_or_hash }}<br>
+          {{ portfolio_comparison_charts:slug_or_hash }}<br>
+          {{ cashflow_summary:slug_or_hash }}<br>
+          {{ cashflow_charts:slug_or_hash }}<br>
+          {{ cashflow_comparison_summary:slug_or_hash }}<br>
+          {{ cashflow_comparison_charts:slug_or_hash }}<br>
+          {{ dividend_summary:slug_or_hash }}<br>
+          {{ dividend_charts:slug_or_hash }}<br>
+          {{ dividend_comparison:slug_or_hash }}<br>"""
     )
 
     # --- Yayın durumu ---

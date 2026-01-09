@@ -13,26 +13,36 @@ from portfolio.models import CashFlowEntry, CashFlowSnapshot
 register = template.Library()
 
 IMAGE_PATTERN = re.compile(r"\{\{\s*image:(\d+)\s*\}\}")
-PORTFOLIO_SUMMARY_PATTERN = re.compile(r"\{\{\s*portfolio_summary(?::(\d+))?\s*\}\}")
-PORTFOLIO_CHARTS_PATTERN = re.compile(r"\{\{\s*portfolio_charts(?::(\d+))?\s*\}\}")
+PORTFOLIO_SUMMARY_PATTERN = re.compile(
+    r"\{\{\s*portfolio_summary(?::([^\s\}]+))?\s*\}\}"
+)
+PORTFOLIO_CHARTS_PATTERN = re.compile(
+    r"\{\{\s*portfolio_charts(?::([^\s\}]+))?\s*\}\}"
+)
 PORTFOLIO_COMPARISON_SUMMARY_PATTERN = re.compile(
-    r"\{\{\s*portfolio_comparison_summary(?::(\d+))?\s*\}\}"
+    r"\{\{\s*portfolio_comparison_summary(?::([^\s\}]+))?\s*\}\}"
 )
 PORTFOLIO_COMPARISON_CHARTS_PATTERN = re.compile(
-    r"\{\{\s*portfolio_comparison_charts(?::(\d+))?\s*\}\}"
+    r"\{\{\s*portfolio_comparison_charts(?::([^\s\}]+))?\s*\}\}"
 )
-CASHFLOW_SUMMARY_PATTERN = re.compile(r"\{\{\s*cashflow_summary(?::(\d+))?\s*\}\}")
-CASHFLOW_CHARTS_PATTERN = re.compile(r"\{\{\s*cashflow_charts(?::(\d+))?\s*\}\}")
+CASHFLOW_SUMMARY_PATTERN = re.compile(
+    r"\{\{\s*cashflow_summary(?::([^\s\}]+))?\s*\}\}"
+)
+CASHFLOW_CHARTS_PATTERN = re.compile(r"\{\{\s*cashflow_charts(?::([^\s\}]+))?\s*\}\}")
 CASHFLOW_COMPARISON_SUMMARY_PATTERN = re.compile(
-    r"\{\{\s*cashflow_comparison_summary(?::(\d+))?\s*\}\}"
+    r"\{\{\s*cashflow_comparison_summary(?::([^\s\}]+))?\s*\}\}"
 )
 CASHFLOW_COMPARISON_CHARTS_PATTERN = re.compile(
-    r"\{\{\s*cashflow_comparison_charts(?::(\d+))?\s*\}\}"
+    r"\{\{\s*cashflow_comparison_charts(?::([^\s\}]+))?\s*\}\}"
 )
-DIVIDEND_SUMMARY_PATTERN = re.compile(r"\{\{\s*dividend_summary(?::(\d+))?\s*\}\}")
-DIVIDEND_CHARTS_PATTERN = re.compile(r"\{\{\s*dividend_charts(?::(\d+))?\s*\}\}")
+DIVIDEND_SUMMARY_PATTERN = re.compile(
+    r"\{\{\s*dividend_summary(?::([^\s\}]+))?\s*\}\}"
+)
+DIVIDEND_CHARTS_PATTERN = re.compile(
+    r"\{\{\s*dividend_charts(?::([^\s\}]+))?\s*\}\}"
+)
 DIVIDEND_COMPARISON_PATTERN = re.compile(
-    r"\{\{\s*dividend_comparison(?::(\d+))?\s*\}\}"
+    r"\{\{\s*dividend_comparison(?::([^\s\}]+))?\s*\}\}"
 )
 
 
@@ -221,6 +231,39 @@ def _get_indexed_item(items, index):
         return None
 
     return items[target_index]
+
+
+def _coerce_identifier(raw_value):
+    if raw_value is None:
+        return None
+    if isinstance(raw_value, int):
+        return raw_value
+    value = str(raw_value).strip()
+    if value.isdigit():
+        return int(value)
+    return value
+
+
+def _get_item_by_identifier(items, identifier):
+    if not items:
+        return None
+
+    identifier = _coerce_identifier(identifier)
+    if identifier is None:
+        return items[0]
+    if isinstance(identifier, int):
+        return _get_indexed_item(items, identifier)
+
+    slug_value = str(identifier)
+    for item in items:
+        item_slug = getattr(item, "slug", "") or ""
+        if not item_slug:
+            continue
+        if slug_value == item_slug:
+            return item
+        if "#" in item_slug and slug_value == item_slug.rsplit("#", 1)[-1]:
+            return item
+    return None
 
 
 def _get_cashflow_snapshots(post):
@@ -783,7 +826,7 @@ def _render_dividend_comparison_html(comparison) -> str:
 def portfolio_summary(context, index=None):
     """Post içindeki snapshot özetini HTML olarak döndürür."""
     post = context.get("post")
-    snapshot = _get_indexed_item(_get_portfolio_snapshots(post), index)
+    snapshot = _get_item_by_identifier(_get_portfolio_snapshots(post), index)
     return mark_safe(_render_portfolio_summary_html(snapshot))
 
 
@@ -791,7 +834,7 @@ def portfolio_summary(context, index=None):
 def portfolio_charts(context, index=None):
     """Post içindeki snapshot grafik alanını HTML olarak döndürür."""
     post = context.get("post")
-    snapshot = _get_indexed_item(_get_portfolio_snapshots(post), index)
+    snapshot = _get_item_by_identifier(_get_portfolio_snapshots(post), index)
     return mark_safe(_render_portfolio_charts_html(snapshot))
 
 
@@ -799,7 +842,7 @@ def portfolio_charts(context, index=None):
 def portfolio_comparison_summary(context, index=None):
     """Post içindeki karşılaştırma özetini HTML olarak döndürür."""
     post = context.get("post")
-    comparison = _get_indexed_item(_get_portfolio_comparisons(post), index)
+    comparison = _get_item_by_identifier(_get_portfolio_comparisons(post), index)
     return mark_safe(_render_portfolio_comparison_summary_html(comparison))
 
 
@@ -807,39 +850,39 @@ def portfolio_comparison_summary(context, index=None):
 def portfolio_comparison_charts(context, index=None):
     """Post içindeki karşılaştırma grafik alanını HTML olarak döndürür."""
     post = context.get("post")
-    comparison = _get_indexed_item(_get_portfolio_comparisons(post), index)
+    comparison = _get_item_by_identifier(_get_portfolio_comparisons(post), index)
     return mark_safe(_render_portfolio_comparison_charts_html(comparison))
 
 
 @register.simple_tag(takes_context=True)
-def cashflow_summary(context):
+def cashflow_summary(context, index=None):
     """Post içindeki nakit akışı snapshot özetini HTML olarak döndürür."""
     post = context.get("post")
-    snapshot = _get_indexed_item(_get_cashflow_snapshots(post), None)
+    snapshot = _get_item_by_identifier(_get_cashflow_snapshots(post), index)
     return mark_safe(_render_cashflow_summary_html(snapshot))
 
 
 @register.simple_tag(takes_context=True)
-def cashflow_charts(context):
+def cashflow_charts(context, index=None):
     """Post içindeki nakit akışı snapshot grafik alanını HTML olarak döndürür."""
     post = context.get("post")
-    snapshot = _get_indexed_item(_get_cashflow_snapshots(post), None)
+    snapshot = _get_item_by_identifier(_get_cashflow_snapshots(post), index)
     return mark_safe(_render_cashflow_charts_html(snapshot))
 
 
 @register.simple_tag(takes_context=True)
-def cashflow_comparison_summary(context):
+def cashflow_comparison_summary(context, index=None):
     """Post içindeki nakit akışı karşılaştırma özetini HTML olarak döndürür."""
     post = context.get("post")
-    comparison = _get_indexed_item(_get_cashflow_comparisons(post), None)
+    comparison = _get_item_by_identifier(_get_cashflow_comparisons(post), index)
     return mark_safe(_render_cashflow_comparison_summary_html(comparison))
 
 
 @register.simple_tag(takes_context=True)
-def cashflow_comparison_charts(context):
+def cashflow_comparison_charts(context, index=None):
     """Post içindeki nakit akışı karşılaştırma grafik alanını HTML olarak döndürür."""
     post = context.get("post")
-    comparison = _get_indexed_item(_get_cashflow_comparisons(post), None)
+    comparison = _get_item_by_identifier(_get_cashflow_comparisons(post), index)
     return mark_safe(_render_cashflow_comparison_charts_html(comparison))
 
 
@@ -847,7 +890,7 @@ def cashflow_comparison_charts(context):
 def dividend_summary(context, index=None):
     """Post içindeki temettü snapshot özetini HTML olarak döndürür."""
     post = context.get("post")
-    snapshot = _get_indexed_item(_get_dividend_snapshots(post), index)
+    snapshot = _get_item_by_identifier(_get_dividend_snapshots(post), index)
     return mark_safe(_render_dividend_summary_html(snapshot))
 
 
@@ -855,7 +898,7 @@ def dividend_summary(context, index=None):
 def dividend_charts(context, index=None):
     """Post içindeki temettü snapshot grafik alanını HTML olarak döndürür."""
     post = context.get("post")
-    snapshot = _get_indexed_item(_get_dividend_snapshots(post), index)
+    snapshot = _get_item_by_identifier(_get_dividend_snapshots(post), index)
     return mark_safe(_render_dividend_charts_html(snapshot))
 
 
@@ -863,7 +906,7 @@ def dividend_charts(context, index=None):
 def dividend_comparison(context, index=None):
     """Post içindeki temettü karşılaştırma tablosunu HTML olarak döndürür."""
     post = context.get("post")
-    comparison = _get_indexed_item(_get_dividend_comparisons(post), index)
+    comparison = _get_item_by_identifier(_get_dividend_comparisons(post), index)
     return mark_safe(_render_dividend_comparison_html(comparison))
 
 
@@ -876,17 +919,17 @@ def render_post_body(context, post):
 
     Markdown içinde kullanılabilen marker'lar:
       {{ image:1 }}  (1-based)
-      {{ portfolio_summary:1 }}
-      {{ portfolio_charts:1 }}
-      {{ portfolio_comparison_summary:1 }}
-      {{ portfolio_comparison_charts:1 }}
-      {{ cashflow_summary:1 }}
-      {{ cashflow_charts:1 }}
-      {{ cashflow_comparison_summary:1 }}
-      {{ cashflow_comparison_charts:1 }}
-      {{ dividend_summary:1 }}
-      {{ dividend_charts:1 }}
-      {{ dividend_comparison:1 }}
+      {{ portfolio_summary:slug_or_hash }}
+      {{ portfolio_charts:slug_or_hash }}
+      {{ portfolio_comparison_summary:slug_or_hash }}
+      {{ portfolio_comparison_charts:slug_or_hash }}
+      {{ cashflow_summary:slug_or_hash }}
+      {{ cashflow_charts:slug_or_hash }}
+      {{ cashflow_comparison_summary:slug_or_hash }}
+      {{ cashflow_comparison_charts:slug_or_hash }}
+      {{ dividend_summary:slug_or_hash }}
+      {{ dividend_charts:slug_or_hash }}
+      {{ dividend_comparison:slug_or_hash }}
     """
     images = list(
         getattr(post, "images", []).all() if getattr(post, "images", None) else []  # pyright: ignore[reportAttributeAccessIssue]
@@ -920,23 +963,23 @@ def render_post_body(context, post):
     portfolio_comparisons = _get_portfolio_comparisons(post)
 
     def portfolio_summary_replacer(match):
-        index = int(match.group(1)) if match.group(1) else None
-        snapshot = _get_indexed_item(portfolio_snapshots, index)
+        identifier = match.group(1)
+        snapshot = _get_item_by_identifier(portfolio_snapshots, identifier)
         return _render_portfolio_summary_html(snapshot)
 
     def portfolio_charts_replacer(match):
-        index = int(match.group(1)) if match.group(1) else None
-        snapshot = _get_indexed_item(portfolio_snapshots, index)
+        identifier = match.group(1)
+        snapshot = _get_item_by_identifier(portfolio_snapshots, identifier)
         return _render_portfolio_charts_html(snapshot)
 
     def portfolio_comparison_summary_replacer(match):
-        index = int(match.group(1)) if match.group(1) else None
-        comparison = _get_indexed_item(portfolio_comparisons, index)
+        identifier = match.group(1)
+        comparison = _get_item_by_identifier(portfolio_comparisons, identifier)
         return _render_portfolio_comparison_summary_html(comparison)
 
     def portfolio_comparison_charts_replacer(match):
-        index = int(match.group(1)) if match.group(1) else None
-        comparison = _get_indexed_item(portfolio_comparisons, index)
+        identifier = match.group(1)
+        comparison = _get_item_by_identifier(portfolio_comparisons, identifier)
         return _render_portfolio_comparison_charts_html(comparison)
 
     expanded = PORTFOLIO_SUMMARY_PATTERN.sub(portfolio_summary_replacer, expanded)
@@ -951,23 +994,23 @@ def render_post_body(context, post):
     cashflow_comparisons = _get_cashflow_comparisons(post)
 
     def cashflow_summary_replacer(match):
-        index = int(match.group(1)) if match.group(1) else None
-        snapshot = _get_indexed_item(cashflow_snapshots, index)
+        identifier = match.group(1)
+        snapshot = _get_item_by_identifier(cashflow_snapshots, identifier)
         return _render_cashflow_summary_html(snapshot)
 
     def cashflow_charts_replacer(match):
-        index = int(match.group(1)) if match.group(1) else None
-        snapshot = _get_indexed_item(cashflow_snapshots, index)
+        identifier = match.group(1)
+        snapshot = _get_item_by_identifier(cashflow_snapshots, identifier)
         return _render_cashflow_charts_html(snapshot)
 
     def cashflow_comparison_summary_replacer(match):
-        index = int(match.group(1)) if match.group(1) else None
-        comparison = _get_indexed_item(cashflow_comparisons, index)
+        identifier = match.group(1)
+        comparison = _get_item_by_identifier(cashflow_comparisons, identifier)
         return _render_cashflow_comparison_summary_html(comparison)
 
     def cashflow_comparison_charts_replacer(match):
-        index = int(match.group(1)) if match.group(1) else None
-        comparison = _get_indexed_item(cashflow_comparisons, index)
+        identifier = match.group(1)
+        comparison = _get_item_by_identifier(cashflow_comparisons, identifier)
         return _render_cashflow_comparison_charts_html(comparison)
 
     expanded = CASHFLOW_SUMMARY_PATTERN.sub(cashflow_summary_replacer, expanded)
@@ -982,21 +1025,21 @@ def render_post_body(context, post):
     dividend_comparisons = _get_dividend_comparisons(post)
 
     def dividend_summary_replacer(match):
-        index = int(match.group(1)) if match.group(1) else None
-        snapshot = _get_indexed_item(dividend_snapshots, index)
+        identifier = match.group(1)
+        snapshot = _get_item_by_identifier(dividend_snapshots, identifier)
         return _render_dividend_summary_html(snapshot)
 
     def dividend_charts_replacer(match):
-        index = int(match.group(1)) if match.group(1) else None
-        snapshot = _get_indexed_item(dividend_snapshots, index)
+        identifier = match.group(1)
+        snapshot = _get_item_by_identifier(dividend_snapshots, identifier)
         return _render_dividend_charts_html(snapshot)
 
     expanded = DIVIDEND_SUMMARY_PATTERN.sub(dividend_summary_replacer, expanded)
     expanded = DIVIDEND_CHARTS_PATTERN.sub(dividend_charts_replacer, expanded)
 
     def dividend_comparison_replacer(match):
-        index = int(match.group(1)) if match.group(1) else None
-        comparison = _get_indexed_item(dividend_comparisons, index)
+        identifier = match.group(1)
+        comparison = _get_item_by_identifier(dividend_comparisons, identifier)
         return _render_dividend_comparison_html(comparison)
 
     expanded = DIVIDEND_COMPARISON_PATTERN.sub(dividend_comparison_replacer, expanded)
