@@ -1,0 +1,49 @@
+{% load static %}
+
+<ul class="post-list">
+  {% for post in posts %}
+    <li class="post-list__item">
+      <h2 class="post-list__title">
+        <a href="{{ post.get_absolute_url }}">{{ post.title }}</a>
+      </h2>
+      {% if post.cover_image %}
+        <figure>
+          <img
+            src="{{ post.cover_1200.url }}"
+            srcset="
+              {{ post.cover_600.url }} 600w,
+              {{ post.cover_900.url }} 900w,
+              {{ post.cover_1200.url }} 1200w
+            "
+            sizes="(max-width: 768px) 100vw, 720px"
+            alt="{{ post.title }}"
+            loading="lazy"
+          />
+        </figure>
+      {% else %}
+        <figure class="home-portfolio__placeholder">
+          <img
+            src="{% static 'images/home/portfolio-coins.svg' %}"
+            alt="Portföy görseli"
+            loading="lazy"
+          />
+        </figure>
+      {% endif %}
+
+      <p class="post-list__meta">
+        <small>
+          {{ post.published_at|date:"d F Y" }}
+          — {{ post.author.full_name }}
+          {% if post.category %}
+            — <a href="{{ post.category.get_absolute_url }}">{{ post.category.name }}</a>
+          {% endif %}
+        </small>
+      </p>
+
+      {% if post.excerpt %}
+        <p>{{ post.excerpt }} <span><a href="{{ post.get_absolute_url }}"> Okumaya devam et...</a></span></p>
+      {% endif %}
+    </li>
+    <hr />
+  {% endfor %}
+</ul>

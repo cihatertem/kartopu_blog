@@ -7,6 +7,7 @@ from django.db.models import Count, F, IntegerField, Q
 from django.db.models.expressions import ExpressionWrapper
 from django.db.models.functions import TruncMonth
 from django.urls import reverse
+from django.utils.formats import date_format
 
 from blog.cache_keys import (
     NAV_ARCHIVES_KEY,
@@ -104,6 +105,7 @@ def categories_tags_context(request):
             nav_archives.append(
                 {
                     "month": row["month"],
+                    "label": date_format(row["month"], "F Y"),
                     "post_count": row["post_count"],
                     "key": f"{row['month'].year:04d}-{row['month'].month:02d}",
                     "url": reverse(

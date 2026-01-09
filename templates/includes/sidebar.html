@@ -85,7 +85,7 @@
     <ul class="sidebar-list">
       {% for archive in nav_archives %}
         <li class="sidebar-item {% if active_archive_key == archive.key %}is-active{% endif %}">
-          <a href="{{ archive.url }}">{{ archive.month|date:"F Y" }} ({{ archive.post_count }})</a>
+          <a href="{{ archive.url }}">{{ archive.label }} ({{ archive.post_count }})</a>
         </li>
       {% empty %}
         <li>Henüz arşiv yok.</li>
