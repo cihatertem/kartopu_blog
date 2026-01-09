@@ -113,12 +113,12 @@ def _render_portfolio_summary_html(snapshot) -> str:
     html = f"""
 <section class="portfolio-snapshot">
   <h3>Bu yazının portföy özeti</h3>
-  <div style="border: 1px solid #ddd; border-radius: 8px; padding: 1rem; margin: 1rem 0">
-    <p style="margin: 0 0 0.25rem 0"><strong>Portföy:</strong> {portfolio_name}</p>
-    <p style="margin: 0 0 0.75rem 0"><strong>Tarih:</strong> {snapshot_date}
-      <span style="opacity: 0.7">({period_display})</span>
+  <div class="summary-card">
+    <p class="summary-meta"><strong>Portföy:</strong> {portfolio_name}</p>
+    <p class="summary-meta summary-meta--spaced"><strong>Tarih:</strong> {snapshot_date}
+      <span class="text-muted">({period_display})</span>
     </p>
-    <ul style="list-style: none; padding-left: 0; margin: 0">
+    <ul class="summary-list">
       <li><strong>Toplam Değer:</strong> {total_value}</li>
       <li><strong>Toplam Maliyet:</strong> {total_cost}</li>
       {target_li}
@@ -156,19 +156,19 @@ def _render_portfolio_charts_html(snapshot) -> str:
     timeseries_json = escape(json.dumps(timeseries, cls=DjangoJSONEncoder))
 
     return """
-<section class="portfolio-charts" style="margin: 1rem 0" data-portfolio-allocation="{allocation_json}" data-portfolio-timeseries="{timeseries_json}">
-  <div class="portfolio-chart-fallback" style="display:none; padding: 0.75rem 1rem; border: 1px solid #f2c2c2; background: #fff5f5; border-radius: 8px; margin-bottom: 1rem;">
+<section class="chart-section portfolio-charts" data-portfolio-allocation="{allocation_json}" data-portfolio-timeseries="{timeseries_json}">
+  <div class="chart-fallback portfolio-chart-fallback is-hidden">
     Grafikler yüklenemedi. (Tarayıcı eklentisi / ağ politikası / CSP engelliyor olabilir.)
   </div>
 
-  <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 1rem">
-    <div style="border: 1px solid #eee; border-radius: 8px; padding: 1rem">
-      <h4 style="margin-top: 0">Dağılım</h4>
+  <div class="chart-grid">
+    <div class="chart-card">
+      <h4 class="chart-card__title">Dağılım</h4>
       <canvas data-chart-kind="portfolio-allocation" height="220"></canvas>
     </div>
 
-    <div style="border: 1px solid #eee; border-radius: 8px; padding: 1rem">
-      <h4 style="margin-top: 0">Portföy Değeri (Zaman Serisi)</h4>
+    <div class="chart-card">
+      <h4 class="chart-card__title">Portföy Değeri (Zaman Serisi)</h4>
       <canvas data-chart-kind="portfolio-timeseries" height="220"></canvas>
     </div>
   </div>
@@ -362,13 +362,13 @@ def _render_portfolio_comparison_summary_html(comparison) -> str:
     html = f"""
 <section class="portfolio-comparison">
   <h3>Portföy Karşılaştırması</h3>
-  <div style="border: 1px solid #ddd; border-radius: 8px; padding: 1rem; margin: 1rem 0">
-    <div style="display:grid; gap: 1rem; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));">
+  <div class="summary-card">
+    <div class="comparison-grid">
       <div>
-        <p style="margin: 0 0 0.25rem 0"><strong>Tarih:</strong> {base_label}
-          <span style="opacity: 0.7">({base_period})</span>
+        <p class="summary-meta"><strong>Tarih:</strong> {base_label}
+          <span class="text-muted">({base_period})</span>
         </p>
-        <ul style="list-style: none; padding-left: 0; margin: 0">
+        <ul class="summary-list">
           <li><strong>Toplam Değer:</strong> {_format_currency(base_value, portfolio_currency)}</li>
           <li><strong>Toplam Maliyet:</strong> {_format_currency(base_cost, portfolio_currency)}</li>
           {base_target_ratio_html}
@@ -376,10 +376,10 @@ def _render_portfolio_comparison_summary_html(comparison) -> str:
         </ul>
       </div>
       <div>
-        <p style="margin: 0 0 0.25rem 0"><strong>Tarih:</strong> {compare_label}
-          <span style="opacity: 0.7">({compare_period})</span>
+        <p class="summary-meta"><strong>Tarih:</strong> {compare_label}
+          <span class="text-muted">({compare_period})</span>
         </p>
-        <ul style="list-style: none; padding-left: 0; margin: 0">
+        <ul class="summary-list">
           <li><strong>Toplam Değer:</strong> {_format_currency(compare_value, portfolio_currency)}</li>
           <li><strong>Toplam Maliyet:</strong> {_format_currency(compare_cost, portfolio_currency)}</li>
           {compare_target_ratio_html}
@@ -387,8 +387,8 @@ def _render_portfolio_comparison_summary_html(comparison) -> str:
         </ul>
       </div>
     </div>
-    <div style="margin-top: 0.75rem; padding-top: 0.75rem; border-top: 1px solid #eee">
-      <p style="margin: 0"><strong>Değişim:</strong> Toplam Değer {_format_currency(value_delta, portfolio_currency)},
+    <div class="comparison-footer">
+      <p class="summary-meta summary-meta--tight"><strong>Değişim:</strong> Toplam Değer {_format_currency(value_delta, portfolio_currency)},
         Getiri {escape(f"{float(return_delta):.2f}")}%{target_ratio_delta_html}</p>
     </div>
   </div>
@@ -426,12 +426,12 @@ def _render_portfolio_comparison_charts_html(comparison) -> str:
     comparison_json = escape(json.dumps(payload, cls=DjangoJSONEncoder))
 
     return """
-<section class="portfolio-comparison-charts" style="margin: 1rem 0" data-portfolio-comparison="{comparison_json}">
-  <div class="portfolio-comparison-chart-fallback" style="display:none; padding: 0.75rem 1rem; border: 1px solid #f2c2c2; background: #fff5f5; border-radius: 8px; margin-bottom: 1rem;">
+<section class="chart-section portfolio-comparison-charts" data-portfolio-comparison="{comparison_json}">
+  <div class="chart-fallback portfolio-comparison-chart-fallback is-hidden">
     Grafikler yüklenemedi. (Tarayıcı eklentisi / ağ politikası / CSP engelliyor olabilir.)
   </div>
-  <div style="border: 1px solid #eee; border-radius: 8px; padding: 1rem">
-    <h4 style="margin-top: 0">Karşılaştırma Özeti</h4>
+  <div class="chart-card">
+    <h4 class="chart-card__title">Karşılaştırma Özeti</h4>
     <canvas data-chart-kind="portfolio-comparison" height="260"></canvas>
   </div>
 </section>
@@ -461,12 +461,12 @@ def _render_cashflow_summary_html(snapshot) -> str:
     html = f"""
 <section class="cashflow-snapshot">
   <h3>Bu yazının nakit akışı özeti</h3>
-  <div style="border: 1px solid #ddd; border-radius: 8px; padding: 1rem; margin: 1rem 0">
-    <p style="margin: 0 0 0.25rem 0"><strong>Nakit Akışı:</strong> {cashflow_name}</p>
-    <p style="margin: 0 0 0.75rem 0"><strong>Tarih:</strong> {snapshot_date}
-      <span style="opacity: 0.7">({period_display})</span>
+  <div class="summary-card">
+    <p class="summary-meta"><strong>Nakit Akışı:</strong> {cashflow_name}</p>
+    <p class="summary-meta summary-meta--spaced"><strong>Tarih:</strong> {snapshot_date}
+      <span class="text-muted">({period_display})</span>
     </p>
-    <ul style="list-style: none; padding-left: 0; margin: 0">
+    <ul class="summary-list">
       <li><strong>Toplam Nakit Akışı:</strong> {total_amount}</li>
       {category_rows}
     </ul>
@@ -501,19 +501,19 @@ def _render_cashflow_charts_html(snapshot) -> str:
     timeseries_json = escape(json.dumps(timeseries, cls=DjangoJSONEncoder))
 
     return """
-<section class="cashflow-charts" style="margin: 1rem 0" data-cashflow-allocation="{allocation_json}" data-cashflow-timeseries="{timeseries_json}">
-    <div class="cashflow-chart-fallback" style="display:none; padding: 0.75rem 1rem; border: 1px solid #f2c2c2; background: #fff5f5; border-radius: 8px; margin-bottom: 1rem;">
+<section class="chart-section cashflow-charts" data-cashflow-allocation="{allocation_json}" data-cashflow-timeseries="{timeseries_json}">
+  <div class="chart-fallback cashflow-chart-fallback is-hidden">
     Grafikler yüklenemedi. (Tarayıcı eklentisi / ağ politikası / CSP engelliyor olabilir.)
   </div>
 
-  <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 1rem">
-    <div style="border: 1px solid #eee; border-radius: 8px; padding: 1rem">
-      <h4 style="margin-top: 0">Nakit Akışı Dağılımı</h4>
+  <div class="chart-grid">
+    <div class="chart-card">
+      <h4 class="chart-card__title">Nakit Akışı Dağılımı</h4>
       <canvas data-chart-kind="cashflow-allocation" height="220"></canvas>
     </div>
 
-    <div style="border: 1px solid #eee; border-radius: 8px; padding: 1rem">
-      <h4 style="margin-top: 0">Nakit Akışı (Zaman Serisi)</h4>
+    <div class="chart-card">
+      <h4 class="chart-card__title">Nakit Akışı (Zaman Serisi)</h4>
       <canvas data-chart-kind="cashflow-timeseries" height="220"></canvas>
     </div>
   </div>
@@ -570,37 +570,37 @@ def _render_cashflow_comparison_summary_html(comparison) -> str:
         f"<li><strong>{escape(category_label_map.get(category, category))}:</strong> "
         f"{_format_currency(base_items.get(category, Decimal('0')), cashflow_currency)} → "
         f"{_format_currency(compare_items.get(category, Decimal('0')), cashflow_currency)} "
-        f'(<span style="opacity: 0.8">{_format_currency(compare_items.get(category, Decimal("0")) - base_items.get(category, Decimal("0")), cashflow_currency)}</span>)</li>'
+        f'(<span class="text-muted">{_format_currency(compare_items.get(category, Decimal("0")) - base_items.get(category, Decimal("0")), cashflow_currency)}</span>)</li>'
         for category in categories
     )
 
     html = f"""
 <section class="cashflow-comparison">
   <h3>Nakit Akışı Karşılaştırması</h3>
-  <div style="border: 1px solid #ddd; border-radius: 8px; padding: 1rem; margin: 1rem 0">
-    <div style="display:grid; gap: 1rem; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));">
+  <div class="summary-card">
+    <div class="comparison-grid">
       <div>
-        <p style="margin: 0 0 0.25rem 0"><strong>Tarih:</strong> {base_label}
-          <span style="opacity: 0.7">({base_period})</span>
+        <p class="summary-meta"><strong>Tarih:</strong> {base_label}
+          <span class="text-muted">({base_period})</span>
         </p>
-        <ul style="list-style: none; padding-left: 0; margin: 0">
+        <ul class="summary-list">
           <li><strong>Toplam Nakit Akışı:</strong> {_format_currency(base_amount, cashflow_currency)}</li>
           {base_category_rows}
         </ul>
       </div>
       <div>
-        <p style="margin: 0 0 0.25rem 0"><strong>Tarih:</strong> {compare_label}
-          <span style="opacity: 0.7">({compare_period})</span>
+        <p class="summary-meta"><strong>Tarih:</strong> {compare_label}
+          <span class="text-muted">({compare_period})</span>
         </p>
-        <ul style="list-style: none; padding-left: 0; margin: 0">
+        <ul class="summary-list">
           <li><strong>Toplam Nakit Akışı:</strong> {_format_currency(compare_amount, cashflow_currency)}</li>
           {compare_category_rows}
         </ul>
       </div>
     </div>
-    <div style="margin-top: 0.75rem; padding-top: 0.75rem; border-top: 1px solid #eee">
-      <p style="margin: 0"><strong>Değişim:</strong> {_format_currency(delta, cashflow_currency)} ({escape(f"{float(pct_change):.2f}")}%)</p>
-      <ul style="list-style: none; padding-left: 0; margin: 0.5rem 0 0 0">
+    <div class="comparison-footer">
+      <p class="summary-meta summary-meta--tight"><strong>Değişim:</strong> {_format_currency(delta, cashflow_currency)} ({escape(f"{float(pct_change):.2f}")}%)</p>
+      <ul class="summary-list summary-list--compact">
         {category_delta_rows}
       </ul>
     </div>
@@ -632,12 +632,12 @@ def _render_cashflow_comparison_charts_html(comparison) -> str:
     comparison_json = escape(json.dumps(payload, cls=DjangoJSONEncoder))
 
     return """
-<section class="cashflow-comparison-charts" style="margin: 1rem 0" data-cashflow-comparison="{comparison_json}">
-  <div class="cashflow-comparison-chart-fallback" style="display:none; padding: 0.75rem 1rem; border: 1px solid #f2c2c2; background: #fff5f5; border-radius: 8px; margin-bottom: 1rem;">
+<section class="chart-section cashflow-comparison-charts" data-cashflow-comparison="{comparison_json}">
+  <div class="chart-fallback cashflow-comparison-chart-fallback is-hidden">
     Grafikler yüklenemedi. (Tarayıcı eklentisi / ağ politikası / CSP engelliyor olabilir.)
   </div>
-  <div style="border: 1px solid #eee; border-radius: 8px; padding: 1rem">
-    <h4 style="margin-top: 0">Nakit Akışı Karşılaştırma Özeti</h4>
+  <div class="chart-card">
+    <h4 class="chart-card__title">Nakit Akışı Karşılaştırma Özeti</h4>
     <canvas data-chart-kind="cashflow-comparison" height="260"></canvas>
   </div>
 </section>
@@ -657,30 +657,29 @@ def _render_dividend_summary_html(snapshot) -> str:
         "payment_date"
     )
 
-    cell_style = "padding: 0.5rem; border-bottom: 1px solid #f2f2f2; text-align: left;"
     rows = "\n".join(
         "<tr>"
-        f"<td style=\"{cell_style}\">{escape(item.asset.name)}</td>"
-        f"<td style=\"{cell_style}\">{escape(str(item.payment_date))}</td>"
-        f"<td style=\"{cell_style}\">{_format_currency(item.per_share_net_amount, snapshot.currency)}</td>"
-        f"<td style=\"{cell_style}\">{escape(f'{float((item.dividend_yield_on_payment_price or 0) * 100):.2f}')}%</td>"
-        f"<td style=\"{cell_style}\">{escape(f'{float((item.dividend_yield_on_average_cost or 0) * 100):.2f}')}%</td>"
-        f"<td style=\"{cell_style}\">{_format_currency(item.total_net_amount, snapshot.currency)}</td>"
+        f'<td class="data-table__cell">{escape(item.asset.name)}</td>'
+        f'<td class="data-table__cell">{escape(str(item.payment_date))}</td>'
+        f'<td class="data-table__cell">{_format_currency(item.per_share_net_amount, snapshot.currency)}</td>'
+        f'<td class="data-table__cell">{escape(f"{float((item.dividend_yield_on_payment_price or 0) * 100):.2f}")}%</td>'
+        f'<td class="data-table__cell">{escape(f"{float((item.dividend_yield_on_average_cost or 0) * 100):.2f}")}%</td>'
+        f'<td class="data-table__cell">{_format_currency(item.total_net_amount, snapshot.currency)}</td>'
         "</tr>"
         for item in payment_items
     )
 
     table_html = f"""
-    <div style="overflow-x: auto; margin-top: 1rem;">
-      <table style="width: 100%; border-collapse: collapse; min-width: 640px; font-size: 0.95rem;">
+    <div class="table-scroll">
+      <table class="data-table data-table--wide">
         <thead>
           <tr>
-            <th style="text-align:left; border-bottom: 1px solid #eee; padding: 0.5rem; background: #fafafa;">Varlık</th>
-            <th style="text-align:left; border-bottom: 1px solid #eee; padding: 0.5rem; background: #fafafa;">Ödeme Tarihi</th>
-            <th style="text-align:left; border-bottom: 1px solid #eee; padding: 0.5rem; background: #fafafa;">Hisse Başına Net Temettü</th>
-            <th style="text-align:left; border-bottom: 1px solid #eee; padding: 0.5rem; background: #fafafa;">Ödeme Günü Temettü Verimi</th>
-            <th style="text-align:left; border-bottom: 1px solid #eee; padding: 0.5rem; background: #fafafa;">Ortalama Maliyet Temettü Verimi</th>
-            <th style="text-align:left; border-bottom: 1px solid #eee; padding: 0.5rem; background: #fafafa;">Toplam Net Temettü</th>
+            <th class="data-table__header">Varlık</th>
+            <th class="data-table__header">Ödeme Tarihi</th>
+            <th class="data-table__header">Hisse Başına Net Temettü</th>
+            <th class="data-table__header">Ödeme Günü Temettü Verimi</th>
+            <th class="data-table__header">Ortalama Maliyet Temettü Verimi</th>
+            <th class="data-table__header">Toplam Net Temettü</th>
           </tr>
         </thead>
         <tbody>
@@ -693,10 +692,10 @@ def _render_dividend_summary_html(snapshot) -> str:
     html = f"""
 <section class="dividend-summary">
   <h3>Bu yazının temettü özeti</h3>
-  <div style="border: 1px solid #ddd; border-radius: 8px; padding: 1rem; margin: 1rem 0">
-    <p style="margin: 0 0 0.25rem 0"><strong>Yıl:</strong> {year}</p>
-    <p style="margin: 0 0 0.75rem 0"><strong>Para Birimi:</strong> {currency}</p>
-    <p style="margin: 0"><strong>Toplam Temettü:</strong> {total_amount}</p>
+  <div class="summary-card">
+    <p class="summary-meta"><strong>Yıl:</strong> {year}</p>
+    <p class="summary-meta summary-meta--spaced"><strong>Para Birimi:</strong> {currency}</p>
+    <p class="summary-meta summary-meta--tight"><strong>Toplam Temettü:</strong> {total_amount}</p>
     {table_html}
   </div>
 </section>
@@ -716,12 +715,12 @@ def _render_dividend_charts_html(snapshot) -> str:
     allocation_json = escape(json.dumps(allocation, cls=DjangoJSONEncoder))
 
     return """
-<section class="dividend-charts" style="margin: 1rem 0" data-dividend-allocation="{allocation_json}">
-  <div class="dividend-chart-fallback" style="display:none; padding: 0.75rem 1rem; border: 1px solid #f2c2c2; background: #fff5f5; border-radius: 8px; margin-bottom: 1rem;">
+<section class="chart-section dividend-charts" data-dividend-allocation="{allocation_json}">
+  <div class="chart-fallback dividend-chart-fallback is-hidden">
     Grafikler yüklenemedi. (Tarayıcı eklentisi / ağ politikası / CSP engelliyor olabilir.)
   </div>
-  <div style="border: 1px solid #eee; border-radius: 8px; padding: 1rem">
-    <h4 style="margin-top: 0">Temettü Dağılımı</h4>
+  <div class="chart-card">
+    <h4 class="chart-card__title">Temettü Dağılımı</h4>
     <canvas data-chart-kind="dividend-allocation" height="220"></canvas>
   </div>
 </section>
@@ -752,28 +751,28 @@ def _render_dividend_comparison_html(comparison) -> str:
     html = f"""
 <section class="dividend-comparison">
   <h3>Temettü Karşılaştırması</h3>
-  <div style="border: 1px solid #ddd; border-radius: 8px; padding: 1rem; margin: 1rem 0">
-    <div style="overflow-x: auto;">
-      <table style="width: 100%; border-collapse: collapse; min-width: 360px; font-size: 0.95rem;">
+  <div class="summary-card">
+    <div class="table-scroll">
+      <table class="data-table">
         <thead>
           <tr>
-            <th style="text-align:left; border-bottom: 1px solid #eee; padding: 0.5rem; background: #fafafa;">Yıl</th>
-            <th style="text-align:left; border-bottom: 1px solid #eee; padding: 0.5rem; background: #fafafa;">Toplam Temettü</th>
+            <th class="data-table__header">Yıl</th>
+            <th class="data-table__header">Toplam Temettü</th>
           </tr>
         </thead>
         <tbody>
           <tr>
-            <td style="padding: 0.5rem; border-bottom: 1px solid #f2f2f2;">{base_year}</td>
-            <td style="padding: 0.5rem; border-bottom: 1px solid #f2f2f2;">{base_total_display}</td>
+            <td class="data-table__cell">{base_year}</td>
+            <td class="data-table__cell">{base_total_display}</td>
           </tr>
           <tr>
-            <td style="padding: 0.5rem; border-bottom: 1px solid #f2f2f2;">{compare_year}</td>
-            <td style="padding: 0.5rem; border-bottom: 1px solid #f2f2f2;">{compare_total_display}</td>
+            <td class="data-table__cell">{compare_year}</td>
+            <td class="data-table__cell">{compare_total_display}</td>
           </tr>
         </tbody>
       </table>
     </div>
-    <p style="margin: 0.75rem 0 0 0"><strong>Değişim:</strong> {delta_display} ({escape(f"{float(pct_change):.2f}")}%)</p>
+    <p class="summary-meta summary-meta--spaced"><strong>Değişim:</strong> {delta_display} ({escape(f"{float(pct_change):.2f}")}%)</p>
   </div>
 </section>
 """

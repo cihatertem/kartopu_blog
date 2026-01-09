@@ -35,6 +35,9 @@ class BlogPostImageInline(admin.TabularInline):
 
     fields = ("thumb", "image", "alt_text", "caption", "order")
 
+    class Media:
+        css = {"all": ("css/admin.css",)}
+
     def thumb(self, obj: BlogPostImage) -> str | SafeString:
         if not obj.pk or not obj.image:
             return "—"
@@ -45,7 +48,7 @@ class BlogPostImageInline(admin.TabularInline):
             url = obj.image.url
 
         return format_html(
-            "<img src='{}' style='height:60px; width:auto; border-radius:6px;' loading='lazy' />",
+            "<img src='{}' class='admin-thumb' loading='lazy' />",
             url,
         )
 

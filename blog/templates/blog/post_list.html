@@ -5,10 +5,10 @@
 {% include "includes/breadcrumbs.html" %}
   <h1>Blog</h1>
   {% if page_obj %}
-    <ul>
+    <ul class="post-list">
       {% for post in page_obj.object_list %}
-        <li>
-          <h2 style="margin-bottom: 0.25rem;">
+        <li class="post-list__item">
+          <h2 class="post-list__title">
             <a href="{{ post.get_absolute_url }}">{{ post.title }}</a>
           </h2>
           {% if post.cover_image %}
@@ -27,7 +27,7 @@
             </figure>
           {% endif %}
 
-          <p style="margin-top: 0;">
+          <p class="post-list__meta">
             <small>
               {{ post.published_at|date:"d F Y" }}
               — {{ post.author.full_name }}
@@ -45,16 +45,13 @@
       {% endfor %}
     </ul>
 
-    <nav>
+    <nav class="pagination">
       {% if page_obj.has_previous %}
-        <a href="?page={{ page_obj.previous_page_number }}{% if q %}&q={{ q|urlencode }}{% endif %}">← Önceki</a>
+        <a class="pagination__link" href="?page={{ page_obj.previous_page_number }}{% if q %}&q={{ q|urlencode }}{% endif %}">← Önceki</a>
       {% endif %}
-
-      <span> Sayfa {{ page_obj.number }} / {{ page_obj.paginator.num_pages }} </span>
-
+      <span class="pagination__status"> Sayfa {{ page_obj.number }} / {{ page_obj.paginator.num_pages }} </span>
       {% if page_obj.has_next %}
-        <a href="?page={{ page_obj.next_page_number }}{% if q %}&q={{ q|urlencode }}{% endif %}">Sonraki →</a>
-
+        <a class="pagination__link" href="?page={{ page_obj.next_page_number }}{% if q %}&q={{ q|urlencode }}{% endif %}">Sonraki →</a>
       {% endif %}
     </nav>
 

@@ -1,122 +1,93 @@
-<section style="border: 1px solid #eee; padding: 1rem; border-radius: 8px;">
-  <h3 style="margin-top: 0;">Ara</h3>
+<div class="sidebar">
+  <section class="sidebar-card">
+    <h3 class="sidebar-title">Ara</h3>
 
-  <form method="get" action="{% url 'blog:search_results' %}">
-    <input
-      type="search"
-      name="q"
-      placeholder="Blogda ara..."
-      value="{{ q|default:'' }}"
-      style="width: 100%; padding: 0.5rem; border: 1px solid #ddd; border-radius: 6px;"
-    />
-  </form>
+    <form method="get" action="{% url 'blog:search_results' %}" class="sidebar-form">
+      <input
+        type="search"
+        name="q"
+        placeholder="Blogda ara..."
+        value="{{ q|default:'' }}"
+        class="input-field"
+      />
+    </form>
+  </section>
 
-</section>
+  <!-- Son Yazılar Bölümü -->
+  <section class="sidebar-card">
+    <h3 class="sidebar-title">Son Yazılar</h3>
 
-<div style="height: 1rem;"></div>
+    <ul class="sidebar-list">
+      {% for post in nav_recent_posts %}
+        <li>
+          <a href="{{ post.get_absolute_url }}">{{ post.title }}</a>
+        </li>
+      {% empty %}
+        <li>Henüz yazı yok.</li>
+      {% endfor %}
+    </ul>
+  </section>
 
-<! -- Son Yazılar Bölümü -->
-<section style="border: 1px solid #eee; padding: 1rem; border-radius: 8px;">
-  <h3 style="margin-top: 0;">Son Yazılar</h3>
+  <!-- Popüler Yazılar Bölümü -->
+  <section class="sidebar-card">
+    <h3 class="sidebar-title">Popüler Yazılar</h3>
 
-  <ul style="padding-left: 1.2rem; margin: 0;">
-    {% for post in nav_recent_posts %}
-      <li>
-        <a href="{{ post.get_absolute_url }}">{{ post.title }}</a>
-      </li>
-    {% empty %}
-      <li>Henüz yazı yok.</li>
-    {% endfor %}
-  </ul>
-</section>
+    <ul class="sidebar-list">
+      {% for post in nav_popular_posts %}
+        <li>
+          <a href="{{ post.get_absolute_url }}">{{ post.title }}</a>
+        </li>
+      {% empty %}
+        <li>Henüz yazı yok.</li>
+      {% endfor %}
+    </ul>
+  </section>
 
-<div style="height: 1rem;"></div>
+  <!-- Kategoriler Bölümü -->
+  <section class="sidebar-card">
+    <h3 class="sidebar-title">Kategoriler</h3>
 
-<! -- Popüler Yazılar Bölümü -->
-<section style="border: 1px solid #eee; padding: 1rem; border-radius: 8px;">
-  <h3 style="margin-top: 0;">Popüler Yazılar</h3>
-
-  <ul style="padding-left: 1.2rem; margin: 0;">
-    {% for post in nav_popular_posts %}
-      <li>
-        <a href="{{ post.get_absolute_url }}">{{ post.title }}</a>
-      </li>
-    {% empty %}
-      <li>Henüz yazı yok.</li>
-    {% endfor %}
-  </ul>
-</section>
-
-<div style="height: 1rem;"></div>
-
-<! -- Kategoriler Bölümü -->
-<section style="border: 1px solid #eee; padding: 1rem; border-radius: 8px;">
-  <h3 style="margin-top: 0;">Kategoriler</h3>
-
-  <ul style="padding-left: 1.2rem; margin: 0;">
-    {% for c in nav_categories %}
-      <li class="{% if active_category_slug == c.slug %}active{% endif %}">
-        {% if active_category_slug == c.slug %}
-          <strong>
-            <a href="{{ c.get_absolute_url }}">{{ c.name }} ({{ c.post_count }})</a>
-          </strong>
-        {% else %}
+    <ul class="sidebar-list">
+      {% for c in nav_categories %}
+        <li class="sidebar-item {% if active_category_slug == c.slug %}is-active{% endif %}">
           <a href="{{ c.get_absolute_url }}">{{ c.name }} ({{ c.post_count }})</a>
-        {% endif %}
-      </li>
-    {% empty %}
-      <li>Henüz kategori yok.</li>
-    {% endfor %}
-  </ul>
-</section>
+        </li>
+      {% empty %}
+        <li>Henüz kategori yok.</li>
+      {% endfor %}
+    </ul>
+  </section>
 
-<div style="height: 1rem;"></div>
+  <!-- Etiketler Bölümü -->
+  <section class="sidebar-card">
+    <h3 class="sidebar-title">Etiketler</h3>
 
-<! -- Etiketler Bölümü -->
-<section style="border: 1px solid #eee; padding: 1rem; border-radius: 8px;">
-  <h3 style="margin-top: 0;">Etiketler</h3>
+    <div class="tag-cloud">
+      {% for tag in nav_tags %}
+        <a
+          href="{% url 'blog:tag_detail' tag.slug %}"
+          class="tag-cloud__item {% if active_tag_slug == tag.slug %}is-active{% endif %}"
+        >
+          #{{ tag.name }}
+        </a>
+      {% empty %}
+        <span>Henüz etiket yok.</span>
+      {% endfor %}
+    </div>
+  </section>
 
-  <div style="display: flex; flex-wrap: wrap; gap: 0.5rem;">
-    {% for tag in nav_tags %}
-      <a
-        href="{% url 'blog:tag_detail' tag.slug %}"
-        style="
-          font-size: {{ tag.cloud_size }}rem;
-          padding: 0.2rem 0.45rem;
-          border: 1px solid #eee;
-          border-radius: 999px;
-          text-decoration: none;
-          color: inherit;
-          {% if active_tag_slug == tag.slug %}font-weight: 700; border-color: #bbb;{% endif %}
-        "
-      >
-        #{{ tag.name }}
-      </a>
-    {% empty %}
-      <span>Henüz etiket yok.</span>
-    {% endfor %}
-  </div>
-</section>
+  <!-- Arşivler Bölümü -->
+  <section class="sidebar-card">
+    <h3 class="sidebar-title">Arşiv</h3>
 
-<div style="height: 1rem;"></div>
-
-<! -- Arşivler Bölümü -->
-<section style="border: 1px solid #eee; padding: 1rem; border-radius: 8px;">
-  <h3 style="margin-top: 0;">Arşiv</h3>
-
-  <ul style="padding-left: 1.2rem; margin: 0;">
-    {% for archive in nav_archives %}
-      <li class="{% if active_archive_key == archive.key %}active{% endif %}">
-        {% if active_archive_key == archive.key %}
-          <strong>
-            <a href="{{ archive.url }}">{{ archive.month|date:"F Y" }} ({{ archive.post_count }})</a>
-          </strong>
-        {% else %}
+    <ul class="sidebar-list">
+      {% for archive in nav_archives %}
+        <li class="sidebar-item {% if active_archive_key == archive.key %}is-active{% endif %}">
           <a href="{{ archive.url }}">{{ archive.month|date:"F Y" }} ({{ archive.post_count }})</a>
-        {% endif %}
-      </li>
-    {% empty %}
-      <li>Henüz arşiv yok.</li>
-    {% endfor %}
-  </ul>
-</section>
+        </li>
+      {% empty %}
+        <li>Henüz arşiv yok.</li>
+      {% endfor %}
+    </ul>
+  </section>
+</div>

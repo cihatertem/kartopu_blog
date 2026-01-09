@@ -5,35 +5,27 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>{% block title %}kartopu.money{% endblock %}</title>
+    <link rel="stylesheet" href="{% static 'css/site.css' %}" />
     <script src="{% static 'vendor/chart.umd.min.js' %}"></script>
     {% block head %}{% endblock %}
   </head>
 
   <body>
-    <header style="border-bottom: 1px solid #ddd; padding: 1rem 0;">
+    <header class="site-header">
       {% include "includes/navbar.html" %}
     </header>
 
     {% if messages %}
-      <div style="max-width: 1100px; margin: 1rem auto 0; padding: 0 1rem;">
+      <div class="flash-messages">
         {% for message in messages %}
-          <div style="padding: 0.75rem 1rem; border: 1px solid #eee; margin-bottom: 0.5rem;">
+          <div class="flash-message">
             {{ message }}
           </div>
         {% endfor %}
       </div>
     {% endif %}
 
-    <div
-      style="
-        max-width: 1100px;
-        margin: 0 auto;
-        padding: 1rem;
-        display: grid;
-        grid-template-columns: 1fr 280px;
-        gap: 2rem;
-      "
-    >
+    <div class="site-layout">
       <main>
         {% block content %}{% endblock %}
       </main>
@@ -43,14 +35,14 @@
       </aside>
     </div>
 
-    <footer style="border-top: 1px solid #ddd; padding: 1rem 0; margin-top: 2rem;">
-      <div style="max-width: 1100px; margin: 0 auto; padding: 0 1rem;">
+    <footer class="site-footer">
+      <div class="site-footer__inner">
         <small>© {% now "Y" %} kartopu.money</small>
       </div>
     </footer>
   </body>
   <script>
-  {% block js_script %}{% endblock %}
+  {% block js_script %} {% endblock %}
   (function () {
       const urlParams = new URLSearchParams(window.location.search);
       if (urlParams.get("popup") === "1") {
