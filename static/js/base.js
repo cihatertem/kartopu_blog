@@ -13,4 +13,13 @@
             window.close();
         }, 150);
     }
+    const dateTarget = document.getElementById("site-date");
+    if (dateTarget) {
+        const formatter = new Intl.DateTimeFormat("tr-TR", {
+            day: "numeric",
+            month: "long",
+            year: "numeric",
+        });
+        dateTarget.textContent = formatter.format(new Date());
+    }
 })();

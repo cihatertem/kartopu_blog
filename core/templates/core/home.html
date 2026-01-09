@@ -1,0 +1,108 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Anasayfa - kartopu.money{% endblock %}
+
+{% block content %}
+  <section class="home-hero">
+    <div class="home-hero__content">
+      <p class="home-hero__eyebrow">Finansal Özgürlüğe Doğru</p>
+      <h1>Kendi Kartopunu Oluştur</h1>
+      <p class="home-hero__subtitle">
+        Portföy raporları, piyasa özetleri ve yatırım notlarıyla kendi finansal
+        yolculuğunu planla.
+      </p>
+      <div class="home-hero__actions">
+        {% if featured_post %}
+          <a class="button button--primary" href="{{ featured_post.get_absolute_url }}">
+            Son Portföyü Gör
+          </a>
+        {% else %}
+          <button class="button button--primary is-disabled" type="button" disabled>
+            Son Portföyü Gör
+          </button>
+        {% endif %}
+
+        <button class="button button--ghost" type="button">Abone Ol</button>
+      </div>
+    </div>
+    <div class="home-hero__image">
+      <img
+        src="{% static 'images/home/hero-snowball.svg' %}"
+        alt="Kartopu portföy görseli"
+        loading="eager"
+      />
+    </div>
+  </section>
+
+  <section class="home-portfolio">
+    <div class="home-portfolio__header">
+      <div>
+        <h2>Son Portföy Yazıları</h2>
+        <p class="home-portfolio__subtitle">
+          Portföy kategorisindeki en yeni yazılar.
+        </p>
+      </div>
+      {% if portfolio_category %}
+        <a class="button" href="{{ portfolio_category.get_absolute_url }}">
+          Tüm portföy yazılarına git
+        </a>
+      {% else %}
+        <button class="button is-disabled" type="button" disabled>
+          Tüm portföy yazılarına git
+        </button>
+      {% endif %}
+    </div>
+
+    {% if portfolio_posts %}
+      <ul class="post-list home-portfolio__list">
+        {% for post in portfolio_posts %}
+          <li class="post-list__item">
+            <h3 class="post-list__title">
+              <a href="{{ post.get_absolute_url }}">{{ post.title }}</a>
+            </h3>
+            {% if post.cover_image %}
+              <figure>
+                <img
+                  src="{{ post.cover_1200.url }}"
+                  srcset="
+                    {{ post.cover_600.url }} 600w,
+                    {{ post.cover_900.url }} 900w,
+                    {{ post.cover_1200.url }} 1200w
+                  "
+                  sizes="(max-width: 768px) 100vw, 720px"
+                  alt="{{ post.title }}"
+                  loading="lazy"
+                />
+              </figure>
+            {% else %}
+              <figure class="home-portfolio__placeholder">
+                <img
+                  src="{% static 'images/home/portfolio-coins.svg' %}"
+                  alt="Portföy görseli"
+                  loading="lazy"
+                />
+              </figure>
+            {% endif %}
+
+            <p class="post-list__meta">
+              <small>
+                {{ post.published_at|date:"d F Y" }}
+                — {{ post.author.full_name }}
+                {% if post.category %}
+                  — <a href="{{ post.category.get_absolute_url }}">{{ post.category.name }}</a>
+                {% endif %}
+              </small>
+            </p>
+
+            {% if post.excerpt %}
+              <p>{{ post.excerpt }} <span><a href="{{ post.get_absolute_url }}"> Okumaya devam et...</a></span></p>
+            {% endif %}
+          </li>
+        {% endfor %}
+      </ul>
+    {% else %}
+      <p>Henüz portföy kategorisinde yazı yok.</p>
+    {% endif %}
+  </section>
+{% endblock %}

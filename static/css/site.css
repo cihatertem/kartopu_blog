@@ -68,6 +68,12 @@ hr {
   align-items: center;
 }
 
+.site-nav__date {
+  font-size: 0.95rem;
+  color: var(--color-muted);
+  margin-right: 0.5rem;
+}
+
 .site-nav__brand {
   font-weight: 700;
   font-size: 1.2rem;
@@ -308,6 +314,116 @@ select:focus {
   background: #fff;
 }
 
+.button.is-disabled,
+.button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
+.home-hero {
+  display: grid;
+  grid-template-columns: minmax(0, 1.1fr) minmax(0, 0.9fr);
+  gap: 2rem;
+  padding: 1.5rem;
+  border-radius: 20px;
+  background: linear-gradient(
+    135deg,
+    var(--color-primary-soft),
+    var(--color-surface)
+  );
+  border: 1px solid var(--color-border);
+  box-shadow: var(--shadow-soft);
+}
+
+.home-hero__eyebrow {
+  margin: 0 0 0.5rem;
+  color: var(--color-primary-dark);
+  font-weight: 600;
+}
+
+.home-hero h1 {
+  margin: 0 0 0.75rem;
+  font-size: 2.2rem;
+}
+
+.home-hero__subtitle {
+  margin: 0 0 1.5rem;
+  color: var(--color-muted);
+}
+
+.home-hero__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+}
+
+.home-hero__image {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.home-hero__image img {
+  border-radius: 16px;
+  max-height: 320px;
+  width: 100%;
+  object-fit: cover;
+}
+
+.home-portfolio {
+  margin-top: 2rem;
+}
+
+.home-portfolio__header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.home-portfolio__subtitle {
+  margin: 0.5rem 0 0;
+  color: var(--color-muted);
+}
+
+.home-portfolio__list {
+  margin-top: 1.5rem;
+}
+
+.home-portfolio__placeholder {
+  margin: 1rem 0 0;
+}
+
+.goal-widget__text {
+  margin: 0 0 0.75rem;
+  color: var(--color-muted);
+}
+
+.goal-widget__bar {
+  position: relative;
+  height: 10px;
+  border-radius: 999px;
+  background: var(--color-border);
+  overflow: hidden;
+  margin-bottom: 0.75rem;
+}
+
+.goal-widget__bar span {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, var(--color-primary), var(--color-accent));
+}
+
+.goal-widget__meta {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  color: var(--color-muted);
+  font-size: 0.9rem;
+}
+
 .comment-list {
   list-style: none;
   padding: 0;
@@ -529,6 +645,14 @@ select:focus {
 
   .site-nav {
     justify-content: center;
+  }
+
+  .home-hero {
+    grid-template-columns: 1fr;
+  }
+
+  .home-hero__image {
+    order: -1;
   }
 }
 
