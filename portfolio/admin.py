@@ -410,8 +410,8 @@ class DividendSnapshotPaymentInline(admin.TabularInline):
 
 @admin.register(DividendSnapshot)
 class DividendSnapshotAdmin(admin.ModelAdmin):
-    list_display = ("name", "year", "currency", "total_amount")
-    list_filter = ("year", "currency")
+    list_display = ("name", "year", "snapshot_date", "currency", "total_amount")
+    list_filter = ("year", "snapshot_date", "currency")
     readonly_fields = ("total_amount",)
     search_fields = ("name", "slug")
     inlines = (DividendSnapshotAssetInline, DividendSnapshotPaymentInline)
@@ -424,6 +424,7 @@ class DividendSnapshotAdmin(admin.ModelAdmin):
         snapshot = DividendSnapshot.create_snapshot(
             year=obj.year,
             currency=obj.currency,
+            snapshot_date=obj.snapshot_date,
             name=obj.name,
         )
         obj.pk = snapshot.pk

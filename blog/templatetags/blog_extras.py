@@ -16,18 +16,14 @@ IMAGE_PATTERN = re.compile(r"\{\{\s*image:(\d+)\s*\}\}")
 PORTFOLIO_SUMMARY_PATTERN = re.compile(
     r"\{\{\s*portfolio_summary(?::([^\s\}]+))?\s*\}\}"
 )
-PORTFOLIO_CHARTS_PATTERN = re.compile(
-    r"\{\{\s*portfolio_charts(?::([^\s\}]+))?\s*\}\}"
-)
+PORTFOLIO_CHARTS_PATTERN = re.compile(r"\{\{\s*portfolio_charts(?::([^\s\}]+))?\s*\}\}")
 PORTFOLIO_COMPARISON_SUMMARY_PATTERN = re.compile(
     r"\{\{\s*portfolio_comparison_summary(?::([^\s\}]+))?\s*\}\}"
 )
 PORTFOLIO_COMPARISON_CHARTS_PATTERN = re.compile(
     r"\{\{\s*portfolio_comparison_charts(?::([^\s\}]+))?\s*\}\}"
 )
-CASHFLOW_SUMMARY_PATTERN = re.compile(
-    r"\{\{\s*cashflow_summary(?::([^\s\}]+))?\s*\}\}"
-)
+CASHFLOW_SUMMARY_PATTERN = re.compile(r"\{\{\s*cashflow_summary(?::([^\s\}]+))?\s*\}\}")
 CASHFLOW_CHARTS_PATTERN = re.compile(r"\{\{\s*cashflow_charts(?::([^\s\}]+))?\s*\}\}")
 CASHFLOW_COMPARISON_SUMMARY_PATTERN = re.compile(
     r"\{\{\s*cashflow_comparison_summary(?::([^\s\}]+))?\s*\}\}"
@@ -35,12 +31,8 @@ CASHFLOW_COMPARISON_SUMMARY_PATTERN = re.compile(
 CASHFLOW_COMPARISON_CHARTS_PATTERN = re.compile(
     r"\{\{\s*cashflow_comparison_charts(?::([^\s\}]+))?\s*\}\}"
 )
-DIVIDEND_SUMMARY_PATTERN = re.compile(
-    r"\{\{\s*dividend_summary(?::([^\s\}]+))?\s*\}\}"
-)
-DIVIDEND_CHARTS_PATTERN = re.compile(
-    r"\{\{\s*dividend_charts(?::([^\s\}]+))?\s*\}\}"
-)
+DIVIDEND_SUMMARY_PATTERN = re.compile(r"\{\{\s*dividend_summary(?::([^\s\}]+))?\s*\}\}")
+DIVIDEND_CHARTS_PATTERN = re.compile(r"\{\{\s*dividend_charts(?::([^\s\}]+))?\s*\}\}")
 DIVIDEND_COMPARISON_PATTERN = re.compile(
     r"\{\{\s*dividend_comparison(?::([^\s\}]+))?\s*\}\}"
 )
@@ -327,7 +319,7 @@ def _get_dividend_snapshots(post):
     return _get_prefetched_list(
         post,
         "dividend_snapshots",
-        post.dividend_snapshots.order_by("-year", "-created_at"),
+        post.dividend_snapshots.order_by("-snapshot_date", "-created_at"),
     )
 
 

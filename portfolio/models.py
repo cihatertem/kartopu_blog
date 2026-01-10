@@ -82,16 +82,19 @@ class Asset(UUIDModelMixin, TimeStampedModelMixin):
     def __str__(self) -> str:
         return f"{self.name} ({self.symbol})" if self.symbol else self.name
 
-    def refresh_price(self) -> None:
+    def refresh_price(self, price_date: date | None = None) -> Decimal | None:
         if not self.symbol:
-            return
+            return None
 
-        price = fetch_yahoo_finance_price(self.symbol)
+        price = fetch_yahoo_finance_price(self.symbol, price_date=price_date)
         if price is None:
-            return
+            return None
 
-        self.current_price = price
-        self.price_updated_at = timezone.now()
+        if price_date is None:
+            self.current_price = price
+            self.price_updated_at = timezone.now()
+
+        return price
 
     def save(self, *args: object, **kwargs: object) -> None:
         if self._state.adding and self.symbol and not self.current_price:
@@ -192,20 +195,28 @@ class Portfolio(UUIDModelMixin, TimeStampedModelMixin):
     def __str__(self) -> str:
         return f"{self.name}"
 
-    def get_positions(self) -> list[dict[str, Decimal | Asset]]:
+    def get_positions(
+        self,
+        *,
+        price_date: date | None = None,
+    ) -> list[dict[str, Decimal | Asset]]:
         positions: dict[str, dict[str, Decimal | Asset]] = {}
         transactions = (
             self.transactions.select_related("asset")  # pyright: ignore[reportAttributeAccessIssue]
             .all()
             .order_by("trade_date", "created_at")
         )
-        fx_rates: dict[tuple[str, str], Decimal] = {}
+        fx_rates: dict[tuple[str, str, date | None], Decimal] = {}
 
         for transaction in transactions:
             asset = transaction.asset
-            currency_pair = (asset.currency, self.currency)
+            currency_pair = (asset.currency, self.currency, transaction.trade_date)
             if currency_pair not in fx_rates:
-                fx_rate = fetch_fx_rate(asset.currency, self.currency)
+                fx_rate = fetch_fx_rate(
+                    asset.currency,
+                    self.currency,
+                    rate_date=transaction.trade_date,
+                )
                 fx_rates[currency_pair] = (
                     fx_rate if fx_rate is not None else Decimal("1")
                 )
@@ -243,11 +254,26 @@ class Portfolio(UUIDModelMixin, TimeStampedModelMixin):
             asset = data["asset"]
             quantity = data["quantity"]
             current_price = asset.current_price or Decimal("0")  # pyright: ignore[reportAttributeAccessIssue]
-            currency_pair = (asset.currency, self.currency)  # pyright: ignore[reportAttributeAccessIssue]
+            if price_date and asset.symbol:  # pyright: ignore[reportAttributeAccessIssue]
+                fetched_price = fetch_yahoo_finance_price(
+                    asset.symbol,  # pyright: ignore[reportAttributeAccessIssue]
+                    price_date=price_date,
+                )
+                if fetched_price is not None:
+                    current_price = fetched_price
+            elif not current_price and asset.symbol:  # pyright: ignore[reportAttributeAccessIssue]
+                fetched_price = fetch_yahoo_finance_price(asset.symbol)  # pyright: ignore[reportAttributeAccessIssue]
+                if fetched_price is not None:
+                    current_price = fetched_price
+            currency_pair = (asset.currency, self.currency, price_date)  # pyright: ignore[reportAttributeAccessIssue]
             fx_rate = fx_rates.get(currency_pair)
 
             if fx_rate is None:
-                fx_rate = fetch_fx_rate(asset.currency, self.currency)  # pyright: ignore[reportAttributeAccessIssue]
+                fx_rate = fetch_fx_rate(
+                    asset.currency,  # pyright: ignore[reportAttributeAccessIssue]
+                    self.currency,
+                    rate_date=price_date,
+                )  # pyright: ignore[reportAttributeAccessIssue]
                 fx_rate = fx_rate if fx_rate is not None else Decimal("1")
                 fx_rates[currency_pair] = fx_rate
 
@@ -388,7 +414,7 @@ class PortfolioSnapshot(UUIDModelMixin, TimeStampedModelMixin):
         return f"{self.portfolio} - {self.snapshot_date}"
 
     def save(self, *args: object, **kwargs: object) -> None:
-        if not self.name and self.portfolio_id and self.snapshot_date:
+        if not self.name and self.portfolio_id and self.snapshot_date:  # pyright: ignore[reportAttributeAccessIssue]
             self.name = f"{self.portfolio} - {self.snapshot_date}"
         if not self.slug and self.name:
             self.slug = _generate_unique_slug(self.__class__, self.name)
@@ -405,18 +431,7 @@ class PortfolioSnapshot(UUIDModelMixin, TimeStampedModelMixin):
     ) -> "PortfolioSnapshot":
         snapshot_date = snapshot_date or timezone.now().date()  # pyright: ignore[reportAssignmentType]
 
-        assets = (
-            Asset.objects.filter(transactions__portfolios=portfolio)
-            .distinct()
-            .order_by("name")
-        )
-        for asset in assets:
-            asset.refresh_price()
-            asset.save(
-                update_fields=["current_price", "price_updated_at", "updated_at"]
-            )
-
-        positions = portfolio.get_positions()
+        positions = portfolio.get_positions(price_date=snapshot_date)
         total_value = sum(  # pyright: ignore[reportCallIssue]
             (position["market_value"] for position in positions),  # pyright: ignore[reportArgumentType]
             Decimal("0"),
@@ -597,7 +612,7 @@ class CashFlowSnapshot(UUIDModelMixin, TimeStampedModelMixin):
         return f"{self.cashflow} - {self.snapshot_date}"
 
     def save(self, *args: object, **kwargs: object) -> None:
-        if not self.name and self.cashflow_id:
+        if not self.name and self.cashflow_id:  # pyright: ignore[reportAttributeAccessIssue]
             if self.snapshot_date:
                 self.name = f"{self.cashflow} - {self.snapshot_date}"
             else:
@@ -629,20 +644,25 @@ class CashFlowSnapshot(UUIDModelMixin, TimeStampedModelMixin):
             cashflows=cashflow,
             entry_date__gte=start_date,
             entry_date__lte=end_date,
-        ).values("category", "amount", "currency")
+        ).values("category", "amount", "currency", "entry_date")
 
         category_totals: dict[str, Decimal] = {}
-        fx_rates: dict[tuple[str, str], Decimal] = {}
+        fx_rates: dict[tuple[str, str, date | None], Decimal] = {}
 
         for entry in entries:
             amount = entry["amount"] or Decimal("0")
             entry_currency = entry["currency"]
             fx_rate = Decimal("1")
+            entry_date = entry["entry_date"]
             if entry_currency != cashflow.currency:
-                currency_pair = (entry_currency, cashflow.currency)
+                currency_pair = (entry_currency, cashflow.currency, entry_date)
                 fx_rate = fx_rates.get(currency_pair)
                 if fx_rate is None:
-                    fetched_rate = fetch_fx_rate(entry_currency, cashflow.currency)
+                    fetched_rate = fetch_fx_rate(
+                        entry_currency,
+                        cashflow.currency,
+                        rate_date=entry_date,
+                    )
                     fx_rate = fetched_rate if fetched_rate is not None else Decimal("1")
                     fx_rates[currency_pair] = fx_rate
             converted_amount = amount * fx_rate
@@ -872,7 +892,11 @@ class DividendPayment(UUIDModelMixin, TimeStampedModelMixin):
         for currency, _ in Asset.Currency.choices:
             fx_rate = Decimal("1")
             if base_currency != currency:
-                fetched_rate = fetch_fx_rate(base_currency, currency)
+                fetched_rate = fetch_fx_rate(
+                    base_currency,
+                    currency,
+                    rate_date=self.payment_date,
+                )
                 fx_rate = fetched_rate if fetched_rate is not None else Decimal("1")
             per_share = self.net_dividend_per_share * fx_rate
             total_converted = total_amount * fx_rate
@@ -929,6 +953,7 @@ class DividendSnapshot(UUIDModelMixin, TimeStampedModelMixin):
         choices=Asset.Currency.choices,
         default=Asset.Currency.TRY,
     )
+    snapshot_date = models.DateField(default=timezone.now)
     name = models.CharField(max_length=200, blank=True)
     slug = models.CharField(
         max_length=255,
@@ -944,7 +969,7 @@ class DividendSnapshot(UUIDModelMixin, TimeStampedModelMixin):
     class Meta:  # pyright: ignore[reportIncompatibleVariableOverride]
         verbose_name = "Temettü Snapshot"
         verbose_name_plural = "Temettü Snapshotları"
-        ordering = ("-year", "-created_at")
+        ordering = ("-snapshot_date", "-created_at")
 
     def __str__(self) -> str:
         if self.slug:
@@ -964,8 +989,10 @@ class DividendSnapshot(UUIDModelMixin, TimeStampedModelMixin):
         *,
         year: int,
         currency: str,
+        snapshot_date: date | None = None,
         name: str | None = None,
     ) -> "DividendSnapshot":
+        snapshot_date = snapshot_date or date(year, 12, 31)
         payments = (
             DividendPayment.objects.select_related("asset")
             .filter(payment_date__year=year)
@@ -979,7 +1006,11 @@ class DividendSnapshot(UUIDModelMixin, TimeStampedModelMixin):
         for payment in payments:
             fx_rate = Decimal("1")
             if payment.asset.currency != currency:
-                fetched_rate = fetch_fx_rate(payment.asset.currency, currency)
+                fetched_rate = fetch_fx_rate(
+                    payment.asset.currency,
+                    currency,
+                    rate_date=payment.payment_date,
+                )
                 fx_rate = fetched_rate if fetched_rate is not None else Decimal("1")
             per_share = payment.net_dividend_per_share * fx_rate
             total_payment = payment.total_net_amount * fx_rate
@@ -1012,6 +1043,7 @@ class DividendSnapshot(UUIDModelMixin, TimeStampedModelMixin):
         snapshot = cls.objects.create(
             year=year,
             currency=currency,
+            snapshot_date=snapshot_date,
             name=name or f"{year} Temettü Özeti",
             total_amount=total_amount,
         )
