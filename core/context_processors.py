@@ -86,7 +86,7 @@ def categories_tags_context(request):
                 t["cloud_size"] = round(0.85 + normalized * 0.75, 2)
             t["color_class"] = get_tag_color_class(t["slug"])
 
-        cache.set(NAV_TAGS_KEY, nav_tags, timeout=600)
+        cache.set(NAV_TAGS_KEY, nav_tags, timeout=CACHE_TIMEOUT)
 
     nav_archives_key = f"{NAV_ARCHIVES_KEY}:{get_language() or 'tr'}"
     nav_archives = cache.get(nav_archives_key)
@@ -118,7 +118,7 @@ def categories_tags_context(request):
                     ),
                 }
             )
-            cache.set(nav_archives_key, nav_archives, timeout=600)
+            cache.set(nav_archives_key, nav_archives, timeout=CACHE_TIMEOUT)
 
     nav_recent_posts = cache.get(NAV_RECENT_POSTS_KEY)
 
@@ -131,7 +131,7 @@ def categories_tags_context(request):
             .order_by("-published_at")
             .only("title", "slug")[:5]
         )
-        cache.set(NAV_RECENT_POSTS_KEY, nav_recent_posts, timeout=600)
+        cache.set(NAV_RECENT_POSTS_KEY, nav_recent_posts, timeout=CACHE_TIMEOUT)
 
     nav_popular_posts = cache.get(NAV_POPULAR_POSTS_KEY)
 
@@ -157,7 +157,7 @@ def categories_tags_context(request):
             .order_by("-popularity_score", "-view_count", "-published_at")
             .only("title", "slug", "view_count")[:5]
         )
-        cache.set(NAV_POPULAR_POSTS_KEY, nav_popular_posts, timeout=600)
+        cache.set(NAV_POPULAR_POSTS_KEY, nav_popular_posts, timeout=CACHE_TIMEOUT)
 
     featured_snapshot = (
         PortfolioSnapshot.objects.select_related("portfolio")

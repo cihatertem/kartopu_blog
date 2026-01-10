@@ -1,5 +1,5 @@
 # ---------- BASE STAGE ----------
-FROM python:3.13-slim AS base
+FROM python:3.14-slim AS base
 
 LABEL maintainer="Cihat Ertem <cihatertem@gmail.com>"
 
@@ -66,4 +66,4 @@ RUN uv run python manage.py collectstatic --noinput
 
 USER app
 
-CMD ["uv", "run", "gunicorn", "config.wsgi:application", "--bind", "0.0.0.0:9002", "--workers", "3"]
+CMD ["uv", "run", "gunicorn", "config.wsgi:application", "--bind", "0.0.0.0:9002", "--workers", "2"]
