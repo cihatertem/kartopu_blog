@@ -109,7 +109,8 @@ class BlogPost(
           {{ cashflow_comparison_charts:slug_or_hash }}<br>
           {{ dividend_summary:slug_or_hash }}<br>
           {{ dividend_charts:slug_or_hash }}<br>
-          {{ dividend_comparison:slug_or_hash }}<br>"""
+          {{ dividend_comparison:slug_or_hash }}<br>
+          {{ legal_disclaimer }}<br>"""
     )
 
     # --- Yayın durumu ---

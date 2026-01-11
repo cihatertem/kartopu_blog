@@ -36,6 +36,7 @@ DIVIDEND_CHARTS_PATTERN = re.compile(r"\{\{\s*dividend_charts(?::([^\s\}]+))?\s*
 DIVIDEND_COMPARISON_PATTERN = re.compile(
     r"\{\{\s*dividend_comparison(?::([^\s\}]+))?\s*\}\}"
 )
+LEGAL_DISCLAIMER_PATTERN = re.compile(r"\{\{\s*legal_disclaimer\s*\}\}")
 
 
 @register.filter
@@ -922,6 +923,7 @@ def render_post_body(context, post):
       {{ dividend_summary:slug_or_hash }}
       {{ dividend_charts:slug_or_hash }}
       {{ dividend_comparison:slug_or_hash }}
+      {{ legal_disclaimer }}
     """
     images = list(
         getattr(post, "images", []).all() if getattr(post, "images", None) else []  # pyright: ignore[reportAttributeAccessIssue]
@@ -1035,6 +1037,22 @@ def render_post_body(context, post):
         return _render_dividend_comparison_html(comparison)
 
     expanded = DIVIDEND_COMPARISON_PATTERN.sub(dividend_comparison_replacer, expanded)
+
+    legal_disclaimer_html = """
+<aside class="legal-disclaimer-inline">
+  <p class="legal-disclaimer-inline__title">YASAL UYARI</p>
+  <p class="legal-disclaimer-inline__text">
+    Burada yer alan yatırım bilgi, yorum ve tavsiyeleri yatırım danışmanlığı kapsamında değildir.
+    Yatırım danışmanlığı hizmeti, kişilerin risk ve getiri tercihleri dikkate alınarak kişiye özel
+    sunulmaktadır. Burada yer alan ve hiçbir şekilde yönlendirici nitelikte olmayan içerik, yorum ve
+    tavsiyeler ise genel niteliktedir. Bu tavsiyeler mali durumunuz ile risk ve getiri tercihlerinize
+    uygun olmayabilir. Bu nedenle, sadece burada yer alan bilgilere dayanılarak yatırım kararı
+    verilmesi beklentilerinize uygun sonuçlar doğurmayabilir.
+  </p>
+</aside>
+"""
+
+    expanded = LEGAL_DISCLAIMER_PATTERN.sub(legal_disclaimer_html, expanded)
 
     return mark_safe(render_markdown(expanded))
 

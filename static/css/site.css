@@ -417,6 +417,23 @@ select:focus {
   border-color: var(--color-warning-border);
 }
 
+.legal-disclaimer-inline {
+  padding: 1rem;
+  border-radius: 12px;
+  border: 1px solid var(--color-warning-border);
+  background: var(--color-warning-bg);
+  margin: 1.5rem 0;
+}
+
+.legal-disclaimer-inline__title {
+  margin: 0 0 0.5rem;
+  font-weight: 700;
+}
+
+.legal-disclaimer-inline__text {
+  margin: 0;
+}
+
 .post-list {
   list-style: none;
   padding: 0;
