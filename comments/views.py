@@ -10,11 +10,16 @@ from blog.models import BlogPost
 from .forms import CommentForm
 from .models import Comment
 
-COMMENT_RATE_LIMIT = "3/m"
+COMMENT_RATE_LIMIT = "5/m"
 COMMENT_RATE_LIMIT_KEY = "ip"
 
 
-@ratelimit(key=COMMENT_RATE_LIMIT_KEY, rate=COMMENT_RATE_LIMIT, block=False)
+@ratelimit(
+    key=COMMENT_RATE_LIMIT_KEY,
+    rate=COMMENT_RATE_LIMIT,
+    block=False,
+    method=["POST"],
+)
 @login_required
 @require_POST
 def post_comment(request, post_id):

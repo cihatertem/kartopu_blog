@@ -18,7 +18,7 @@
     {% if messages %}
       <div class="flash-messages">
         {% for message in messages %}
-          <div class="flash-message">
+        <div class="flash-message{% if message.level_tag %} flash-message--{{ message.level_tag }}{% endif %}">
             {{ message }}
           </div>
         {% endfor %}
