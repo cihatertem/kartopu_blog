@@ -1,11 +1,18 @@
 {% extends "base.html" %}
 {% load static %}
 
-{% block title %}{{ archive_month|date:"F Y" }} - kartopu.money{% endblock %}
+{% block title %}{{ archive_month }} Arşivi | Kartopu Blog{% endblock %}
+{% block head %}
+  <meta
+    name="description"
+    content="Kartopu Blog'un {{ archive_month }} dönemine ait yayınlanmış yazılar."
+  />
+  <meta name="robots" content="noindex, follow">
+{% endblock %}
 
 {% block content %}
 {% include "includes/breadcrumbs.html" %}
-  <h1>{{ archive_month|date:"F Y" }}</h1>
+  <h1>{{ archive_month }} Arşivi</h1>
   <hr />
 
   {% if page_obj %}

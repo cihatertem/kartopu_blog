@@ -1,6 +1,12 @@
 {% extends "base.html" %}
 {% load static %}
-{% block title %}{{ category.name }} - kartopu.money{% endblock %}
+{% block title %}{{ category.name|title }} Yazıları | Kartopu Blog{% endblock %}
+{% block head %}
+  <meta
+    name="description"
+    content="{{ category.description|default:'Kartopu Blog kategorisindeki en yeni yazılar.' }}"
+  />
+{% endblock %}
 
 {% block content %}
 {% include "includes/breadcrumbs.html" %}

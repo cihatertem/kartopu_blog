@@ -1,0 +1,96 @@
+{% extends "base.html" %}
+
+{% block title %}İletişim | Kartopu Blog{% endblock %}
+{% block head %}
+  <meta
+    name="description"
+    content="Kartopu Blog ile iletişime geçin. Görüş, öneri ve iş birliği talepleriniz için bana buradan ulaşabilirsiniz."
+  />
+{% endblock %}
+
+{% block content %}
+  <section class="summary-card">
+    <h1>İletişim</h1>
+    <p>
+      Sorularınızı, önerilerinizi ve iş birliği taleplerinizi paylaşmak için bu
+      formu kullanabilirsiniz.
+    </p>
+    <p>
+      Fikirlerinizi duymak, içerikleri geliştirmek ve birlikte üretmek benim için
+      çok değerli. Aşağıdaki alanları doldurarak bana ulaşmayı deneyebilirsiniz.
+    </p>
+  </section>
+
+  <section class="summary-card">
+    <h2>Mesaj gönder</h2>
+    <form class="comment-form" method="post" action="#">
+      {% csrf_token %}
+      <div class="comment-form__field">
+        <label for="contact-name">İsim</label>
+        <input
+          class="input-field"
+          type="text"
+          id="contact-name"
+          name="name"
+          autocomplete="name"
+          placeholder="Adınızı yazın"
+        />
+      </div>
+
+      <div class="comment-form__field">
+        <label for="contact-subject">Konu</label>
+        <input
+          class="input-field"
+          type="text"
+          id="contact-subject"
+          name="subject"
+          maxlength="255"
+          placeholder="Mesaj başlığını yazın"
+        />
+      </div>
+
+      <div class="comment-form__field">
+        <label for="contact-email">E-posta adresi</label>
+        <input
+          class="input-field"
+          type="email"
+          id="contact-email"
+          name="email"
+          autocomplete="email"
+          placeholder="ornek@eposta.com"
+        />
+      </div>
+
+      <div class="comment-form__field">
+        <label for="contact-message">İçerik</label>
+        <textarea
+          id="contact-message"
+          name="message"
+          rows="6"
+          maxlength="3000"
+          data-char-counter="contact-message-counter"
+          placeholder="Mesajınızı yazın"
+        ></textarea>
+        <div class="char-counter">
+          Kalan karakter: <span id="contact-message-counter">3000</span>
+        </div>
+      </div>
+
+      <div class="comment-form__field is-hidden">
+        <label for="contact-website">Website</label>
+        <input
+          class="input-field"
+          type="text"
+          id="contact-website"
+          name="website"
+          autocomplete="off"
+          tabindex="-1"
+        />
+      </div>
+
+      <button class="input-field" type="submit" disabled>
+        Gönder (yakında)
+      </button>
+    </form>
+  </section>
+{% endblock %}

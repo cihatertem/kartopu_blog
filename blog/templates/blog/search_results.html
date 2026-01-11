@@ -2,7 +2,15 @@
 {% load static %}
 
 {% block title %}
-  {% if q %}"{{ q }}" için arama sonuçları{% else %}Arama{% endif %}
+  {% if q %}'{{ q }}' için arama sonuçları | Kartopu Blog {% else %}Arama{% endif %}
+{% endblock %}
+
+{% block head %}
+  <meta
+    name="description"
+    content="{% if q %}Kartopu Blog'ta '{{ q }}' için bulunan arama sonuçları.{% else %}Kartopu Blog'ta arama yapın ve en yeni yazıları keşfedin.{% endif %}"
+  />
+  <meta name="robots" content="noindex, follow">
 {% endblock %}
 
 {% block content %}

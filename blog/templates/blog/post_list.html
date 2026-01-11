@@ -1,7 +1,24 @@
 {% extends "base.html" %}
 {% load static %}
 
-{% block title %}Blog - kartopu.money{% endblock %}
+{% block title %}
+{% if page_obj.number > 1 %}
+  Tüm Blog Yazıları - Sayfa {{ page_obj.number }} | Kartopu Blog
+{% else %}
+  Tüm Blog Yazıları | Kartopu Blog
+{% endif %}
+{% endblock %}
+
+{% block head %}
+  <meta
+    name="description"
+    content="Kartopu Blog’daki tüm yazıları burada bulabilirsiniz. Finansal özgürlük, yatırım stratejileri ve kişisel finans üzerine güncel içerikler."
+  />
+
+  {% if page_obj.number > 1 %}
+    <meta name="robots" content="noindex, follow">
+  {% endif %}
+{% endblock %}
 
 {% block content %}
 {% include "includes/breadcrumbs.html" %}

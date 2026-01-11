@@ -1,7 +1,13 @@
 {% extends "base.html" %}
 {% load static %}
 
-{% block title %}Anasayfa - kartopu.money{% endblock %}
+{% block title %}Kartopu Money – Finansal Özgürlük ve Yatırım Günlüğü{% endblock %}
+{% block head %}
+  <meta
+    name="description"
+    content=" Bu blogta finansal özgürlük yolculuğumu paylaşıyorum.. Yatırım stratejileri, kişisel finans ipuçları ve piyasa analizleri ile kartopunuzu büyütün."
+  />
+{% endblock %}
 
 {% block content %}
   <section class="home-hero">
@@ -9,17 +15,18 @@
       <p class="home-hero__eyebrow">Finansal Özgürlüğe Doğru</p>
       <h1>Kendi Kartopunu Oluştur</h1>
       <p class="home-hero__subtitle">
-        Portföy raporları, piyasa özetleri ve yatırım notlarıyla kendi finansal
-        yolculuğunu planla.
+        Bu blogta finansal özgürlük yolculuğumu paylaşıyorum. <br />
+        Yatırım stratejilerim, kişisel finans ipuçları ve piyasa analizleri ile
+        kartopunuzu büyütmenize yardımcı olmayı hedefliyorum.
       </p>
       <div class="home-hero__actions">
         {% if featured_post %}
           <a class="button button--primary" href="{{ featured_post.get_absolute_url }}">
-            Son Portföyü Gör
+            Güncel Portföyü Gör
           </a>
         {% else %}
           <button class="button button--primary is-disabled" type="button" disabled>
-            Son Portföyü Gör
+            Güncel Portföyü Gör
           </button>
         {% endif %}
 

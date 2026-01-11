@@ -65,4 +65,33 @@
             hideLegalDisclaimer();
         });
     }
+
+    const charCountTargets = document.querySelectorAll(
+        "[data-char-counter]",
+    );
+
+    const updateCharCounter = (field) => {
+        if (!field) {
+            return;
+        }
+        const counterId = field.dataset.charCounter;
+        if (!counterId) {
+            return;
+        }
+        const counter = document.getElementById(counterId);
+        if (!counter) {
+            return;
+        }
+        const maxLength = Number(field.getAttribute("maxlength"));
+        if (!Number.isFinite(maxLength)) {
+            return;
+        }
+        const remaining = Math.max(0, maxLength - field.value.length);
+        counter.textContent = String(remaining);
+    };
+
+    charCountTargets.forEach((field) => {
+        updateCharCounter(field);
+        field.addEventListener("input", () => updateCharCounter(field));
+    });
 })();

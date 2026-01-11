@@ -12,6 +12,10 @@ from imagekit.processors import ResizeToFit, Transpose
 from core.images import optimize_uploaded_image
 from core.mixins import TimeStampedModelMixin, UUIDModelMixin
 
+META_TITLE_SUFFIX = " | Kartopu Blog"
+SEO_TITLE_MAX_LENGTH = 45
+SEO_DESCRIPTION_MAX_LENGTH = 160
+
 
 class Category(
     UUIDModelMixin,
@@ -19,7 +23,11 @@ class Category(
 ):
     name = models.CharField(max_length=80, unique=True)
     slug = models.SlugField(max_length=80, unique=True)
-    description = models.TextField(blank=True)
+    description = models.TextField(
+        blank=True,
+        max_length=SEO_DESCRIPTION_MAX_LENGTH,
+        help_text="Kategori açıklaması (SEO için) max 160 karakter.",
+    )
 
     class Meta:  # pyright: ignore[reportIncompatibleVariableOverride]
         verbose_name = "Kategori"
@@ -86,7 +94,7 @@ class BlogPost(
     )
 
     title = models.CharField(
-        max_length=45,
+        max_length=SEO_TITLE_MAX_LENGTH,
         help_text="Yazı başlığı. Max 45 karakter.",
     )
     slug = models.SlugField(
@@ -137,12 +145,12 @@ class BlogPost(
 
     # --- SEO ---
     meta_title = models.CharField(
-        max_length=45,
+        max_length=SEO_TITLE_MAX_LENGTH,
         blank=True,
         help_text="SEO title (önerilen: 35–45 karakter 45 max).",
     )
     meta_description = models.CharField(
-        max_length=160,
+        max_length=SEO_DESCRIPTION_MAX_LENGTH,
         blank=True,
         help_text="SEO description (önerilen: 140–160 karakter)",
     )
@@ -264,7 +272,7 @@ class BlogPost(
     @property
     def effective_meta_title(self) -> str:
         """Template usage: <title> {{ post.effective_meta_title }} </title>"""
-        suffix = " | Kartopu Blog"
+        suffix = META_TITLE_SUFFIX
         base_meta_title = self.meta_title or self.title
         meta_title = str(base_meta_title).strip() + suffix
 

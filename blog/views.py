@@ -1,7 +1,6 @@
 from datetime import date
 
 from allauth.socialaccount.models import SocialAccount
-from core.tag_colors import build_tag_items
 from django.contrib.auth.decorators import login_required
 from django.contrib.postgres.aggregates import StringAgg
 from django.contrib.postgres.search import SearchQuery, SearchRank, SearchVector
@@ -15,6 +14,7 @@ from django.utils.formats import date_format
 from comments.forms import CommentForm
 from comments.models import MAX_COMMENT_LENGTH, Comment
 from core import helpers
+from core.tag_colors import build_tag_items
 from portfolio.models import (
     CashFlowComparison,
     CashFlowSnapshot,
@@ -78,7 +78,10 @@ def archive_index(request):
     return render(
         request,
         "blog/archive_index.html",
-        {"archives": archives, "active_nav": "blog"},
+        {
+            "archives": archives,
+            "active_nav": "blog",
+        },
     )
 
 

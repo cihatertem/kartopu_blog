@@ -1,12 +1,19 @@
 {% extends "base.html" %}
 {% load static %}
 
-{% block title %}#{{ tag.name }} - kartopu.money{% endblock %}
+{% block title %}#{{ tag.name|title }} etiketli yazılar - Kartopu Blog{% endblock %}
+{% block head %}
+  <meta
+    name="description"
+    content="#{{ tag.name|title }} etiketine ait yayınlanmış yazılar."
+  />
+  <meta name="robots" content="noindex, follow">
+{% endblock %}
 
 {% block content %}
 {% include "includes/breadcrumbs.html" %}
 
-<h1>#{{ tag.name }}</h1>
+<h1>#{{ tag.name }} etiketine ait yazılar.</h1>
 
 {% if page_obj %}
   {% include "includes/post_list.html" with posts=page_obj.object_list %}

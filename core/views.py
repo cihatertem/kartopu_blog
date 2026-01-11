@@ -1,4 +1,4 @@
-from django.shortcuts import HttpResponse, render
+from django.shortcuts import render
 from django.utils.text import slugify
 
 from blog.models import BlogPost, Category
@@ -41,8 +41,16 @@ def home_view(request):
 
 
 def about_view(request):
-    return HttpResponse("About Us Page")
+    context = {
+        "active_nav": "about",
+    }
+
+    return render(request, "core/about.html", context)
 
 
 def contact_view(request):
-    return HttpResponse("Contact Us Page")
+    context = {
+        "active_nav": "contact",
+    }
+
+    return render(request, "core/contact.html", context)
