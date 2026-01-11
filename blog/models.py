@@ -5,7 +5,7 @@ from django.contrib.postgres.indexes import GinIndex
 from django.contrib.postgres.search import SearchVector
 from django.db import models
 from django.urls import reverse
-from django.utils.text import slugify
+from django.utils.text import Truncator, slugify
 from imagekit.models import ImageSpecField
 from imagekit.processors import ResizeToFit, Transpose
 
@@ -85,7 +85,10 @@ class BlogPost(
         help_text="Yazı ile ilişkili etiketler",
     )
 
-    title = models.CharField(max_length=255)
+    title = models.CharField(
+        max_length=45,
+        help_text="Yazı başlığı. Max 45 karakter.",
+    )
     slug = models.SlugField(
         max_length=255,
         unique=True,
@@ -134,12 +137,14 @@ class BlogPost(
 
     # --- SEO ---
     meta_title = models.CharField(
-        max_length=255,
+        max_length=45,
         blank=True,
+        help_text="SEO title (önerilen: 35–45 karakter 45 max).",
     )
     meta_description = models.CharField(
-        max_length=500,
+        max_length=160,
         blank=True,
+        help_text="SEO description (önerilen: 140–160 karakter)",
     )
     canonical_url = models.URLField(
         blank=True,
@@ -258,13 +263,18 @@ class BlogPost(
 
     @property
     def effective_meta_title(self) -> str:
-        """Template usage: <meta name="description" content="{{ post.effective_meta_title }}">"""
-        return str(self.meta_title) or str(self.title)
+        """Template usage: <title> {{ post.effective_meta_title }} </title>"""
+        suffix = " | Kartopu Blog"
+        base_meta_title = self.meta_title or self.title
+        meta_title = str(base_meta_title).strip() + suffix
+
+        return Truncator(meta_title).chars(60)
 
     @property
     def effective_meta_description(self) -> str:
         """Template usage: <meta name="description" content="{{ post.effective_meta_description }}">"""
-        return str(self.meta_description) or str(self.excerpt)[:300]
+        base = self.meta_description or self.excerpt or ""
+        return Truncator(base).chars(160)
 
 
 class BlogPostImage(
