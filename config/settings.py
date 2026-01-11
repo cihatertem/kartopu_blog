@@ -10,6 +10,7 @@ For the full list of settings and their values, see
 https://docs.djangoproject.com/en/6.0/ref/settings/
 """
 
+import ipaddress
 import os
 from pathlib import Path
 
@@ -199,3 +200,30 @@ SOCIALACCOUNT_PROVIDERS = {
 
 # ImageKit settings
 IMAGEKIT_CACHEFILE_DIR = "cache"
+
+# gunicorn 2+ workers ratelimit issue
+# "python manage.py createcachetable ratelimit_cache" run at prod once
+CACHES = {
+    "default": {
+        "BACKEND": "django.core.cache.backends.db.DatabaseCache",
+        "LOCATION": "ratelimit_cache",
+    }
+}
+
+RATELIMIT_USE_CACHE = "default"
+
+if not DEBUG:
+    _raw = os.getenv("TRUSTED_PROXY_NETS", "")
+    TRUSTED_PROXY_NETS = []
+
+    if _raw:
+        for net in _raw.split(","):
+            TRUSTED_PROXY_NETS.append(ipaddress.ip_network(net.strip()))
+
+    CSRF_COOKIE_SECURE = True
+    CSRF_COOKIE_HTTPONLY = True
+    SESSION_COOKIE_SECURE = True
+    SECURE_SSL_REDIRECT = True
+    USE_X_FORWARDED_HOST = True
+    SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
+    SESSION_COOKIE_HTTPONLY = True

@@ -5,6 +5,7 @@ from django.views.decorators.http import require_http_methods
 from django_ratelimit.decorators import ratelimit
 
 from blog.models import BlogPost, Category
+from core.helpers import client_ip_key
 
 from .forms import ContactForm
 
@@ -57,7 +58,7 @@ def about_view(request):
 
 
 @ratelimit(
-    key=CONTACT_RATE_LIMIT_KEY,
+    key=client_ip_key,
     rate=CONTACT_RATE_LIMIT,
     block=False,
     method=["POST"],

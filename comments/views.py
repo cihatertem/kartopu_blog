@@ -6,6 +6,7 @@ from django.views.decorators.http import require_POST
 from django_ratelimit.decorators import ratelimit
 
 from blog.models import BlogPost
+from core.helpers import client_ip_key
 
 from .forms import CommentForm
 from .models import Comment
@@ -15,7 +16,7 @@ COMMENT_RATE_LIMIT_KEY = "ip"
 
 
 @ratelimit(
-    key=COMMENT_RATE_LIMIT_KEY,
+    key=client_ip_key,
     rate=COMMENT_RATE_LIMIT,
     block=False,
     method=["POST"],
