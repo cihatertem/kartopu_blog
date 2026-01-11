@@ -22,4 +22,47 @@
         });
         dateTarget.textContent = formatter.format(new Date());
     }
+
+    const legalDisclaimer = document.getElementById("legal-disclaimer");
+    const legalDisclaimerButton = document.getElementById(
+        "legal-disclaimer-accept",
+    );
+    const legalDisclaimerStorageKey = "legal-disclaimer-acknowledged";
+
+    const hideLegalDisclaimer = () => {
+        if (!legalDisclaimer) {
+            return;
+        }
+        legalDisclaimer.classList.add("is-hidden");
+        document.body.classList.remove("has-legal-disclaimer");
+        legalDisclaimer.setAttribute("aria-hidden", "true");
+    };
+
+    if (legalDisclaimer) {
+        let isAcknowledged = false;
+        try {
+            isAcknowledged =
+                localStorage.getItem(legalDisclaimerStorageKey) === "1";
+        } catch (error) {
+            console.warn("Unable to read legal disclaimer marker.", error);
+        }
+
+        if (isAcknowledged) {
+            hideLegalDisclaimer();
+        } else {
+            document.body.classList.add("has-legal-disclaimer");
+            legalDisclaimer.removeAttribute("aria-hidden");
+        }
+    }
+
+    if (legalDisclaimerButton) {
+        legalDisclaimerButton.addEventListener("click", () => {
+            try {
+                localStorage.setItem(legalDisclaimerStorageKey, "1");
+            } catch (error) {
+                console.warn("Unable to store legal disclaimer marker.", error);
+            }
+            hideLegalDisclaimer();
+        });
+    }
 })();

@@ -67,6 +67,10 @@ body {
   line-height: 1.6;
 }
 
+body.has-legal-disclaimer {
+  padding-bottom: 140px;
+}
+
 a {
   color: var(--color-primary);
   text-decoration: none;
@@ -490,6 +494,40 @@ select:focus {
   opacity: 0.6;
   cursor: not-allowed;
   pointer-events: none;
+}
+
+.legal-disclaimer {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 1100;
+  padding: 1rem 0;
+  background: var(--color-warning-bg);
+  border-top: 1px solid var(--color-warning-border);
+  box-shadow: 0 -8px 24px rgba(31, 42, 55, 0.15);
+}
+
+.legal-disclaimer.is-hidden {
+  display: none;
+}
+
+.legal-disclaimer__content {
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 0 1rem;
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  flex-wrap: wrap;
+  justify-content: space-between;
+}
+
+.legal-disclaimer__text {
+  margin: 0;
+  color: var(--color-text);
+  max-width: 800px;
+  font-size: 0.95rem;
 }
 
 .home-hero {
