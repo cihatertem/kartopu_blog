@@ -817,8 +817,13 @@ select:focus {
   margin-bottom: 1rem;
 }
 
-.is-hidden {
-  display: none;
+.is-website {
+  position: absolute;
+  left: -10000px;
+  top: auto;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
 }
 
 .chart-grid {

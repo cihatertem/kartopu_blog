@@ -11,7 +11,7 @@ from .forms import CommentForm
 from .models import Comment
 
 COMMENT_RATE_LIMIT = "3/m"
-COMMENT_RATE_LIMIT_KEY = "user"
+COMMENT_RATE_LIMIT_KEY = "ip"
 
 
 @ratelimit(key=COMMENT_RATE_LIMIT_KEY, rate=COMMENT_RATE_LIMIT, block=False)

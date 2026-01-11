@@ -23,8 +23,19 @@
 
   <section class="summary-card">
     <h2>Mesaj gönder</h2>
-    <form class="comment-form" method="post" action="#">
+    <form class="comment-form" method="post" action="{% url 'core:contact' %}">
       {% csrf_token %}
+      <div class="comment-form__field is-website">
+        <label for="contact-website">Website</label>
+        <input
+          class="input-field website_"
+          type="text"
+          id="contact-website"
+          name="website"
+          autocomplete="off"
+          value="{{ form.website.value|default_if_none:'' }}"
+        />
+      </div>
       <div class="comment-form__field">
         <label for="contact-name">İsim</label>
         <input
@@ -34,6 +45,7 @@
           name="name"
           autocomplete="name"
           placeholder="Adınızı yazın"
+          value="{{ form.name.value|default_if_none:'' }}"
         />
       </div>
 
@@ -46,6 +58,7 @@
           name="subject"
           maxlength="255"
           placeholder="Mesaj başlığını yazın"
+          value="{{ form.subject.value|default_if_none:'' }}"
         />
       </div>
 
@@ -58,6 +71,7 @@
           name="email"
           autocomplete="email"
           placeholder="ornek@eposta.com"
+          value="{{ form.email.value|default_if_none:'' }}"
         />
       </div>
 
@@ -70,26 +84,14 @@
           maxlength="3000"
           data-char-counter="contact-message-counter"
           placeholder="Mesajınızı yazın"
-        ></textarea>
+        >{{ form.message.value|default_if_none:'' }}</textarea>
         <div class="char-counter">
           Kalan karakter: <span id="contact-message-counter">3000</span>
         </div>
       </div>
 
-      <div class="comment-form__field is-hidden">
-        <label for="contact-website">Website</label>
-        <input
-          class="input-field"
-          type="text"
-          id="contact-website"
-          name="website"
-          autocomplete="off"
-          tabindex="-1"
-        />
-      </div>
-
-      <button class="input-field" type="submit" disabled>
-        Gönder (yakında)
+      <button class="input-field" type="submit">
+        Gönder
       </button>
     </form>
   </section>
