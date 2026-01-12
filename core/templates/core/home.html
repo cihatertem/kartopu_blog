@@ -30,7 +30,20 @@
           </button>
         {% endif %}
 
-        <button class="button button--ghost" type="button">Abone Ol</button>
+        <a class="button button--ghost" href="{% url 'blog:post_feed' %}">
+          <svg
+            class="button__icon"
+            viewBox="0 0 24 24"
+            aria-hidden="true"
+            focusable="false"
+          >
+            <path
+              fill="currentColor"
+              d="M5 20a2 2 0 1 1 0-4 2 2 0 0 1 0 4Zm-1-8v-3a11 11 0 0 1 11 11h-3a8 8 0 0 0-8-8Zm0-6V3a17 17 0 0 1 17 17h-3A14 14 0 0 0 4 6Z"
+            />
+          </svg>
+          Abone Ol
+        </a>
       </div>
     </div>
   </section>

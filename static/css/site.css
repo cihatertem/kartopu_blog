@@ -17,6 +17,7 @@
   --color-warning-soft: #fff0c2;
   --color-warning-bg: #fff4d6;
   --color-warning-border: #ffe3a3;
+  --color-burcu: #3ecece;
   --shadow-soft: 0 10px 24px rgba(31, 42, 55, 0.08);
   --tag-color-1-bg: linear(
     45deg,
@@ -504,6 +505,11 @@ select:focus {
   font-weight: 600;
 }
 
+.button__icon {
+  width: 1rem;
+  height: 1rem;
+}
+
 .button--primary {
   background: linear-gradient(
     135deg,
@@ -514,8 +520,31 @@ select:focus {
   color: #fff;
 }
 
+.button--primary:hover {
+  background: linear-gradient(
+    135deg,
+    var(--color-primary-dark),
+    var(--color-accent-dark)
+  );
+  color: #fff;
+}
+
 .button--ghost {
-  background: #fff;
+  background: linear-gradient(
+    135deg,
+    var(--color-lilac-dark),
+    var(--color-burcu)
+  );
+  color: #fff;
+}
+
+.button--ghost:hover {
+  background: linear-gradient(
+    135deg,
+    var(--color-lilac-dark),
+    var(--color-primary-dark)
+  );
+  color: #fff;
 }
 
 .button.is-disabled,
@@ -561,7 +590,7 @@ select:focus {
 
 .home-hero {
   display: grid;
-  grid-template-columns: minmax(0, 1.1fr) minmax(0, 1.4fr);
+  grid-template-columns: minmax(0, 1.4fr) minmax(0, 1.4fr);
   gap: 2rem;
   padding: 1.5rem;
   border-radius: 20px;
@@ -641,6 +670,14 @@ select:focus {
 
 .home-portfolio__placeholder {
   margin: 1rem 0 0;
+}
+
+.category-header {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  align-items: center;
+  justify-content: space-between;
 }
 
 .goal-widget__text {

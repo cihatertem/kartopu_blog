@@ -228,6 +228,9 @@ if not DEBUG:
     CSRF_COOKIE_SECURE = True
     CSRF_COOKIE_HTTPONLY = True
     CSRF_COOKIE_SAMESITE = os.getenv("DJANGO_CSRF_COOKIE_SAMESITE", "Lax")
+    CSRF_TRUSTED_ORIGINS = [
+        f"https://{host}" for host in ALLOWED_HOSTS
+    ]  # e.g. ["https://example.com"]
     SESSION_COOKIE_SECURE = True
     SESSION_COOKIE_SAMESITE = os.getenv("DJANGO_SESSION_COOKIE_SAMESITE", "Lax")
     SECURE_SSL_REDIRECT = True
@@ -236,7 +239,9 @@ if not DEBUG:
     SESSION_COOKIE_HTTPONLY = True
     SECURE_CONTENT_TYPE_NOSNIFF = True
     SECURE_REFERRER_POLICY = "strict-origin-when-cross-origin"
-    SECURE_CROSS_ORIGIN_OPENER_POLICY = "same-origin"
+    SECURE_CROSS_ORIGIN_OPENER_POLICY = (
+        "same-origin"  # allauth sorun çıkartabiliyor, dikkat
+    )
 
     if USE_TRAEFIK_SECURITY_HEADERS:
         SECURE_HSTS_SECONDS = 0
