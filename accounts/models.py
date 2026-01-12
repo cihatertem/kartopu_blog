@@ -1,6 +1,10 @@
+from io import BytesIO
+
 from django.contrib.auth.models import AbstractUser, BaseUserManager
-from django.core.files.storage import FileSystemStorage
+from django.core.files.base import ContentFile
+from django.core.files.storage import Storage, default_storage
 from django.db import models
+from django.utils.deconstruct import deconstructible
 from django.utils.text import slugify
 from PIL import Image, ImageOps
 
@@ -9,10 +13,31 @@ from core.mixins import TimeStampedModelMixin, UUIDModelMixin
 # Create your models here.
 
 
-class OverWriteAvatarStorage(FileSystemStorage):
+@deconstructible
+class OverWriteAvatarStorage(Storage):
+    _storage = default_storage
+
+    def _open(self, name, mode="rb"):
+        return self._storage.open(name, mode)
+
+    def _save(self, name, content):
+        return self._storage.save(name, content)
+
+    def delete(self, name):
+        return self._storage.delete(name)
+
+    def exists(self, name):
+        return self._storage.exists(name)
+
+    def url(self, name):
+        return self._storage.url(name)
+
+    def size(self, name):
+        return self._storage.size(name)
+
     def get_available_name(self, name: str, max_length: int | None = None) -> str:
-        if self.exists(name):
-            self.delete(name)
+        if self._storage.exists(name):
+            self._storage.delete(name)
         return name
 
 
@@ -104,17 +129,27 @@ class User(  # pyright: ignore[reportIncompatibleVariableOverride]
         if not self.avatar:
             return
 
-        avatar_path = self.avatar.path  # type: ignore
+        self.avatar.open("rb")
+        try:
+            with Image.open(self.avatar) as img:
+                img = ImageOps.exif_transpose(img)
 
-        with Image.open(avatar_path) as img:
-            img = ImageOps.exif_transpose(img)
+                if (
+                    img.height <= self.MAX_AVATAR_SIZE[1]
+                    and img.width <= self.MAX_AVATAR_SIZE[0]
+                ):
+                    return  # No need to resize
 
-            if (
-                img.height <= self.MAX_AVATAR_SIZE[1]
-                and img.width <= self.MAX_AVATAR_SIZE[0]
-            ):
-                return  # No need to resize
+                img = img.convert("RGB")
+                img.thumbnail(self.MAX_AVATAR_SIZE)
+                buffer = BytesIO()
+                img.save(buffer, format="JPEG", quality=85)
+        finally:
+            self.avatar.close()
 
-            img = img.convert("RGB")
-            img.thumbnail(self.MAX_AVATAR_SIZE)
-            img.save(avatar_path, format="JPEG", quality=85)
+        content = ContentFile(buffer.getvalue())
+        storage = self.avatar.storage
+        name = self.avatar.name
+        if storage.exists(name):
+            storage.delete(name)
+        storage.save(name, content)

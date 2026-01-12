@@ -9,7 +9,7 @@ from django.utils.text import Truncator, slugify
 from imagekit.models import ImageSpecField
 from imagekit.processors import ResizeToFit, Transpose
 
-from core.images import optimize_uploaded_image
+from core.images import optimize_uploaded_image_field
 from core.mixins import TimeStampedModelMixin, UUIDModelMixin
 
 META_TITLE_SUFFIX = " | Kartopu Blog"
@@ -262,7 +262,7 @@ class BlogPost(
 
         if is_new and self.cover_image:
             try:
-                optimize_uploaded_image(self.cover_image.path)
+                optimize_uploaded_image_field(self.cover_image)
             except Exception:
                 pass
 
@@ -350,7 +350,7 @@ class BlogPostImage(
         # Sadece ilk upload'ta optimize et
         if is_new and self.image:
             try:
-                optimize_uploaded_image(self.image.path)
+                optimize_uploaded_image_field(self.image)
             except Exception:
                 pass
 
