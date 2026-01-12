@@ -141,7 +141,7 @@ USE_TZ = True
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/5.2/howto/static-files/
 
-STATIC_URL = "static/"
+STATIC_URL = "/static/"
 
 # collectstatic çıktısının gideceği klasör
 STATIC_ROOT = BASE_DIR / "staticfiles"
@@ -153,6 +153,42 @@ MEDIA_ROOT = BASE_DIR / "media"
 
 # Default primary key field type
 # https://docs.djangoproject.com/en/5.2/ref/settings/#default-auto-field
+
+
+USE_S3 = (not DEBUG) and bool(os.getenv("AWS_STORAGE_BUCKET_NAME"))
+
+if USE_S3:
+    MEDIA_ROOT = None  # veya tanımlama
+    INSTALLED_APPS.append("storages")
+
+    AWS_STORAGE_BUCKET_NAME = os.getenv("AWS_STORAGE_BUCKET_NAME", "")
+    AWS_S3_REGION_NAME = os.getenv("AWS_S3_REGION_NAME", "")
+    AWS_ACCESS_KEY_ID = os.getenv("AWS_ACCESS_KEY_ID", "")
+    AWS_SECRET_ACCESS_KEY = os.getenv("AWS_SECRET_ACCESS_KEY", "")
+    AWS_S3_CUSTOM_DOMAIN = os.getenv("AWS_S3_CUSTOM_DOMAIN", "")
+    AWS_S3_ENDPOINT_URL = os.getenv("AWS_S3_ENDPOINT_URL", "")
+    AWS_DEFAULT_ACL = None
+    AWS_S3_OBJECT_PARAMETERS = {"CacheControl": "max-age=86400"}
+    AWS_LOCATION_STATIC = os.getenv("AWS_LOCATION_STATIC", "static")
+    AWS_LOCATION_MEDIA = os.getenv("AWS_LOCATION_MEDIA", "media")
+
+    STORAGES = {
+        "default": {
+            "BACKEND": "storages.backends.s3.S3Storage",
+            "OPTIONS": {"location": AWS_LOCATION_MEDIA},
+        },
+        "staticfiles": {
+            "BACKEND": "storages.backends.s3.S3Storage",
+            "OPTIONS": {"location": AWS_LOCATION_STATIC},
+        },
+    }
+
+    s3_domain = AWS_S3_CUSTOM_DOMAIN or f"{AWS_STORAGE_BUCKET_NAME}.s3.amazonaws.com"
+    s3_base_url = f"https://{s3_domain}".rstrip("/")
+    STATIC_URL = f"{s3_base_url}/{AWS_LOCATION_STATIC}/"
+    MEDIA_URL = f"{s3_base_url}/{AWS_LOCATION_MEDIA}/"
+else:
+    MEDIA_ROOT = BASE_DIR / "media"
 
 AUTH_USER_MODEL = "accounts.User"
 
