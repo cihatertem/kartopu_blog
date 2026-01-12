@@ -40,6 +40,7 @@ INSTALLED_APPS = [
     "django.contrib.messages",
     "django.contrib.staticfiles",
     "django.contrib.postgres",  # postgres full text search
+    "django.contrib.sitemaps",
     "django.contrib.sites",
     # third party apps
     "imagekit",
