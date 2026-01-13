@@ -1,6 +1,15 @@
 import ipaddress
+from http import HTTPStatus
 
 from django.conf import settings
+from django.http import JsonResponse
+from django.utils.deprecation import MiddlewareMixin
+
+
+class HealthCheckMiddleware(MiddlewareMixin):
+    def process_request(self, request):
+        if request.META["PATH_INFO"] == "/ping":
+            return JsonResponse({"response": "pong!"}, status=HTTPStatus.OK)
 
 
 class TrustedProxyMiddleware:
