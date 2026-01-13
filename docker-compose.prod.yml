@@ -56,7 +56,7 @@ services:
             POSTGRES_PASSWORD: /run/secrets/postgres-password
             AWS_ACCESS_KEY_ID: /run/secrets/aws-kartopu-consumer-access
             AWS_SECRET_ACCESS_KEY: /run/secrets/aws-kartopu-consumer-secret
-            UV_CACHE_DIR: /tmp/uv-cache
+            UV_CACHE_DIR: /tmp/uv-cache # prod permisson error fix
         secrets:
             - kartopu-secret-key
             - email-pass
