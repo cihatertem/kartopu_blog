@@ -1,34 +1,26 @@
 {% extends "base.html" %}
+{% load blog_extras %}
 
-{% block title %}Hakkımda | Kartopu Blog{% endblock %}
+{% block title %}{{ about_page.meta_title|default:"Hakkımızda" }} | Kartopu Blog{% endblock %}
 {% block head %}
   <meta
     name="description"
-    content="Kartopu Blog’un arkasındaki kişi ve finansal özgürlük yolculuğum hakkında bilgi edinin. Yatırım yaklaşımım ve bu blogun amacı burada."
+    content="{{ about_page.meta_description|default:"Kartopu Blog’un arkasındaki bizler ve finansal özgürlük yolculuğumuz hakkında bilgi edinin. Yatırım yaklaşımımız ve bu blogun amacı burada." }}"
   />
 {% endblock %}
 
 {% block content %}
+{% if about_page %}
+  <article>
+    <h1>{{ about_page.title }}</h1>
+    <div>
+      {{ about_page.content|render_post_content:about_page.images.all|safe }}
+    </div>
+  </article>
+{% else %}
   <section class="summary-card">
-    <h1>Hakkımda</h1>
-    <p>
-      Bu alan şimdilik örnek içerik ile doldurulmuştur. İlerleyen dönemde
-      kartopu.money'nin hikayesini, yol haritasını ve içerik yaklaşımını burada
-      daha detaylı anlatmayı planlıyorum.
-    </p>
-    <p>
-      Finansal okuryazarlık, yatırım psikolojisi ve sürdürülebilir alışkanlıklar
-      üzerine içerikler üretirken; şeffaf, anlaşılır ve uygulanabilir bilgiler
-      paylaşmayı önceliklendireceğim.
-    </p>
+    <h1>Hakkımızda</h1>
+    <p>Henüz içerik oluşturulmadı.</p>
   </section>
-
-  <section class="summary-card">
-    <h2>Değerler &amp; Odak</h2>
-    <ul>
-      <li>Güncel gelişmeleri sade bir dille özetlemek.</li>
-      <li>Uzun vadeli düşünmeyi teşvik eden kaynaklar hazırlamak.</li>
-      <li>Deneyim, veri ve yorumları dengeli bir şekilde aktarmak.</li>
-    </ul>
-  </section>
+{% endif %}
 {% endblock %}

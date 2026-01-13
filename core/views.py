@@ -6,6 +6,7 @@ from django_ratelimit.decorators import ratelimit
 
 from blog.models import BlogPost, Category
 from core.helpers import client_ip_key
+from core.models import AboutPage
 
 from .forms import ContactForm
 
@@ -50,8 +51,12 @@ def home_view(request):
 
 
 def about_view(request):
+    about_page = (
+        AboutPage.objects.prefetch_related("images").order_by("-updated_at").first()
+    )
     context = {
         "active_nav": "about",
+        "about_page": about_page,
     }
 
     return render(request, "core/about.html", context)

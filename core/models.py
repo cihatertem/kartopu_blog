@@ -1,9 +1,18 @@
-from django.db import models
+import os
 
+from django.core.exceptions import ValidationError
+from django.db import models
+from django.utils.text import slugify
+from imagekit.models import ImageSpecField
+from imagekit.processors import ResizeToFit, Transpose
+
+from .images import optimize_uploaded_image_field
 from .mixins import TimeStampedModelMixin, UUIDModelMixin
 
+SEO_TITLE_MAX_LENGTH = 45
+SEO_DESCRIPTION_MAX_LENGTH = 160
 
-# Create your models here.
+
 class ContactMessage(
     UUIDModelMixin,
     TimeStampedModelMixin,
@@ -24,3 +33,114 @@ class ContactMessage(
 
     def __str__(self) -> str:
         return f"{self.name} - {self.subject}"
+
+
+def about_image_upload_path(instance: "AboutPageImage", filename: str) -> str:
+    filename, file_extension = os.path.splitext(filename.lower())
+    safe_name = slugify(filename)
+    return f"core/about/images/{safe_name}{file_extension}"
+
+
+class AboutPage(
+    UUIDModelMixin,
+    TimeStampedModelMixin,
+):
+    title = models.CharField(max_length=120, default="Hakkımda")
+    content = models.TextField(
+        help_text="""Hakkımda sayfası içeriği (Markdown veya HTML).
+        Markdown içinde kullanılabilen marker'lar:<br>
+          {{ image:1 }}  (1-based)<br>"""
+    )
+    meta_title = models.CharField(
+        max_length=SEO_TITLE_MAX_LENGTH,
+        blank=True,
+        help_text="SEO title (önerilen: 35–45 karakter 45 max).",
+    )
+    meta_description = models.CharField(
+        max_length=SEO_DESCRIPTION_MAX_LENGTH,
+        blank=True,
+        help_text="SEO description (önerilen: 140–160 karakter)",
+    )
+
+    class Meta:  # pyright: ignore[reportIncompatibleVariableOverride]
+        verbose_name = "Hakkımda Sayfası"
+        verbose_name_plural = "Hakkımda Sayfası"
+
+    def clean(self) -> None:
+        super().clean()
+        if AboutPage.objects.exclude(pk=self.pk).exists():
+            raise ValidationError("Sadece tek bir hakkımda sayfası olabilir.")
+
+    def __str__(self) -> str:
+        return str(self.title)
+
+
+class AboutPageImage(
+    UUIDModelMixin,
+    TimeStampedModelMixin,
+):
+    page = models.ForeignKey(
+        AboutPage,
+        on_delete=models.CASCADE,
+        related_name="images",
+    )
+
+    image = models.ImageField(
+        upload_to=about_image_upload_path,  # pyright: ignore[reportArgumentType]
+    )
+
+    alt_text = models.CharField(
+        max_length=255,
+        blank=True,
+        help_text="Erişilebilirlik ve SEO için",
+    )
+
+    caption = models.CharField(
+        max_length=255,
+        blank=True,
+        help_text="Görsel alt yazısı",
+    )
+
+    order = models.PositiveSmallIntegerField(
+        default=0,  # pyright: ignore[reportArgumentType]
+        help_text="Görsel sırası",
+    )
+
+    image_600 = ImageSpecField(
+        source="image",
+        processors=[Transpose(), ResizeToFit(600, 600)],
+        format="WEBP",
+        options={"quality": 85},
+    )
+
+    image_900 = ImageSpecField(
+        source="image",
+        processors=[Transpose(), ResizeToFit(900, 900)],
+        format="WEBP",
+        options={"quality": 85},
+    )
+
+    image_1200 = ImageSpecField(
+        source="image",
+        processors=[Transpose(), ResizeToFit(1200, 1200)],
+        format="WEBP",
+        options={"quality": 85},
+    )
+
+    class Meta:  # pyright: ignore[reportIncompatibleVariableOverride]
+        ordering = ["order"]
+        verbose_name = "Hakkımda Görseli"
+        verbose_name_plural = "Hakkımda Görselleri"
+
+    def save(self, *args, **kwargs):
+        is_new = self._state.adding
+        super().save(*args, **kwargs)
+
+        if is_new and self.image:
+            try:
+                optimize_uploaded_image_field(self.image)
+            except Exception:
+                pass
+
+    def __str__(self) -> str:
+        return f"{self.page.title} - Görsel"
