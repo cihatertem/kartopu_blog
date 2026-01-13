@@ -42,7 +42,7 @@ services:
                 - "traefik.http.middlewares.kartopublog-headers.headers.stspreload=true"
                 - "traefik.http.middlewares.kartopublog-headers.headers.stsseconds=63072000"
                 - "traefik.http.middlewares.kartopublog-headers.headers.permissionsPolicy=geolocation=(),midi=(),sync-xhr=(),microphone=(),camera=(),magnetometer=(),gyroscope=(),fullscreen=self,payment=()"
-                - "traefik.http.middlewares.kartopublog-headers.headers.contentSecurityPolicy=default-src 'self'; script-src 'self' https://burcu-photo.s3.amazonaws.com https://cdn.jsdelivr.net https:; object-src 'self'; style-src 'self' https: data:; img-src 'self' https: data:; media-src 'self'; frame-src 'self'; font-src 'self' https: data:; connect-src 'self' https: data:; frame-ancestors 'self';"
+                - "traefik.http.middlewares.kartopublog-headers.headers.contentSecurityPolicy=default-src 'self'; script-src 'self' https://kartopu-money.s3.amazonaws.com https:; object-src 'self'; style-src 'self' https: data:; img-src 'self' https: data:; media-src 'self'; frame-src 'self'; font-src 'self' https: data:; connect-src 'self' https: data:; frame-ancestors 'self';"
             placement:
                 constraints:
                     - node.role==manager
@@ -56,6 +56,7 @@ services:
             POSTGRES_PASSWORD: /run/secrets/postgres-password
             AWS_ACCESS_KEY_ID: /run/secrets/aws-kartopu-consumer-access
             AWS_SECRET_ACCESS_KEY: /run/secrets/aws-kartopu-consumer-secret
+            UV_CACHE_DIR: /tmp/uv-cache
         secrets:
             - kartopu-secret-key
             - email-pass

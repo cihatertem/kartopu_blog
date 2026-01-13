@@ -22,7 +22,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends curl gettext \
 
 ENV UV_INSTALL_DIR=/usr/local/bin \
     UV_COMPILE_BYTECODE=1 \
-    UV_CACHE_DIR=/var/cache/uv
+    UV_CACHE_DIR=/tmp/uv-cache
 
 RUN mkdir -p /var/cache/uv \
     && chown -R app:app /var/cache/uv

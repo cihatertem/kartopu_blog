@@ -178,7 +178,7 @@ if USE_S3:
     AWS_ACCESS_KEY_ID = get_swarm_secret_for_psg("AWS_ACCESS_KEY_ID", "")
     AWS_SECRET_ACCESS_KEY = get_swarm_secret_for_psg("AWS_SECRET_ACCESS_KEY", "")
     AWS_S3_CUSTOM_DOMAIN = os.getenv("AWS_S3_CUSTOM_DOMAIN", "")
-    AWS_S3_ENDPOINT_URL = os.getenv("AWS_S3_ENDPOINT_URL", "")
+    # AWS_S3_ENDPOINT_URL = os.getenv("AWS_S3_ENDPOINT_URL", "")
     AWS_DEFAULT_ACL = None
     AWS_S3_OBJECT_PARAMETERS = {"CacheControl": "max-age=86400"}
     AWS_LOCATION_STATIC = os.getenv("AWS_LOCATION_STATIC", "static")
