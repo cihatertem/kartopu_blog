@@ -1,3 +1,5 @@
+import os
+
 from django.conf import settings
 from django.conf.urls.static import static
 from django.contrib import admin
@@ -12,7 +14,7 @@ from core.sitemaps import sitemaps
 SITEMAP_CACHE_SECONDS = 60 * 60  # 1 hour
 
 urlpatterns = [
-    path("admin/", admin.site.urls),
+    path(os.getenv("ADMIN_ADDRESS") or "admin/", admin.site.urls),
     path(
         "accounts/login/",
         account_views.disabled_account_view,

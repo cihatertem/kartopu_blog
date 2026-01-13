@@ -14,6 +14,15 @@ import ipaddress
 import os
 from pathlib import Path
 
+
+def get_swarm_secret_for_psg(key: str, default: str = "") -> str:
+    value = os.getenv(key, default)
+    if os.path.isfile(value):
+        with open(value) as f:
+            return f.readline().strip("\n")
+    return value.strip("\n")
+
+
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
@@ -22,7 +31,9 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # See https://docs.djangoproject.com/en/5.2/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = os.getenv("DJANGO_SECRET", "django-insecure-please-change-me")
+SECRET_KEY = get_swarm_secret_for_psg(
+    "DJANGO_SECRET", "django-insecure-please-change-me"
+)
 
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = os.getenv("DJANGO_DEBUG", "0") == "1"
@@ -43,6 +54,7 @@ INSTALLED_APPS = [
     "django.contrib.sitemaps",
     "django.contrib.sites",
     # third party apps
+    "django_cleanup.apps.CleanupConfig",
     "imagekit",
     "allauth",
     "allauth.account",
@@ -100,8 +112,8 @@ DATABASES = {
     "default": {
         "ENGINE": "django.db.backends.postgresql",
         "NAME": os.getenv("POSTGRES_DB", "app_db"),
-        "USER": os.getenv("POSTGRES_USER", "app_user"),
-        "PASSWORD": os.getenv("POSTGRES_PASSWORD", "app_pass"),
+        "USER": get_swarm_secret_for_psg("POSTGRES_USER"),
+        "PASSWORD": get_swarm_secret_for_psg("POSTGRES_PASSWORD"),
         "HOST": os.getenv("POSTGRES_HOST", "db"),
         "PORT": os.getenv("POSTGRES_PORT", "5432"),
     }
@@ -163,8 +175,8 @@ if USE_S3:
 
     AWS_STORAGE_BUCKET_NAME = os.getenv("AWS_STORAGE_BUCKET_NAME", "")
     AWS_S3_REGION_NAME = os.getenv("AWS_S3_REGION_NAME", "")
-    AWS_ACCESS_KEY_ID = os.getenv("AWS_ACCESS_KEY_ID", "")
-    AWS_SECRET_ACCESS_KEY = os.getenv("AWS_SECRET_ACCESS_KEY", "")
+    AWS_ACCESS_KEY_ID = get_swarm_secret_for_psg("AWS_ACCESS_KEY_ID", "")
+    AWS_SECRET_ACCESS_KEY = get_swarm_secret_for_psg("AWS_SECRET_ACCESS_KEY", "")
     AWS_S3_CUSTOM_DOMAIN = os.getenv("AWS_S3_CUSTOM_DOMAIN", "")
     AWS_S3_ENDPOINT_URL = os.getenv("AWS_S3_ENDPOINT_URL", "")
     AWS_DEFAULT_ACL = None
@@ -226,14 +238,6 @@ SOCIALACCOUNT_PROVIDERS = {
             "access_type": "online",
         },
     },
-    # "twitter_oauth2": {
-    #     # X OAuth2 scope örnekleri (ihtiyacına göre):
-    #     # - Sadece login için genelde users.read yeterli olur
-    #     # - Email istiyorsan users.email gerekir (X tarafında izin/uygunluk gerekebilir)
-    #     "SCOPE": [
-    #         "users.read",
-    #     ],
-    # },
 }
 
 # ImageKit settings
