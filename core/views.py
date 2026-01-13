@@ -5,7 +5,7 @@ from django.views.decorators.http import require_http_methods
 from django_ratelimit.decorators import ratelimit
 
 from blog.models import BlogPost, Category
-from core.helpers import client_ip_key
+from core.helpers import client_ip_key, get_client_ip
 from core.models import AboutPage
 
 from .forms import ContactForm
@@ -90,7 +90,7 @@ def contact_view(request):
                 )
                 return redirect("core:contact")
 
-            contact_message.ip_address = request.META.get("REMOTE_ADDR")
+            contact_message.ip_address = get_client_ip(request)
             contact_message.user_agent = request.META.get("HTTP_USER_AGENT", "")[:500]
             contact_message.save()
             messages.success(

@@ -65,15 +65,17 @@ services:
             - postgres-password
             - aws-kartopu-consumer-access
             - aws-kartopu-consumer-secret
-        command: sh -c "uv run python manage.py collectstatic --noinput &&
+        command:
+            sh -c "uv run python manage.py collectstatic --noinput &&
             uv run python manage.py makemigrations &&
             uv run python manage.py migrate &&
             uv run gunicorn --bind 0.0.0.0:9002 --workers 2 config.wsgi:application"
+            #uv run python manage.py createcachetable ratelimit_cache # ilk seferde rate limit db için çalıştırılmalı
         networks:
             - kopru
             - backend
         healthcheck:
-            test: curl -fsSL -o /dev/null -w '%{http_code}' http://localhost:9002/ping || exit 1
+            test: curl -fsSL -o /dev/null -w '%{http_code}' http://0.0.0.0:9002/ping || exit 1
             interval: 15s
             timeout: 5s
             retries: 3
