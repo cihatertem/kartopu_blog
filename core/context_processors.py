@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from decimal import ROUND_HALF_UP, Decimal
 
+from django.conf import settings
 from django.core.cache import cache
 from django.db.models import Count, F, IntegerField, Q
 from django.db.models.expressions import ExpressionWrapper
@@ -204,3 +205,7 @@ def categories_tags_context(request):
         "nav_popular_posts": nav_popular_posts,
         "goal_widget_snapshot": goal_widget_snapshot,
     }
+
+
+def google_analytics_context(request):
+    return {"GOOGLE_ANALYTICS_ID": settings.GOOGLE_ANALYTICS_ID}

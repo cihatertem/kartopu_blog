@@ -17,34 +17,43 @@ services:
             labels:
                 - "traefik.enable=true"
                 - "traefik.swarm.network=kopru"
-                # Routers
-                ## HTTPS
-                - "traefik.http.routers.kartopublog.rule=(Host(`kartopu.money`) || Host(`www.kartopu.money`))"
-                - "traefik.http.routers.kartopublog.entrypoints=websecure"
-                - "traefik.http.routers.kartopublog.tls=true"
-                # first cert creation then comment
-                - "traefik.http.routers.kartopublog.tls.certresolver=awsresolver"
-                # Load Balancer
+                # -------------------------
+                # 1) ROOT domain -> app
+                # -------------------------
+                - "traefik.http.routers.kartopublog-root.rule=Host(`kartopu.money`)"
+                - "traefik.http.routers.kartopublog-root.entrypoints=websecure"
+                - "traefik.http.routers.kartopublog-root.tls=true"
+                - "traefik.http.routers.kartopublog-root.tls.certresolver=awsresolver"
+                # app service port
                 - "traefik.http.services.kartopublog.loadbalancer.server.port=9002"
-                # Middlewares
-                - "traefik.http.routers.kartopublog.middlewares=kartopublog-inflightreq,kartopublog-ratelimit,kartopublog-retry,kartopublog-compress,kartopublog-headers"
-
+                # middlewares (mevcutların aynısı root router'a bağlandı)
+                - "traefik.http.routers.kartopublog-root.middlewares=kartopublog-inflightreq,kartopublog-ratelimit,kartopublog-retry,kartopublog-compress,kartopublog-headers"
                 - "traefik.http.middlewares.kartopublog-ratelimit.ratelimit.average=5"
                 - "traefik.http.middlewares.kartopublog-ratelimit.ratelimit.sourcecriterion.ipstrategy.excludedips=10.0.2.0/24"
-
                 - "traefik.http.middlewares.kartopublog-retry.retry.attempts=2"
                 - "traefik.http.middlewares.kartopublog-retry.retry.initialinterval=100ms"
-
                 - "traefik.http.middlewares.kartopublog-inflightreq.inflightreq.amount=3"
                 - "traefik.http.middlewares.kartopublog-inflightreq.inflightreq.sourcecriterion.ipstrategy.excludedips=10.0.2.0/24"
-
                 - "traefik.http.middlewares.kartopublog-compress.compress=true"
-
                 - "traefik.http.middlewares.kartopublog-headers.headers.stsincludesubdomains=true"
                 - "traefik.http.middlewares.kartopublog-headers.headers.stspreload=true"
                 - "traefik.http.middlewares.kartopublog-headers.headers.stsseconds=63072000"
                 - "traefik.http.middlewares.kartopublog-headers.headers.permissionsPolicy=geolocation=(),midi=(),sync-xhr=(),microphone=(),camera=(),magnetometer=(),gyroscope=(),fullscreen=self,payment=()"
-                - "traefik.http.middlewares.kartopublog-headers.headers.contentSecurityPolicy=default-src 'self'; script-src 'self' https://kartopu-money.s3.amazonaws.com  https:; object-src 'self'; style-src 'self' https: data:; img-src 'self' https: data:; media-src 'self'; frame-src 'self'; font-src 'self' https: data:; connect-src 'self' https: data:; frame-ancestors 'self';"
+                - "traefik.http.middlewares.kartopublog-headers.headers.contentSecurityPolicy=default-src 'self'; script-src 'self' https://kartopu-money.s3.amazonaws.com https:; object-src 'self'; style-src 'self' 'unsafe-inline' https: data:; img-src 'self' https: data:; media-src 'self'; frame-src 'self'; font-src 'self' https: data:; connect-src 'self' https: data:; frame-ancestors 'self';"
+                # -------------------------
+                # 2) WWW domain -> 301 redirect to root
+                # -------------------------
+                - "traefik.http.routers.kartopublog-www.rule=Host(`www.kartopu.money`)"
+                - "traefik.http.routers.kartopublog-www.entrypoints=websecure"
+                - "traefik.http.routers.kartopublog-www.tls=true"
+                - "traefik.http.routers.kartopublog-www.tls.certresolver=awsresolver"
+                # www router backend'e gitmesin: noop internal service
+                - "traefik.http.routers.kartopublog-www.service=noop@internal"
+                # redirect middleware
+                - "traefik.http.middlewares.kartopublog-www-to-root.redirectregex.regex=^https?://www\\.kartopu\\.money/(.*)"
+                - "traefik.http.middlewares.kartopublog-www-to-root.redirectregex.replacement=https://kartopu.money/$${1}"
+                - "traefik.http.middlewares.kartopublog-www-to-root.redirectregex.permanent=true"
+                - "traefik.http.routers.kartopublog-www.middlewares=kartopublog-www-to-root"
             placement:
                 constraints:
                     - node.role==manager

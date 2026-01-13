@@ -8,13 +8,10 @@
     <link rel="stylesheet" href="{% static 'css/site.css' %}" />
     <link rel="icon" type="image/svg+xml" href="{% static 'images/home/hero-snow-ball.png' %}" />
     <!-- Google tag (gtag.js) -->
-    <script async src="https://www.googletagmanager.com/gtag/js?id=G-1DXCLGBW9N"></script>
-    <script>
-      window.dataLayer = window.dataLayer || [];
-      function gtag(){dataLayer.push(arguments);}
-      gtag('js', new Date());
-      gtag('config', 'G-1DXCLGBW9N');
-    </script>
+    {% if GOOGLE_ANALYTICS_ID %}
+    <script async src="https://www.googletagmanager.com/gtag/js?id={{ GOOGLE_ANALYTICS_ID }}"></script>
+    <script defer src="{% static 'js/ga.js' %}" data-ga-id="{{ GOOGLE_ANALYTICS_ID }}"></script>
+    {% endif %}
 
     <script src="{% static 'vendor/chart.umd.min.js' %}"></script>
     {% block head %}{% endblock %}

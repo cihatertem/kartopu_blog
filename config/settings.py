@@ -40,6 +40,7 @@ DEBUG = os.getenv("DJANGO_DEBUG", "0") == "1"
 
 ALLOWED_HOSTS = ["*"] if DEBUG else os.getenv("DJANGO_ALLOWED_HOSTS", "").split(",")
 
+GOOGLE_ANALYTICS_ID = os.getenv("GOOGLE_ANALYTICS_ID", "")
 
 # Application definition
 
@@ -98,6 +99,7 @@ TEMPLATES = [
                 "django.contrib.messages.context_processors.messages",
                 "core.context_processors.categories_tags_context",  # navbar/sidebar categories context
                 "core.context_processors.breadcrumbs_context",  # automatic breadcrumbs context
+                "core.context_processors.google_analytics_context",
             ],
         },
     },
