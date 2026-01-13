@@ -75,7 +75,7 @@ services:
             - kopru
             - backend
         healthcheck:
-            test: curl -fsSL -o /dev/null -w '%{http_code}' http://0.0.0.0:9002/ping || exit 1
+            test: curl -fsSL -o /dev/null -w '%{http_code}' http://127.0.0.1:9002/ping || exit 1
             interval: 15s
             timeout: 5s
             retries: 3
