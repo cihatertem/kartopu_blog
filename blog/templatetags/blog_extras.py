@@ -1,6 +1,6 @@
 import json
 import re
-from decimal import Decimal
+from decimal import Decimal, InvalidOperation
 
 from django import template
 from django.core.serializers.json import DjangoJSONEncoder
@@ -199,9 +199,28 @@ def _currency_symbol(currency_code: str | None) -> str:
 
 
 def _format_currency(value, currency_code: str | None) -> str:
-    value_str = escape(str(value))
+    value_str = _format_tr_number(value)
+    value_str = escape(value_str)
     symbol = _currency_symbol(currency_code)
     return f"{value_str} {symbol}".rstrip()
+
+
+def _format_tr_number(value) -> str:
+    try:
+        dec = Decimal(str(value))
+
+        has_decimal = dec % 1 != 0
+
+        if has_decimal:
+            s = f"{dec:,.2f}"
+        else:
+            s = f"{dec:,.0f}"
+
+        s = s.replace(",", "X").replace(".", ",").replace("X", ".")
+        return s
+
+    except (InvalidOperation, TypeError):
+        return str(value)
 
 
 def _get_prefetched_list(post, attr_name, fallback_queryset):

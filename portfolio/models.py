@@ -16,7 +16,7 @@ from core.mixins import TimeStampedModelMixin, UUIDModelMixin
 from portfolio.services import fetch_fx_rate, fetch_yahoo_finance_price
 
 MAX_DICITS = 200
-MAX_DECIMAL_PLACES = 2
+MAX_DECIMAL_PLACES = 4
 MAX_DECIMAL_PLACES_FOR_QUANTITY = 5
 SLUG_HASH_LENGTH = 6
 SLUG_HASH_ALPHABET = string.ascii_lowercase + string.digits
@@ -46,6 +46,8 @@ def _generate_unique_slug(model_cls: type[models.Model], name: str) -> str:
 class Asset(UUIDModelMixin, TimeStampedModelMixin):
     class AssetType(models.TextChoices):
         STOCK = "stock", "Hisse"
+        BIST = "bist", "BIST"
+        SPX = "abd stock", "ABD Hisse"
         BES = "bes", "BES"
         ETF = "etf", "ETF"
         FON = "fon", "Yatırım Fonu"
@@ -54,6 +56,7 @@ class Asset(UUIDModelMixin, TimeStampedModelMixin):
         VIOP = "viop", "VİOP"
         CASH = "cash", "Nakit"
         CRYPTO = "crypto", "Kripto"
+        GOLD = "gold", "Altın"
         OTHER = "other", "Diğer"
 
     class Currency(models.TextChoices):
@@ -1107,10 +1110,10 @@ class DividendSnapshotPaymentItem(UUIDModelMixin, TimeStampedModelMixin):
         max_digits=MAX_DICITS, decimal_places=MAX_DECIMAL_PLACES
     )
     dividend_yield_on_payment_price = models.DecimalField(
-        max_digits=10, decimal_places=4
+        max_digits=MAX_DICITS, decimal_places=MAX_DECIMAL_PLACES
     )
     dividend_yield_on_average_cost = models.DecimalField(
-        max_digits=10, decimal_places=4
+        max_digits=MAX_DICITS, decimal_places=MAX_DECIMAL_PLACES
     )
     total_net_amount = models.DecimalField(
         max_digits=MAX_DICITS, decimal_places=MAX_DECIMAL_PLACES
