@@ -25,6 +25,7 @@ class ContactMessage(
     message = models.TextField(max_length=MAX_MESSAGE_LENGTH)
     website = models.CharField(max_length=255, blank=True)
     is_spam = models.BooleanField(default=False)
+    is_read = models.BooleanField(default=False)
     ip_address = models.GenericIPAddressField(blank=True, null=True)
     user_agent = models.CharField(max_length=500, blank=True)
 

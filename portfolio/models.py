@@ -78,6 +78,7 @@ class Asset(UUIDModelMixin, TimeStampedModelMixin):
     class Meta:  # pyright: ignore[reportIncompatibleVariableOverride]
         verbose_name = "Varlık"
         verbose_name_plural = "Varlıklar"
+        ordering = ("name",)
 
     def __str__(self) -> str:
         return f"{self.name} ({self.symbol})" if self.symbol else self.name

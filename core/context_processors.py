@@ -20,8 +20,10 @@ from blog.cache_keys import (
 )
 from blog.models import BlogPost, Category, Tag
 from comments.models import Comment
-from core.tag_colors import get_tag_color_class
 from portfolio.models import PortfolioSnapshot
+
+from .models import ContactMessage
+from .tag_colors import get_tag_color_class
 
 CACHE_TIMEOUT = 600  # 10 minutes
 
@@ -197,6 +199,12 @@ def categories_tags_context(request):
             "remaining_pct": target_pct,
         }
 
+    unread_contact_message_count = 0
+    if request.user.is_authenticated and request.user.is_staff:
+        unread_contact_message_count = ContactMessage.objects.filter(
+            is_read=False,
+        ).count()
+
     return {
         "nav_categories": nav_categories,
         "nav_tags": nav_tags,
@@ -204,6 +212,7 @@ def categories_tags_context(request):
         "nav_recent_posts": nav_recent_posts,
         "nav_popular_posts": nav_popular_posts,
         "goal_widget_snapshot": goal_widget_snapshot,
+        "unread_contact_message_count": unread_contact_message_count,
     }
 
 

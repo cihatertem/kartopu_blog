@@ -8,9 +8,35 @@ from .models import AboutPage, AboutPageImage, ContactMessage
 
 @admin.register(ContactMessage)
 class ContactMessageAdmin(admin.ModelAdmin):
-    list_display = ("name", "email", "subject", "is_spam", "created_at")
-    list_filter = ("is_spam", "created_at")
+    list_display = ("name", "email", "subject", "is_read", "is_spam", "created_at")
+    list_filter = ("is_read", "is_spam", "created_at")
     search_fields = ("name", "email", "subject", "message")
+    actions = (
+        "mark_as_read",
+        "mark_as_unread",
+        "mark_as_spam",
+        "mark_as_not_spam",
+    )
+
+    def mark_as_read(self, request, queryset):
+        queryset.update(is_read=True)
+
+    mark_as_read.short_description = "Seçili mesajları okundu olarak işaretle"
+
+    def mark_as_unread(self, request, queryset):
+        queryset.update(is_read=False)
+
+    mark_as_unread.short_description = "Seçili mesajları okunmadı olarak işaretle"
+
+    def mark_as_spam(self, request, queryset):
+        queryset.update(is_spam=True)
+
+    mark_as_spam.short_description = "Seçili mesajları spam olarak işaretle"
+
+    def mark_as_not_spam(self, request, queryset):
+        queryset.update(is_spam=False)
+
+    mark_as_not_spam.short_description = "Seçili mesajları spam değil olarak işaretle"
 
 
 class AboutPageImageInline(admin.TabularInline):
