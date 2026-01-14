@@ -186,6 +186,60 @@ document.addEventListener("DOMContentLoaded", function () {
     });
 
     document
+        .querySelectorAll(".portfolio-category-charts")
+        .forEach((section) => {
+            const fallbackSelector = ".portfolio-category-chart-fallback";
+            if (!isChartAvailable()) {
+                revealFallback(section, fallbackSelector);
+                return;
+            }
+            const allocationRaw = section.dataset.portfolioCategoryAllocation;
+            if (!allocationRaw) {
+                revealFallback(section, fallbackSelector);
+                return;
+            }
+
+            let allocationData;
+            try {
+                allocationData = JSON.parse(allocationRaw);
+            } catch {
+                revealFallback(section, fallbackSelector);
+                return;
+            }
+
+            const allocationCanvas = section.querySelector(
+                'canvas[data-chart-kind="portfolio-category-allocation"]',
+            );
+            if (allocationData && allocationCanvas) {
+                try {
+                    new Chart(allocationCanvas, {
+                        type: "doughnut",
+                        data: {
+                            labels: allocationData.labels,
+                            datasets: [{ data: allocationData.values }],
+                        },
+                        options: {
+                            responsive: true,
+                            plugins: {
+                                legend: { position: "bottom" },
+                                tooltip: {
+                                    callbacks: {
+                                        label(ctx) {
+                                            const v = ctx.parsed || 0;
+                                            return `${ctx.label}: ${v.toFixed(2)}%`;
+                                        },
+                                    },
+                                },
+                            },
+                        },
+                    });
+                } catch {
+                    revealFallback(section, fallbackSelector);
+                }
+            }
+        });
+
+    document
         .querySelectorAll(".portfolio-comparison-charts")
         .forEach((section) => {
             const fallbackSelector = ".portfolio-comparison-chart-fallback";

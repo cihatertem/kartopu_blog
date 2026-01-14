@@ -112,6 +112,7 @@ class BlogPost(
           {{ image:1 }}  (1-based)<br>
           {{ portfolio_summary:slug_or_hash }}<br>
           {{ portfolio_charts:slug_or_hash }}<br>
+          {{ portfolio_category_summary:slug_or_hash }}<br>
           {{ portfolio_comparison_summary:slug_or_hash }}<br>
           {{ portfolio_comparison_charts:slug_or_hash }}<br>
           {{ cashflow_summary:slug_or_hash }}<br>

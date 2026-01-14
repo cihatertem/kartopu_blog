@@ -17,6 +17,9 @@ PORTFOLIO_SUMMARY_PATTERN = re.compile(
     r"\{\{\s*portfolio_summary(?::([^\s\}]+))?\s*\}\}"
 )
 PORTFOLIO_CHARTS_PATTERN = re.compile(r"\{\{\s*portfolio_charts(?::([^\s\}]+))?\s*\}\}")
+PORTFOLIO_CATEGORY_SUMMARY_PATTERN = re.compile(
+    r"\{\{\s*portfolio_category_summary(?::([^\s\}]+))?\s*\}\}"
+)
 PORTFOLIO_COMPARISON_SUMMARY_PATTERN = re.compile(
     r"\{\{\s*portfolio_comparison_summary(?::([^\s\}]+))?\s*\}\}"
 )
@@ -179,6 +182,44 @@ def _render_portfolio_charts_html(snapshot) -> str:
 """.format(
         allocation_json=allocation_json,
         timeseries_json=timeseries_json,
+    )
+
+
+def _render_portfolio_category_summary_html(snapshot) -> str:
+    if not snapshot:
+        return ""
+
+    items = snapshot.items.select_related("asset").order_by("-allocation_pct")
+    category_totals: dict[str, float] = {}
+    for item in items:
+        asset = item.asset
+        label = asset.get_asset_type_display() if asset else "Diğer"
+        category_totals[label] = category_totals.get(label, 0) + float(
+            (item.allocation_pct or 0) * 100
+        )
+
+    if not category_totals:
+        return ""
+
+    sorted_items = sorted(category_totals.items(), key=lambda row: row[1], reverse=True)
+    allocation = {
+        "labels": [label for label, _ in sorted_items],
+        "values": [value for _, value in sorted_items],
+    }
+    allocation_json = escape(json.dumps(allocation, cls=DjangoJSONEncoder))
+
+    return """
+<section class="chart-section portfolio-category-charts" data-portfolio-category-allocation="{allocation_json}">
+  <div class="chart-fallback portfolio-category-chart-fallback is-hidden">
+    Grafikler yüklenemedi. (Tarayıcı eklentisi / ağ politikası / CSP engelliyor olabilir.)
+  </div>
+  <div class="chart-card">
+    <h4 class="chart-card__title">Kategori Dağılımı</h4>
+    <canvas data-chart-kind="portfolio-category-allocation" height="220"></canvas>
+  </div>
+</section>
+""".format(
+        allocation_json=allocation_json,
     )
 
 
@@ -715,10 +756,10 @@ def _render_dividend_summary_html(snapshot) -> str:
     rows = "\n".join(
         "<tr>"
         f'<td class="data-table__cell">{escape(item.asset.name)}</td>'
-        f'<td class="data-table__cell">{escape(str(item.payment_date))}</td>'
+        f'<td class="data-table__cell data-table__cell--hide-mobile">{escape(str(item.payment_date))}</td>'
         f'<td class="data-table__cell">{_format_currency(item.per_share_net_amount, snapshot.currency)}</td>'
         f'<td class="data-table__cell">{escape(f"{float((item.dividend_yield_on_payment_price or 0) * 100):.2f}")}%</td>'
-        f'<td class="data-table__cell">{escape(f"{float((item.dividend_yield_on_average_cost or 0) * 100):.2f}")}%</td>'
+        f'<td class="data-table__cell data-table__cell--hide-mobile">{escape(f"{float((item.dividend_yield_on_average_cost or 0) * 100):.2f}")}%</td>'
         f'<td class="data-table__cell">{_format_currency(item.total_net_amount, snapshot.currency)}</td>'
         "</tr>"
         for item in payment_items
@@ -730,10 +771,10 @@ def _render_dividend_summary_html(snapshot) -> str:
         <thead>
           <tr>
             <th class="data-table__header">Varlık</th>
-            <th class="data-table__header">Ödeme Tarihi</th>
+            <th class="data-table__header data-table__header--hide-mobile">Ödeme Tarihi</th>
             <th class="data-table__header">Hisse Başına Net Temettü</th>
             <th class="data-table__header">Ödeme Günü Temettü Verimi</th>
-            <th class="data-table__header">Ortalama Maliyet Temettü Verimi</th>
+            <th class="data-table__header data-table__header--hide-mobile">Ortalama Maliyet Temettü Verimi</th>
             <th class="data-table__header">Toplam Net Temettü</th>
           </tr>
         </thead>
@@ -851,6 +892,14 @@ def portfolio_charts(context, index=None):
 
 
 @register.simple_tag(takes_context=True)
+def portfolio_category_summary(context, index=None):
+    """Post içindeki snapshot kategori özet donut grafiğini HTML olarak döndürür."""
+    post = context.get("post")
+    snapshot = _get_item_by_identifier(_get_portfolio_snapshots(post), index)
+    return mark_safe(_render_portfolio_category_summary_html(snapshot))
+
+
+@register.simple_tag(takes_context=True)
 def portfolio_comparison_summary(context, index=None):
     """Post içindeki karşılaştırma özetini HTML olarak döndürür."""
     post = context.get("post")
@@ -933,6 +982,7 @@ def render_post_body(context, post):
       {{ image:1 }}  (1-based)
       {{ portfolio_summary:slug_or_hash }}
       {{ portfolio_charts:slug_or_hash }}
+      {{ portfolio_category_summary:slug_or_hash }}
       {{ portfolio_comparison_summary:slug_or_hash }}
       {{ portfolio_comparison_charts:slug_or_hash }}
       {{ cashflow_summary:slug_or_hash }}
@@ -985,6 +1035,11 @@ def render_post_body(context, post):
         snapshot = _get_item_by_identifier(portfolio_snapshots, identifier)
         return _render_portfolio_charts_html(snapshot)
 
+    def portfolio_category_summary_replacer(match):
+        identifier = match.group(1)
+        snapshot = _get_item_by_identifier(portfolio_snapshots, identifier)
+        return _render_portfolio_category_summary_html(snapshot)
+
     def portfolio_comparison_summary_replacer(match):
         identifier = match.group(1)
         comparison = _get_item_by_identifier(portfolio_comparisons, identifier)
@@ -997,6 +1052,9 @@ def render_post_body(context, post):
 
     expanded = PORTFOLIO_SUMMARY_PATTERN.sub(portfolio_summary_replacer, expanded)
     expanded = PORTFOLIO_CHARTS_PATTERN.sub(portfolio_charts_replacer, expanded)
+    expanded = PORTFOLIO_CATEGORY_SUMMARY_PATTERN.sub(
+        portfolio_category_summary_replacer, expanded
+    )
     expanded = PORTFOLIO_COMPARISON_SUMMARY_PATTERN.sub(
         portfolio_comparison_summary_replacer, expanded
     )
