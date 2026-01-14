@@ -1,5 +1,12 @@
 document.addEventListener("DOMContentLoaded", function () {
     const urlParams = new URLSearchParams(window.location.search);
+    const revealFallback = (section, selector) => {
+        const fallback = section.querySelector(selector);
+        if (fallback) {
+            fallback.classList.remove("is-hidden");
+        }
+    };
+    const isChartAvailable = () => typeof Chart !== "undefined";
 
     if (urlParams.get("popup") === "1" && window.opener) {
         window.opener.location.reload();
@@ -89,15 +96,24 @@ document.addEventListener("DOMContentLoaded", function () {
     // PortfolioSnapshot charts
     // -------------------------
     document.querySelectorAll(".portfolio-charts").forEach((section) => {
+        const fallbackSelector = ".portfolio-chart-fallback";
+        if (!isChartAvailable()) {
+            revealFallback(section, fallbackSelector);
+            return;
+        }
         const allocationRaw = section.dataset.portfolioAllocation;
         const timeseriesRaw = section.dataset.portfolioTimeseries;
-        if (!allocationRaw || !timeseriesRaw) return;
+        if (!allocationRaw || !timeseriesRaw) {
+            revealFallback(section, fallbackSelector);
+            return;
+        }
 
         let allocationData, timeseriesData;
         try {
             allocationData = JSON.parse(allocationRaw);
             timeseriesData = JSON.parse(timeseriesRaw);
         } catch {
+            revealFallback(section, fallbackSelector);
             return;
         }
 
@@ -105,72 +121,89 @@ document.addEventListener("DOMContentLoaded", function () {
             'canvas[data-chart-kind="portfolio-allocation"]',
         );
         if (allocationData && allocationCanvas) {
-            new Chart(allocationCanvas, {
-                type: "doughnut",
-                data: {
-                    labels: allocationData.labels,
-                    datasets: [{ data: allocationData.values }],
-                },
-                options: {
-                    responsive: true,
-                    plugins: {
-                        legend: { position: "bottom" },
-                        tooltip: {
-                            callbacks: {
-                                label(ctx) {
-                                    const v = ctx.parsed || 0;
-                                    return `${ctx.label}: ${v.toFixed(2)}%`;
+            try {
+                new Chart(allocationCanvas, {
+                    type: "doughnut",
+                    data: {
+                        labels: allocationData.labels,
+                        datasets: [{ data: allocationData.values }],
+                    },
+                    options: {
+                        responsive: true,
+                        plugins: {
+                            legend: { position: "bottom" },
+                            tooltip: {
+                                callbacks: {
+                                    label(ctx) {
+                                        const v = ctx.parsed || 0;
+                                        return `${ctx.label}: ${v.toFixed(2)}%`;
+                                    },
                                 },
                             },
                         },
                     },
-                },
-            });
+                });
+            } catch {
+                revealFallback(section, fallbackSelector);
+            }
         }
 
         const timeseriesCanvas = section.querySelector(
             'canvas[data-chart-kind="portfolio-timeseries"]',
         );
         if (timeseriesData && timeseriesCanvas) {
-            new Chart(timeseriesCanvas, {
-                type: "line",
-                data: {
-                    labels: timeseriesData.labels,
-                    datasets: [
-                        {
-                            data: timeseriesData.values,
-                            fill: false,
-                            tension: 0.25,
-                        },
-                    ],
-                },
-                options: {
-                    responsive: true,
-                    plugins: { legend: { display: false } },
-                    scales: {
-                        x: {
-                            ticks: {
-                                maxRotation: 0,
-                                autoSkip: true,
-                                maxTicksLimit: 8,
+            try {
+                new Chart(timeseriesCanvas, {
+                    type: "line",
+                    data: {
+                        labels: timeseriesData.labels,
+                        datasets: [
+                            {
+                                data: timeseriesData.values,
+                                fill: false,
+                                tension: 0.25,
+                            },
+                        ],
+                    },
+                    options: {
+                        responsive: true,
+                        plugins: { legend: { display: false } },
+                        scales: {
+                            x: {
+                                ticks: {
+                                    maxRotation: 0,
+                                    autoSkip: true,
+                                    maxTicksLimit: 8,
+                                },
                             },
                         },
                     },
-                },
-            });
+                });
+            } catch {
+                revealFallback(section, fallbackSelector);
+            }
         }
     });
 
     document
         .querySelectorAll(".portfolio-comparison-charts")
         .forEach((section) => {
+            const fallbackSelector = ".portfolio-comparison-chart-fallback";
+            if (!isChartAvailable()) {
+                revealFallback(section, fallbackSelector);
+                return;
+            }
             const comparisonRaw = section.dataset.portfolioComparison;
-            if (!comparisonRaw) return;
+            if (!comparisonRaw) {
+                revealFallback(section, fallbackSelector);
+                return;
+            }
 
             let comparisonData;
             try {
                 comparisonData = JSON.parse(comparisonRaw);
             } catch {
+                revealFallback(section, fallbackSelector);
                 return;
             }
 
@@ -178,31 +211,41 @@ document.addEventListener("DOMContentLoaded", function () {
                 'canvas[data-chart-kind="portfolio-comparison"]',
             );
             if (comparisonData && comparisonCanvas) {
-                new Chart(comparisonCanvas, {
-                    type: "bar",
-                    data: {
-                        labels: comparisonData.labels,
-                        datasets: [
-                            {
-                                label: comparisonData.base_label || "Base",
-                                data: comparisonData.base,
-                            },
-                            {
-                                label:
-                                    comparisonData.compare_label || "Compare",
-                                data: comparisonData.compare,
-                            },
-                        ],
-                    },
-                    options: {
-                        responsive: true,
-                        plugins: { legend: { position: "bottom" } },
-                        scales: {
-                            x: { ticks: { maxRotation: 0, autoSkip: true } },
-                            y: { beginAtZero: true },
+                try {
+                    new Chart(comparisonCanvas, {
+                        type: "bar",
+                        data: {
+                            labels: comparisonData.labels,
+                            datasets: [
+                                {
+                                    label: comparisonData.base_label || "Base",
+                                    data: comparisonData.base,
+                                },
+                                {
+                                    label:
+                                        comparisonData.compare_label ||
+                                        "Compare",
+                                    data: comparisonData.compare,
+                                },
+                            ],
                         },
-                    },
-                });
+                        options: {
+                            responsive: true,
+                            plugins: { legend: { position: "bottom" } },
+                            scales: {
+                                x: {
+                                    ticks: {
+                                        maxRotation: 0,
+                                        autoSkip: true,
+                                    },
+                                },
+                                y: { beginAtZero: true },
+                            },
+                        },
+                    });
+                } catch {
+                    revealFallback(section, fallbackSelector);
+                }
             }
         });
 
@@ -210,15 +253,24 @@ document.addEventListener("DOMContentLoaded", function () {
     // Cashflow charts
     // -------------------------
     document.querySelectorAll(".cashflow-charts").forEach((section) => {
+        const fallbackSelector = ".cashflow-chart-fallback";
+        if (!isChartAvailable()) {
+            revealFallback(section, fallbackSelector);
+            return;
+        }
         const allocationRaw = section.dataset.cashflowAllocation;
         const timeseriesRaw = section.dataset.cashflowTimeseries;
-        if (!allocationRaw || !timeseriesRaw) return;
+        if (!allocationRaw || !timeseriesRaw) {
+            revealFallback(section, fallbackSelector);
+            return;
+        }
 
         let allocationData, timeseriesData;
         try {
             allocationData = JSON.parse(allocationRaw);
             timeseriesData = JSON.parse(timeseriesRaw);
         } catch {
+            revealFallback(section, fallbackSelector);
             return;
         }
 
@@ -230,56 +282,64 @@ document.addEventListener("DOMContentLoaded", function () {
         );
 
         if (allocationData && allocationCanvas) {
-            new Chart(allocationCanvas, {
-                type: "doughnut",
-                data: {
-                    labels: allocationData.labels,
-                    datasets: [{ data: allocationData.values }],
-                },
-                options: {
-                    responsive: true,
-                    plugins: {
-                        legend: { position: "bottom" },
-                        tooltip: {
-                            callbacks: {
-                                label(ctx) {
-                                    const v = ctx.parsed || 0;
-                                    return `${ctx.label}: ${v.toFixed(2)}%`;
+            try {
+                new Chart(allocationCanvas, {
+                    type: "doughnut",
+                    data: {
+                        labels: allocationData.labels,
+                        datasets: [{ data: allocationData.values }],
+                    },
+                    options: {
+                        responsive: true,
+                        plugins: {
+                            legend: { position: "bottom" },
+                            tooltip: {
+                                callbacks: {
+                                    label(ctx) {
+                                        const v = ctx.parsed || 0;
+                                        return `${ctx.label}: ${v.toFixed(2)}%`;
+                                    },
                                 },
                             },
                         },
                     },
-                },
-            });
+                });
+            } catch {
+                revealFallback(section, fallbackSelector);
+            }
         }
 
         if (timeseriesData && timeseriesCanvas) {
-            new Chart(timeseriesCanvas, {
-                type: "line",
-                data: {
-                    labels: timeseriesData.labels,
-                    datasets: [
-                        {
-                            data: timeseriesData.values,
-                            fill: false,
-                            tension: 0.25,
-                        },
-                    ],
-                },
-                options: {
-                    responsive: true,
-                    plugins: { legend: { display: false } },
-                    scales: {
-                        x: {
-                            ticks: {
-                                maxRotation: 0,
-                                autoSkip: true,
-                                maxTicksLimit: 8,
+            try {
+                new Chart(timeseriesCanvas, {
+                    type: "line",
+                    data: {
+                        labels: timeseriesData.labels,
+                        datasets: [
+                            {
+                                data: timeseriesData.values,
+                                fill: false,
+                                tension: 0.25,
+                            },
+                        ],
+                    },
+                    options: {
+                        responsive: true,
+                        plugins: { legend: { display: false } },
+                        scales: {
+                            x: {
+                                ticks: {
+                                    maxRotation: 0,
+                                    autoSkip: true,
+                                    maxTicksLimit: 8,
+                                },
                             },
                         },
                     },
-                },
-            });
+                });
+            } catch {
+                revealFallback(section, fallbackSelector);
+            }
         }
     });
 
@@ -289,13 +349,22 @@ document.addEventListener("DOMContentLoaded", function () {
     document
         .querySelectorAll(".cashflow-comparison-charts")
         .forEach((section) => {
+            const fallbackSelector = ".cashflow-comparison-chart-fallback";
+            if (!isChartAvailable()) {
+                revealFallback(section, fallbackSelector);
+                return;
+            }
             const comparisonRaw = section.dataset.cashflowComparison;
-            if (!comparisonRaw) return;
+            if (!comparisonRaw) {
+                revealFallback(section, fallbackSelector);
+                return;
+            }
 
             let comparisonData;
             try {
                 comparisonData = JSON.parse(comparisonRaw);
             } catch {
+                revealFallback(section, fallbackSelector);
                 return;
             }
 
@@ -304,31 +373,41 @@ document.addEventListener("DOMContentLoaded", function () {
             );
 
             if (comparisonData && comparisonCanvas) {
-                new Chart(comparisonCanvas, {
-                    type: "bar",
-                    data: {
-                        labels: comparisonData.labels,
-                        datasets: [
-                            {
-                                label: comparisonData.base_label || "Base",
-                                data: comparisonData.base,
-                            },
-                            {
-                                label:
-                                    comparisonData.compare_label || "Compare",
-                                data: comparisonData.compare,
-                            },
-                        ],
-                    },
-                    options: {
-                        responsive: true,
-                        plugins: { legend: { position: "bottom" } },
-                        scales: {
-                            x: { ticks: { maxRotation: 0, autoSkip: true } },
-                            y: { beginAtZero: true },
+                try {
+                    new Chart(comparisonCanvas, {
+                        type: "bar",
+                        data: {
+                            labels: comparisonData.labels,
+                            datasets: [
+                                {
+                                    label: comparisonData.base_label || "Base",
+                                    data: comparisonData.base,
+                                },
+                                {
+                                    label:
+                                        comparisonData.compare_label ||
+                                        "Compare",
+                                    data: comparisonData.compare,
+                                },
+                            ],
                         },
-                    },
-                });
+                        options: {
+                            responsive: true,
+                            plugins: { legend: { position: "bottom" } },
+                            scales: {
+                                x: {
+                                    ticks: {
+                                        maxRotation: 0,
+                                        autoSkip: true,
+                                    },
+                                },
+                                y: { beginAtZero: true },
+                            },
+                        },
+                    });
+                } catch {
+                    revealFallback(section, fallbackSelector);
+                }
             }
         });
 
@@ -336,13 +415,22 @@ document.addEventListener("DOMContentLoaded", function () {
     // Dividend charts
     // -------------------------
     document.querySelectorAll(".dividend-charts").forEach((section) => {
+        const fallbackSelector = ".dividend-chart-fallback";
+        if (!isChartAvailable()) {
+            revealFallback(section, fallbackSelector);
+            return;
+        }
         const allocationRaw = section.dataset.dividendAllocation;
-        if (!allocationRaw) return;
+        if (!allocationRaw) {
+            revealFallback(section, fallbackSelector);
+            return;
+        }
 
         let allocationData;
         try {
             allocationData = JSON.parse(allocationRaw);
         } catch {
+            revealFallback(section, fallbackSelector);
             return;
         }
 
@@ -351,27 +439,31 @@ document.addEventListener("DOMContentLoaded", function () {
         );
 
         if (allocationData && allocationCanvas) {
-            new Chart(allocationCanvas, {
-                type: "doughnut",
-                data: {
-                    labels: allocationData.labels,
-                    datasets: [{ data: allocationData.values }],
-                },
-                options: {
-                    responsive: true,
-                    plugins: {
-                        legend: { position: "bottom" },
-                        tooltip: {
-                            callbacks: {
-                                label(ctx) {
-                                    const v = ctx.parsed || 0;
-                                    return `${ctx.label}: ${v.toFixed(2)}%`;
+            try {
+                new Chart(allocationCanvas, {
+                    type: "doughnut",
+                    data: {
+                        labels: allocationData.labels,
+                        datasets: [{ data: allocationData.values }],
+                    },
+                    options: {
+                        responsive: true,
+                        plugins: {
+                            legend: { position: "bottom" },
+                            tooltip: {
+                                callbacks: {
+                                    label(ctx) {
+                                        const v = ctx.parsed || 0;
+                                        return `${ctx.label}: ${v.toFixed(2)}%`;
+                                    },
                                 },
                             },
                         },
                     },
-                },
-            });
+                });
+            } catch {
+                revealFallback(section, fallbackSelector);
+            }
         }
     });
 

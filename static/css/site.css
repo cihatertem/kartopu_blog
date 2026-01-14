@@ -871,6 +871,10 @@ select:focus {
   margin-bottom: 1rem;
 }
 
+.is-hidden {
+  display: none;
+}
+
 .is-website {
   position: absolute;
   left: -10000px;
