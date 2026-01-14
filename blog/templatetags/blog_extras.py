@@ -158,7 +158,7 @@ def _render_portfolio_charts_html(snapshot) -> str:
     allocation_json = escape(json.dumps(allocation, cls=DjangoJSONEncoder))
     timeseries_json = escape(json.dumps(timeseries, cls=DjangoJSONEncoder))
 
-    return f"""
+    return """
 <section class="chart-section portfolio-charts" data-portfolio-allocation="{allocation_json}" data-portfolio-timeseries="{timeseries_json}">
   <div class="chart-fallback portfolio-chart-fallback is-hidden">
     Grafikler yüklenemedi. (Tarayıcı eklentisi / ağ politikası / CSP engelliyor olabilir.)
