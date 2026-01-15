@@ -765,8 +765,48 @@ def _render_dividend_summary_html(snapshot) -> str:
         for item in payment_items
     )
 
+    cards = "\n".join(
+        """
+      <div class="dividend-summary-card">
+        <div class="dividend-summary-card__header">{asset}</div>
+        <div class="dividend-summary-card__row">
+          <span>Ödeme Tarihi</span>
+          <strong>{payment_date}</strong>
+        </div>
+        <div class="dividend-summary-card__row">
+          <span>Hisse Başına Net Temettü</span>
+          <strong>{per_share}</strong>
+        </div>
+        <div class="dividend-summary-card__row">
+          <span>Ödeme Günü Temettü Verimi</span>
+          <strong>{yield_payment}</strong>
+        </div>
+        <div class="dividend-summary-card__row">
+          <span>Ortalama Maliyet Temettü Verimi</span>
+          <strong>{yield_average}</strong>
+        </div>
+        <div class="dividend-summary-card__row dividend-summary-card__row--total">
+          <span>Toplam Net Temettü</span>
+          <strong>{total}</strong>
+        </div>
+      </div>
+        """.format(
+            asset=escape(item.asset.name),
+            payment_date=escape(str(item.payment_date)),
+            per_share=_format_currency(item.per_share_net_amount, snapshot.currency),
+            yield_payment=escape(
+                f"{float((item.dividend_yield_on_payment_price or 0) * 100):.2f}%"
+            ),
+            yield_average=escape(
+                f"{float((item.dividend_yield_on_average_cost or 0) * 100):.2f}%"
+            ),
+            total=_format_currency(item.total_net_amount, snapshot.currency),
+        )
+        for item in payment_items
+    )
+
     table_html = f"""
-    <div class="table-scroll">
+    <div class="table-scroll dividend-summary__table">
       <table class="data-table data-table--wide">
         <thead>
           <tr>
@@ -788,11 +828,19 @@ def _render_dividend_summary_html(snapshot) -> str:
     html = f"""
 <section class="dividend-summary">
   <h3>Bu yazının temettü özeti</h3>
+  <div class="summary-card dividend-summary__meta-card">
+    <p class="summary-meta"><strong>Yıl:</strong> {year}</p>
+    <p class="summary-meta summary-meta--spaced"><strong>Para Birimi:</strong> {currency}</p>
+    <p class="summary-meta summary-meta--tight"><strong>Toplam Temettü:</strong> {total_amount}</p>
+  </div>
   <div class="summary-card">
     <p class="summary-meta"><strong>Yıl:</strong> {year}</p>
     <p class="summary-meta summary-meta--spaced"><strong>Para Birimi:</strong> {currency}</p>
     <p class="summary-meta summary-meta--tight"><strong>Toplam Temettü:</strong> {total_amount}</p>
     {table_html}
+  </div>
+  <div class="dividend-summary__cards">
+    {cards}
   </div>
 </section>
 """

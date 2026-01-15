@@ -844,6 +844,58 @@ select:focus {
   box-shadow: var(--shadow-soft);
 }
 
+.dividend-summary__meta-card {
+  display: none;
+}
+
+.dividend-summary__cards {
+  display: none;
+  gap: 0.75rem;
+}
+
+.dividend-summary-card {
+  border: 1px solid var(--color-border);
+  border-radius: 14px;
+  padding: 0.85rem 1rem;
+  background: var(--color-surface);
+  box-shadow: var(--shadow-soft);
+  display: grid;
+  gap: 0.5rem;
+}
+
+.dividend-summary-card__header {
+  font-weight: 700;
+  font-size: 1.05rem;
+  color: var(--color-text);
+}
+
+.dividend-summary-card__row {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  border-bottom: 1px solid #eef1f6;
+  padding-bottom: 0.35rem;
+  font-size: 0.95rem;
+}
+
+.dividend-summary-card__row:last-child {
+  border-bottom: none;
+  padding-bottom: 0;
+}
+
+.dividend-summary-card__row span {
+  color: var(--color-muted);
+}
+
+.dividend-summary-card__row strong {
+  color: var(--color-text);
+  font-weight: 600;
+}
+
+.dividend-summary-card__row--total strong {
+  font-size: 1.05rem;
+}
+
 .summary-meta {
   margin: 0 0 0.25rem;
   color: var(--color-text);
@@ -913,7 +965,7 @@ select:focus {
 
 .chart-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(375px, 1fr));
+  /*grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));*/
   gap: 1rem;
 }
 
@@ -980,6 +1032,30 @@ select:focus {
 
   .home-hero {
     grid-template-columns: 1fr;
+  }
+
+  .dividend-summary__meta-card {
+    display: block;
+  }
+
+  .dividend-summary .summary-meta {
+    display: none;
+  }
+
+  .dividend-summary__meta-card .summary-meta {
+    display: block;
+  }
+
+  .dividend-summary__table {
+    display: none;
+  }
+
+  .dividend-summary > .summary-card:not(.dividend-summary__meta-card) {
+    display: none;
+  }
+
+  .dividend-summary__cards {
+    display: grid;
   }
 }
 
