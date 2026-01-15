@@ -15,6 +15,7 @@ from core.mixins import TimeStampedModelMixin, UUIDModelMixin
 META_TITLE_SUFFIX = " | Kartopu Blog"
 SEO_TITLE_MAX_LENGTH = 45
 SEO_DESCRIPTION_MAX_LENGTH = 160
+KARTOPU_MONEY_BASE_URL = "https://kartopu.money"
 
 
 class Category(
@@ -251,6 +252,9 @@ class BlogPost(
         # slug otomatik üret
         if not self.slug:
             self.slug = slugify(self.title)
+
+        if not self.canonical_url:
+            self.canonical_url = KARTOPU_MONEY_BASE_URL + self.slug
 
         if self.status == self.Status.PUBLISHED and self.published_at is None:
             from django.utils import timezone

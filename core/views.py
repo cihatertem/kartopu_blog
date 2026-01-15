@@ -1,3 +1,5 @@
+from __future__ import print_function
+
 from django.contrib import messages
 from django.shortcuts import redirect, render
 from django.utils.text import slugify
@@ -5,7 +7,13 @@ from django.views.decorators.http import require_http_methods
 from django_ratelimit.decorators import ratelimit
 
 from blog.models import BlogPost, Category
-from core.helpers import client_ip_key, get_client_ip
+from core.helpers import (
+    CAPTCHA_SESSION_KEY,
+    _generate_captcha,
+    captcha_is_valid,
+    client_ip_key,
+    get_client_ip,
+)
 from core.models import AboutPage
 
 from .forms import ContactForm
@@ -80,6 +88,14 @@ def contact_view(request):
             )
             return redirect("core:contact")
 
+        if not captcha_is_valid(request):
+            messages.error(
+                request, "Toplam alanı boş ya da hatalı. Lütfen tekrar deneyin."
+            )
+            return redirect("core:contact")
+
+        request.session.pop(CAPTCHA_SESSION_KEY, None)
+
         if form.is_valid():
             contact_message = form.save(commit=False)
 
@@ -101,9 +117,13 @@ def contact_view(request):
 
         messages.error(request, "Lütfen form alanlarını kontrol edin.")
 
+    num_one, num_two = _generate_captcha(request)
+
     context = {
         "active_nav": "contact",
         "form": form,
+        "num1": num_one,
+        "num2": num_two,
     }
 
     return render(request, "core/contact.html", context)

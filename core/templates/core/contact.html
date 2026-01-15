@@ -23,7 +23,7 @@
 
   <section class="summary-card">
     <h2>Mesaj gönder</h2>
-    <form class="comment-form" method="post" action="{% url 'core:contact' %}">
+    <form class="comment-form" method="post">
       {% csrf_token %}
       <div class="comment-form__field is-website">
         <label for="contact-website">Website</label>
@@ -93,7 +93,13 @@
           Kalan karakter: <span id="contact-message-counter">3000</span>
         </div>
       </div>
-
+      <div class="comment-form__field captcha">
+        <label for="captcha" class="captcha-question"
+          ><span class="num1">{{ num1 }}</span> +
+          <span class="num2">{{ num2 }}</span> =
+        </label>
+        <input type="number" id="captcha" name="captcha" class="input-field" placeholder="Toplam ?" required />
+      </div>
       <button class="input-field button--primary" type="submit">
         Gönder
       </button>

@@ -79,7 +79,7 @@ class User(  # pyright: ignore[reportIncompatibleVariableOverride]
 ):
     username = None
     first_name = models.CharField(max_length=30)
-    last_name = models.CharField(max_length=30, blank=True, null=True)
+    last_name = models.CharField(max_length=30, blank=True)
     email = models.EmailField(unique=True)
     bio = models.TextField(blank=True)
     website = models.URLField(blank=True)
@@ -123,9 +123,6 @@ class User(  # pyright: ignore[reportIncompatibleVariableOverride]
 
     @property
     def full_name(self) -> str:
-        if self.last_name is None:
-            return self.first_name.title() or ""
-
         return self.get_full_name().title()
 
     def _resize_avatar(self) -> None:
