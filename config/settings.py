@@ -301,7 +301,7 @@ if not DEBUG:
     SECURE_CONTENT_TYPE_NOSNIFF = True
     SECURE_REFERRER_POLICY = "strict-origin-when-cross-origin"
     SECURE_CROSS_ORIGIN_OPENER_POLICY = (
-        "same-origin"  # allauth sorun çıkartabiliyor, dikkat
+        "same-origin"  # allauth sorun çıkartabiliyor, dikkat.
     )
 
     if USE_TRAEFIK_SECURITY_HEADERS:
