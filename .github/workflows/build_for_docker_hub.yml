@@ -1,31 +1,39 @@
 name: Docker Build and Push
 
 on:
-  push:
-    branches:
-      - main
+    push:
+        branches:
+            - main
+    workflow_run:
+        workflows:
+            - Merge dev into main
+        types:
+            - completed
 
 jobs:
-  build-and-push:
-    runs-on: ubuntu-24.04
+    build-and-push:
+        if: ${{ github.event_name == 'push' || github.event.workflow_run.conclusion == 'success' }}
+        runs-on: ubuntu-24.04
 
-    env:
-      DOCKERHUB_USER: ${{ secrets.DOCKERHUB_USER }}
-      DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v3
-      - name: Set Docker image tag (with Short SHA)
-        run: echo "IMAGE_TAG=${GITHUB_SHA::7}" >> $GITHUB_ENV
+        env:
+            DOCKERHUB_USER: ${{ secrets.DOCKERHUB_USER }}
+            DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
+        steps:
+            - name: Checkout repository
+              uses: actions/checkout@v3
+              with:
+                  ref: main
+            - name: Set Docker image tag (with Short SHA)
+              run: echo "IMAGE_TAG=${GITHUB_SHA::7}" >> $GITHUB_ENV
 
-      - name: Login to Docker Hub
-        run: docker login --username "$DOCKERHUB_USER" --password "$DOCKERHUB_TOKEN"
+            - name: Login to Docker Hub
+              run: docker login --username "$DOCKERHUB_USER" --password "$DOCKERHUB_TOKEN"
 
-      - name: Build Docker image
-        run: |
-          docker build --target prod -t ndhakara/kartopu_blog:${{ env.IMAGE_TAG }} -t ndhakara/kartopu_blog:latest .
+            - name: Build Docker image
+              run: |
+                  docker build --target prod -t ndhakara/kartopu_blog:${{ env.IMAGE_TAG }} -t ndhakara/kartopu_blog:latest .
 
-      - name: Push Docker image
-        run: |
-          docker push ndhakara/kartopu_blog:${{ env.IMAGE_TAG }}
-          docker push ndhakara/kartopu_blog:latest
+            - name: Push Docker image
+              run: |
+                  docker push ndhakara/kartopu_blog:${{ env.IMAGE_TAG }}
+                  docker push ndhakara/kartopu_blog:latest
