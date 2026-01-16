@@ -28,3 +28,4 @@ pgdata/
 git_oncesi_notlar.md
 yol_haritasi.md
 docker-compose.prod.yml
+codex.patch

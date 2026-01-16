@@ -209,7 +209,7 @@ else:
 AUTH_USER_MODEL = "accounts.User"
 
 SITE_ID = 1
-SITE_NAME = os.getenv("SITE_NAME", "Kartopu Blog")
+SITE_NAME = os.getenv("SITE_NAME", "Kartopu Money")
 SITE_BASE_URL = os.getenv("SITE_BASE_URL", "http://localhost:9002")
 
 AUTHENTICATION_BACKENDS = [
@@ -301,7 +301,7 @@ if not DEBUG:
     SECURE_CONTENT_TYPE_NOSNIFF = True
     SECURE_REFERRER_POLICY = "strict-origin-when-cross-origin"
     SECURE_CROSS_ORIGIN_OPENER_POLICY = (
-        "same-origin"  # allauth sorun çıkartabiliyor, dikkat
+        "same-origin"  # allauth sorun çıkartabiliyor, dikkat.
     )
 
     if USE_TRAEFIK_SECURITY_HEADERS:
