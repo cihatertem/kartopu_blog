@@ -34,6 +34,7 @@ urlpatterns = [
     path("", include("core.urls", namespace="core")),
     path("portfolio/", include("portfolio.urls", namespace="portfolio")),
     path("blog/", include("blog.urls", namespace="blog")),
+    path("newsletter/", include("newsletter.urls", namespace="newsletter")),
     path("authors/", include("accounts.urls", namespace="accounts")),
     path("comments/", include("comments.urls", namespace="comments")),
     path(

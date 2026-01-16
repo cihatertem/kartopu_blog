@@ -1,0 +1,10 @@
+Merhaba,
+
+{{ site_name }} newsletter aboneliğinizi tamamlamak için aşağıdaki bağlantıya tıklayın:
+
+{{ confirm_url }}
+
+Eğer bu isteği siz yapmadıysanız, bu e-postayı yok sayabilirsiniz.
+
+Aboneliğinizi istediğiniz zaman iptal edebilirsiniz:
+{{ unsubscribe_url }}

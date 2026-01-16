@@ -67,6 +67,7 @@ INSTALLED_APPS = [
     "core.apps.CoreConfig",
     "accounts.apps.AccountsConfig",
     "blog.apps.BlogConfig",
+    "newsletter.apps.NewsletterConfig",
     "portfolio.apps.PortfolioConfig",
     "comments.apps.CommentsConfig",
 ]
@@ -208,6 +209,8 @@ else:
 AUTH_USER_MODEL = "accounts.User"
 
 SITE_ID = 1
+SITE_NAME = os.getenv("SITE_NAME", "Kartopu Blog")
+SITE_BASE_URL = os.getenv("SITE_BASE_URL", "http://localhost:9002")
 
 AUTHENTICATION_BACKENDS = [
     "django.contrib.auth.backends.ModelBackend",
@@ -245,6 +248,20 @@ SOCIALACCOUNT_PROVIDERS = {
 
 # ImageKit settings
 IMAGEKIT_CACHEFILE_DIR = "cache"
+
+# Email (Gmail SMTP)
+EMAIL_BACKEND = "django.core.mail.backends.smtp.EmailBackend"
+EMAIL_HOST = os.getenv("EMAIL_HOST", "smtp.gmail.com")
+EMAIL_PORT = int(os.getenv("EMAIL_PORT", "587"))
+EMAIL_USE_TLS = os.getenv("EMAIL_USE_TLS", "1") == "1"
+EMAIL_HOST_USER = get_swarm_secret_for_psg("KARTOPU_SMTP_USER", "")
+EMAIL_HOST_PASSWORD = get_swarm_secret_for_psg("KARTOPU_SMTP_PASSWORD", "")
+DEFAULT_FROM_EMAIL = os.getenv(
+    "DEFAULT_FROM_EMAIL", EMAIL_HOST_USER or "no-reply@kartopu.money"
+)
+EMAIL_TIMEOUT = int(os.getenv("EMAIL_TIMEOUT", "10"))
+
+NEWSLETTER_TOKEN_MAX_AGE = int(os.getenv("NEWSLETTER_TOKEN_MAX_AGE", "604800"))
 
 # gunicorn 2+ workers ratelimit issue
 # "python manage.py createcachetable ratelimit_cache" run at prod once

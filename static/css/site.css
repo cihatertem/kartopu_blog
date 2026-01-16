@@ -331,6 +331,21 @@ hr {
   gap: 0.5rem;
 }
 
+.newsletter-widget__text {
+  margin: 0 0 0.75rem;
+  color: var(--color-muted);
+  font-size: 0.95rem;
+}
+
+.newsletter-widget__actions {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.newsletter-widget__actions .button {
+  flex: 1;
+}
+
 .sidebar-item.is-active > a {
   font-weight: 600;
   color: var(--color-primary-dark);

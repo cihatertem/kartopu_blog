@@ -1,0 +1,7 @@
+Merhaba,
+
+{{ site_name }} newsletter aboneliğinizi iptal etmek için aşağıdaki bağlantıya tıklayın:
+
+{{ unsubscribe_url }}
+
+Eğer bu isteği siz yapmadıysanız, bu e-postayı yok sayabilirsiniz.

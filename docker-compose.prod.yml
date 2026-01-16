@@ -61,8 +61,8 @@ services:
             - ./environments/kartopublog_environment.txt
         environment:
             DJANGO_SECRET: /run/secrets/kartopu-secret-key
-            EMAIL_HOST_USER: /run/secrets/email-user
-            EMAIL_HOST_PASSWORD: /run/secrets/email-pass
+            KARTOPU_SMTP_USER: /run/secrets/kartopu-email-user
+            KARTOPU_SMTP_PASSWORD: /run/secrets/kartopu-email-pass
             POSTGRES_USER: /run/secrets/postgres-username
             POSTGRES_PASSWORD: /run/secrets/postgres-password
             AWS_ACCESS_KEY_ID: /run/secrets/aws-kartopu-consumer-access
@@ -70,8 +70,9 @@ services:
             UV_CACHE_DIR: /tmp/uv-cache
         secrets:
             - kartopu-secret-key
-            - email-pass
-            - email-user
+            - kartopu-email-pass
+            - kartopu-email-user
+            - default-from-email
             - postgres-username
             - postgres-password
             - aws-kartopu-consumer-access
@@ -101,9 +102,11 @@ networks:
 secrets:
     kartopu-secret-key:
         external: true
-    email-pass:
+    kartopu-email-pass:
         external: true
-    email-user:
+    kartopu-email-user:
+        external: true
+    default-from-email:
         external: true
     postgres-username:
         external: true

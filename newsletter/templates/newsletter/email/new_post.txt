@@ -1,0 +1,12 @@
+Merhaba,
+
+Yeni yazımız yayında: {{ post.title }}
+
+{{ post_url }}
+
+{% if post.excerpt %}Özet:
+{{ post.excerpt }}
+{% endif %}
+
+Aboneliğinizi iptal etmek için:
+{{ unsubscribe_url }}

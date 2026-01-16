@@ -1,0 +1,13 @@
+<!doctype html>
+<html lang="tr">
+  <body>
+    <p>Merhaba,</p>
+    <p><strong>{{ announcement.subject }}</strong></p>
+    <p>{{ announcement.body|linebreaksbr }}</p>
+    <hr />
+    <p style="font-size: 0.9rem; color: #555;">
+      Aboneliğinizi iptal etmek için <a href="{{ unsubscribe_url }}">buraya</a>
+      tıklayın.
+    </p>
+  </body>
+</html>

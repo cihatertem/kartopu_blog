@@ -1,0 +1,16 @@
+<!doctype html>
+<html lang="tr">
+  <body>
+    <p>Merhaba,</p>
+    <p>Yeni yazımız yayında: <strong>{{ post.title }}</strong></p>
+    <p><a href="{{ post_url }}">Yazıyı oku</a></p>
+    {% if post.excerpt %}
+      <p><em>{{ post.excerpt }}</em></p>
+    {% endif %}
+    <hr />
+    <p style="font-size: 0.9rem; color: #555;">
+      Aboneliğinizi iptal etmek için <a href="{{ unsubscribe_url }}">buraya</a>
+      tıklayın.
+    </p>
+  </body>
+</html>

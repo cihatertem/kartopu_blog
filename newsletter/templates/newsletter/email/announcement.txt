@@ -1,0 +1,8 @@
+Merhaba,
+
+{{ announcement.subject }}
+
+{{ announcement.body }}
+
+Aboneliğinizi iptal etmek için:
+{{ unsubscribe_url }}

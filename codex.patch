@@ -1,0 +1,1165 @@
+diff --git a/config/settings.py b/config/settings.py
+index 203eb3cd4162d9ce72136f2a7f18ae3fb9528251..1415ffcc98a38b6f5d1e919e9268e2368ad6b39b 100644
+--- a/config/settings.py
++++ b/config/settings.py
+@@ -45,50 +45,51 @@ GOOGLE_ANALYTICS_ID = os.getenv("GOOGLE_ANALYTICS_ID", "")
+ # Application definition
+ 
+ INSTALLED_APPS = [
+     "django.contrib.admin",
+     "django.contrib.auth",
+     "django.contrib.contenttypes",
+     "django.contrib.sessions",
+     "django.contrib.messages",
+     "django.contrib.staticfiles",
+     "django.contrib.postgres",  # postgres full text search
+     "django.contrib.sitemaps",
+     "django.contrib.sites",
+     # third party apps
+     "django_cleanup.apps.CleanupConfig",
+     "imagekit",
+     "allauth",
+     "allauth.account",
+     "allauth.socialaccount",
+     "allauth.socialaccount.providers.google",
+     "allauth.socialaccount.providers.twitter_oauth2",
+     "allauth.socialaccount.providers.openid_connect",
+     # project apps
+     "core.apps.CoreConfig",
+     "accounts.apps.AccountsConfig",
+     "blog.apps.BlogConfig",
++    "newsletter.apps.NewsletterConfig",
+     "portfolio.apps.PortfolioConfig",
+     "comments.apps.CommentsConfig",
+ ]
+ 
+ MIDDLEWARE = [
+     "core.middlewares.TrustedProxyMiddleware",
+     "core.middlewares.HealthCheckMiddleware",
+     "django.middleware.security.SecurityMiddleware",
+     "django.contrib.sessions.middleware.SessionMiddleware",
+     "django.middleware.locale.LocaleMiddleware",
+     "django.middleware.common.CommonMiddleware",
+     "django.middleware.csrf.CsrfViewMiddleware",
+     "django.contrib.auth.middleware.AuthenticationMiddleware",
+     "allauth.account.middleware.AccountMiddleware",  # allauth middleware
+     "django.contrib.messages.middleware.MessageMiddleware",
+     "django.middleware.clickjacking.XFrameOptionsMiddleware",
+ ]
+ 
+ ROOT_URLCONF = "config.urls"
+ 
+ TEMPLATES = [
+     {
+         "BACKEND": "django.template.backends.django.DjangoTemplates",
+         "DIRS": [BASE_DIR / "templates"],
+         "APP_DIRS": True,
+@@ -186,88 +187,104 @@ if USE_S3:
+     AWS_S3_OBJECT_PARAMETERS = {"CacheControl": "max-age=86400"}
+     AWS_LOCATION_STATIC = os.getenv("AWS_LOCATION_STATIC", "static")
+     AWS_LOCATION_MEDIA = os.getenv("AWS_LOCATION_MEDIA", "media")
+ 
+     STORAGES = {
+         "default": {
+             "BACKEND": "storages.backends.s3.S3Storage",
+             "OPTIONS": {"location": AWS_LOCATION_MEDIA},
+         },
+         "staticfiles": {
+             "BACKEND": "storages.backends.s3.S3Storage",
+             "OPTIONS": {"location": AWS_LOCATION_STATIC},
+         },
+     }
+ 
+     s3_domain = AWS_S3_CUSTOM_DOMAIN or f"{AWS_STORAGE_BUCKET_NAME}.s3.amazonaws.com"
+     s3_base_url = f"https://{s3_domain}".rstrip("/")
+     STATIC_URL = f"{s3_base_url}/{AWS_LOCATION_STATIC}/"
+     MEDIA_URL = f"{s3_base_url}/{AWS_LOCATION_MEDIA}/"
+ else:
+     MEDIA_ROOT = BASE_DIR / "media"
+ 
+ AUTH_USER_MODEL = "accounts.User"
+ 
+ SITE_ID = 1
++SITE_NAME = os.getenv("SITE_NAME", "Kartopu Blog")
++SITE_BASE_URL = os.getenv("SITE_BASE_URL", "http://localhost:9002")
+ 
+ AUTHENTICATION_BACKENDS = [
+     "django.contrib.auth.backends.ModelBackend",
+     "allauth.account.auth_backends.AuthenticationBackend",
+ ]
+ ACCOUNT_USER_MODEL_USERNAME_FIELD = None
+ 
+ ACCOUNT_ALLOW_REGISTRATION = False
+ ACCOUNT_LOGIN_METHODS = {"email"}
+ ACCOUNT_SIGNUP_FIELDS = [""]
+ 
+ ACCOUNT_EMAIL_VERIFICATION = "none"
+ 
+ SOCIALACCOUNT_EMAIL_REQUIRED = False
+ SOCIALACCOUNT_EMAIL_VERIFICATION = "none"
+ SOCIALACCOUNT_EMAIL_AUTHENTICATION = True
+ SOCIALACCOUNT_EMAIL_AUTHENTICATION_AUTO_CONNECT = True
+ 
+ SILENCED_SYSTEM_CHECKS = ["account.W001"]
+ 
+ SOCIALACCOUNT_LOGIN_ON_GET = True
+ ACCOUNT_LOGOUT_ON_GET = False
+ 
+ LOGIN_REDIRECT_URL = "/"
+ ACCOUNT_SIGNUP_REDIRECT_URL = "/"
+ 
+ SOCIALACCOUNT_PROVIDERS = {
+     "google": {
+         "SCOPE": ["profile", "email"],
+         "AUTH_PARAMS": {
+             "access_type": "online",
+         },
+     },
+ }
+ 
+ # ImageKit settings
+ IMAGEKIT_CACHEFILE_DIR = "cache"
+ 
++# Email (Gmail SMTP)
++EMAIL_BACKEND = "django.core.mail.backends.smtp.EmailBackend"
++EMAIL_HOST = os.getenv("EMAIL_HOST", "smtp.gmail.com")
++EMAIL_PORT = int(os.getenv("EMAIL_PORT", "587"))
++EMAIL_USE_TLS = os.getenv("EMAIL_USE_TLS", "1") == "1"
++EMAIL_HOST_USER = get_swarm_secret_for_psg("GMAIL_SMTP_USER", "")
++EMAIL_HOST_PASSWORD = get_swarm_secret_for_psg("GMAIL_SMTP_PASSWORD", "")
++DEFAULT_FROM_EMAIL = os.getenv(
++    "DEFAULT_FROM_EMAIL", EMAIL_HOST_USER or "no-reply@kartopu.blog"
++)
++EMAIL_TIMEOUT = int(os.getenv("EMAIL_TIMEOUT", "10"))
++
++NEWSLETTER_TOKEN_MAX_AGE = int(os.getenv("NEWSLETTER_TOKEN_MAX_AGE", "604800"))
++
+ # gunicorn 2+ workers ratelimit issue
+ # "python manage.py createcachetable ratelimit_cache" run at prod once
+ CACHES = {
+     "default": {
+         "BACKEND": "django.core.cache.backends.db.DatabaseCache",
+         "LOCATION": "ratelimit_cache",
+     }
+ }
+ 
+ RATELIMIT_USE_CACHE = "default"
+ 
+ if not DEBUG:
+     _raw = os.getenv("TRUSTED_PROXY_NETS", "")
+     TRUSTED_PROXY_NETS = []
+ 
+     USE_TRAEFIK_SECURITY_HEADERS = (
+         os.getenv("DJANGO_USE_TRAEFIK_SECURITY_HEADERS", "1") == "1"
+     )
+ 
+     if _raw:
+         for net in _raw.split(","):
+             TRUSTED_PROXY_NETS.append(ipaddress.ip_network(net.strip()))
+ 
+     CSRF_COOKIE_SECURE = True
+     CSRF_COOKIE_HTTPONLY = True
+diff --git a/config/urls.py b/config/urls.py
+index f275d5e811bfe4df27f287e3e0fd31da9e27998d..ecbcb5fe70446b2d7653da65f69f3bd9e76cd0fd 100644
+--- a/config/urls.py
++++ b/config/urls.py
+@@ -12,50 +12,51 @@ from accounts import views as account_views
+ from core.sitemaps import sitemaps
+ 
+ SITEMAP_CACHE_SECONDS = 60 * 60  # 1 hour
+ 
+ urlpatterns = [
+     path(os.getenv("ADMIN_ADDRESS") or "admin/", admin.site.urls),
+     path(
+         "accounts/login/",
+         account_views.disabled_account_view,
+         name="account_login_disabled",
+     ),
+     path(
+         "accounts/signup/",
+         account_views.disabled_account_view,
+         name="account_signup_disabled",
+     ),
+     path(
+         "accounts/email/",
+         account_views.disabled_account_view,
+         name="account_email_disabled",
+     ),
+     path("accounts/", include("allauth.urls")),
+     path("", include("core.urls", namespace="core")),
+     path("portfolio/", include("portfolio.urls", namespace="portfolio")),
+     path("blog/", include("blog.urls", namespace="blog")),
++    path("newsletter/", include("newsletter.urls", namespace="newsletter")),
+     path("authors/", include("accounts.urls", namespace="accounts")),
+     path("comments/", include("comments.urls", namespace="comments")),
+     path(
+         "robots.txt",
+         TemplateView.as_view(template_name="robots.txt", content_type="text/plain"),
+         name="robots",
+     ),
+ ]
+ 
+ urlpatterns += [
+     path(
+         "sitemap.xml",
+         cache_page(SITEMAP_CACHE_SECONDS)(index),
+         {"sitemaps": sitemaps},
+         name="django.contrib.sitemaps.views.index",
+     ),
+     path(
+         "sitemap-<section>.xml",
+         cache_page(SITEMAP_CACHE_SECONDS)(sitemap),
+         {"sitemaps": sitemaps},
+         name="django.contrib.sitemaps.views.sitemap",
+     ),
+ ]
+ 
+ if settings.DEBUG:
+diff --git a/newsletter/__init__.py b/newsletter/__init__.py
+new file mode 100644
+index 0000000000000000000000000000000000000000..8e4c3a0601a5d1ffdf139f62498045c1feff60fc
+--- /dev/null
++++ b/newsletter/__init__.py
+@@ -0,0 +1 @@
++"""Newsletter app."""
+diff --git a/newsletter/admin.py b/newsletter/admin.py
+new file mode 100644
+index 0000000000000000000000000000000000000000..33923d1514de2cc97880f49667d0206c49e8a5b0
+--- /dev/null
++++ b/newsletter/admin.py
+@@ -0,0 +1,43 @@
++from django.contrib import admin, messages
++from django.utils import timezone
++
++from .models import Announcement, AnnouncementStatus, Subscriber, SubscriberStatus
++from .services import send_announcement
++
++
++@admin.action(description="Seçili abonelikleri iptal et")
++def mark_unsubscribed(modeladmin, request, queryset):
++    updated = queryset.update(
++        status=SubscriberStatus.UNSUBSCRIBED, unsubscribed_at=timezone.now()
++    )
++    messages.success(request, f"{updated} abonelik iptal edildi.")
++
++
++@admin.register(Subscriber)
++class SubscriberAdmin(admin.ModelAdmin):
++    list_display = ("email", "status", "subscribed_at", "confirmed_at", "unsubscribed_at")
++    list_filter = ("status", "created_at")
++    search_fields = ("email",)
++    actions = (mark_unsubscribed,)
++    ordering = ("-created_at",)
++
++
++@admin.action(description="Seçili duyuruyu abonelere gönder")
++def send_selected_announcements(modeladmin, request, queryset):
++    for announcement in queryset:
++        if announcement.status == AnnouncementStatus.SENT:
++            messages.warning(request, f"{announcement.subject} zaten gönderildi.")
++            continue
++        sent_count = send_announcement(announcement)
++        messages.success(
++            request,
++            f"{announcement.subject} duyurusu {sent_count} aboneye gönderildi.",
++        )
++
++
++@admin.register(Announcement)
++class AnnouncementAdmin(admin.ModelAdmin):
++    list_display = ("subject", "status", "sent_at", "created_at")
++    list_filter = ("status", "created_at")
++    search_fields = ("subject",)
++    actions = (send_selected_announcements,)
+diff --git a/newsletter/apps.py b/newsletter/apps.py
+new file mode 100644
+index 0000000000000000000000000000000000000000..4af78348d637a303d2b7598a21a976a6c9e337b1
+--- /dev/null
++++ b/newsletter/apps.py
+@@ -0,0 +1,9 @@
++from django.apps import AppConfig
++
++
++class NewsletterConfig(AppConfig):
++    default_auto_field = "django.db.models.BigAutoField"
++    name = "newsletter"
++
++    def ready(self) -> None:
++        from . import signals  # noqa: F401
+diff --git a/newsletter/forms.py b/newsletter/forms.py
+new file mode 100644
+index 0000000000000000000000000000000000000000..8a881ce44ae02e9e8a357b63ce838cb6f0b98541
+--- /dev/null
++++ b/newsletter/forms.py
+@@ -0,0 +1,8 @@
++from django import forms
++
++
++class NewsletterEmailForm(forms.Form):
++    email = forms.EmailField(
++        label="E-posta",
++        widget=forms.EmailInput(attrs={"placeholder": "E-posta adresiniz"}),
++    )
+diff --git a/newsletter/migrations/0001_initial.py b/newsletter/migrations/0001_initial.py
+new file mode 100644
+index 0000000000000000000000000000000000000000..391f652eb97b0553159e2b62db11e7f3e3be002c
+--- /dev/null
++++ b/newsletter/migrations/0001_initial.py
+@@ -0,0 +1,115 @@
++import uuid
++
++from django.db import migrations, models
++import django.db.models.deletion
++
++
++class Migration(migrations.Migration):
++    initial = True
++
++    dependencies = [
++        ("blog", "0020_alter_blogpost_content"),
++    ]
++
++    operations = [
++        migrations.CreateModel(
++            name="Announcement",
++            fields=[
++                (
++                    "id",
++                    models.UUIDField(
++                        default=uuid.uuid4,
++                        editable=False,
++                        help_text="A unique identifier for the record.",
++                        primary_key=True,
++                        serialize=False,
++                    ),
++                ),
++                ("created_at", models.DateTimeField(auto_now_add=True)),
++                ("updated_at", models.DateTimeField(auto_now=True)),
++                ("subject", models.CharField(max_length=200)),
++                ("body", models.TextField()),
++                (
++                    "status",
++                    models.CharField(
++                        choices=[("draft", "Taslak"), ("sent", "Gönderildi")],
++                        default="draft",
++                        max_length=20,
++                    ),
++                ),
++                ("sent_at", models.DateTimeField(blank=True, null=True)),
++            ],
++            options={
++                "verbose_name": "Özel Duyuru",
++                "verbose_name_plural": "Özel Duyurular",
++            },
++        ),
++        migrations.CreateModel(
++            name="Subscriber",
++            fields=[
++                (
++                    "id",
++                    models.UUIDField(
++                        default=uuid.uuid4,
++                        editable=False,
++                        help_text="A unique identifier for the record.",
++                        primary_key=True,
++                        serialize=False,
++                    ),
++                ),
++                ("created_at", models.DateTimeField(auto_now_add=True)),
++                ("updated_at", models.DateTimeField(auto_now=True)),
++                ("email", models.EmailField(max_length=254, unique=True)),
++                (
++                    "status",
++                    models.CharField(
++                        choices=[
++                            ("pending", "Onay Bekliyor"),
++                            ("active", "Aktif"),
++                            ("unsubscribed", "İptal Edildi"),
++                        ],
++                        default="pending",
++                        max_length=20,
++                    ),
++                ),
++                ("subscribed_at", models.DateTimeField(blank=True, null=True)),
++                ("confirmed_at", models.DateTimeField(blank=True, null=True)),
++                ("unsubscribed_at", models.DateTimeField(blank=True, null=True)),
++            ],
++            options={
++                "verbose_name": "Newsletter Abonesi",
++                "verbose_name_plural": "Newsletter Aboneleri",
++                "ordering": ("-created_at",),
++            },
++        ),
++        migrations.CreateModel(
++            name="BlogPostNotification",
++            fields=[
++                (
++                    "id",
++                    models.UUIDField(
++                        default=uuid.uuid4,
++                        editable=False,
++                        help_text="A unique identifier for the record.",
++                        primary_key=True,
++                        serialize=False,
++                    ),
++                ),
++                ("created_at", models.DateTimeField(auto_now_add=True)),
++                ("updated_at", models.DateTimeField(auto_now=True)),
++                ("sent_at", models.DateTimeField()),
++                (
++                    "post",
++                    models.OneToOneField(
++                        on_delete=django.db.models.deletion.CASCADE,
++                        related_name="newsletter_notification",
++                        to="blog.blogpost",
++                    ),
++                ),
++            ],
++            options={
++                "verbose_name": "Yazı Bildirimi",
++                "verbose_name_plural": "Yazı Bildirimleri",
++            },
++        ),
++    ]
+diff --git a/newsletter/migrations/__init__.py b/newsletter/migrations/__init__.py
+new file mode 100644
+index 0000000000000000000000000000000000000000..e69de29bb2d1d6434b8b29ae775ad8c2e48c5391
+diff --git a/newsletter/models.py b/newsletter/models.py
+new file mode 100644
+index 0000000000000000000000000000000000000000..5400aa0530b012a55dc774686247be3f5790b9a9
+--- /dev/null
++++ b/newsletter/models.py
+@@ -0,0 +1,95 @@
++from django.db import models
++from django.utils import timezone
++
++from core.mixins import TimeStampedModelMixin, UUIDModelMixin
++
++
++class SubscriberStatus(models.TextChoices):
++    PENDING = "pending", "Onay Bekliyor"
++    ACTIVE = "active", "Aktif"
++    UNSUBSCRIBED = "unsubscribed", "İptal Edildi"
++
++
++class Subscriber(UUIDModelMixin, TimeStampedModelMixin):
++    email = models.EmailField(unique=True)
++    status = models.CharField(
++        max_length=20,
++        choices=SubscriberStatus.choices,
++        default=SubscriberStatus.PENDING,
++    )
++    subscribed_at = models.DateTimeField(blank=True, null=True)
++    confirmed_at = models.DateTimeField(blank=True, null=True)
++    unsubscribed_at = models.DateTimeField(blank=True, null=True)
++
++    class Meta:  # pyright: ignore[reportIncompatibleVariableOverride]
++        ordering = ("-created_at",)
++        verbose_name = "Newsletter Abonesi"
++        verbose_name_plural = "Newsletter Aboneleri"
++
++    def __str__(self) -> str:
++        return self.email
++
++    def mark_pending(self) -> None:
++        self.status = SubscriberStatus.PENDING
++        self.subscribed_at = timezone.now()
++        self.unsubscribed_at = None
++        self.save(update_fields=["status", "subscribed_at", "unsubscribed_at"])
++
++    def activate(self) -> None:
++        self.status = SubscriberStatus.ACTIVE
++        if self.subscribed_at is None:
++            self.subscribed_at = timezone.now()
++        self.confirmed_at = timezone.now()
++        self.unsubscribed_at = None
++        self.save(
++            update_fields=[
++                "status",
++                "subscribed_at",
++                "confirmed_at",
++                "unsubscribed_at",
++            ]
++        )
++
++    def unsubscribe(self) -> None:
++        self.status = SubscriberStatus.UNSUBSCRIBED
++        self.unsubscribed_at = timezone.now()
++        self.save(update_fields=["status", "unsubscribed_at"])
++
++
++class BlogPostNotification(UUIDModelMixin, TimeStampedModelMixin):
++    post = models.OneToOneField(
++        "blog.BlogPost",
++        on_delete=models.CASCADE,
++        related_name="newsletter_notification",
++    )
++    sent_at = models.DateTimeField()
++
++    class Meta:  # pyright: ignore[reportIncompatibleVariableOverride]
++        verbose_name = "Yazı Bildirimi"
++        verbose_name_plural = "Yazı Bildirimleri"
++
++    def __str__(self) -> str:
++        return f"{self.post.title}"  # pyright: ignore[reportAttributeAccessIssue]
++
++
++class AnnouncementStatus(models.TextChoices):
++    DRAFT = "draft", "Taslak"
++    SENT = "sent", "Gönderildi"
++
++
++class Announcement(UUIDModelMixin, TimeStampedModelMixin):
++    subject = models.CharField(max_length=200)
++    body = models.TextField()
++    status = models.CharField(
++        max_length=20,
++        choices=AnnouncementStatus.choices,
++        default=AnnouncementStatus.DRAFT,
++    )
++    sent_at = models.DateTimeField(blank=True, null=True)
++
++    class Meta:  # pyright: ignore[reportIncompatibleVariableOverride]
++        verbose_name = "Özel Duyuru"
++        verbose_name_plural = "Özel Duyurular"
++
++    def __str__(self) -> str:
++        return self.subject
+diff --git a/newsletter/services.py b/newsletter/services.py
+new file mode 100644
+index 0000000000000000000000000000000000000000..722f2f177a45e113210649e9321ee8a5288a545c
+--- /dev/null
++++ b/newsletter/services.py
+@@ -0,0 +1,131 @@
++from __future__ import annotations
++
++from django.conf import settings
++from django.core.mail import EmailMultiAlternatives
++from django.template.loader import render_to_string
++from django.urls import reverse
++from django.utils import timezone
++from django.utils.encoding import iri_to_uri
++
++from django.contrib.sites.models import Site
++
++from .models import Announcement, AnnouncementStatus, Subscriber, SubscriberStatus
++from .tokens import make_token
++
++
++def get_site_base_url() -> str:
++    base_url = getattr(settings, "SITE_BASE_URL", "").strip()
++    if base_url:
++        return base_url.rstrip("/")
++    current_site = Site.objects.get_current()
++    protocol = "https" if not settings.DEBUG else "http"
++    return f"{protocol}://{current_site.domain}".rstrip("/")
++
++
++def build_absolute_uri(path: str) -> str:
++    base_url = get_site_base_url()
++    return f"{base_url}/{path.lstrip('/')}"
++
++
++def build_unsubscribe_url(email: str) -> str:
++    token = make_token(email, "unsubscribe")
++    path = reverse("newsletter:confirm", kwargs={"token": token})
++    return build_absolute_uri(path)
++
++
++def build_subscribe_confirm_url(email: str) -> str:
++    token = make_token(email, "subscribe")
++    path = reverse("newsletter:confirm", kwargs={"token": token})
++    return build_absolute_uri(path)
++
++
++def send_templated_email(
++    *,
++    subject: str,
++    to_email: str,
++    template_prefix: str,
++    context: dict,
++) -> None:
++    text_body = render_to_string(f"newsletter/email/{template_prefix}.txt", context)
++    html_body = render_to_string(f"newsletter/email/{template_prefix}.html", context)
++
++    message = EmailMultiAlternatives(
++        subject=subject,
++        body=text_body,
++        from_email=settings.DEFAULT_FROM_EMAIL,
++        to=[to_email],
++    )
++    message.attach_alternative(html_body, "text/html")
++    message.send(fail_silently=False)
++
++
++def send_subscribe_confirmation(email: str) -> None:
++    confirm_url = build_subscribe_confirm_url(email)
++    unsubscribe_url = build_unsubscribe_url(email)
++    context = {
++        "confirm_url": iri_to_uri(confirm_url),
++        "unsubscribe_url": iri_to_uri(unsubscribe_url),
++        "site_name": getattr(settings, "SITE_NAME", "Kartopu Blog"),
++    }
++    send_templated_email(
++        subject="Newsletter aboneliğinizi onaylayın",
++        to_email=email,
++        template_prefix="subscribe_confirm",
++        context=context,
++    )
++
++
++def send_unsubscribe_confirmation(email: str) -> None:
++    unsubscribe_url = build_unsubscribe_url(email)
++    context = {
++        "unsubscribe_url": iri_to_uri(unsubscribe_url),
++        "site_name": getattr(settings, "SITE_NAME", "Kartopu Blog"),
++    }
++    send_templated_email(
++        subject="Newsletter abonelik iptal isteği",
++        to_email=email,
++        template_prefix="unsubscribe_confirm",
++        context=context,
++    )
++
++
++def send_post_published_email(post) -> None:
++    subscribers = Subscriber.objects.filter(status=SubscriberStatus.ACTIVE)
++    post_url = build_absolute_uri(post.get_absolute_url())
++    for subscriber in subscribers:
++        unsubscribe_url = build_unsubscribe_url(subscriber.email)
++        context = {
++            "post": post,
++            "post_url": iri_to_uri(post_url),
++            "unsubscribe_url": iri_to_uri(unsubscribe_url),
++            "site_name": getattr(settings, "SITE_NAME", "Kartopu Blog"),
++        }
++        send_templated_email(
++            subject=f"Yeni yazı yayında: {post.title}",
++            to_email=subscriber.email,
++            template_prefix="new_post",
++            context=context,
++        )
++
++
++def send_announcement(announcement: Announcement) -> int:
++    subscribers = Subscriber.objects.filter(status=SubscriberStatus.ACTIVE)
++    sent_count = 0
++    for subscriber in subscribers:
++        unsubscribe_url = build_unsubscribe_url(subscriber.email)
++        context = {
++            "announcement": announcement,
++            "unsubscribe_url": iri_to_uri(unsubscribe_url),
++            "site_name": getattr(settings, "SITE_NAME", "Kartopu Blog"),
++        }
++        send_templated_email(
++            subject=announcement.subject,
++            to_email=subscriber.email,
++            template_prefix="announcement",
++            context=context,
++        )
++        sent_count += 1
++    announcement.status = AnnouncementStatus.SENT
++    announcement.sent_at = timezone.now()
++    announcement.save(update_fields=["status", "sent_at"])
++    return sent_count
+diff --git a/newsletter/signals.py b/newsletter/signals.py
+new file mode 100644
+index 0000000000000000000000000000000000000000..b97b10389b67d837a1f720e16ea3b3aafd7decde
+--- /dev/null
++++ b/newsletter/signals.py
+@@ -0,0 +1,24 @@
++from django.db import transaction
++from django.db.models.signals import post_save
++from django.dispatch import receiver
++from django.utils import timezone
++
++from blog.models import BlogPost
++
++from .models import BlogPostNotification
++from .services import send_post_published_email
++
++
++@receiver(post_save, sender=BlogPost)
++def notify_subscribers_on_publish(sender, instance: BlogPost, **kwargs):
++    if instance.status != BlogPost.Status.PUBLISHED or not instance.published_at:
++        return
++
++    if BlogPostNotification.objects.filter(post=instance).exists():
++        return
++
++    def _send_notification():
++        send_post_published_email(instance)
++        BlogPostNotification.objects.create(post=instance, sent_at=timezone.now())
++
++    transaction.on_commit(_send_notification)
+diff --git a/newsletter/templates/newsletter/confirm_result.html b/newsletter/templates/newsletter/confirm_result.html
+new file mode 100644
+index 0000000000000000000000000000000000000000..96768378fce13466517d45cd69a143c0028e295d
+--- /dev/null
++++ b/newsletter/templates/newsletter/confirm_result.html
+@@ -0,0 +1,11 @@
++{% extends "base.html" %}
++
++{% block title %}{{ title }} | Kartopu Blog{% endblock %}
++
++{% block content %}
++  <section class="content-card">
++    <h1>{{ title }}</h1>
++    <p>{{ message }}</p>
++    <a class="button button--primary" href="/">Anasayfaya dön</a>
++  </section>
++{% endblock %}
+diff --git a/newsletter/templates/newsletter/email/announcement.html b/newsletter/templates/newsletter/email/announcement.html
+new file mode 100644
+index 0000000000000000000000000000000000000000..4098edf974b30fcd83f380a739792ec3a9546047
+--- /dev/null
++++ b/newsletter/templates/newsletter/email/announcement.html
+@@ -0,0 +1,13 @@
++<!doctype html>
++<html lang="tr">
++  <body>
++    <p>Merhaba,</p>
++    <p><strong>{{ announcement.subject }}</strong></p>
++    <p>{{ announcement.body|linebreaksbr }}</p>
++    <hr />
++    <p style="font-size: 0.9rem; color: #555;">
++      Aboneliğinizi iptal etmek için <a href="{{ unsubscribe_url }}">buraya</a>
++      tıklayın.
++    </p>
++  </body>
++</html>
+diff --git a/newsletter/templates/newsletter/email/announcement.txt b/newsletter/templates/newsletter/email/announcement.txt
+new file mode 100644
+index 0000000000000000000000000000000000000000..71339e4c2f3b382f74db8222e4c52b48c58aa6ea
+--- /dev/null
++++ b/newsletter/templates/newsletter/email/announcement.txt
+@@ -0,0 +1,8 @@
++Merhaba,
++
++{{ announcement.subject }}
++
++{{ announcement.body }}
++
++Aboneliğinizi iptal etmek için:
++{{ unsubscribe_url }}
+diff --git a/newsletter/templates/newsletter/email/new_post.html b/newsletter/templates/newsletter/email/new_post.html
+new file mode 100644
+index 0000000000000000000000000000000000000000..2610755eec765a6bfadf82f60a418b2515d953a0
+--- /dev/null
++++ b/newsletter/templates/newsletter/email/new_post.html
+@@ -0,0 +1,16 @@
++<!doctype html>
++<html lang="tr">
++  <body>
++    <p>Merhaba,</p>
++    <p>Yeni yazımız yayında: <strong>{{ post.title }}</strong></p>
++    <p><a href="{{ post_url }}">Yazıyı oku</a></p>
++    {% if post.excerpt %}
++      <p><em>{{ post.excerpt }}</em></p>
++    {% endif %}
++    <hr />
++    <p style="font-size: 0.9rem; color: #555;">
++      Aboneliğinizi iptal etmek için <a href="{{ unsubscribe_url }}">buraya</a>
++      tıklayın.
++    </p>
++  </body>
++</html>
+diff --git a/newsletter/templates/newsletter/email/new_post.txt b/newsletter/templates/newsletter/email/new_post.txt
+new file mode 100644
+index 0000000000000000000000000000000000000000..338d0f32835d0f495a556851a9558f5a14c02834
+--- /dev/null
++++ b/newsletter/templates/newsletter/email/new_post.txt
+@@ -0,0 +1,12 @@
++Merhaba,
++
++Yeni yazımız yayında: {{ post.title }}
++
++{{ post_url }}
++
++{% if post.excerpt %}Özet:
++{{ post.excerpt }}
++{% endif %}
++
++Aboneliğinizi iptal etmek için:
++{{ unsubscribe_url }}
+diff --git a/newsletter/templates/newsletter/email/subscribe_confirm.html b/newsletter/templates/newsletter/email/subscribe_confirm.html
+new file mode 100644
+index 0000000000000000000000000000000000000000..7530450e1e39661d2509f9e44372db00d142e7e4
+--- /dev/null
++++ b/newsletter/templates/newsletter/email/subscribe_confirm.html
+@@ -0,0 +1,17 @@
++<!doctype html>
++<html lang="tr">
++  <body>
++    <p>Merhaba,</p>
++    <p>
++      <strong>{{ site_name }}</strong> newsletter aboneliğinizi tamamlamak için
++      aşağıdaki bağlantıya tıklayın:
++    </p>
++    <p><a href="{{ confirm_url }}">Aboneliği Onayla</a></p>
++    <p>Eğer bu isteği siz yapmadıysanız, bu e-postayı yok sayabilirsiniz.</p>
++    <hr />
++    <p style="font-size: 0.9rem; color: #555;">
++      Aboneliğinizi istediğiniz zaman iptal edebilirsiniz:
++      <a href="{{ unsubscribe_url }}">Abonelikten çık</a>
++    </p>
++  </body>
++</html>
+diff --git a/newsletter/templates/newsletter/email/subscribe_confirm.txt b/newsletter/templates/newsletter/email/subscribe_confirm.txt
+new file mode 100644
+index 0000000000000000000000000000000000000000..a8231bc7a8297afb803ad02a481b0c2ad95bf5e8
+--- /dev/null
++++ b/newsletter/templates/newsletter/email/subscribe_confirm.txt
+@@ -0,0 +1,10 @@
++Merhaba,
++
++{{ site_name }} newsletter aboneliğinizi tamamlamak için aşağıdaki bağlantıya tıklayın:
++
++{{ confirm_url }}
++
++Eğer bu isteği siz yapmadıysanız, bu e-postayı yok sayabilirsiniz.
++
++Aboneliğinizi istediğiniz zaman iptal edebilirsiniz:
++{{ unsubscribe_url }}
+diff --git a/newsletter/templates/newsletter/email/unsubscribe_confirm.html b/newsletter/templates/newsletter/email/unsubscribe_confirm.html
+new file mode 100644
+index 0000000000000000000000000000000000000000..108812b8bbde8e20a42767b013c418cbfe1dd552
+--- /dev/null
++++ b/newsletter/templates/newsletter/email/unsubscribe_confirm.html
+@@ -0,0 +1,12 @@
++<!doctype html>
++<html lang="tr">
++  <body>
++    <p>Merhaba,</p>
++    <p>
++      <strong>{{ site_name }}</strong> newsletter aboneliğinizi iptal etmek için
++      aşağıdaki bağlantıya tıklayın:
++    </p>
++    <p><a href="{{ unsubscribe_url }}">Aboneliği İptal Et</a></p>
++    <p>Eğer bu isteği siz yapmadıysanız, bu e-postayı yok sayabilirsiniz.</p>
++  </body>
++</html>
+diff --git a/newsletter/templates/newsletter/email/unsubscribe_confirm.txt b/newsletter/templates/newsletter/email/unsubscribe_confirm.txt
+new file mode 100644
+index 0000000000000000000000000000000000000000..c3205b35fe6a7aebdd8001040f55aee04269d6fc
+--- /dev/null
++++ b/newsletter/templates/newsletter/email/unsubscribe_confirm.txt
+@@ -0,0 +1,7 @@
++Merhaba,
++
++{{ site_name }} newsletter aboneliğinizi iptal etmek için aşağıdaki bağlantıya tıklayın:
++
++{{ unsubscribe_url }}
++
++Eğer bu isteği siz yapmadıysanız, bu e-postayı yok sayabilirsiniz.
+diff --git a/newsletter/tokens.py b/newsletter/tokens.py
+new file mode 100644
+index 0000000000000000000000000000000000000000..8025d60ccb159be496550520ecc99636069cee3a
+--- /dev/null
++++ b/newsletter/tokens.py
+@@ -0,0 +1,13 @@
++from django.core import signing
++
++
++TOKEN_SALT = "newsletter"
++
++
++def make_token(email: str, action: str) -> str:
++    payload = {"email": email, "action": action}
++    return signing.dumps(payload, salt=TOKEN_SALT)
++
++
++def parse_token(token: str, max_age: int):
++    return signing.loads(token, salt=TOKEN_SALT, max_age=max_age)
+diff --git a/newsletter/urls.py b/newsletter/urls.py
+new file mode 100644
+index 0000000000000000000000000000000000000000..6b0363371e819335fbec86b678cbe4072bff64c9
+--- /dev/null
++++ b/newsletter/urls.py
+@@ -0,0 +1,11 @@
++from django.urls import path
++
++from . import views
++
++app_name = "newsletter"
++
++urlpatterns = [
++    path("subscribe/", views.subscribe_request, name="subscribe_request"),
++    path("unsubscribe/", views.unsubscribe_request, name="unsubscribe_request"),
++    path("confirm/<str:token>/", views.confirm_subscription, name="confirm"),
++]
+diff --git a/newsletter/views.py b/newsletter/views.py
+new file mode 100644
+index 0000000000000000000000000000000000000000..fab34c16edd94ca5488cfa1697ed8568a87cfbc4
+--- /dev/null
++++ b/newsletter/views.py
+@@ -0,0 +1,124 @@
++from django.conf import settings
++from django.contrib import messages
++from django.core import signing
++from django.shortcuts import redirect, render
++from django.utils import timezone
++
++from .forms import NewsletterEmailForm
++from .models import Subscriber, SubscriberStatus
++from .services import send_subscribe_confirmation, send_unsubscribe_confirmation
++from .tokens import parse_token
++
++
++def subscribe_request(request):
++    if request.method != "POST":
++        return redirect("/")
++
++    form = NewsletterEmailForm(request.POST)
++    if not form.is_valid():
++        messages.error(request, "Lütfen geçerli bir e-posta adresi girin.")
++        return redirect(request.META.get("HTTP_REFERER", "/"))
++
++    email = form.cleaned_data["email"].lower()
++    subscriber, created = Subscriber.objects.get_or_create(email=email)
++
++    if subscriber.status == SubscriberStatus.ACTIVE:
++        messages.info(request, "Bu adres zaten aktif bir abonelikte.")
++        return redirect(request.META.get("HTTP_REFERER", "/"))
++
++    if created or subscriber.status != SubscriberStatus.PENDING:
++        subscriber.status = SubscriberStatus.PENDING
++        subscriber.subscribed_at = timezone.now()
++        subscriber.unsubscribed_at = None
++        subscriber.save(update_fields=["status", "subscribed_at", "unsubscribed_at"])
++
++    send_subscribe_confirmation(email)
++    messages.success(
++        request,
++        "Aboneliğinizi onaylamak için e-posta gönderildi."
++        " Lütfen gelen kutunuzu kontrol edin.",
++    )
++    return redirect(request.META.get("HTTP_REFERER", "/"))
++
++
++def unsubscribe_request(request):
++    if request.method != "POST":
++        return redirect("/")
++
++    form = NewsletterEmailForm(request.POST)
++    if not form.is_valid():
++        messages.error(request, "Lütfen geçerli bir e-posta adresi girin.")
++        return redirect(request.META.get("HTTP_REFERER", "/"))
++
++    email = form.cleaned_data["email"].lower()
++    subscriber = Subscriber.objects.filter(email=email).first()
++
++    if subscriber:
++        send_unsubscribe_confirmation(email)
++
++    messages.success(
++        request,
++        "Eğer bu e-posta kayıtlıysa iptal onayı gönderildi."
++        " Lütfen gelen kutunuzu kontrol edin.",
++    )
++    return redirect(request.META.get("HTTP_REFERER", "/"))
++
++
++def confirm_subscription(request, token: str):
++    max_age = getattr(settings, "NEWSLETTER_TOKEN_MAX_AGE", 60 * 60 * 24 * 7)
++    try:
++        payload = parse_token(token, max_age=max_age)
++    except signing.SignatureExpired:
++        return render(
++            request,
++            "newsletter/confirm_result.html",
++            {
++                "title": "Link Süresi Doldu",
++                "message": "Onay linkinin süresi dolmuş. Lütfen yeniden deneyin.",
++            },
++            status=400,
++        )
++    except signing.BadSignature:
++        return render(
++            request,
++            "newsletter/confirm_result.html",
++            {
++                "title": "Geçersiz Link",
++                "message": "Onay linki geçersiz. Lütfen yeniden deneyin.",
++            },
++            status=400,
++        )
++
++    email = payload.get("email")
++    action = payload.get("action")
++
++    if not email or action not in {"subscribe", "unsubscribe"}:
++        return render(
++            request,
++            "newsletter/confirm_result.html",
++            {
++                "title": "Geçersiz Talep",
++                "message": "Talep bilgileri eksik veya hatalı.",
++            },
++            status=400,
++        )
++
++    subscriber, _ = Subscriber.objects.get_or_create(email=email)
++
++    if action == "subscribe":
++        subscriber.activate()
++        title = "Abonelik Onaylandı"
++        message = "Newsletter aboneliğiniz başarıyla aktif edildi."
++    else:
++        subscriber.unsubscribe()
++        title = "Abonelik İptal Edildi"
++        message = "Newsletter aboneliğiniz iptal edildi."
++
++    return render(
++        request,
++        "newsletter/confirm_result.html",
++        {
++            "title": title,
++            "message": message,
++        },
++    )
+diff --git a/static/css/site.css b/static/css/site.css
+index 0f2be2f652ab40316c3832ffde2db59a685ada10..c99b6a957df3021477bb7a8779c7c4ab4a64af22 100644
+--- a/static/css/site.css
++++ b/static/css/site.css
+@@ -309,50 +309,65 @@ hr {
+ 
+ .sidebar-post-meta {
+   display: flex;
+   flex-direction: column;
+   gap: 0.15rem;
+   min-width: 0;
+ }
+ 
+ .sidebar-post-title {
+   font-size: 0.95rem;
+   font-weight: 600;
+   color: var(--color-text);
+   line-height: 1.3;
+ }
+ 
+ .sidebar-post-date {
+   font-size: 0.85rem;
+   color: var(--color-muted);
+ }
+ 
+ .sidebar-form {
+   display: grid;
+   gap: 0.5rem;
+ }
+ 
++.newsletter-widget__text {
++  margin: 0 0 0.75rem;
++  color: var(--color-muted);
++  font-size: 0.95rem;
++}
++
++.newsletter-widget__actions {
++  display: flex;
++  gap: 0.5rem;
++}
++
++.newsletter-widget__actions .button {
++  flex: 1;
++}
++
+ .sidebar-item.is-active > a {
+   font-weight: 600;
+   color: var(--color-primary-dark);
+ }
+ 
+ .input-field,
+ textarea,
+ select {
+   width: 100%;
+   padding: 0.6rem 0.75rem;
+   border-radius: 10px;
+   border: 1px solid var(--color-border);
+   font: inherit;
+   background: #fff;
+ }
+ 
+ .input-field:focus,
+ textarea:focus,
+ select:focus {
+   outline: 2px solid var(--color-primary-soft);
+   border-color: var(--color-primary);
+ }
+ 
+ .tag-cloud {
+   display: flex;
+diff --git a/templates/includes/newsletter_widget.html b/templates/includes/newsletter_widget.html
+new file mode 100644
+index 0000000000000000000000000000000000000000..9485fe3154420aebecc14f91eb1577c0371e8ea8
+--- /dev/null
++++ b/templates/includes/newsletter_widget.html
+@@ -0,0 +1,18 @@
++<section class="sidebar-card newsletter-widget">
++  <h3 class="sidebar-title">Newsletter</h3>
++  <p class="newsletter-widget__text">Yeni yazılar ve özel duyurular için e-posta adresinizi bırakın.</p>
++  <form method="post" action="{% url 'newsletter:subscribe_request' %}" class="sidebar-form newsletter-widget__form">
++    {% csrf_token %}
++    <input type="email" name="email" class="input-field" placeholder="E-posta adresiniz" required />
++    <div class="newsletter-widget__actions">
++      <button type="submit" class="button button--primary">Abone Ol</button>
++      <button
++        type="submit"
++        class="button button--ghost"
++        formaction="{% url 'newsletter:unsubscribe_request' %}"
++      >
++        Abonelikten Çık
++      </button>
++    </div>
++  </form>
++</section>
+diff --git a/templates/includes/sidebar.html b/templates/includes/sidebar.html
+index 267ab617f861a16fde4ede687987ecea8d3e5ab4..38929ee4690dbafad19c2ec3b294b57fdfb76752 100644
+--- a/templates/includes/sidebar.html
++++ b/templates/includes/sidebar.html
+@@ -1,44 +1,46 @@
+ {% load static %}
+ 
+ <div class="sidebar">
+   <section class="sidebar-card">
+     <h3 class="sidebar-title">Ara</h3>
+ 
+     <form method="get" action="{% url 'blog:search_results' %}" class="sidebar-form">
+       <input
+         type="search"
+         name="q"
+         placeholder="Blogda ara..."
+         value="{{ q|default:'' }}"
+         class="input-field"
+       />
+     </form>
+   </section>
+ 
+   {% include "includes/goal_widget.html" %}
+ 
++  {% include "includes/newsletter_widget.html" %}
++
+   <!-- Son Yazılar Bölümü -->
+   <section class="sidebar-card">
+     <h3 class="sidebar-title">Son Yazılar</h3>
+ 
+     <ul class="sidebar-post-list">
+       {% for post in nav_recent_posts %}
+         <li class="sidebar-post-item">
+           <a class="sidebar-post-link" href="{{ post.get_absolute_url }}">
+             <span class="sidebar-post-thumb">
+               {% if post.cover_image %}
+                 <img src="{{ post.cover_600.url }}" alt="{{ post.title }}" loading="lazy" />
+               {% else %}
+                 <img src="{% static 'images/home/portfolio-coins.svg' %}" alt="{{ post.title }}" loading="lazy" />
+               {% endif %}
+             </span>
+             <span class="sidebar-post-meta">
+               <span class="sidebar-post-title">{{ post.title }}</span>
+               <span class="sidebar-post-date">{{ post.published_at|date:"d F Y" }}</span>
+             </span>
+           </a>
+         </li>
+       {% empty %}
+         <li>Henüz yazı yok.</li>
+       {% endfor %}
+     </ul>

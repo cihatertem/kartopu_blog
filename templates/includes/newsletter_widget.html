@@ -1,0 +1,18 @@
+<section class="sidebar-card newsletter-widget">
+  <h3 class="sidebar-title">Newsletter</h3>
+  <p class="newsletter-widget__text">Yeni yazılar ve özel duyurular için e-posta adresinizi bırakın.</p>
+  <form method="post" action="{% url 'newsletter:subscribe_request' %}" class="sidebar-form newsletter-widget__form">
+    {% csrf_token %}
+    <input type="email" name="email" class="input-field" placeholder="E-posta adresiniz" required />
+    <div class="newsletter-widget__actions">
+      <button type="submit" class="button button--primary">Abone Ol</button>
+      <button
+        type="submit"
+        class="button button--ghost"
+        formaction="{% url 'newsletter:unsubscribe_request' %}"
+      >
+        Ayrıl
+      </button>
+    </div>
+  </form>
+</section>

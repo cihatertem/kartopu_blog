@@ -1,0 +1,11 @@
+{% extends "base.html" %}
+
+{% block title %}{{ title }} | Kartopu Blog{% endblock %}
+
+{% block content %}
+  <section class="content-card">
+    <h1>{{ title }}</h1>
+    <p>{{ message }}</p>
+    <a class="button button--primary" href="/">Anasayfaya dön</a>
+  </section>
+{% endblock %}
