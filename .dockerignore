@@ -36,6 +36,8 @@ Thumbs.db
 Dockerfile
 docker-compose.yaml
 docker-compose.yml
+docker-compose.prod.yml
+.dockerignore
 
 # Git directories
 .git/
@@ -55,3 +57,7 @@ htmlcov/
 git_oncesi_notlar.md
 yol_haritasi.md
 .venv/
+.env
+.env.*
+README.md
+codex.patch
