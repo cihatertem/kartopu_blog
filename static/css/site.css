@@ -604,6 +604,11 @@ select:focus {
   box-shadow: var(--shadow-soft);
 }
 
+.home-hero__content {
+  position: relative;
+  width: max-content;
+}
+
 .home-hero__eyebrow {
   margin: 0 0 0.5rem;
   color: var(--color-primary-dark);
@@ -1075,6 +1080,11 @@ select:focus {
 
   .home-hero {
     background: url("../images/home/hero_ball.png") bottom / cover no-repeat;
+  }
+
+  .home-hero__content {
+    position: relative;
+    width: 100%;
   }
 
   .home-hero__subtitle {
