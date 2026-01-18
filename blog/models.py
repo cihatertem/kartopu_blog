@@ -385,3 +385,47 @@ class Tag(
 
     def get_absolute_url(self) -> str:
         return reverse("blog:tag_detail", kwargs={"slug": self.slug})
+
+
+class BlogPostReaction(
+    TimeStampedModelMixin,
+):
+    class Reaction(models.TextChoices):
+        ALKIS = "alkis", "Alkış"  # pyright: ignore[reportAssignmentType]
+        ILHAM = "ilham", "İlham"  # pyright: ignore[reportAssignmentType]
+        MERAK = "merak", "Merak"  # pyright: ignore[reportAssignmentType]
+        KALP = "kalp", "Sevgi"  # pyright: ignore[reportAssignmentType]
+        ROKET = "roket", "Gaz"  # pyright: ignore[reportAssignmentType]
+        SURPRIZ = "surpriz", "Şaşkın"  # pyright: ignore[reportAssignmentType]
+        MUTLU = "mutlu", "Mutlu"  # pyright: ignore[reportAssignmentType]
+        DUYGULANDIM = "duygulandim", "Duygulandım"  # pyright: ignore[reportAssignmentType]
+        DUSUNCELI = "dusunceli", "Düşünceli"  # pyright: ignore[reportAssignmentType]
+        HUZUNLU = "huzunlu", "Hüzünlü"  # pyright: ignore[reportAssignmentType]
+        RAHATSIZ = "rahatsiz", "Rahatsız"  # pyright: ignore[reportAssignmentType]
+        KORKU = "korku", "Endişe"  # pyright: ignore[reportAssignmentType]
+
+    post = models.ForeignKey(
+        BlogPost,
+        on_delete=models.CASCADE,
+        related_name="reactions",
+    )
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="blog_post_reactions",
+    )
+    reaction = models.CharField(max_length=20, choices=Reaction.choices)
+
+    class Meta:  # pyright: ignore[reportIncompatibleVariableOverride]
+        verbose_name = "Blog Tepkisi"
+        verbose_name_plural = "Blog Tepkileri"
+        constraints = (
+            models.UniqueConstraint(
+                fields=("post", "user"),
+                name="unique_blog_post_reaction",
+            ),
+        )
+        indexes = (models.Index(fields=("post", "reaction")),)
+
+    def __str__(self) -> str:
+        return f"{self.post.title} - {self.get_reaction_display()}"

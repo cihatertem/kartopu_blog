@@ -36,11 +36,12 @@ document.addEventListener("DOMContentLoaded", function () {
     // -------------------------
     // Social login modal
     // -------------------------
-    const loginButton = document.getElementById("social-login-button");
     const modal = document.getElementById("social-login-modal");
     const closeButton = document.getElementById("close-social-login");
 
-    if (loginButton && modal) {
+    const loginButtons = document.querySelectorAll(".social-login-trigger");
+
+    if (loginButtons.length > 0 && modal) {
         const openModal = () => {
             modal.classList.add("is-open");
             modal.setAttribute("aria-hidden", "false");
@@ -51,7 +52,9 @@ document.addEventListener("DOMContentLoaded", function () {
             modal.setAttribute("aria-hidden", "true");
         };
 
-        loginButton.addEventListener("click", openModal);
+        loginButtons.forEach((button) => {
+            button.addEventListener("click", openModal);
+        });
 
         if (closeButton) {
             closeButton.addEventListener("click", closeModal);
@@ -90,6 +93,122 @@ document.addEventListener("DOMContentLoaded", function () {
                 }, 500);
             });
         });
+    }
+
+    // -------------------------
+    // Post reaction widget
+    // -------------------------
+    const reactionSection = document.querySelector(".reaction-widget");
+    if (reactionSection) {
+        const postId = reactionSection.dataset.postId;
+        const reactionUrl = reactionSection.dataset.reactionUrl;
+        const canReact = reactionSection.dataset.canReact === "true";
+        const buttons = Array.from(
+            reactionSection.querySelectorAll(".reaction-card"),
+        );
+        const note = reactionSection.querySelector(".reaction-widget__note");
+
+        const getCookie = (name) => {
+            const cookies = document.cookie ? document.cookie.split(";") : [];
+            for (const cookie of cookies) {
+                const trimmed = cookie.trim();
+                if (trimmed.startsWith(`${name}=`)) {
+                    return decodeURIComponent(trimmed.slice(name.length + 1));
+                }
+            }
+            return "";
+        };
+
+        const applySelection = (reactionKey) => {
+            buttons.forEach((button) => {
+                const isSelected = button.dataset.reaction === reactionKey;
+                button.classList.toggle("is-selected", isSelected);
+                button.setAttribute(
+                    "aria-pressed",
+                    isSelected ? "true" : "false",
+                );
+            });
+
+            if (note && canReact) {
+                if (reactionKey) {
+                    const activeButton = buttons.find(
+                        (button) => button.dataset.reaction === reactionKey,
+                    );
+                    const label =
+                        activeButton?.querySelector(
+                            ".reaction-card__label",
+                        )?.textContent || "bir";
+                    note.textContent = `Bu yazıda “${label}” tepkisini bıraktın. İstersen değiştirip geri alabilirsin.`;
+                } else {
+                    note.textContent = "Tepkini seçebilirsin.";
+                }
+            }
+        };
+
+        const applyCounts = (counts) => {
+            buttons.forEach((button) => {
+                const countEl = button.querySelector("[data-count]");
+                if (countEl) {
+                    const countValue = counts?.[button.dataset.reaction] ?? 0;
+                    countEl.textContent = String(countValue);
+                }
+            });
+        };
+
+        if (postId && buttons.length > 0) {
+            const initialSelected = reactionSection.dataset.selected || "";
+            applySelection(initialSelected);
+
+            if (!canReact) {
+                buttons.forEach((button) => {
+                    button.disabled = true;
+                    button.classList.add("is-disabled");
+                });
+                return;
+            }
+
+            buttons.forEach((button) => {
+                button.addEventListener("click", async () => {
+                    if (!reactionUrl) return;
+                    const reactionKey = button.dataset.reaction;
+                    if (!reactionKey) return;
+                    const currentSelected =
+                        reactionSection.dataset.selected || "";
+                    const nextReaction =
+                        currentSelected === reactionKey ? "" : reactionKey;
+
+                    try {
+                        const response = await fetch(reactionUrl, {
+                            method: "POST",
+                            headers: {
+                                "Content-Type":
+                                    "application/x-www-form-urlencoded",
+                                "X-CSRFToken": getCookie("csrftoken"),
+                            },
+                            body: new URLSearchParams({
+                                reaction: nextReaction,
+                            }).toString(),
+                            credentials: "same-origin",
+                        });
+
+                        if (!response.ok) {
+                            throw new Error("reaction failed");
+                        }
+
+                        const payload = await response.json();
+                        reactionSection.dataset.selected =
+                            payload.selected || "";
+                        applySelection(payload.selected || "");
+                        applyCounts(payload.counts || {});
+                    } catch (error) {
+                        if (note) {
+                            note.textContent =
+                                "Tepki kaydedilirken bir hata oluştu. Lütfen tekrar deneyin.";
+                        }
+                    }
+                });
+            });
+        }
     }
 
     // -------------------------

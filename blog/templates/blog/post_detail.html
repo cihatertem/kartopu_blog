@@ -69,6 +69,10 @@
   {% endif %}
   <hr />
 
+  <!-- Social Reaction Section -->
+
+{% include "includes/social_reaction.html" %}
+
   <!-- Comments Section -->
   <section>
     <h3>Yorumlar <span>({{ comment_total }})</span> </h3>
@@ -110,7 +114,7 @@
       <p><small>Yorumlar moderasyon sonrası yayınlanır.</small></p>
     {% else %}
       <p>Yorum yapmak için sosyal hesap ile giriş yapmalısın.</p>
-      <button type="button" id="social-login-button" class="button button--primary">Sosyal Hesap ile Giriş Yap</button>
+      <button type="button" id="social-login-button" class="button button--primary social-login-trigger">Sosyal Hesap ile Giriş Yap</button>
       <div
         id="social-login-modal"
         class="modal"

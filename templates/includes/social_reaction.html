@@ -1,0 +1,53 @@
+<section
+  class="reaction-widget"
+  data-post-id="{{ post.id }}"
+  data-reaction-url="{% url 'blog:post_reaction' post.slug %}"
+  data-selected="{{ user_reaction }}"
+  data-can-react="{{ can_react|yesno:'true,false' }}"
+>
+  <div class="reaction-widget__header">
+    <span class="reaction-widget__icon" aria-hidden="true">☺️</span>
+    <div>
+      <h3 class="reaction-widget__title">Bu Makale Sana Ne Hissettirdi?</h3>
+      <p class="reaction-widget__subtitle">Bir tepki seçerek paylaşabilirsin.</p>
+    </div>
+  </div>
+  <div class="reaction-widget__grid" role="list">
+    {% for reaction in reaction_options %}
+      <button
+        class="reaction-card{% if reaction.key == user_reaction %} is-selected{% endif %}{% if not can_react %} is-disabled{% endif %}"
+        type="button"
+        data-reaction="{{ reaction.key }}"
+        role="listitem"
+        {% if not can_react %}disabled{% endif %}
+      >
+        <span class="reaction-card__emoji" aria-hidden="true">{{ reaction.emoji }}</span>
+        <span class="reaction-card__label">{{ reaction.label }}</span>
+        <span class="reaction-card__count" aria-live="polite" data-count>{{ reaction.count }}</span>
+      </button>
+    {% endfor %}
+  </div>
+  <p class="reaction-widget__note" aria-live="polite">
+    {% if can_react %}
+      {% if user_reaction_label %}
+        Bu yazıda “{{ user_reaction_label }}” tepkisini bıraktın. İstersen değiştirip geri alabilirsin.
+      {% else %}
+        Tepkini seçebilirsin.
+      {% endif %}
+    {% else %}
+      {% if requires_social_auth %}
+        Tepki bırakmak için sosyal hesabını bağlamalısın.
+      {% else %}
+        Tepki bırakmak için sosyal hesap ile giriş yapmalısın.
+      {% endif %}
+    {% endif %}
+  </p>
+  {% if not request.user.is_authenticated %}
+    <div class="reaction-widget__actions">
+      <button type="button" class="button button--primary social-login-trigger">
+        Sosyal Hesap ile Giriş Yap
+      </button>
+    </div>
+  {% endif %}
+</section>
+<hr />
