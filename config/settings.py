@@ -72,6 +72,26 @@ INSTALLED_APPS = [
     "comments.apps.CommentsConfig",
 ]
 
+LOGGING = {
+    "version": 1,
+    "disable_existing_loggers": False,
+    "handlers": {
+        "console": {
+            "class": "logging.StreamHandler",
+        }
+    },
+    "loggers": {
+        "allauth": {
+            "handlers": ["console"],
+            "level": "DEBUG",
+        },
+        "allauth.socialaccount": {
+            "handlers": ["console"],
+            "level": "DEBUG",
+        },
+    },
+}
+
 MIDDLEWARE = [
     "core.middlewares.TrustedProxyMiddleware",
     "core.middlewares.HealthCheckMiddleware",
