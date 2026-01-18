@@ -346,6 +346,57 @@ hr {
   flex: 1;
 }
 
+.follow-widget__links {
+  display: flex;
+  flex-wrap: nowrap;
+  gap: 0.75rem;
+}
+
+.follow-widget__link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: inherit;
+  transition:
+    transform 0.2s ease,
+    box-shadow 0.2s ease;
+}
+
+.follow-widget__link:hover,
+.follow-widget__link:focus-visible {
+  text-decoration: none;
+  box-shadow: 0 6px 18px rgba(13, 22, 52, 0.08);
+  transform: translateY(-1px);
+}
+
+.follow-widget__icon {
+  width: 42px;
+  height: 42px;
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  color: var(--color-accent);
+}
+
+.follow-widget__icon svg {
+  width: 20px;
+  height: 20px;
+  display: block;
+}
+
+.follow-widget__icon:hover,
+.follow-widget__icon:focus-visible {
+  color: var(--color-primary);
+}
+
+.follow-widget__icon--mail svg {
+  width: 22px;
+  height: 22px;
+}
+
 .sidebar-item.is-active > a {
   font-weight: 600;
   color: var(--color-primary-dark);
@@ -438,6 +489,67 @@ select:focus {
   border-color: var(--tag-color-5-border);
 }
 
+.share-widget {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.share-widget__title {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 600;
+}
+
+.share-widget__links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+}
+
+.share-widget__link {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  padding: 0.4rem 0.75rem;
+  border-radius: 10px;
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
+  color: inherit;
+  font-size: 0.95rem;
+  font-weight: 600;
+  transition:
+    border-color 0.2s ease,
+    box-shadow 0.2s ease,
+    transform 0.2s ease;
+}
+
+.share-widget__link:hover,
+.share-widget__link:focus-visible {
+  border-color: var(--color-primary);
+  box-shadow: 0 6px 14px rgba(47, 109, 161, 0.12);
+  transform: translateY(-1px);
+  outline: none;
+}
+
+.share-widget__icon {
+  width: 24px;
+  height: 24px;
+  border-radius: 6px;
+  display: grid;
+  place-items: center;
+  font-size: 0.85rem;
+  font-weight: 700;
+  background: #e9eef5;
+  color: #3b5a9a;
+  text-transform: lowercase;
+}
+
+.share-widget__icon--x {
+  background: #1f2937;
+  color: #ffffff;
+  text-transform: none;
+}
+
 .reaction-widget {
   border: 1px solid var(--color-border);
   border-radius: 16px;
@@ -493,7 +605,9 @@ select:focus {
   font: inherit;
   color: inherit;
   cursor: pointer;
-  transition: transform 0.2s ease, box-shadow 0.2s ease,
+  transition:
+    transform 0.2s ease,
+    box-shadow 0.2s ease,
     border-color 0.2s ease;
 }
 

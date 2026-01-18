@@ -1,0 +1,13 @@
+<section class="sidebar-card">
+  <h3 class="sidebar-title">Ara</h3>
+
+  <form method="get" action="{% url 'blog:search_results' %}" class="sidebar-form">
+    <input
+      type="search"
+      name="q"
+      placeholder="Blogda ara..."
+      value="{{ q|default:'' }}"
+      class="input-field"
+    />
+  </form>
+</section>
