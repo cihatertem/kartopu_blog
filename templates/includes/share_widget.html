@@ -1,0 +1,36 @@
+{% with share_url=request.build_absolute_uri %}
+  {% with share_text=post.title|add:" "|add:share_url %}
+    {% with encoded_url=share_url|urlencode %}
+      {% with encoded_text=share_text|urlencode %}
+        <section class="share-widget" aria-label="Bu yazıyı paylaş">
+          <h4 class="share-widget__title">Bunu paylaş:</h4>
+          <div class="share-widget__links" role="list">
+            <a
+              class="share-widget__link"
+              role="listitem"
+              href="https://www.facebook.com/sharer/sharer.php?u={{ encoded_url }}"
+              target="_blank"
+              rel="noopener noreferrer"
+              aria-label="Facebook'ta paylaş"
+            >
+              <span class="share-widget__icon" aria-hidden="true">f</span>
+              <span class="share-widget__label">Facebook</span>
+            </a>
+            <a
+              class="share-widget__link"
+              role="listitem"
+              href="https://x.com/intent/post?text={{ encoded_text }}"
+              target="_blank"
+              rel="noopener noreferrer"
+              aria-label="X'te paylaş"
+            >
+              <span class="share-widget__icon share-widget__icon--x" aria-hidden="true">X</span>
+              <span class="share-widget__label">X</span>
+            </a>
+          </div>
+        </section>
+        <hr />
+      {% endwith %}
+    {% endwith %}
+  {% endwith %}
+{% endwith %}
