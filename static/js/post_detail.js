@@ -164,50 +164,49 @@ document.addEventListener("DOMContentLoaded", function () {
                     button.disabled = true;
                     button.classList.add("is-disabled");
                 });
-                return;
-            }
+            } else {
+                buttons.forEach((button) => {
+                    button.addEventListener("click", async () => {
+                        if (!reactionUrl) return;
+                        const reactionKey = button.dataset.reaction;
+                        if (!reactionKey) return;
+                        const currentSelected =
+                            reactionSection.dataset.selected || "";
+                        const nextReaction =
+                            currentSelected === reactionKey ? "" : reactionKey;
 
-            buttons.forEach((button) => {
-                button.addEventListener("click", async () => {
-                    if (!reactionUrl) return;
-                    const reactionKey = button.dataset.reaction;
-                    if (!reactionKey) return;
-                    const currentSelected =
-                        reactionSection.dataset.selected || "";
-                    const nextReaction =
-                        currentSelected === reactionKey ? "" : reactionKey;
+                        try {
+                            const response = await fetch(reactionUrl, {
+                                method: "POST",
+                                headers: {
+                                    "Content-Type":
+                                        "application/x-www-form-urlencoded",
+                                    "X-CSRFToken": getCookie("csrftoken"),
+                                },
+                                body: new URLSearchParams({
+                                    reaction: nextReaction,
+                                }).toString(),
+                                credentials: "same-origin",
+                            });
 
-                    try {
-                        const response = await fetch(reactionUrl, {
-                            method: "POST",
-                            headers: {
-                                "Content-Type":
-                                    "application/x-www-form-urlencoded",
-                                "X-CSRFToken": getCookie("csrftoken"),
-                            },
-                            body: new URLSearchParams({
-                                reaction: nextReaction,
-                            }).toString(),
-                            credentials: "same-origin",
-                        });
+                            if (!response.ok) {
+                                throw new Error("reaction failed");
+                            }
 
-                        if (!response.ok) {
-                            throw new Error("reaction failed");
+                            const payload = await response.json();
+                            reactionSection.dataset.selected =
+                                payload.selected || "";
+                            applySelection(payload.selected || "");
+                            applyCounts(payload.counts || {});
+                        } catch (error) {
+                            if (note) {
+                                note.textContent =
+                                    "Tepki kaydedilirken bir hata oluştu. Lütfen tekrar deneyin.";
+                            }
                         }
-
-                        const payload = await response.json();
-                        reactionSection.dataset.selected =
-                            payload.selected || "";
-                        applySelection(payload.selected || "");
-                        applyCounts(payload.counts || {});
-                    } catch (error) {
-                        if (note) {
-                            note.textContent =
-                                "Tepki kaydedilirken bir hata oluştu. Lütfen tekrar deneyin.";
-                        }
-                    }
+                    });
                 });
-            });
+            }
         }
     }
 
