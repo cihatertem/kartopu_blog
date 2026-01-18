@@ -346,6 +346,57 @@ hr {
   flex: 1;
 }
 
+.follow-widget__links {
+  display: flex;
+  flex-wrap: nowrap;
+  gap: 0.75rem;
+}
+
+.follow-widget__link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: inherit;
+  transition:
+    transform 0.2s ease,
+    box-shadow 0.2s ease;
+}
+
+.follow-widget__link:hover,
+.follow-widget__link:focus-visible {
+  text-decoration: none;
+  box-shadow: 0 6px 18px rgba(13, 22, 52, 0.08);
+  transform: translateY(-1px);
+}
+
+.follow-widget__icon {
+  width: 42px;
+  height: 42px;
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  color: var(--color-accent);
+}
+
+.follow-widget__icon svg {
+  width: 20px;
+  height: 20px;
+  display: block;
+}
+
+.follow-widget__icon:hover,
+.follow-widget__icon:focus-visible {
+  color: var(--color-primary);
+}
+
+.follow-widget__icon--mail svg {
+  width: 22px;
+  height: 22px;
+}
+
 .sidebar-item.is-active > a {
   font-weight: 600;
   color: var(--color-primary-dark);
@@ -466,7 +517,9 @@ select:focus {
   color: inherit;
   font-size: 0.95rem;
   font-weight: 600;
-  transition: border-color 0.2s ease, box-shadow 0.2s ease,
+  transition:
+    border-color 0.2s ease,
+    box-shadow 0.2s ease,
     transform 0.2s ease;
 }
 
@@ -552,7 +605,9 @@ select:focus {
   font: inherit;
   color: inherit;
   cursor: pointer;
-  transition: transform 0.2s ease, box-shadow 0.2s ease,
+  transition:
+    transform 0.2s ease,
+    box-shadow 0.2s ease,
     border-color 0.2s ease;
 }
 
