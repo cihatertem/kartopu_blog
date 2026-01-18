@@ -19,5 +19,6 @@ urlpatterns = [
     ),
     path("tag/<slug:slug>/", views.tag_detail, name="tag_detail"),
     path("preview/<slug:slug>/", views.post_preview, name="post_preview"),
+    path("<slug:slug>/reaction/", views.post_reaction, name="post_reaction"),
     path("<slug:slug>/", views.post_detail, name="post_detail"),
 ]

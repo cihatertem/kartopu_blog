@@ -438,6 +438,117 @@ select:focus {
   border-color: var(--tag-color-5-border);
 }
 
+.reaction-widget {
+  border: 1px solid var(--color-border);
+  border-radius: 16px;
+  padding: 1.5rem;
+  background: linear-gradient(135deg, #ffffff 0%, #f5f9ff 45%, #f9fbf7 100%);
+  box-shadow: var(--shadow-soft);
+  display: grid;
+  gap: 1.25rem;
+}
+
+.reaction-widget__header {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.reaction-widget__icon {
+  width: 42px;
+  height: 42px;
+  border-radius: 12px;
+  display: grid;
+  place-items: center;
+  background: var(--color-primary-soft);
+  font-size: 1.4rem;
+}
+
+.reaction-widget__title {
+  margin: 0;
+  font-size: 1.2rem;
+}
+
+.reaction-widget__subtitle {
+  margin: 0.15rem 0 0;
+  color: var(--color-muted);
+  font-size: 0.95rem;
+}
+
+.reaction-widget__grid {
+  display: grid;
+  gap: 0.75rem;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.reaction-card {
+  border: 1px solid var(--color-border);
+  border-radius: 16px;
+  background: var(--color-surface);
+  padding: 0.9rem 0.75rem;
+  display: grid;
+  gap: 0.35rem;
+  align-items: center;
+  justify-items: center;
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+  transition: transform 0.2s ease, box-shadow 0.2s ease,
+    border-color 0.2s ease;
+}
+
+.reaction-card__emoji {
+  font-size: 1.8rem;
+}
+
+.reaction-card__label {
+  font-weight: 600;
+  font-size: 0.95rem;
+}
+
+.reaction-card__count {
+  font-weight: 700;
+  color: var(--color-primary-dark);
+}
+
+.reaction-card:hover,
+.reaction-card:focus-visible {
+  border-color: var(--color-primary);
+  box-shadow: 0 8px 18px rgba(47, 109, 161, 0.12);
+  transform: translateY(-2px);
+  outline: none;
+}
+
+.reaction-card.is-selected {
+  border-color: var(--color-accent);
+  background: var(--color-accent-soft);
+  box-shadow: 0 10px 22px rgba(124, 175, 74, 0.18);
+}
+
+.reaction-card.is-disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
+}
+
+.reaction-widget__note {
+  margin: 0;
+  color: var(--color-muted);
+  font-size: 0.9rem;
+}
+
+.reaction-widget__actions {
+  display: flex;
+  justify-content: flex-start;
+}
+
+@media (min-width: 720px) {
+  .reaction-widget__grid {
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+  }
+}
+
 .alert {
   padding: 0.75rem 1rem;
   border-radius: 12px;

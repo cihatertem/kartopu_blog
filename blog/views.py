@@ -7,9 +7,11 @@ from django.contrib.postgres.search import SearchQuery, SearchRank, SearchVector
 from django.core.exceptions import PermissionDenied
 from django.core.paginator import Paginator
 from django.db.models import Count, F, Prefetch
+from django.http import JsonResponse
 from django.shortcuts import get_object_or_404, render
 from django.urls import reverse
 from django.utils.formats import date_format
+from django.views.decorators.http import require_POST
 
 from comments.forms import CommentForm
 from comments.models import MAX_COMMENT_LENGTH, Comment
@@ -24,10 +26,89 @@ from portfolio.models import (
     PortfolioSnapshot,
 )
 
-from .models import BlogPost, Category, Tag
+from .models import BlogPost, BlogPostReaction, Category, Tag
 
 COMMENT_PAGE_SIZE = 10
 POST_PAGE_SIZE = 10
+
+REACTION_OPTIONS = [
+    {"key": BlogPostReaction.Reaction.ALKIS.value, "label": "Alkış", "emoji": "👏"},
+    {"key": BlogPostReaction.Reaction.ILHAM.value, "label": "İlham", "emoji": "🌱"},
+    {"key": BlogPostReaction.Reaction.MERAK.value, "label": "Merak", "emoji": "🧐"},
+    {"key": BlogPostReaction.Reaction.KALP.value, "label": "Sevgi", "emoji": "❤️"},
+    {"key": BlogPostReaction.Reaction.ROKET.value, "label": "Gaz", "emoji": "🚀"},
+    {
+        "key": BlogPostReaction.Reaction.SURPRIZ.value,
+        "label": "Şaşkın",
+        "emoji": "😮",
+    },
+    {"key": BlogPostReaction.Reaction.MUTLU.value, "label": "Mutlu", "emoji": "😄"},
+    {
+        "key": BlogPostReaction.Reaction.DUYGULANDIM.value,
+        "label": "Duygulandım",
+        "emoji": "🥲",
+    },
+    {
+        "key": BlogPostReaction.Reaction.DUSUNCELI.value,
+        "label": "Düşünceli",
+        "emoji": "😐",
+    },
+    {
+        "key": BlogPostReaction.Reaction.HUZUNLU.value,
+        "label": "Hüzünlü",
+        "emoji": "😢",
+    },
+    {
+        "key": BlogPostReaction.Reaction.RAHATSIZ.value,
+        "label": "Rahatsız",
+        "emoji": "🤢",
+    },
+    {"key": BlogPostReaction.Reaction.KORKU.value, "label": "Endişe", "emoji": "😨"},
+]
+
+
+def _build_reaction_context(request, post):
+    counts = (
+        BlogPostReaction.objects.filter(post=post)
+        .values("reaction")
+        .annotate(total=Count("id"))
+    )
+    reaction_counts = {item["reaction"]: item["total"] for item in counts}
+
+    user_reaction = ""
+    if request.user.is_authenticated:
+        user_reaction = (
+            BlogPostReaction.objects.filter(post=post, user=request.user)
+            .values_list("reaction", flat=True)
+            .first()
+            or ""
+        )
+
+    reaction_options = [
+        {
+            **reaction,
+            "count": reaction_counts.get(reaction["key"], 0),
+        }
+        for reaction in REACTION_OPTIONS
+    ]
+
+    user_reaction_label = ""
+    if user_reaction:
+        matched = next(
+            (
+                option["label"]
+                for option in reaction_options
+                if option["key"] == user_reaction
+            ),
+            "",
+        )
+        user_reaction_label = matched
+
+    return {
+        "reaction_options": reaction_options,
+        "user_reaction": user_reaction,
+        "user_reaction_label": user_reaction_label,
+    }
 
 
 def _build_comment_context(request, post):
@@ -257,6 +338,9 @@ def post_detail(request, slug: str):
     comment_context = _build_comment_context(request, post)
     has_social_account = comment_context["has_social_account"]
 
+    reaction_context = _build_reaction_context(request, post)
+    can_react = request.user.is_authenticated and has_social_account
+
     return render(
         request,
         "blog/post_detail.html",
@@ -280,6 +364,8 @@ def post_detail(request, slug: str):
             "MAX_COMMENT_LENGTH": MAX_COMMENT_LENGTH,
             "comment_page_obj": comment_context["comment_page_obj"],
             "comment_total": comment_context["comment_total"],
+            "can_react": can_react,
+            **reaction_context,
         },
     )
 
@@ -356,6 +442,9 @@ def post_preview(request, slug: str):
     comment_context = _build_comment_context(request, post)
     has_social_account = comment_context["has_social_account"]
 
+    reaction_context = _build_reaction_context(request, post)
+    can_react = has_social_account
+
     return render(
         request,
         "blog/post_detail.html",
@@ -377,8 +466,62 @@ def post_preview(request, slug: str):
             "requires_social_auth": not has_social_account,
             "comment_page_obj": comment_context["comment_page_obj"],
             "comment_total": comment_context["comment_total"],
+            "can_react": can_react,
+            **reaction_context,
         },
     )
+
+
+@require_POST
+@login_required
+def post_reaction(request, slug: str):
+    post = get_object_or_404(
+        BlogPost.objects.filter(status=BlogPost.Status.PUBLISHED),
+        slug=slug,
+    )
+
+    has_social_account = SocialAccount.objects.filter(user=request.user).exists()
+    if not has_social_account:
+        return JsonResponse(
+            {"detail": "Sosyal hesap gereklidir."},
+            status=403,
+        )
+
+    reaction = (request.POST.get("reaction") or "").strip()
+    valid_reactions = {choice.value for choice in BlogPostReaction.Reaction}
+    if reaction and reaction not in valid_reactions:
+        return JsonResponse({"detail": "Geçersiz tepki."}, status=400)
+
+    existing = BlogPostReaction.objects.filter(post=post, user=request.user).first()
+    selected = ""
+
+    if reaction:
+        if existing:
+            if existing.reaction == reaction:
+                existing.delete()
+            else:
+                existing.reaction = reaction
+                existing.save(update_fields=["reaction", "updated_at"])
+                selected = reaction
+        else:
+            BlogPostReaction.objects.create(
+                post=post,
+                user=request.user,
+                reaction=reaction,
+            )
+            selected = reaction
+    else:
+        if existing:
+            existing.delete()
+
+    counts = (
+        BlogPostReaction.objects.filter(post=post)
+        .values("reaction")
+        .annotate(total=Count("id"))
+    )
+    counts_payload = {item["reaction"]: item["total"] for item in counts}
+
+    return JsonResponse({"selected": selected, "counts": counts_payload})
 
 
 def archive_detail(request, year: int, month: int):
