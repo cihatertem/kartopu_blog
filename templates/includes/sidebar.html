@@ -1,19 +1,5 @@
-{% load static %}
-
 <div class="sidebar">
-  <section class="sidebar-card">
-    <h3 class="sidebar-title">Ara</h3>
-
-    <form method="get" action="{% url 'blog:search_results' %}" class="sidebar-form">
-      <input
-        type="search"
-        name="q"
-        placeholder="Blogda ara..."
-        value="{{ q|default:'' }}"
-        class="input-field"
-      />
-    </form>
-  </section>
+  {% include "includes/sidebar_search.html" %}
 
   {% include "includes/goal_widget.html" %}
 
@@ -21,106 +7,13 @@
 
   {% include "includes/follow_widget.html" %}
 
-  <!-- Son Yazılar Bölümü -->
-  <section class="sidebar-card">
-    <h3 class="sidebar-title">Son Yazılar</h3>
+  {% include "includes/sidebar_recent_posts.html" %}
 
-    <ul class="sidebar-post-list">
-      {% for post in nav_recent_posts %}
-        <li class="sidebar-post-item">
-          <a class="sidebar-post-link" href="{{ post.get_absolute_url }}">
-            <span class="sidebar-post-thumb">
-              {% if post.cover_image %}
-                <img src="{{ post.cover_600.url }}" alt="{{ post.title }}" loading="lazy" />
-              {% else %}
-                <img src="{% static 'images/home/portfolio-coins.svg' %}" alt="{{ post.title }}" loading="lazy" />
-              {% endif %}
-            </span>
-            <span class="sidebar-post-meta">
-              <span class="sidebar-post-title">{{ post.title }}</span>
-              <span class="sidebar-post-date">{{ post.published_at|date:"d F Y" }}</span>
-            </span>
-          </a>
-        </li>
-      {% empty %}
-        <li>Henüz yazı yok.</li>
-      {% endfor %}
-    </ul>
-  </section>
+  {% include "includes/sidebar_popular_posts.html" %}
 
-  <!-- Popüler Yazılar Bölümü -->
-  <section class="sidebar-card">
-    <h3 class="sidebar-title">Popüler Yazılar</h3>
+  {% include "includes/sidebar_categories.html" %}
 
-    <ul class="sidebar-post-list">
-      {% for post in nav_popular_posts %}
-        <li class="sidebar-post-item">
-          <a class="sidebar-post-link" href="{{ post.get_absolute_url }}">
-            <span class="sidebar-post-thumb">
-              {% if post.cover_image %}
-                <img src="{{ post.cover_600.url }}" alt="{{ post.title }}" loading="lazy" />
-              {% else %}
-                <img src="{% static 'images/home/portfolio-coins.svg' %}" alt="{{ post.title }}" loading="lazy" />
-              {% endif %}
-            </span>
-            <span class="sidebar-post-meta">
-              <span class="sidebar-post-title">{{ post.title }}</span>
-              <span class="sidebar-post-date">{{ post.published_at|date:"d F Y" }}</span>
-            </span>
-          </a>
-        </li>
-      {% empty %}
-        <li>Henüz yazı yok.</li>
-      {% endfor %}
-    </ul>
-  </section>
+  {% include "includes/sidebar_tags.html" %}
 
-  <!-- Kategoriler Bölümü -->
-  <section class="sidebar-card">
-    <h3 class="sidebar-title">Kategoriler</h3>
-
-    <ul class="sidebar-list">
-      {% for c in nav_categories %}
-        <li class="sidebar-item {% if active_category_slug == c.slug %}is-active{% endif %}">
-          <a href="{{ c.get_absolute_url }}">{{ c.name }} ({{ c.post_count }})</a>
-        </li>
-      {% empty %}
-        <li>Henüz kategori yok.</li>
-      {% endfor %}
-    </ul>
-  </section>
-
-  <!-- Etiketler Bölümü -->
-  <section class="sidebar-card">
-    <h3 class="sidebar-title">Etiketler</h3>
-
-    <div class="tag-cloud">
-      {% for tag in nav_tags %}
-        <a
-          href="{% url 'blog:tag_detail' tag.slug %}"
-          class="tag-cloud__item {{ tag.color_class }} {% if active_tag_slug == tag.slug %}is-active{% endif %}"
-          style="font-size: {{ tag.cloud_size }}rem;"
-        >
-          #{{ tag.name }}
-        </a>
-      {% empty %}
-        <span>Henüz etiket yok.</span>
-      {% endfor %}
-    </div>
-  </section>
-
-  <!-- Arşivler Bölümü -->
-  <section class="sidebar-card">
-    <h3 class="sidebar-title">Arşiv</h3>
-
-    <ul class="sidebar-list">
-      {% for archive in nav_archives %}
-        <li class="sidebar-item {% if active_archive_key == archive.key %}is-active{% endif %}">
-          <a href="{{ archive.url }}">{{ archive.label }} ({{ archive.post_count }})</a>
-        </li>
-      {% empty %}
-        <li>Henüz arşiv yok.</li>
-      {% endfor %}
-    </ul>
-  </section>
+  {% include "includes/sidebar_archives.html" %}
 </div>

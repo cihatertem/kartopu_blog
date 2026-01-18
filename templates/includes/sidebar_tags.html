@@ -1,0 +1,17 @@
+<section class="sidebar-card">
+  <h3 class="sidebar-title">Etiketler</h3>
+
+  <div class="tag-cloud">
+    {% for tag in nav_tags %}
+      <a
+        href="{% url 'blog:tag_detail' tag.slug %}"
+        class="tag-cloud__item {{ tag.color_class }} {% if active_tag_slug == tag.slug %}is-active{% endif %}"
+        style="font-size: {{ tag.cloud_size }}rem;"
+      >
+        #{{ tag.name }}
+      </a>
+    {% empty %}
+      <span>Henüz etiket yok.</span>
+    {% endfor %}
+  </div>
+</section>
