@@ -72,26 +72,6 @@ INSTALLED_APPS = [
     "comments.apps.CommentsConfig",
 ]
 
-LOGGING = {
-    "version": 1,
-    "disable_existing_loggers": False,
-    "handlers": {
-        "console": {
-            "class": "logging.StreamHandler",
-        }
-    },
-    "loggers": {
-        "allauth": {
-            "handlers": ["console"],
-            "level": "DEBUG",
-        },
-        "allauth.socialaccount": {
-            "handlers": ["console"],
-            "level": "DEBUG",
-        },
-    },
-}
-
 MIDDLEWARE = [
     "core.middlewares.TrustedProxyMiddleware",
     "core.middlewares.HealthCheckMiddleware",
@@ -320,9 +300,9 @@ if not DEBUG:
     SESSION_COOKIE_HTTPONLY = True
     SECURE_CONTENT_TYPE_NOSNIFF = True
     SECURE_REFERRER_POLICY = "strict-origin-when-cross-origin"
-    SECURE_CROSS_ORIGIN_OPENER_POLICY = (
-        "same-origin"  # allauth sorun çıkartabiliyor, dikkat.
-    )
+    # SECURE_CROSS_ORIGIN_OPENER_POLICY = (
+    #     "same-origin"  # allauth sorun çıkartabiliyor, dikkat.
+    # )
 
     if USE_TRAEFIK_SECURITY_HEADERS:
         SECURE_HSTS_SECONDS = 0
