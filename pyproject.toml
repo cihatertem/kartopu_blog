@@ -8,7 +8,6 @@ dependencies = [
     "bleach>=6.3.0",
     "cryptography>=46.0.3",
     "django~=6.0.0",
-    "django-allauth>=65.14.0",
     "django-imagekit>=6.0.0",
     "django-ratelimit>=4.1.0",
     "django-storages>=1.14.6",
@@ -17,12 +16,13 @@ dependencies = [
     "markdown>=3.10",
     "boto3>=1.40.33",
     "pillow>=12.0.0",
-    "psycopg[binary]>=3.2.13",
     "pyjwt>=2.10.1",
     "requests>=2.32.5",
     "tinycss2>=1.5.1",
     "yfinance>=1.0",
     "django-cleanup>=9.0.0",
+    "django-allauth[socialaccount]>=65.14.0",
+    "psycopg[binary]>=3.3.2",
 ]
 
 [dependency-groups]

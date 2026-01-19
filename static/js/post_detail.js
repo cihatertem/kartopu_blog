@@ -8,12 +8,6 @@ document.addEventListener("DOMContentLoaded", function () {
     };
     const isChartAvailable = () => typeof Chart !== "undefined";
 
-    if (urlParams.get("popup") === "1" && window.opener) {
-        window.opener.location.reload();
-        window.close();
-        return;
-    }
-
     // -------------------------
     // Textarea character counter
     // -------------------------
@@ -40,11 +34,24 @@ document.addEventListener("DOMContentLoaded", function () {
     const closeButton = document.getElementById("close-social-login");
 
     const loginButtons = document.querySelectorAll(".social-login-trigger");
+    let pendingReload = false;
 
     if (loginButtons.length > 0 && modal) {
+        const requestReload = () => {
+            if (modal.classList.contains("is-open")) {
+                pendingReload = true;
+                return;
+            }
+            window.location.reload();
+        };
+
         const openModal = () => {
             modal.classList.add("is-open");
             modal.setAttribute("aria-hidden", "false");
+            if (pendingReload) {
+                pendingReload = false;
+                window.location.reload();
+            }
         };
 
         const closeModal = () => {
@@ -88,11 +95,26 @@ document.addEventListener("DOMContentLoaded", function () {
                 const timer = window.setInterval(() => {
                     if (popup.closed) {
                         window.clearInterval(timer);
-                        window.location.reload();
+                        requestReload();
                     }
                 }, 500);
             });
         });
+        window.addEventListener("message", (event) => {
+            if (event.origin !== window.location.origin) return;
+            if (event.data?.type === "social-login-complete") {
+                requestReload();
+            }
+        });
+    }
+
+    if (urlParams.get("popup") === "1" && window.opener) {
+        window.opener.postMessage(
+            { type: "social-login-complete" },
+            window.location.origin,
+        );
+        window.close();
+        return;
     }
 
     // -------------------------
@@ -135,9 +157,8 @@ document.addEventListener("DOMContentLoaded", function () {
                         (button) => button.dataset.reaction === reactionKey,
                     );
                     const label =
-                        activeButton?.querySelector(
-                            ".reaction-card__label",
-                        )?.textContent || "bir";
+                        activeButton?.querySelector(".reaction-card__label")
+                            ?.textContent || "bir";
                     note.textContent = `Bu yazıda “${label}” tepkisini bıraktın. İstersen değiştirip geri alabilirsin.`;
                 } else {
                     note.textContent = "Tepkini seçebilirsin.";
