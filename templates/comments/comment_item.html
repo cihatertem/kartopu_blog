@@ -1,6 +1,18 @@
 <li class="comment-item">
-  <strong>{{ comment.author.full_name }}</strong>
-  <small>— {{ comment.created_at|date:"d F Y H:i" }}</small>
+  <div class="comment-header">
+    {% if comment.social_avatar_url %}
+      <img
+        class="comment-avatar"
+        src="{{ comment.social_avatar_url }}"
+        alt="{{ comment.author.full_name }}"
+        loading="lazy"
+      >
+    {% endif %}
+    <div class="comment-meta">
+      <strong>{{ comment.author.full_name }}</strong>
+      <small>— {{ comment.created_at|date:"d F Y H:i" }}</small>
+    </div>
+  </div>
   <p class="comment-body">{{ comment.body|linebreaksbr }}</p>
 
   {% if can_comment %}

@@ -66,6 +66,46 @@ REACTION_OPTIONS = [
     {"key": BlogPostReaction.Reaction.KORKU.value, "label": "Endişe", "emoji": "😨"},
 ]
 
+SOCIAL_AVATAR_KEYS = (
+    "picture",
+    "pictureUrl",
+    "avatar_url",
+    "profile_image_url_https",
+    "profile_image_url",
+)
+
+
+def _normalize_avatar_url(url):
+    if not isinstance(url, str):
+        return ""
+
+    if url.startswith("http://pbs.twimg.com"):
+        return url.replace("http://", "https://", 1)
+
+    if url.startswith("http"):
+        return url
+
+    return ""
+
+
+def _extract_social_avatar_url(extra_data):
+    if not isinstance(extra_data, dict):
+        return ""
+
+    for key in SOCIAL_AVATAR_KEYS:
+        value = _normalize_avatar_url(extra_data.get(key))
+        if value:
+            return value
+
+    image_data = extra_data.get("image")
+    if isinstance(image_data, dict):
+        for key in ("url", "href"):
+            value = _normalize_avatar_url(image_data.get(key))
+            if value:
+                return value
+
+    return ""
+
 
 def _build_reaction_context(request, post):
     counts = (
@@ -119,11 +159,23 @@ def _build_comment_context(request, post):
         .select_related("author")
         .order_by("-created_at")
     )
+    author_ids = {comment.author_id for comment in approved_comments}
+    social_avatar_map = {}
+    if author_ids:
+        social_accounts = SocialAccount.objects.filter(user_id__in=author_ids)
+        for account in social_accounts:
+            avatar_url = _normalize_avatar_url(account.get_avatar_url())
+            if not avatar_url:
+                avatar_url = _extract_social_avatar_url(account.extra_data or {})
+            if avatar_url and account.user_id not in social_avatar_map:  # pyright: ignore[reportAttributeAccessIssue]
+                social_avatar_map[account.user_id] = avatar_url  # pyright: ignore[reportAttributeAccessIssue]
+
     replies_by_parent = {}
     for comment in approved_comments:
         replies_by_parent.setdefault(comment.parent_id, []).append(comment)
     for comment in approved_comments:
         comment.nested_replies = replies_by_parent.get(comment.id, [])  # type: ignore[attr-defined]
+        comment.social_avatar_url = social_avatar_map.get(comment.author_id, "")  # type: ignore[attr-defined]
     top_level_comments = replies_by_parent.get(None, [])
     comment_form = CommentForm()
     has_social_account = (
