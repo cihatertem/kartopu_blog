@@ -48,15 +48,15 @@ document.addEventListener("DOMContentLoaded", function () {
         const openModal = () => {
             modal.classList.add("is-open");
             modal.setAttribute("aria-hidden", "false");
-            if (pendingReload) {
-                pendingReload = false;
-                window.location.reload();
-            }
         };
 
         const closeModal = () => {
             modal.classList.remove("is-open");
             modal.setAttribute("aria-hidden", "true");
+            if (pendingReload) {
+                pendingReload = false;
+                window.location.reload();
+            }
         };
 
         loginButtons.forEach((button) => {
@@ -100,6 +100,7 @@ document.addEventListener("DOMContentLoaded", function () {
                 }, 500);
             });
         });
+
         window.addEventListener("message", (event) => {
             if (event.origin !== window.location.origin) return;
             if (event.data?.type === "social-login-complete") {
