@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from urllib.parse import urlparse
+
 from django.conf import settings
 from django.core.mail import EmailMultiAlternatives
 from django.template.loader import render_to_string
@@ -23,6 +25,13 @@ def get_site_base_url() -> str:
 
 
 def build_absolute_uri(path: str) -> str:
+    parsed = urlparse(path)
+    if parsed.scheme and parsed.netloc:
+        return path
+    if path.startswith("//"):
+        base_url = get_site_base_url()
+        base_scheme = urlparse(base_url).scheme or "https"
+        return f"{base_scheme}:{path}"
     base_url = get_site_base_url()
     return f"{base_url}/{path.lstrip('/')}"
 
