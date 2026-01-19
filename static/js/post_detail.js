@@ -140,6 +140,8 @@ document.addEventListener("DOMContentLoaded", function () {
             }
             return "";
         };
+        const getCsrfToken = () =>
+            reactionSection.dataset.csrfToken || getCookie("csrftoken");
 
         const applySelection = (reactionKey) => {
             buttons.forEach((button) => {
@@ -202,7 +204,7 @@ document.addEventListener("DOMContentLoaded", function () {
                                 headers: {
                                     "Content-Type":
                                         "application/x-www-form-urlencoded",
-                                    "X-CSRFToken": getCookie("csrftoken"),
+                                    "X-CSRFToken": getCsrfToken(),
                                 },
                                 body: new URLSearchParams({
                                     reaction: nextReaction,

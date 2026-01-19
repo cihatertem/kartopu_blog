@@ -4,6 +4,7 @@
   data-reaction-url="{% url 'blog:post_reaction' post.slug %}"
   data-selected="{{ user_reaction }}"
   data-can-react="{{ can_react|yesno:'true,false' }}"
+  data-csrf-token="{{ csrf_token }}"
 >
   <div class="reaction-widget__header">
     <span class="reaction-widget__icon" aria-hidden="true">☺️</span>
