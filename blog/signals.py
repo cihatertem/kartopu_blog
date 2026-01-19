@@ -3,6 +3,7 @@ import shutil
 
 from django.conf import settings
 from django.core.cache import cache
+from django.core.files.storage import default_storage
 from django.db.models.signals import m2m_changed, post_delete, post_save
 from django.dispatch import receiver
 
@@ -30,6 +31,19 @@ def _delete_local_dir_if_exists(path: str) -> None:
         pass
 
 
+def _delete_storage_dir_if_exists(path: str) -> None:
+    if not path:
+        return
+    try:
+        directories, files = default_storage.listdir(path)
+        for file_name in files:
+            default_storage.delete(os.path.join(path, file_name))
+        for directory in directories:
+            _delete_storage_dir_if_exists(os.path.join(path, directory))
+    except Exception:
+        pass
+
+
 def _post_media_dir(post: BlogPost) -> str:
     if not settings.MEDIA_ROOT:
         return ""
@@ -43,6 +57,11 @@ def _post_cache_dir(post: BlogPost) -> str:
     return os.path.join(settings.MEDIA_ROOT, cache_dir, "blog", post.slug)
 
 
+def _post_cache_storage_dir(post: BlogPost) -> str:
+    cache_dir = getattr(settings, "IMAGEKIT_CACHEFILE_DIR", "cache")
+    return os.path.join(cache_dir, "blog", post.slug)
+
+
 @receiver(post_delete, sender=BlogPostImage)
 def blogpostimage_delete_files(sender, instance: BlogPostImage, **kwargs):
     _delete_storage_file(instance.image)
@@ -50,7 +69,10 @@ def blogpostimage_delete_files(sender, instance: BlogPostImage, **kwargs):
 
 @receiver(post_delete, sender=BlogPost)
 def blogpost_delete_files(sender, instance: BlogPost, **kwargs):
-    _delete_local_dir_if_exists(_post_cache_dir(instance))
+    if getattr(settings, "USE_S3", False):
+        _delete_storage_dir_if_exists(_post_cache_storage_dir(instance))
+    else:
+        _delete_local_dir_if_exists(_post_cache_dir(instance))
 
     _delete_local_dir_if_exists(_post_media_dir(instance))
 
