@@ -92,10 +92,14 @@ def send_unsubscribe_confirmation(email: str) -> None:
 def send_post_published_email(post) -> None:
     subscribers = Subscriber.objects.filter(status=SubscriberStatus.ACTIVE)
     post_url = build_absolute_uri(post.get_absolute_url())
+    cover_image_url = None
+    if getattr(post, "cover_image", None):
+        cover_image_url = build_absolute_uri(post.cover_1200.url)
     for subscriber in subscribers:
         unsubscribe_url = build_unsubscribe_url(subscriber.email)
         context = {
             "post": post,
+            "cover_image_url": iri_to_uri(cover_image_url) if cover_image_url else None,
             "post_url": iri_to_uri(post_url),
             "unsubscribe_url": iri_to_uri(unsubscribe_url),
             "site_name": getattr(settings, "SITE_NAME", "Kartopu Blog"),
