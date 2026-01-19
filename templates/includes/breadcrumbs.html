@@ -4,9 +4,9 @@
     <a href="/">Ana sayfa</a>
     {% for item in breadcrumbs %}
       / {% if item.url %}
-          <a href="{{ item.url }}">{{ item.label }}</a>
+          <a href="{{ item.url }}">{{ item.label|title }}</a>
         {% else %}
-          <strong>{{ item.label }}</strong>
+          <strong>{{ item.label|title }}</strong>
         {% endif %}
     {% endfor %}
   </small>

@@ -4,7 +4,7 @@
   <ul class="sidebar-list">
     {% for c in nav_categories %}
       <li class="sidebar-item {% if active_category_slug == c.slug %}is-active{% endif %}">
-        <a href="{{ c.get_absolute_url }}">{{ c.name }} ({{ c.post_count }})</a>
+        <a href="{{ c.get_absolute_url }}">{{ c.name|title }} ({{ c.post_count }})</a>
       </li>
     {% empty %}
       <li>Henüz kategori yok.</li>
