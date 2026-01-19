@@ -31,10 +31,14 @@ def _delete_local_dir_if_exists(path: str) -> None:
 
 
 def _post_media_dir(post: BlogPost) -> str:
+    if not settings.MEDIA_ROOT:
+        return ""
     return os.path.join(settings.MEDIA_ROOT, "blog", post.slug)
 
 
 def _post_cache_dir(post: BlogPost) -> str:
+    if not settings.MEDIA_ROOT:
+        return ""
     cache_dir = getattr(settings, "IMAGEKIT_CACHEFILE_DIR", "cache")
     return os.path.join(settings.MEDIA_ROOT, cache_dir, "blog", post.slug)
 
