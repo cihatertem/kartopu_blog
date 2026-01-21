@@ -118,7 +118,6 @@ def _render_portfolio_summary_html(snapshot) -> str:
 
     html = f"""
 <section class="portfolio-snapshot">
-  <h3>Bu yazının portföy özeti</h3>
   <div class="summary-card">
     <p class="summary-meta"><strong>Portföy:</strong> {portfolio_name}</p>
     <p class="summary-meta summary-meta--spaced"><strong>Tarih:</strong> {snapshot_date}
@@ -556,7 +555,6 @@ def _render_cashflow_summary_html(snapshot) -> str:
 
     html = f"""
 <section class="cashflow-snapshot">
-  <h3>Bu yazının nakit akışı özeti</h3>
   <div class="summary-card">
     <p class="summary-meta"><strong>Nakit Akışı:</strong> {cashflow_name}</p>
     <p class="summary-meta summary-meta--spaced"><strong>Tarih:</strong> {snapshot_date}
@@ -827,7 +825,6 @@ def _render_dividend_summary_html(snapshot) -> str:
 
     html = f"""
 <section class="dividend-summary">
-  <h3>Bu yazının temettü özeti</h3>
   <div class="summary-card dividend-summary__meta-card">
     <p class="summary-meta"><strong>Yıl:</strong> {year}</p>
     <p class="summary-meta summary-meta--spaced"><strong>Para Birimi:</strong> {currency}</p>
