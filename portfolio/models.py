@@ -205,11 +205,11 @@ class Portfolio(UUIDModelMixin, TimeStampedModelMixin):
         price_date: date | None = None,
     ) -> list[dict[str, Decimal | Asset]]:
         positions: dict[str, dict[str, Decimal | Asset]] = {}
-        transactions = (
-            self.transactions.select_related("asset")  # pyright: ignore[reportAttributeAccessIssue]
-            .all()
-            .order_by("trade_date", "created_at")
-        )
+        transactions = self.transactions.select_related(  # pyright: ignore[reportAttributeAccessIssue]
+            "asset"
+        ).order_by("trade_date", "created_at")
+        if price_date:
+            transactions = transactions.filter(trade_date__lte=price_date)
         fx_rates: dict[tuple[str, str, date | None], Decimal] = {}
 
         for transaction in transactions:
@@ -643,6 +643,8 @@ class CashFlowSnapshot(UUIDModelMixin, TimeStampedModelMixin):
         else:
             start_date = snapshot_date.replace(month=1, day=1)
             end_date = snapshot_date.replace(month=12, day=31)
+        if snapshot_date < end_date:
+            end_date = snapshot_date
 
         entries = CashFlowEntry.objects.filter(
             cashflows=cashflow,
@@ -999,7 +1001,7 @@ class DividendSnapshot(UUIDModelMixin, TimeStampedModelMixin):
         snapshot_date = snapshot_date or date(year, 12, 31)
         payments = (
             DividendPayment.objects.select_related("asset")
-            .filter(payment_date__year=year)
+            .filter(payment_date__year=year, payment_date__lte=snapshot_date)
             .order_by("payment_date", "created_at")
         )
 
