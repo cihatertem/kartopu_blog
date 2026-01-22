@@ -1,5 +1,5 @@
 <nav class="site-nav">
-  <div class="site-nav__top">
+    <div class="site-nav__top">
       <span class="site-nav__date" id="site-date" aria-live="polite"></span>
       {% include "includes/message_counter.html" %}
       <a href="/" class="site-nav__brand">
@@ -7,7 +7,12 @@
         <span class="site-nav__brand-dot">.</span>
         <span class="site-nav__brand-accent">money</span>
       </a>
-      <span class="site-nav__spacer" aria-hidden="true"></span>
+      <div class="site-nav__actions">
+        <button class="theme-toggle" type="button" data-theme-toggle aria-pressed="false">
+          <span class="theme-toggle__icon" aria-hidden="true">🌙</span>
+          <span class="theme-toggle__text">Koyu mod</span>
+        </button>
+      </div>
     </div>
 
     <div class="site-nav__links">

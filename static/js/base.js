@@ -1,4 +1,54 @@
 (function () {
+    const themeStorageKey = "theme-preference";
+    const themeToggle = document.querySelector("[data-theme-toggle]");
+
+    const getStoredTheme = () => {
+        try {
+            return localStorage.getItem(themeStorageKey);
+        } catch (error) {
+            console.warn("Unable to read theme preference.", error);
+            return null;
+        }
+    };
+
+    const updateThemeToggle = (theme) => {
+        if (!themeToggle) {
+            return;
+        }
+        const isDark = theme === "dark";
+        themeToggle.setAttribute("aria-pressed", String(isDark));
+        const icon = themeToggle.querySelector(".theme-toggle__icon");
+        const text = themeToggle.querySelector(".theme-toggle__text");
+        if (icon) {
+            icon.textContent = isDark ? "☀️" : "🌙";
+        }
+        if (text) {
+            text.textContent = isDark ? "Açık mod" : "Koyu mod";
+        }
+    };
+
+    const applyTheme = (theme) => {
+        document.documentElement.setAttribute("data-theme", theme);
+        updateThemeToggle(theme);
+    };
+
+    let storedTheme = getStoredTheme();
+    let activeTheme = storedTheme || "light";
+    applyTheme(activeTheme);
+
+    if (themeToggle) {
+        themeToggle.addEventListener("click", () => {
+            activeTheme = activeTheme === "dark" ? "light" : "dark";
+            applyTheme(activeTheme);
+            storedTheme = activeTheme;
+            try {
+                localStorage.setItem(themeStorageKey, activeTheme);
+            } catch (error) {
+                console.warn("Unable to store theme preference.", error);
+            }
+        });
+    }
+
     const urlParams = new URLSearchParams(window.location.search);
     if (urlParams.get("popup") === "1") {
         if (window.opener) {
