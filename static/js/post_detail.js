@@ -7,6 +7,13 @@ document.addEventListener("DOMContentLoaded", function () {
         }
     };
     const isChartAvailable = () => typeof Chart !== "undefined";
+    const getDoughnutLegendOptions = () => {
+        const legend = { position: "bottom" };
+        if (document.documentElement.getAttribute("data-theme") === "dark") {
+            legend.labels = { color: "#dde7e9" };
+        }
+        return legend;
+    };
 
     // -------------------------
     // Textarea character counter
@@ -273,7 +280,7 @@ document.addEventListener("DOMContentLoaded", function () {
                     options: {
                         responsive: true,
                         plugins: {
-                            legend: { position: "bottom" },
+                            legend: getDoughnutLegendOptions(),
                             tooltip: {
                                 callbacks: {
                                     label(ctx) {
@@ -363,7 +370,7 @@ document.addEventListener("DOMContentLoaded", function () {
                         options: {
                             responsive: true,
                             plugins: {
-                                legend: { position: "bottom" },
+                                legend: getDoughnutLegendOptions(),
                                 tooltip: {
                                     callbacks: {
                                         label(ctx) {
@@ -488,7 +495,7 @@ document.addEventListener("DOMContentLoaded", function () {
                     options: {
                         responsive: true,
                         plugins: {
-                            legend: { position: "bottom" },
+                            legend: getDoughnutLegendOptions(),
                             tooltip: {
                                 callbacks: {
                                     label(ctx) {
@@ -645,7 +652,7 @@ document.addEventListener("DOMContentLoaded", function () {
                     options: {
                         responsive: true,
                         plugins: {
-                            legend: { position: "bottom" },
+                            legend: getDoughnutLegendOptions(),
                             tooltip: {
                                 callbacks: {
                                     label(ctx) {
