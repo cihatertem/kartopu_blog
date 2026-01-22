@@ -18,13 +18,13 @@
         const isDark = theme === "dark";
         themeToggle.setAttribute("aria-pressed", String(isDark));
         const icon = themeToggle.querySelector(".theme-toggle__icon");
-        const text = themeToggle.querySelector(".theme-toggle__text");
+        // const text = themeToggle.querySelector(".theme-toggle__text");
         if (icon) {
             icon.textContent = isDark ? "☀️" : "🌙";
         }
-        if (text) {
-            text.textContent = isDark ? "Açık mod" : "Koyu mod";
-        }
+        // if (text) {
+        //     text.textContent = isDark ? "Açık mod" : "Koyu mod";
+        // }
     };
 
     const applyTheme = (theme) => {
@@ -116,9 +116,7 @@
         });
     }
 
-    const charCountTargets = document.querySelectorAll(
-        "[data-char-counter]",
-    );
+    const charCountTargets = document.querySelectorAll("[data-char-counter]");
 
     const updateCharCounter = (field) => {
         if (!field) {
