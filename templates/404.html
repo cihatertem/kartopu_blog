@@ -1,0 +1,34 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}404 | Kartopu Money{% endblock %}
+
+{% block content %}
+  <section class="not-found">
+    <div class="not-found__card">
+      <div class="not-found__content">
+        <p class="not-found__eyebrow">Kaybolduk</p>
+        <h1 class="not-found__title">404 - Sayfa bulunamadı</h1>
+        <p class="not-found__text">
+          Aradığınız sayfa taşınmış ya da kaldırılmış olabilir. Ana sayfaya dönerek en güncel
+          içeriklere ulaşabilirsiniz.
+        </p>
+        <div class="not-found__actions">
+          <a class="button button--primary" href="{% url 'core:home' %}">Ana sayfaya dön</a>
+          <a class="button button--ghost" href="{% url 'blog:post_list' %}">Blog yazılarına göz at</a>
+        </div>
+      </div>
+      <div class="not-found__visual">
+        <img src="{% static 'images/home/hero-snow-ball.png' %}" alt="Kartopu simgesi" />
+      </div>
+    </div>
+    <div class="summary-card not-found__tips">
+      <h2 class="not-found__tips-title">İsterseniz buradan da ilerleyebilirsiniz</h2>
+      <ul class="not-found__tips-list">
+        <li><a href="{% url 'core:about' %}">Hakkımızda</a> sayfasında ekibimizi tanıyın.</li>
+        <li><a href="{% url 'core:contact' %}">İletişim</a> sayfasından bize ulaşın.</li>
+        <li><a href="{% url 'blog:search_results' %}">Arama</a> ile istediğiniz başlığı bulun.</li>
+      </ul>
+    </div>
+  </section>
+{% endblock %}
