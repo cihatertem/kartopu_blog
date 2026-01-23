@@ -1,7 +1,15 @@
-<div class="legal-disclaimer" id="legal-disclaimer" role="dialog" aria-live="polite">
+<div class="legal-disclaimer"
+     id="legal-disclaimer"
+     role="dialog"
+     aria-modal="true"
+     aria-labelledby="legal-disclaimer-title"
+     aria-describedby="legal-disclaimer-desc">
   <div class="legal-disclaimer__content">
-    <p class="legal-disclaimer__text">
-      <strong>YASAL UYARI </strong><br />
+
+    <h2 id="legal-disclaimer-title" class="sr-only">Yasal Uyarı</h2>
+
+    <p class="legal-disclaimer__text" id="legal-disclaimer-desc">
+      <strong>YASAL UYARI</strong><br />
       Burada yer alan yatırım bilgi, yorum ve tavsiyeleri yatırım danışmanlığı kapsamında değildir.
       Yatırım danışmanlığı hizmeti, kişilerin risk ve getiri tercihleri dikkate alınarak kişiye özel
       sunulmaktadır. Burada yer alan ve hiçbir şekilde yönlendirici nitelikte olmayan içerik, yorum ve
@@ -9,7 +17,11 @@
       uygun olmayabilir. Bu nedenle, sadece burada yer alan bilgilere dayanılarak yatırım kararı
       verilmesi beklentilerinize uygun sonuçlar doğurmayabilir.
     </p>
-    <button class="button button--primary" type="button" id="legal-disclaimer-accept">
+
+    <button class="button button--primary"
+            type="button"
+            id="legal-disclaimer-accept"
+            aria-label="Okudum, anladım ve yasal uyarıyı kapat">
       Okudum, anladım.
     </button>
   </div>
