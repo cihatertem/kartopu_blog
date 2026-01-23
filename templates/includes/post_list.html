@@ -17,7 +17,15 @@
             "
             sizes="(max-width: 768px) 100vw, 720px"
             alt="{{ post.title }}"
-            loading="lazy"
+            width="{{ post.cover_1200.width }}"
+            height="{{ post.cover_1200.height }}"
+            decoding="async"
+            {% if forloop.first %}
+              loading="eager"
+              fetchpriority="high"
+            {% else %}
+              loading="lazy"
+            {% endif %}
           />
         </figure>
       {% else %}
@@ -25,7 +33,10 @@
           <img
             src="{% static 'images/home/portfolio-coins.svg' %}"
             alt="Portföy görseli"
+            width="600"
+            height="600"
             loading="lazy"
+            decoding="async"
           />
         </figure>
       {% endif %}

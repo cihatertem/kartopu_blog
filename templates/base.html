@@ -9,11 +9,11 @@
     <link rel="icon" type="image/svg+xml" href="{% static 'images/home/hero-snow-ball.png' %}" />
     <!-- Google tag (gtag.js) -->
     {% if GOOGLE_ANALYTICS_ID %}
+    <link rel="preconnect" href="https://www.googletagmanager.com" crossorigin />
+    <link rel="dns-prefetch" href="https://www.googletagmanager.com" />
     <script async src="https://www.googletagmanager.com/gtag/js?id={{ GOOGLE_ANALYTICS_ID }}"></script>
     <script defer src="{% static 'js/ga.js' %}" data-ga-id="{{ GOOGLE_ANALYTICS_ID }}"></script>
     {% endif %}
-
-    <script src="{% static 'vendor/chart.umd.min.js' %}"></script>
     {% block head %}{% endblock %}
   </head>
 
@@ -45,5 +45,5 @@
     {% include "includes/footer.html" %}
   </body>
   {% block js_script %}{% endblock %}
-  <script src="{% static 'js/base.js' %}"></script>
+  <script defer src="{% static 'js/base.js' %}"></script>
 </html>

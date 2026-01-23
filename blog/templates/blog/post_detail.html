@@ -36,7 +36,11 @@
           "
           sizes="(max-width: 768px) 100vw, 720px"
           alt="{{ post.title }}"
-          loading="lazy"
+          width="{{ post.cover_1200.width }}"
+          height="{{ post.cover_1200.height }}"
+          loading="eager"
+          fetchpriority="high"
+          decoding="async"
         />
       </figure>
     {% endif %}
@@ -171,5 +175,6 @@
 {% endblock %}
 
 {% block js_script %}
-  <script src="{% static 'js/post_detail.js' %}"></script>
+  <script defer src="{% static 'vendor/chart.umd.min.js' %}"></script>
+  <script defer src="{% static 'js/post_detail.js' %}"></script>
 {% endblock %}
