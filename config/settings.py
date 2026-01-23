@@ -153,38 +153,39 @@ USE_I18N = True
 USE_L10N = True
 USE_TZ = True
 
-LOGGING = {
-    "version": 1,
-    "disable_existing_loggers": False,
-    "formatters": {
-        "verbose": {
-            "format": "[{asctime}] {levelname} {name} {message}",
-            "style": "{",
+if logging := os.getenv("DJANGO_LOGGING", "0") == "1":
+    LOGGING = {
+        "version": 1,
+        "disable_existing_loggers": False,
+        "formatters": {
+            "verbose": {
+                "format": "[{asctime}] {levelname} {name} {message}",
+                "style": "{",
+            },
         },
-    },
-    "handlers": {
-        "console": {
-            "class": "logging.StreamHandler",
-            "formatter": "verbose",
+        "handlers": {
+            "console": {
+                "class": "logging.StreamHandler",
+                "formatter": "verbose",
+            },
         },
-    },
-    "root": {
-        "handlers": ["console"],
-        "level": os.getenv("DJANGO_LOG_LEVEL", "INFO"),
-    },
-    "loggers": {
-        "django.request": {  # 500 hataları burada loglanır
+        "root": {
             "handlers": ["console"],
-            "level": "ERROR",
-            "propagate": False,
+            "level": os.getenv("DJANGO_LOG_LEVEL", "INFO"),
         },
-        "django.server": {
-            "handlers": ["console"],
-            "level": "INFO",
-            "propagate": False,
+        "loggers": {
+            "django.request": {  # 500 hataları burada loglanır
+                "handlers": ["console"],
+                "level": "ERROR",
+                "propagate": False,
+            },
+            "django.server": {
+                "handlers": ["console"],
+                "level": "INFO",
+                "propagate": False,
+            },
         },
-    },
-}
+    }
 
 
 # Static files (CSS, JavaScript, Images)
