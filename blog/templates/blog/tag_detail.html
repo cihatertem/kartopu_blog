@@ -2,6 +2,10 @@
 {% load static %}
 
 {% block title %}#{{ tag.name|title }} etiketli yazılar - Kartopu Money{% endblock %}
+{% block page_css %}
+  <link rel="stylesheet" href="{% static 'css/blog.css' %}" />
+  <link rel="stylesheet" href="{% static 'css/post_list.css' %}" />
+{% endblock %}
 {% block head %}
   <meta
     name="description"

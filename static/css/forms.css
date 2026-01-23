@@ -1,0 +1,14 @@
+.comment-form__field {
+  margin-bottom: 0.75rem;
+}
+
+.comment-form {
+  display: grid;
+  gap: 0.5rem;
+}
+
+.char-counter {
+  font-size: 0.9rem;
+  color: var(--color-muted);
+  margin-bottom: 0.75rem;
+}

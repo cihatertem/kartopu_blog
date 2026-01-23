@@ -1,0 +1,26 @@
+.captcha {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.25rem;
+  border-radius: 0.75rem;
+  margin: 0 auto;
+}
+
+.captcha-question {
+  padding: 0.4rem 0.75rem;
+  border-radius: 0.6rem;
+  background: linear-gradient(
+    135deg,
+    var(--color-primary),
+    var(--color-accent)
+  );
+  color: white;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.captcha input {
+  padding: 0.4rem 0.75rem;
+  width: 120px;
+}

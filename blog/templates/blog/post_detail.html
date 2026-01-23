@@ -2,6 +2,10 @@
 {% load socialaccount blog_extras static %}
 
 {% block title %}{{ post.effective_meta_title }}{% endblock %}
+{% block page_css %}
+  <link rel="stylesheet" href="{% static 'css/blog.css' %}" />
+  <link rel="stylesheet" href="{% static 'css/forms.css' %}" />
+{% endblock %}
 
 {% block head %}
   <meta name="description" content="{{ post.effective_meta_description }}" />
