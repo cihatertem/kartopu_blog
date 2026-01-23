@@ -1053,6 +1053,12 @@ select:focus {
   margin-top: 2rem;
 }
 
+.home-portfolio,
+.post-list {
+  content-visibility: auto;
+  contain-intrinsic-size: 1px 800px;
+}
+
 .home-portfolio__header {
   display: flex;
   flex-wrap: wrap;
