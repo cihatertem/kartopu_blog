@@ -428,4 +428,4 @@ class BlogPostReaction(
         indexes = (models.Index(fields=("post", "reaction")),)
 
     def __str__(self) -> str:
-        return f"{self.post.title} - {self.get_reaction_display()}"
+        return f"{self.post.title} - {self.get_reaction_display()}"  # pyright: ignore[reportAttributeAccessIssue]
