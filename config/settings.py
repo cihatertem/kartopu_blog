@@ -257,7 +257,7 @@ SOCIALACCOUNT_PROVIDERS = {
 }
 
 # ImageKit settings
-IMAGEKIT_CACHEFILE_DIR = "cache"
+IMAGEKIT_CACHEFILE_DIR = "caches"
 
 # Email (Gmail SMTP)
 EMAIL_BACKEND = "django.core.mail.backends.smtp.EmailBackend"
