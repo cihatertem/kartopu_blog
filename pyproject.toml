@@ -23,7 +23,6 @@ dependencies = [
     "django-cleanup>=9.0.0",
     "django-allauth[socialaccount]>=65.14.0",
     "psycopg[binary]>=3.3.2",
-    "brotli>=1.2.0",
 ]
 
 [dependency-groups]
