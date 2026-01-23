@@ -5,14 +5,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>{% block title %}| Kartopu Money{% endblock %}</title>
-    <link
-      rel="preload"
-      href="{% static 'css/site.css' %}"
-      as="style"
-      onload="this.onload=null;this.rel='stylesheet'">
-    <noscript>
-      <link rel="stylesheet" href="{% static 'css/site.css' %}">
-    </noscript>
+    <link rel="stylesheet" href="{% static 'css/site.css' %}" />
     <link rel="icon" type="image/svg+xml" href="{% static 'images/home/hero-snow-ball.png' %}" />
     <!-- Google tag (gtag.js) -->
     {% if GOOGLE_ANALYTICS_ID %}
