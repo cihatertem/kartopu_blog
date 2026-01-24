@@ -327,6 +327,47 @@
     <script async src="https://www.googletagmanager.com/gtag/js?id={{ GOOGLE_ANALYTICS_ID }}"></script>
     <script defer src="{% static 'js/ga.js' %}" data-ga-id="{{ GOOGLE_ANALYTICS_ID }}"></script>
     {% endif %}
+    {% static 'images/home/hero-snow-ball.png' as site_logo_path %}
+    {% with site_logo_url=site_logo_path|absolute_url:site_base_url %}
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@graph": [
+          {
+            "@type": "Organization",
+            "@id": "{{ site_base_url }}#organization",
+            "name": "{{ site_name|escapejs }}",
+            "url": "{{ site_base_url }}",
+            "logo": {
+              "@type": "ImageObject",
+              "url": "{{ site_logo_url }}"
+            }{% if site_social_links %},
+            "sameAs": [
+              {% for link in site_social_links %}
+              "{{ link }}"{% if not forloop.last %},{% endif %}
+              {% endfor %}
+            ]{% endif %}
+          },
+          {
+            "@type": "WebSite",
+            "@id": "{{ site_base_url }}#website",
+            "url": "{{ site_base_url }}",
+            "name": "{{ site_name|escapejs }}",
+            "publisher": {
+              "@id": "{{ site_base_url }}#organization"
+            },
+            "inLanguage": "tr-TR",
+            "potentialAction": {
+              "@type": "SearchAction",
+              "target": "{{ site_base_url }}{% url 'blog:search_results' %}?q={search_term_string}",
+              "query-input": "required name=search_term_string"
+            }
+          }
+        ]
+      }
+    </script>
+    {% endwith %}
+    {% block structured_data %}{% endblock %}
     {% block head %}{% endblock %}
   </head>
 

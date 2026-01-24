@@ -11,6 +11,42 @@
   <meta name="description" content="{{ post.effective_meta_description }}" />
 {% endblock %}
 
+{% block structured_data %}
+  {% static 'images/home/hero-snow-ball.png' as site_logo_path %}
+  {% with site_logo_url=site_logo_path|absolute_url:site_base_url %}
+  {% with post_url=post.get_absolute_url|absolute_url:site_base_url %}
+  {% with cover=post.cover_rendition %}
+  <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "BlogPosting",
+      "@id": "{{ post_url }}#blogposting",
+      "headline": "{{ post.title|escapejs }}",
+      "description": "{{ post.effective_meta_description|escapejs }}",
+      "inLanguage": "tr-TR",
+      "datePublished": "{% if post.published_at %}{{ post.published_at|date:'c' }}{% endif %}",
+      "dateModified": "{{ post.updated_at|date:'c' }}",
+      "mainEntityOfPage": {
+        "@type": "WebPage",
+        "@id": "{{ post_url }}"
+      },
+      "author": {
+        "@type": "Person",
+        "name": "{{ post.author.full_name|default:post.author.email|escapejs }}"
+      },
+      "publisher": {
+        "@id": "{{ site_base_url }}#organization"
+      },
+      "image": [
+        "{% if cover %}{{ cover.src|absolute_url:site_base_url }}{% else %}{{ site_logo_url }}{% endif %}"
+      ]
+    }
+  </script>
+  {% endwith %}
+  {% endwith %}
+  {% endwith %}
+{% endblock %}
+
 {% block content %}
   {% include "includes/breadcrumbs.html" %}
   {% if is_preview %}

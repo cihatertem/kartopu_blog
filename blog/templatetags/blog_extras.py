@@ -1,5 +1,6 @@
 import json
 import re
+from urllib.parse import urljoin
 from decimal import Decimal, InvalidOperation
 
 from django import template
@@ -47,6 +48,16 @@ DIVIDEND_COMPARISON_PATTERN = re.compile(
     r"\{\{\s*dividend_comparison(?::([^\s\}]+))?\s*\}\}"
 )
 LEGAL_DISCLAIMER_PATTERN = re.compile(r"\{\{\s*legal_disclaimer\s*\}\}")
+
+
+@register.filter
+def absolute_url(path: str, base_url: str) -> str:
+    if not path:
+        return ""
+    if not base_url:
+        return path
+    base = base_url.rstrip("/") + "/"
+    return urljoin(base, str(path))
 
 
 @register.simple_tag

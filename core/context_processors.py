@@ -218,3 +218,15 @@ def categories_tags_context(request):
 
 def google_analytics_context(request):
     return {"GOOGLE_ANALYTICS_ID": settings.GOOGLE_ANALYTICS_ID}
+
+
+def site_metadata_context(request):
+    base_url = settings.SITE_BASE_URL.rstrip("/")
+    return {
+        "site_name": settings.SITE_NAME,
+        "site_base_url": base_url,
+        "site_social_links": [
+            "https://x.com/KartopuMoney",
+            "https://www.youtube.com/channel/UCn4Vlw6WLaTjq1vh0OIk8lQ",
+        ],
+    }
