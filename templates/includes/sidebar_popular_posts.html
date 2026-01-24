@@ -9,14 +9,27 @@
         <a class="sidebar-post-link" href="{{ post.get_absolute_url }}">
           <span class="sidebar-post-thumb">
             {% if post.cover_image %}
-              <img
-                src="{{ post.cover_600.url }}"
-                alt="{{ post.title }}"
-                width="{{ post.cover_600.width }}"
-                height="{{ post.cover_600.height }}"
-                loading="lazy"
-                decoding="async"
-              />
+              {% with cover=post.cover_thumb_rendition %}
+                {% if cover %}
+                  <img
+                    src="{{ cover.src }}"
+                    alt="{{ post.title }}"
+                    width="{{ cover.width }}"
+                    height="{{ cover.height }}"
+                    loading="lazy"
+                    decoding="async"
+                  />
+                {% else %}
+                  <img
+                    src="{% static 'images/home/portfolio-coins.svg' %}"
+                    alt="{{ post.title }}"
+                    width="54"
+                    height="54"
+                    loading="lazy"
+                    decoding="async"
+                  />
+                {% endif %}
+              {% endwith %}
             {% else %}
               <img
                 src="{% static 'images/home/portfolio-coins.svg' %}"

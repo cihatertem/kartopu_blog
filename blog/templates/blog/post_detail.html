@@ -30,23 +30,34 @@
     </p>
 
     {% if post.cover_image %}
-      <figure>
-        <img
-          src="{{ post.cover_1200.url }}"
-          srcset="
-            {{ post.cover_600.url }} 600w,
-            {{ post.cover_900.url }} 900w,
-            {{ post.cover_1200.url }} 1200w
-          "
-          sizes="(max-width: 768px) 100vw, 720px"
-          alt="{{ post.title }}"
-          width="{{ post.cover_1200.width }}"
-          height="{{ post.cover_1200.height }}"
-          loading="eager"
-          fetchpriority="high"
-          decoding="async"
-        />
-      </figure>
+      {% with cover=post.cover_rendition %}
+        {% if cover %}
+          <figure>
+            <img
+              src="{{ cover.src }}"
+              srcset="{{ cover.srcset }}"
+              sizes="(max-width: 768px) 100vw, 720px"
+              alt="{{ post.title }}"
+              width="{{ cover.width }}"
+              height="{{ cover.height }}"
+              loading="eager"
+              fetchpriority="high"
+              decoding="async"
+            />
+          </figure>
+        {% else %}
+          <figure class="home-portfolio__placeholder">
+            <img
+              src="{% static 'images/home/portfolio-coins.svg' %}"
+              alt="{{ post.title }}"
+              width="600"
+              height="600"
+              loading="lazy"
+              decoding="async"
+            />
+          </figure>
+        {% endif %}
+      {% endwith %}
     {% endif %}
 
     <hr />

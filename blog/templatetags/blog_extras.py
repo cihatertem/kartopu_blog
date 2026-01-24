@@ -42,6 +42,36 @@ DIVIDEND_COMPARISON_PATTERN = re.compile(
 LEGAL_DISCLAIMER_PATTERN = re.compile(r"\{\{\s*legal_disclaimer\s*\}\}")
 
 
+def _render_responsive_image_figure(img) -> str:
+    rendition = getattr(img, "rendition", None)
+    if not rendition:
+        return ""
+
+    src = rendition["src"]
+    srcset = rendition["srcset"]
+    width = rendition["width"]
+    height = rendition["height"]
+    alt_text = escape(getattr(img, "alt_text", "") or "")
+
+    figure = f"""
+<figure>
+  <img
+    src="{src}"
+    srcset="{srcset}"
+    sizes="(max-width: 768px) 100vw, 720px"
+    alt="{alt_text}"
+    width="{width}"
+    height="{height}"
+    loading="lazy"
+  />
+"""
+    caption = getattr(img, "caption", "")
+    if caption:
+        figure += f"<figcaption>{escape(caption)}</figcaption>\n"
+    figure += "</figure>"
+    return figure
+
+
 @register.filter
 def render_post_content(content, images):
     images = list(images)
@@ -52,21 +82,7 @@ def render_post_content(content, images):
             return ""
 
         img = images[index]
-
-        figure = f"""
-<figure>
-  <img
-    src="{img.image_1200.url}"
-    srcset="{img.image_600.url} 600w, {img.image_900.url} 900w, {img.image_1200.url} 1200w"
-    sizes="(max-width: 768px) 100vw, 720px"
-    alt="{img.alt_text}"
-    loading="lazy"
-  />
-"""
-        if img.caption:
-            figure += f"<figcaption>{img.caption}</figcaption>\n"
-        figure += "</figure>"
-        return figure
+        return _render_responsive_image_figure(img)
 
     expanded = IMAGE_PATTERN.sub(replacer, content or "")
 
@@ -1049,21 +1065,7 @@ def render_post_body(context, post):
         if index < 0 or index >= len(images):
             return ""
         img = images[index]
-
-        figure = f"""
-<figure>
-  <img
-    src="{img.image_1200.url}"
-    srcset="{img.image_600.url} 600w, {img.image_900.url} 900w, {img.image_1200.url} 1200w"
-    sizes="(max-width: 768px) 100vw, 720px"
-    alt="{escape(img.alt_text or "")}"
-    loading="lazy"
-  />
-"""
-        if img.caption:
-            figure += f"<figcaption>{escape(img.caption)}</figcaption>\n"
-        figure += "</figure>"
-        return figure
+        return _render_responsive_image_figure(img)
 
     expanded = IMAGE_PATTERN.sub(image_replacer, content)
 

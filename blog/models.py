@@ -1,4 +1,5 @@
 import os
+from functools import cached_property
 
 from django.conf import settings
 from django.contrib.postgres.indexes import GinIndex
@@ -9,6 +10,7 @@ from django.utils.text import Truncator, slugify
 from imagekit.models import ImageSpecField
 from imagekit.processors import ResizeToFit, Transpose
 
+from core.imagekit import build_responsive_rendition
 from core.images import optimize_uploaded_image_field
 from core.mixins import TimeStampedModelMixin, UUIDModelMixin
 
@@ -289,6 +291,30 @@ class BlogPost(
         base = self.meta_description or self.excerpt or ""
         return Truncator(base).chars(160)
 
+    @cached_property
+    def cover_rendition(self) -> dict | None:
+        if not self.cover_image:
+            return None
+        return build_responsive_rendition(
+            original_field=self.cover_image,
+            spec_map={
+                600: self.cover_600,
+                900: self.cover_900,
+                1200: self.cover_1200,
+            },
+            largest_size=1200,
+        )
+
+    @cached_property
+    def cover_thumb_rendition(self) -> dict | None:
+        if not self.cover_image:
+            return None
+        return build_responsive_rendition(
+            original_field=self.cover_image,
+            spec_map={600: self.cover_600},
+            largest_size=600,
+        )
+
 
 class BlogPostImage(
     UUIDModelMixin,
@@ -361,6 +387,20 @@ class BlogPostImage(
 
     def __str__(self) -> str:
         return f"{self.post.title} - Görsel"  # pyright: ignore[reportAttributeAccessIssue]
+
+    @cached_property
+    def rendition(self) -> dict | None:
+        if not self.image:
+            return None
+        return build_responsive_rendition(
+            original_field=self.image,
+            spec_map={
+                600: self.image_600,
+                900: self.image_900,
+                1200: self.image_1200,
+            },
+            largest_size=1200,
+        )
 
 
 class Tag(

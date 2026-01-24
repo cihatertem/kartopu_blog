@@ -11,6 +11,8 @@ from django.utils.encoding import iri_to_uri
 
 from django.contrib.sites.models import Site
 
+from core.imagekit import safe_file_url
+
 from .models import Announcement, AnnouncementStatus, Subscriber, SubscriberStatus
 from .tokens import make_token
 
@@ -102,8 +104,14 @@ def send_post_published_email(post) -> None:
     subscribers = Subscriber.objects.filter(status=SubscriberStatus.ACTIVE)
     post_url = build_absolute_uri(post.get_absolute_url())
     cover_image_url = None
-    if getattr(post, "cover_image", None):
-        cover_image_url = build_absolute_uri(post.cover_1200.url)
+    cover_field = getattr(post, "cover_image", None)
+    if cover_field:
+        cover_rendition = getattr(post, "cover_rendition", None)
+        cover_url = (
+            cover_rendition["src"] if cover_rendition else safe_file_url(cover_field)
+        )
+        if cover_url:
+            cover_image_url = build_absolute_uri(cover_url)
     for subscriber in subscribers:
         unsubscribe_url = build_unsubscribe_url(subscriber.email)
         context = {

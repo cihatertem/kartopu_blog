@@ -1,4 +1,5 @@
 import os
+from functools import cached_property
 
 from django.core.exceptions import ValidationError
 from django.db import models
@@ -6,6 +7,7 @@ from django.utils.text import slugify
 from imagekit.models import ImageSpecField
 from imagekit.processors import ResizeToFit, Transpose
 
+from .imagekit import build_responsive_rendition
 from .images import optimize_uploaded_image_field
 from .mixins import TimeStampedModelMixin, UUIDModelMixin
 
@@ -145,3 +147,17 @@ class AboutPageImage(
 
     def __str__(self) -> str:
         return f"{self.page.title} - Görsel"
+
+    @cached_property
+    def rendition(self) -> dict | None:
+        if not self.image:
+            return None
+        return build_responsive_rendition(
+            original_field=self.image,
+            spec_map={
+                600: self.image_600,
+                900: self.image_900,
+                1200: self.image_1200,
+            },
+            largest_size=1200,
+        )
