@@ -4,6 +4,8 @@ from collections.abc import Mapping
 from typing import Any
 
 DEFAULT_RENDITION_DIMENSIONS: dict[int, tuple[int, int]] = {
+    54: (54, 54),
+    108: (108, 108),
     600: (600, 600),
     900: (900, 900),
     1200: (1200, 1200),

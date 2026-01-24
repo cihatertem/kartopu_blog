@@ -8,7 +8,7 @@ from django.db import models
 from django.urls import reverse
 from django.utils.text import Truncator, slugify
 from imagekit.models import ImageSpecField
-from imagekit.processors import ResizeToFit, Transpose
+from imagekit.processors import ResizeToFill, ResizeToFit, Transpose
 
 from core.imagekit import build_responsive_rendition
 from core.images import optimize_uploaded_image_field
@@ -191,6 +191,20 @@ class BlogPost(
         options={"quality": 85},
     )
 
+    cover_thumb_54 = ImageSpecField(
+        source="cover_image",
+        processors=[Transpose(), ResizeToFill(54, 54)],
+        format="WEBP",
+        options={"quality": 82},
+    )
+
+    cover_thumb_108 = ImageSpecField(
+        source="cover_image",
+        processors=[Transpose(), ResizeToFill(108, 108)],
+        format="WEBP",
+        options={"quality": 82},
+    )
+
     portfolio_snapshots = models.ManyToManyField(
         "portfolio.PortfolioSnapshot",
         blank=True,
@@ -311,8 +325,11 @@ class BlogPost(
             return None
         return build_responsive_rendition(
             original_field=self.cover_image,
-            spec_map={600: self.cover_600},
-            largest_size=600,
+            spec_map={
+                54: self.cover_thumb_54,
+                108: self.cover_thumb_108,
+            },
+            largest_size=108,
         )
 
 

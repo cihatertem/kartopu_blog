@@ -13,9 +13,11 @@
                 {% if cover %}
                   <img
                     src="{{ cover.src }}"
+                    srcset="{{ cover.srcset }}"
+                    sizes="54px"
                     alt="{{ post.title }}"
-                    width="{{ cover.width }}"
-                    height="{{ cover.height }}"
+                    width="54"
+                    height="54"
                     loading="lazy"
                     decoding="async"
                   />
