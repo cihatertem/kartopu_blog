@@ -5,6 +5,7 @@ from django.contrib.auth.models import AbstractUser, BaseUserManager
 from django.core.files.base import ContentFile
 from django.core.files.storage import Storage, default_storage
 from django.db import models
+from django.utils import timezone
 from django.utils.deconstruct import deconstructible
 from django.utils.text import slugify
 from imagekit.models import ImageSpecField
@@ -98,6 +99,7 @@ class User(  # pyright: ignore[reportIncompatibleVariableOverride]
         blank=True,
         null=True,
     )
+    avatar_updated_at = models.DateTimeField(blank=True, null=True)
     avatar_42 = ImageSpecField(
         source="avatar",
         processors=[Transpose(), ResizeToFill(42, 42)],
@@ -123,6 +125,9 @@ class User(  # pyright: ignore[reportIncompatibleVariableOverride]
         verbose_name_plural = "Kullanıcılar"
 
     def save(self, *args: object, **kwargs: object) -> None:
+        avatar_uploaded = bool(self.avatar and not self.avatar._committed)
+        if avatar_uploaded:
+            self.avatar_updated_at = timezone.now()
         super().save(*args, **kwargs)  # pyright: ignore[reportArgumentType]
         if self.avatar:
             try:
@@ -174,7 +179,7 @@ class User(  # pyright: ignore[reportIncompatibleVariableOverride]
     def avatar_rendition(self) -> dict | None:
         if not self.avatar:
             return None
-        return build_responsive_rendition(
+        rendition = build_responsive_rendition(
             original_field=self.avatar,
             spec_map={
                 42: self.avatar_42,
@@ -182,3 +187,13 @@ class User(  # pyright: ignore[reportIncompatibleVariableOverride]
             },
             largest_size=64,
         )
+        if not rendition:
+            return None
+        if self.avatar_updated_at:
+            version = int(self.avatar_updated_at.timestamp())
+            rendition["src"] = f"{rendition['src']}?v={version}"
+            rendition["srcset"] = ", ".join(
+                f"{url}?v={version} {size}w"
+                for size, url in rendition["urls"].items()
+            )
+        return rendition
