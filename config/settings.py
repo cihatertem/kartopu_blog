@@ -231,7 +231,7 @@ if USE_S3:
             "BACKEND": "storages.backends.s3.S3Storage",
             "OPTIONS": {
                 "location": AWS_LOCATION_MEDIA,
-                "querystring_auth": True,
+                "querystring_auth": False,
                 "object_parameters": {"CacheControl": "public, max-age=3600"},
             },
         },
