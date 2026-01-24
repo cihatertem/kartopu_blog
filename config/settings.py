@@ -218,9 +218,9 @@ if USE_S3:
     AWS_S3_CUSTOM_DOMAIN = os.getenv("AWS_S3_CUSTOM_DOMAIN", "")
     # AWS_S3_ENDPOINT_URL = os.getenv("AWS_S3_ENDPOINT_URL", "")
     AWS_DEFAULT_ACL = None
-    AWS_S3_OBJECT_PARAMETERS = {
-        "CacheControl": "public, max-age=31536000, immutable",
-    }
+    # AWS_S3_OBJECT_PARAMETERS = {
+    #     "CacheControl": "public, max-age=31536000, immutable",
+    # } commented to use per-storage settings below
     AWS_LOCATION_STATIC = os.getenv("AWS_LOCATION_STATIC", "static")
     AWS_LOCATION_MEDIA = os.getenv("AWS_LOCATION_MEDIA", "media")
 
@@ -232,6 +232,7 @@ if USE_S3:
             "OPTIONS": {
                 "location": AWS_LOCATION_MEDIA,
                 "querystring_auth": True,
+                "object_parameters": {"CacheControl": "public, max-age=3600"},
             },
         },
         "staticfiles": {
@@ -239,6 +240,9 @@ if USE_S3:
             "OPTIONS": {
                 "location": AWS_LOCATION_STATIC,
                 "querystring_auth": False,
+                "object_parameters": {
+                    "CacheControl": "public, max-age=31536000, immutable"
+                },
             },
         },
     }
