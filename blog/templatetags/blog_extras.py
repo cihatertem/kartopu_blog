@@ -9,7 +9,7 @@ from django.utils.html import escape
 from django.utils.safestring import mark_safe
 
 from core.markdown import render_markdown
-from portfolio.models import CashFlowEntry, CashFlowSnapshot
+from portfolio.models import CashFlowEntry, CashFlowSnapshot, SalarySavingsSnapshot
 
 register = template.Library()
 
@@ -34,6 +34,12 @@ CASHFLOW_COMPARISON_SUMMARY_PATTERN = re.compile(
 )
 CASHFLOW_COMPARISON_CHARTS_PATTERN = re.compile(
     r"\{\{\s*cashflow_comparison_charts(?::([^\s\}]+))?\s*\}\}"
+)
+SAVINGS_RATE_SUMMARY_PATTERN = re.compile(
+    r"\{\{\s*savings_rate_summary(?::([^\s\}]+))?\s*\}\}"
+)
+SAVINGS_RATE_CHARTS_PATTERN = re.compile(
+    r"\{\{\s*savings_rate_charts(?::([^\s\}]+))?\s*\}\}"
 )
 DIVIDEND_SUMMARY_PATTERN = re.compile(r"\{\{\s*dividend_summary(?::([^\s\}]+))?\s*\}\}")
 DIVIDEND_CHARTS_PATTERN = re.compile(r"\{\{\s*dividend_charts(?::([^\s\}]+))?\s*\}\}")
@@ -372,6 +378,17 @@ def _get_cashflow_comparisons(post):
     )
 
 
+def _get_salary_savings_snapshots(post):
+    if not post:
+        return []
+
+    return _get_prefetched_list(
+        post,
+        "salary_savings_snapshots",
+        post.salary_savings_snapshots.select_related("flow").order_by("snapshot_date"),
+    )
+
+
 def _get_portfolio_snapshots(post):
     if not post:
         return []
@@ -643,6 +660,57 @@ def _render_cashflow_charts_html(snapshot) -> str:
         allocation_json=allocation_json,
         timeseries_json=timeseries_json,
     )
+
+
+def _render_savings_rate_summary_html(snapshot) -> str:
+    if not snapshot:
+        return ""
+
+    flow_name = escape(getattr(snapshot.flow, "name", ""))
+    snapshot_date = escape(str(snapshot.snapshot_date))
+    savings_rate_pct = escape(f"{float((snapshot.savings_rate or 0) * 100):.2f}")
+
+    return f"""
+<section class="savings-rate-snapshot">
+  <div class="summary-card">
+    <p class="summary-meta"><strong>Akış:</strong> {flow_name}</p>
+    <p class="summary-meta summary-meta--spaced"><strong>Tarih:</strong> {snapshot_date}</p>
+    <ul class="summary-list">
+      <li><strong>Tasarruf Oranı (%):</strong> {savings_rate_pct}</li>
+    </ul>
+    <p class="summary-meta summary-meta--tight text-muted">Maaş ve tasarruf tutarları gizlidir.</p>
+  </div>
+</section>
+"""
+
+
+def _render_savings_rate_charts_html(snapshot) -> str:
+    if not snapshot:
+        return ""
+
+    snapshots_qs = (
+        SalarySavingsSnapshot.objects.filter(flow=snapshot.flow)
+        .order_by("snapshot_date")
+        .values_list("snapshot_date", "savings_rate")
+    )
+    timeseries = {
+        "labels": [d.isoformat() for d, _ in snapshots_qs],
+        "values": [float((rate or 0) * 100) for _, rate in snapshots_qs],
+    }
+    timeseries_json = escape(json.dumps(timeseries, cls=DjangoJSONEncoder))
+
+    return """
+<section class="chart-section savings-rate-charts" data-savings-rate-timeseries="{timeseries_json}">
+  <div class="chart-fallback savings-rate-chart-fallback is-hidden">
+    Grafikler yüklenemedi. (Tarayıcı eklentisi / ağ politikası / CSP engelliyor olabilir.)
+  </div>
+
+  <div class="chart-card">
+    <h4 class="chart-card__title">Tasarruf Oranı (Aylık)</h4>
+    <canvas data-chart-kind="savings-rate-timeseries" height="240"></canvas>
+  </div>
+</section>
+""".format(timeseries_json=timeseries_json)
 
 
 def _render_cashflow_comparison_summary_html(comparison) -> str:
@@ -1004,6 +1072,22 @@ def cashflow_charts(context, index=None):
 
 
 @register.simple_tag(takes_context=True)
+def savings_rate_summary(context, index=None):
+    """Post içindeki maaş/tasarruf snapshot özetini HTML olarak döndürür."""
+    post = context.get("post")
+    snapshot = _get_item_by_identifier(_get_salary_savings_snapshots(post), index)
+    return mark_safe(_render_savings_rate_summary_html(snapshot))
+
+
+@register.simple_tag(takes_context=True)
+def savings_rate_charts(context, index=None):
+    """Post içindeki maaş/tasarruf oranı grafik alanını HTML olarak döndürür."""
+    post = context.get("post")
+    snapshot = _get_item_by_identifier(_get_salary_savings_snapshots(post), index)
+    return mark_safe(_render_savings_rate_charts_html(snapshot))
+
+
+@register.simple_tag(takes_context=True)
 def cashflow_comparison_summary(context, index=None):
     """Post içindeki nakit akışı karşılaştırma özetini HTML olarak döndürür."""
     post = context.get("post")
@@ -1061,6 +1145,8 @@ def render_post_body(context, post):
       {{ cashflow_charts:slug_or_hash }}
       {{ cashflow_comparison_summary:slug_or_hash }}
       {{ cashflow_comparison_charts:slug_or_hash }}
+      {{ savings_rate_summary:slug_or_hash }}
+      {{ savings_rate_charts:slug_or_hash }}
       {{ dividend_summary:slug_or_hash }}
       {{ dividend_charts:slug_or_hash }}
       {{ dividend_comparison:slug_or_hash }}
@@ -1149,6 +1235,24 @@ def render_post_body(context, post):
     )
     expanded = CASHFLOW_COMPARISON_CHARTS_PATTERN.sub(
         cashflow_comparison_charts_replacer, expanded
+    )
+    salary_savings_snapshots = _get_salary_savings_snapshots(post)
+
+    def savings_rate_summary_replacer(match):
+        identifier = match.group(1)
+        snapshot = _get_item_by_identifier(salary_savings_snapshots, identifier)
+        return _render_savings_rate_summary_html(snapshot)
+
+    def savings_rate_charts_replacer(match):
+        identifier = match.group(1)
+        snapshot = _get_item_by_identifier(salary_savings_snapshots, identifier)
+        return _render_savings_rate_charts_html(snapshot)
+
+    expanded = SAVINGS_RATE_SUMMARY_PATTERN.sub(
+        savings_rate_summary_replacer, expanded
+    )
+    expanded = SAVINGS_RATE_CHARTS_PATTERN.sub(
+        savings_rate_charts_replacer, expanded
     )
     dividend_snapshots = _get_dividend_snapshots(post)
     dividend_comparisons = _get_dividend_comparisons(post)

@@ -106,6 +106,7 @@ ALLOWED_ATTRIBUTES = {
         "data-portfolio-comparison",
         "data-portfolio-category-allocation",
         "data-dividend-allocation",
+        "data-savings-rate-timeseries",
     ],
     "main": ["class", "id", "style"],
     "table": ["class", "id", "style"],

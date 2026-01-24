@@ -784,6 +784,155 @@ class CashFlowComparison(UUIDModelMixin, TimeStampedModelMixin):
         super().save(*args, **kwargs)  # pyright: ignore[reportArgumentType]
 
 
+class SalarySavingsFlow(UUIDModelMixin, TimeStampedModelMixin):
+    class Currency(models.TextChoices):
+        TRY = "TRY", "TRY"
+        USD = "USD", "USD"
+        EUR = "EUR", "EUR"
+
+    owner = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="salary_savings_flows",
+    )
+    name = models.CharField(max_length=200)
+    currency = models.CharField(
+        max_length=10,
+        choices=Currency.choices,
+        default=Currency.TRY,
+    )
+
+    class Meta:  # pyright: ignore[reportIncompatibleVariableOverride]
+        verbose_name = "Maaş/Tasarruf Akışı"
+        verbose_name_plural = "Maaş/Tasarruf Akışları"
+        ordering = ("-created_at",)
+
+    def __str__(self) -> str:
+        return self.name
+
+
+class SalarySavingsEntry(UUIDModelMixin, TimeStampedModelMixin):
+    flow = models.ForeignKey(
+        SalarySavingsFlow,
+        on_delete=models.CASCADE,
+        related_name="entries",
+    )
+    entry_date = models.DateField()
+    salary_amount = models.DecimalField(
+        max_digits=MAX_DICITS,
+        decimal_places=MAX_DECIMAL_PLACES,
+    )
+    savings_amount = models.DecimalField(
+        max_digits=MAX_DICITS,
+        decimal_places=MAX_DECIMAL_PLACES,
+    )
+    notes = models.TextField(blank=True)
+
+    class Meta:  # pyright: ignore[reportIncompatibleVariableOverride]
+        verbose_name = "Maaş/Tasarruf Girişi"
+        verbose_name_plural = "Maaş/Tasarruf Girişleri"
+        ordering = ("-entry_date", "-created_at")
+
+    def __str__(self) -> str:
+        return f"{self.flow} - {self.entry_date}"
+
+
+class SalarySavingsSnapshot(UUIDModelMixin, TimeStampedModelMixin):
+    flow = models.ForeignKey(
+        SalarySavingsFlow,
+        on_delete=models.CASCADE,
+        related_name="snapshots",
+    )
+    snapshot_date = models.DateField(default=timezone.now)
+    name = models.CharField(
+        max_length=200,
+        blank=True,
+        help_text="İsimlendirme yapılmazsa akış adı ve tarih kullanılır.",
+    )
+    slug = models.CharField(
+        max_length=255,
+        unique=True,
+        blank=True,
+        null=True,
+        editable=False,
+    )
+    total_salary = models.DecimalField(
+        max_digits=MAX_DICITS,
+        decimal_places=MAX_DECIMAL_PLACES,
+    )
+    total_savings = models.DecimalField(
+        max_digits=MAX_DICITS,
+        decimal_places=MAX_DECIMAL_PLACES,
+    )
+    savings_rate = models.DecimalField(max_digits=10, decimal_places=4)
+
+    class Meta:  # pyright: ignore[reportIncompatibleVariableOverride]
+        verbose_name = "Maaş/Tasarruf Snapshot"
+        verbose_name_plural = "Maaş/Tasarruf Snapshotları"
+        ordering = ("-snapshot_date", "-created_at")
+
+    def __str__(self) -> str:
+        if self.slug:
+            return self.slug
+        if self.name:
+            return self.name
+        return f"{self.flow} - {self.snapshot_date}"
+
+    def save(self, *args: object, **kwargs: object) -> None:
+        if not self.name and self.flow_id:  # pyright: ignore[reportAttributeAccessIssue]
+            if self.snapshot_date:
+                self.name = f"{self.flow} - {self.snapshot_date}"
+            else:
+                self.name = f"{self.flow}"
+        if not self.slug and self.name:
+            self.slug = _generate_unique_slug(self.__class__, self.name)
+        super().save(*args, **kwargs)  # pyright: ignore[reportArgumentType]
+
+    @classmethod
+    def create_snapshot(
+        cls,
+        *,
+        flow: SalarySavingsFlow,
+        snapshot_date: date | None = None,
+        name: str | None = None,
+    ) -> "SalarySavingsSnapshot":
+        snapshot_date = snapshot_date or timezone.now().date()  # pyright: ignore[reportAssignmentType]
+        start_date = snapshot_date.replace(day=1)
+        last_day = calendar.monthrange(snapshot_date.year, snapshot_date.month)[1]
+        end_date = snapshot_date.replace(day=last_day)
+        if snapshot_date < end_date:
+            end_date = snapshot_date
+
+        totals = list(
+            flow.entries.filter(
+                entry_date__gte=start_date,
+                entry_date__lte=end_date,
+            ).values_list("salary_amount", "savings_amount")
+        )
+
+        total_salary = sum(
+            ((salary or Decimal("0")) for salary, _ in totals),
+            Decimal("0"),
+        )
+        total_savings = sum(
+            ((savings or Decimal("0")) for _, savings in totals),
+            Decimal("0"),
+        )
+        savings_rate = (
+            total_savings / total_salary if total_salary > 0 else Decimal("0")
+        )
+
+        snapshot = cls.objects.create(
+            flow=flow,
+            snapshot_date=snapshot_date,
+            name=name or "",
+            total_salary=total_salary,
+            total_savings=total_savings,
+            savings_rate=savings_rate,
+        )
+        return snapshot
+
+
 class DividendComparison(UUIDModelMixin, TimeStampedModelMixin):
     name = models.CharField(max_length=255, blank=True)
     slug = models.CharField(

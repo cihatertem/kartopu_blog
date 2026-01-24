@@ -24,6 +24,7 @@ from portfolio.models import (
     DividendSnapshot,
     PortfolioComparison,
     PortfolioSnapshot,
+    SalarySavingsSnapshot,
 )
 
 from .models import BlogPost, BlogPostReaction, Category, Tag
@@ -343,6 +344,12 @@ def post_detail(request, slug: str):
                 ).order_by("created_at"),
             ),
             Prefetch(
+                "salary_savings_snapshots",
+                queryset=SalarySavingsSnapshot.objects.select_related("flow").order_by(
+                    "snapshot_date"
+                ),
+            ),
+            Prefetch(
                 "dividend_snapshots",
                 queryset=DividendSnapshot.objects.order_by("-year", "-created_at"),
             ),
@@ -460,6 +467,12 @@ def post_preview(request, slug: str):
                     "base_snapshot__cashflow",
                     "compare_snapshot__cashflow",
                 ).order_by("created_at"),
+            ),
+            Prefetch(
+                "salary_savings_snapshots",
+                queryset=SalarySavingsSnapshot.objects.select_related("flow").order_by(
+                    "snapshot_date"
+                ),
             ),
             Prefetch(
                 "dividend_snapshots",

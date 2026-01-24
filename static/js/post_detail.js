@@ -547,6 +547,86 @@ document.addEventListener("DOMContentLoaded", function () {
     });
 
     // -------------------------
+    // Savings rate charts
+    // -------------------------
+    document.querySelectorAll(".savings-rate-charts").forEach((section) => {
+        const fallbackSelector = ".savings-rate-chart-fallback";
+        if (!isChartAvailable()) {
+            revealFallback(section, fallbackSelector);
+            return;
+        }
+
+        const timeseriesRaw = section.dataset.savingsRateTimeseries;
+        if (!timeseriesRaw) {
+            revealFallback(section, fallbackSelector);
+            return;
+        }
+
+        let timeseriesData;
+        try {
+            timeseriesData = JSON.parse(timeseriesRaw);
+        } catch {
+            revealFallback(section, fallbackSelector);
+            return;
+        }
+
+        const timeseriesCanvas = section.querySelector(
+            'canvas[data-chart-kind="savings-rate-timeseries"]',
+        );
+
+        if (timeseriesData && timeseriesCanvas) {
+            try {
+                new Chart(timeseriesCanvas, {
+                    type: "line",
+                    data: {
+                        labels: timeseriesData.labels,
+                        datasets: [
+                            {
+                                data: timeseriesData.values,
+                                fill: false,
+                                tension: 0.25,
+                            },
+                        ],
+                    },
+                    options: {
+                        responsive: true,
+                        plugins: {
+                            legend: { display: false },
+                            tooltip: {
+                                callbacks: {
+                                    label(ctx) {
+                                        const v = ctx.parsed?.y ?? ctx.parsed ?? 0;
+                                        return `Tasarruf Oranı: ${Number(v).toFixed(2)}%`;
+                                    },
+                                },
+                            },
+                        },
+                        scales: {
+                            x: {
+                                ticks: {
+                                    maxRotation: 0,
+                                    autoSkip: true,
+                                    maxTicksLimit: 8,
+                                },
+                            },
+                            y: {
+                                beginAtZero: true,
+                                ticks: {
+                                    callback(value) {
+                                        return `${Number(value).toFixed(0)}%`;
+                                    },
+                                },
+                            },
+                        },
+                    },
+                });
+            } catch {
+                revealFallback(section, fallbackSelector);
+            }
+        }
+    });
+
+    // -------------------------
     // Cashflow comparison charts
     // -------------------------
     document

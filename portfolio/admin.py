@@ -21,6 +21,9 @@ from portfolio.models import (
     PortfolioSnapshot,
     PortfolioSnapshotItem,
     PortfolioTransaction,
+    SalarySavingsEntry,
+    SalarySavingsFlow,
+    SalarySavingsSnapshot,
 )
 
 User = get_user_model()
@@ -334,6 +337,102 @@ class CashFlowComparisonAdmin(admin.ModelAdmin):
             f"{updated} karşılaştırma güncellendi.",
             level=messages.SUCCESS,
         )
+
+
+@admin.register(SalarySavingsFlow)
+class SalarySavingsFlowAdmin(admin.ModelAdmin):
+    list_display = ("name", "owner", "currency", "created_at")
+    search_fields = ("name", "owner__email")
+    list_filter = ("owner", "created_at")
+    actions = ("create_monthly_snapshot",)
+
+    def formfield_for_foreignkey(self, db_field, request, **kwargs):
+        if db_field.name == "owner":
+            qs = User.objects.all()
+            qs = qs.filter(is_staff=True)
+            qs = qs.filter(socialaccount__isnull=True)
+            qs = qs.distinct()
+            kwargs["queryset"] = qs
+        return super().formfield_for_foreignkey(db_field, request, **kwargs)
+
+    def get_changeform_initial_data(self, request):
+        initial = super().get_changeform_initial_data(request)
+        if request.user.is_authenticated and request.user.is_staff:
+            initial.setdefault("owner", request.user.pk)  # pyright: ignore[reportArgumentType]
+        return initial
+
+    @admin.action(description="Aylık maaş/tasarruf snapshot oluştur")
+    def create_monthly_snapshot(self, request, queryset):
+        created = 0
+        for flow in queryset:
+            SalarySavingsSnapshot.create_snapshot(
+                flow=flow,
+                snapshot_date=timezone.now().date(),  # pyright: ignore[reportArgumentType]
+            )
+            created += 1
+        self.message_user(
+            request,
+            f"{created} adet snapshot oluşturuldu.",
+            level=messages.SUCCESS,
+        )
+
+
+@admin.register(SalarySavingsEntry)
+class SalarySavingsEntryAdmin(admin.ModelAdmin):
+    list_display = (
+        "flow",
+        "entry_date",
+        "salary_amount",
+        "savings_amount",
+        "savings_rate_display",
+    )
+    list_filter = ("flow", "entry_date")
+    search_fields = ("flow__name", "flow__owner__email")
+    list_select_related = ("flow", "flow__owner")
+    autocomplete_fields = ("flow",)
+
+    @admin.display(description="Tasarruf Oranı (%)")
+    def savings_rate_display(self, obj):
+        if not obj.salary_amount:
+            return "0.00"
+        return f"{float((obj.savings_amount / obj.salary_amount) * 100):.2f}"
+
+
+@admin.register(SalarySavingsSnapshot)
+class SalarySavingsSnapshotAdmin(admin.ModelAdmin):
+    list_display = (
+        "name",
+        "flow",
+        "snapshot_date",
+        "savings_rate_display",
+        "total_salary",
+        "total_savings",
+    )
+    list_filter = ("snapshot_date",)
+    readonly_fields = ("total_salary", "total_savings", "savings_rate")
+    search_fields = ("name", "slug", "flow__name", "flow__owner__email")
+    list_select_related = ("flow", "flow__owner")
+    autocomplete_fields = ("flow",)
+
+    @admin.display(description="Tasarruf Oranı (%)")
+    def savings_rate_display(self, obj):
+        return f"{float((obj.savings_rate or 0) * 100):.2f}"
+
+    def save_model(self, request, obj, form, change):
+        if change:
+            super().save_model(request, obj, form, change)
+            return
+
+        snapshot = SalarySavingsSnapshot.create_snapshot(
+            flow=obj.flow,
+            snapshot_date=obj.snapshot_date,
+            name=obj.name,
+        )
+        obj.pk = snapshot.pk
+        obj.name = snapshot.name
+        obj.total_salary = snapshot.total_salary
+        obj.total_savings = snapshot.total_savings
+        obj.savings_rate = snapshot.savings_rate
 
 
 @admin.register(DividendComparison)

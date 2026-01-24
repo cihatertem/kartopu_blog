@@ -110,22 +110,26 @@ class BlogPost(
         help_text="Listeleme sayfalarında gösterilecek kısa özet.",
     )
     content = models.TextField(
-        help_text="""Blog içeriği (Markdown veya HTML).
-        Markdown içinde kullanılabilen marker'lar:<br>
-          {{ image:1 }}  (1-based)<br>
-          {{ portfolio_summary:slug_or_hash }}<br>
-          {{ portfolio_charts:slug_or_hash }}<br>
-          {{ portfolio_category_summary:slug_or_hash }}<br>
-          {{ portfolio_comparison_summary:slug_or_hash }}<br>
-          {{ portfolio_comparison_charts:slug_or_hash }}<br>
-          {{ cashflow_summary:slug_or_hash }}<br>
-          {{ cashflow_charts:slug_or_hash }}<br>
-          {{ cashflow_comparison_summary:slug_or_hash }}<br>
-          {{ cashflow_comparison_charts:slug_or_hash }}<br>
-          {{ dividend_summary:slug_or_hash }}<br>
-          {{ dividend_charts:slug_or_hash }}<br>
-          {{ dividend_comparison:slug_or_hash }}<br>
-          {{ legal_disclaimer }}<br>"""
+        help_text=(
+            "Blog içeriği (Markdown veya HTML).\n"
+            "Markdown içinde kullanılabilen marker'lar:<br>\n"
+            "  {{ image:1 }}  (1-based)<br>\n"
+            "  {{ portfolio_summary:slug_or_hash }}<br>\n"
+            "  {{ portfolio_charts:slug_or_hash }}<br>\n"
+            "  {{ portfolio_category_summary:slug_or_hash }}<br>\n"
+            "  {{ portfolio_comparison_summary:slug_or_hash }}<br>\n"
+            "  {{ portfolio_comparison_charts:slug_or_hash }}<br>\n"
+            "  {{ cashflow_summary:slug_or_hash }}<br>\n"
+            "  {{ cashflow_charts:slug_or_hash }}<br>\n"
+            "  {{ cashflow_comparison_summary:slug_or_hash }}<br>\n"
+            "  {{ cashflow_comparison_charts:slug_or_hash }}<br>\n"
+            "  {{ savings_rate_summary:slug_or_hash }}<br>\n"
+            "  {{ savings_rate_charts:slug_or_hash }}<br>\n"
+            "  {{ dividend_summary:slug_or_hash }}<br>\n"
+            "  {{ dividend_charts:slug_or_hash }}<br>\n"
+            "  {{ dividend_comparison:slug_or_hash }}<br>\n"
+            "  {{ legal_disclaimer }}<br>"
+        )
     )
 
     # --- Yayın durumu ---
@@ -231,6 +235,13 @@ class BlogPost(
         blank=True,
         related_name="blog_posts",
         help_text="Bu yazı ile ilişkili nakit akışı karşılaştırmaları",
+    )
+
+    salary_savings_snapshots = models.ManyToManyField(
+        "portfolio.SalarySavingsSnapshot",
+        blank=True,
+        related_name="blog_posts",
+        help_text="Bu yazı ile ilişkili maaş/tasarruf snapshotları",
     )
 
     dividend_snapshots = models.ManyToManyField(
