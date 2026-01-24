@@ -4,6 +4,7 @@ from functools import cached_property
 from django.conf import settings
 from django.contrib.postgres.indexes import GinIndex
 from django.contrib.postgres.search import SearchVector
+from django.core.files.storage import default_storage
 from django.db import models
 from django.urls import reverse
 from django.utils.text import Truncator, slugify
@@ -289,6 +290,7 @@ class BlogPost(
             self.published_at = timezone.now()
 
         is_new = self._state.adding
+        cover_uploaded = bool(self.cover_image and not self.cover_image._committed)
 
         super().save(*args, **kwargs)
 
@@ -297,6 +299,8 @@ class BlogPost(
                 optimize_uploaded_image_field(self.cover_image)
             except Exception:
                 pass
+        if cover_uploaded:
+            self._invalidate_cover_cache()
 
     def get_absolute_url(self) -> str:
         return reverse("blog:post_detail", kwargs={"slug": self.slug})
@@ -342,6 +346,41 @@ class BlogPost(
             },
             largest_size=108,
         )
+
+    def _invalidate_cover_cache(self) -> None:
+        if not self.cover_image or not self.cover_image.name:
+            return
+
+        cache_dir = getattr(settings, "IMAGEKIT_CACHEFILE_DIR", "cache")
+        cache_path = os.path.join(cache_dir, os.path.dirname(self.cover_image.name))
+
+        def delete_storage_dir(path: str) -> None:
+            try:
+                directories, files = default_storage.listdir(path)
+                for file_name in files:
+                    default_storage.delete(os.path.join(path, file_name))
+                for directory in directories:
+                    delete_storage_dir(os.path.join(path, directory))
+            except Exception:
+                pass
+
+        for spec in (
+            self.cover_600,
+            self.cover_900,
+            self.cover_1200,
+            self.cover_thumb_54,
+            self.cover_thumb_108,
+        ):
+            try:
+                cachefile = getattr(spec, "cachefile", None)
+                storage = getattr(cachefile, "storage", None)
+                name = getattr(cachefile, "name", "")
+                if storage and name and storage.exists(name):
+                    storage.delete(name)
+            except Exception:
+                pass
+
+        delete_storage_dir(cache_path)
 
 
 class BlogPostImage(
@@ -404,6 +443,7 @@ class BlogPostImage(
 
     def save(self, *args, **kwargs):
         is_new = self._state.adding
+        image_uploaded = bool(self.image and not self.image._committed)
         super().save(*args, **kwargs)
 
         # Sadece ilk upload'ta optimize et
@@ -412,6 +452,8 @@ class BlogPostImage(
                 optimize_uploaded_image_field(self.image)
             except Exception:
                 pass
+        if image_uploaded:
+            self._invalidate_image_cache()
 
     def __str__(self) -> str:
         return f"{self.post.title} - Görsel"  # pyright: ignore[reportAttributeAccessIssue]
@@ -429,6 +471,35 @@ class BlogPostImage(
             },
             largest_size=1200,
         )
+
+    def _invalidate_image_cache(self) -> None:
+        if not self.image or not self.image.name:
+            return
+
+        cache_dir = getattr(settings, "IMAGEKIT_CACHEFILE_DIR", "cache")
+        cache_path = os.path.join(cache_dir, os.path.dirname(self.image.name))
+
+        def delete_storage_dir(path: str) -> None:
+            try:
+                directories, files = default_storage.listdir(path)
+                for file_name in files:
+                    default_storage.delete(os.path.join(path, file_name))
+                for directory in directories:
+                    delete_storage_dir(os.path.join(path, directory))
+            except Exception:
+                pass
+
+        for spec in (self.image_600, self.image_900, self.image_1200):
+            try:
+                cachefile = getattr(spec, "cachefile", None)
+                storage = getattr(cachefile, "storage", None)
+                name = getattr(cachefile, "name", "")
+                if storage and name and storage.exists(name):
+                    storage.delete(name)
+            except Exception:
+                pass
+
+        delete_storage_dir(cache_path)
 
 
 class Tag(

@@ -1,10 +1,13 @@
+import os
 from functools import cached_property
 from io import BytesIO
 
 from django.contrib.auth.models import AbstractUser, BaseUserManager
+from django.core.files.storage import default_storage
 from django.core.files.base import ContentFile
-from django.core.files.storage import Storage, default_storage
+from django.core.files.storage import Storage
 from django.db import models
+from django.conf import settings
 from django.utils import timezone
 from django.utils.deconstruct import deconstructible
 from django.utils.text import slugify
@@ -132,6 +135,8 @@ class User(  # pyright: ignore[reportIncompatibleVariableOverride]
         if self.avatar:
             try:
                 self._resize_avatar()
+                if avatar_uploaded:
+                    self._invalidate_avatar_cache()
             except Exception:
                 pass  # Hata durumunda avatar olduğu gibi kalır
 
@@ -174,6 +179,35 @@ class User(  # pyright: ignore[reportIncompatibleVariableOverride]
         if storage.exists(name):
             storage.delete(name)
         storage.save(name, content)
+
+    def _invalidate_avatar_cache(self) -> None:
+        if not self.avatar or not self.avatar.name:
+            return
+
+        cache_dir = getattr(settings, "IMAGEKIT_CACHEFILE_DIR", "cache")
+        cache_path = os.path.join(cache_dir, os.path.dirname(self.avatar.name))
+
+        def delete_storage_dir(path: str) -> None:
+            try:
+                directories, files = default_storage.listdir(path)
+                for file_name in files:
+                    default_storage.delete(os.path.join(path, file_name))
+                for directory in directories:
+                    delete_storage_dir(os.path.join(path, directory))
+            except Exception:
+                pass
+
+        for spec in (self.avatar_42, self.avatar_64):
+            try:
+                cachefile = getattr(spec, "cachefile", None)
+                storage = getattr(cachefile, "storage", None)
+                name = getattr(cachefile, "name", "")
+                if storage and name and storage.exists(name):
+                    storage.delete(name)
+            except Exception:
+                pass
+
+        delete_storage_dir(cache_path)
 
     @cached_property
     def avatar_rendition(self) -> dict | None:
