@@ -33,7 +33,10 @@
     };
 
     let storedTheme = getStoredTheme();
-    let activeTheme = storedTheme || "light";
+    const prefersDark =
+        window.matchMedia &&
+        window.matchMedia("(prefers-color-scheme: dark)").matches;
+    let activeTheme = storedTheme || (prefersDark ? "dark" : "light");
     applyTheme(activeTheme);
 
     if (themeToggle) {

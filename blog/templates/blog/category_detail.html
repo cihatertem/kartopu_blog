@@ -1,9 +1,9 @@
 {% extends "base.html" %}
-{% load static %}
+{% load static blog_extras %}
 {% block title %}{{ category.name|title }} Yazıları | Kartopu Money{% endblock %}
 {% block page_css %}
-  <link rel="stylesheet" href="{% static 'css/blog.css' %}" />
-  <link rel="stylesheet" href="{% static 'css/post_list.css' %}" />
+  {% preload_stylesheet 'css/blog.css' %}
+  {% preload_stylesheet 'css/post_list.css' %}
 {% endblock %}
 {% block head %}
   <meta

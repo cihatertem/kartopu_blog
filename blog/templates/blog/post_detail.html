@@ -3,8 +3,8 @@
 
 {% block title %}{{ post.effective_meta_title }}{% endblock %}
 {% block page_css %}
-  <link rel="stylesheet" href="{% static 'css/blog.css' %}" />
-  <link rel="stylesheet" href="{% static 'css/forms.css' %}" />
+  {% preload_stylesheet 'css/blog.css' %}
+  {% preload_stylesheet 'css/forms.css' %}
 {% endblock %}
 
 {% block head %}

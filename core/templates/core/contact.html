@@ -1,10 +1,10 @@
 {% extends "base.html" %}
-{% load static %}
+{% load static blog_extras %}
 
 {% block title %}İletişim | Kartopu Money{% endblock %}
 {% block page_css %}
-  <link rel="stylesheet" href="{% static 'css/forms.css' %}" />
-  <link rel="stylesheet" href="{% static 'css/contact.css' %}" />
+  {% preload_stylesheet 'css/forms.css' %}
+  {% preload_stylesheet 'css/contact.css' %}
 {% endblock %}
 {% block head %}
   <meta

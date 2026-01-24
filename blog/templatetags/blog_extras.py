@@ -4,6 +4,7 @@ from decimal import Decimal, InvalidOperation
 
 from django import template
 from django.core.serializers.json import DjangoJSONEncoder
+from django.templatetags.static import static as static_url
 from django.utils.html import escape
 from django.utils.safestring import mark_safe
 
@@ -40,6 +41,16 @@ DIVIDEND_COMPARISON_PATTERN = re.compile(
     r"\{\{\s*dividend_comparison(?::([^\s\}]+))?\s*\}\}"
 )
 LEGAL_DISCLAIMER_PATTERN = re.compile(r"\{\{\s*legal_disclaimer\s*\}\}")
+
+
+@register.simple_tag
+def preload_stylesheet(path: str) -> str:
+    href = static_url(path)
+    return mark_safe(
+        f'<link rel="preload" href="{href}" as="style" '
+        "onload=\"this.onload=null;this.rel='stylesheet'\">"
+        f"<noscript><link rel=\"stylesheet\" href=\"{href}\"></noscript>"
+    )
 
 
 def _render_responsive_image_figure(img) -> str:
