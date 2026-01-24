@@ -59,11 +59,40 @@
   <article>
     <h1>{{ post.title }}</h1>
 
-    <p>
-      <strong>Yazar:</strong> {{ post.author.full_name }}<br />
-      <strong>Yayınlanma:</strong> {{ post.published_at|date:"d F Y" }}<br />
-      <strong>Okunma:</strong> {{ post.view_count }}
-    </p>
+    <div class="post-detail__meta">
+      <div class="post-detail__author">
+        <div class="post-detail__avatar">
+          {% with avatar=post.author.avatar_rendition %}
+            {% if avatar %}
+              <img
+                class="post-detail__avatar-img"
+                src="{{ avatar.src }}"
+                srcset="{{ avatar.srcset }}"
+                sizes="56px"
+                width="56"
+                height="56"
+                alt="{{ post.author.full_name|default:post.author.email }}"
+                loading="lazy"
+                decoding="async"
+              />
+            {% else %}
+              <span class="post-detail__avatar-fallback" aria-hidden="true">
+                {{ post.author.full_name|default:post.author.email|slice:":1" }}
+              </span>
+            {% endif %}
+          {% endwith %}
+        </div>
+        <div class="post-detail__author-info">
+          <span class="post-detail__author-name">{{ post.author.full_name|default:post.author.email }}</span>
+          <span class="post-detail__meta-line">
+            <span class="post-detail__meta-dot" aria-hidden="true"></span>
+            <span>{{ post.published_at|date:"d F Y" }}</span>
+            <span class="post-detail__meta-separator">•</span>
+            <span>{{ post.view_count }} okunma</span>
+          </span>
+        </div>
+      </div>
+    </div>
 
     {% if post.cover_image %}
       {% with cover=post.cover_rendition %}

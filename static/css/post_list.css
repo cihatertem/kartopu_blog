@@ -21,6 +21,63 @@
 }
 
 .post-list__meta {
-  margin: 0;
+  margin: 0.5rem 0 0;
   color: var(--color-muted);
+}
+
+.post-list__author {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.post-list__avatar {
+  width: 42px;
+  height: 42px;
+  border-radius: 50%;
+  background: var(--color-avatar-bg);
+  color: var(--color-avatar-text);
+  display: grid;
+  place-items: center;
+  font-weight: 600;
+  text-transform: uppercase;
+  flex-shrink: 0;
+  overflow: hidden;
+}
+
+.post-list__avatar-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.post-list__author-info {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+
+.post-list__author-name {
+  font-weight: 600;
+  color: var(--color-text);
+}
+
+.post-list__meta-line {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.9rem;
+  color: var(--color-muted);
+}
+
+.post-list__meta-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--color-avatar-bg);
+}
+
+.post-list__meta-separator {
+  opacity: 0.7;
 }

@@ -41,6 +41,8 @@
   --color-warning-bg: #fff4d6;
   --color-warning-border: #ffe3a3;
   --color-burcu: #3ecece;
+  --color-avatar-bg: #2f6da1;
+  --color-avatar-text: #ffffff;
   --shadow-soft: 0 10px 24px rgba(31, 42, 55, 0.08);
   --tag-color-1-bg: linear(
     45deg,
@@ -123,6 +125,8 @@
   --color-warning-bg: rgba(255, 244, 214, 0.16);
   --color-warning-border: rgba(255, 227, 163, 0.35);
   --color-burcu: #4de1e1;
+  --color-avatar-bg: #5aa4e6;
+  --color-avatar-text: #0f1722;
   --shadow-soft: 0 16px 30px rgba(4, 10, 20, 0.6);
   --tag-color-1-bg: linear-gradient(
     45deg,
