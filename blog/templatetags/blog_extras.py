@@ -48,7 +48,7 @@ def preload_stylesheet(path: str) -> str:
     href = static_url(path)
     return mark_safe(
         f'<link rel="preload" href="{href}" as="style" '
-        "onload=\"this.onload=null;this.rel='stylesheet'\">"
+        'data-preload-stylesheet="true">'
         f"<noscript><link rel=\"stylesheet\" href=\"{href}\"></noscript>"
     )
 

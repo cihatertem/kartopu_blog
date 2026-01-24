@@ -5,22 +5,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>{% block title %}| Kartopu Money{% endblock %}</title>
-    <script>
-      (function () {
-        const storageKey = "theme-preference";
-        let storedTheme = null;
-        try {
-          storedTheme = localStorage.getItem(storageKey);
-        } catch (error) {
-          storedTheme = null;
-        }
-        const prefersDark =
-          window.matchMedia &&
-          window.matchMedia("(prefers-color-scheme: dark)").matches;
-        const theme = storedTheme || (prefersDark ? "dark" : "light");
-        document.documentElement.setAttribute("data-theme", theme);
-      })();
-    </script>
+    <script src="{% static 'js/head.js' %}"></script>
     <style>
       :root {
         --color-bg: #f4f7fb;
@@ -333,6 +318,7 @@
     </style>
     {% preload_stylesheet 'css/site.css' %}
     {% block page_css %}{% endblock %}
+    <script src="{% static 'js/preload.js' %}"></script>
     <link rel="icon" type="image/svg+xml" href="{% static 'images/home/hero-snow-ball.png' %}" />
     <!-- Google tag (gtag.js) -->
     {% if GOOGLE_ANALYTICS_ID %}
