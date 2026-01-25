@@ -65,7 +65,9 @@ def post_cover_upload_path(instance: "BlogPost", filename: str) -> str:
 
 def post_image_upload_path(instance: "BlogPostImage", filename: str) -> str:
     filename, file_extension = os.path.splitext(filename.lower())
-    safe_name = slugify(filename)
+    slug_filename = slugify(filename)
+    timestamp = timezone.now().strftime("%Y%m%d%H%M%S")
+    safe_name = f"{slug_filename}_{timestamp}"
 
     return f"blog/{instance.post.slug}/images/{safe_name}{file_extension}"  # pyright: ignore[reportAttributeAccessIssue]
 

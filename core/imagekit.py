@@ -4,6 +4,8 @@ from collections.abc import Mapping
 from typing import Any
 
 DEFAULT_RENDITION_DIMENSIONS: dict[int, tuple[int, int]] = {
+    42: (42, 42),
+    64: (64, 64),
     54: (54, 54),
     108: (108, 108),
     600: (600, 600),
@@ -28,7 +30,9 @@ def _safe_spec_url(spec_field: Any, fallback_url: str) -> str:
         return fallback_url
 
 
-def _safe_spec_dimensions(spec_field: Any, fallback: tuple[int, int]) -> tuple[int, int]:
+def _safe_spec_dimensions(
+    spec_field: Any, fallback: tuple[int, int]
+) -> tuple[int, int]:
     try:
         width = int(spec_field.width)
         height = int(spec_field.height)

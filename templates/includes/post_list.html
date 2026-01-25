@@ -52,15 +52,42 @@
         </figure>
       {% endif %}
 
-      <p class="post-list__meta">
-        <small>
-          {{ post.published_at|date:"d F Y" }}
-          — {{ post.author.full_name }}
-          {% if post.category %}
-            — <a href="{{ post.category.get_absolute_url }}">{{ post.category.name }}</a>
-          {% endif %}
-        </small>
-      </p>
+      <div class="post-list__meta">
+        <div class="post-list__author">
+          <div class="post-list__avatar">
+            {% with avatar=post.author.avatar_rendition %}
+              {% if avatar %}
+                <img
+                  class="post-list__avatar-img"
+                  src="{{ avatar.src }}"
+                  srcset="{{ avatar.srcset }}"
+                  sizes="42px"
+                  width="42"
+                  height="42"
+                  alt="{{ post.author.full_name|default:post.author.email }}"
+                  loading="lazy"
+                  decoding="async"
+                />
+              {% else %}
+                <span class="post-list__avatar-fallback" aria-hidden="true">
+                  {{ post.author.full_name|default:post.author.email|slice:":1" }}
+                </span>
+              {% endif %}
+            {% endwith %}
+          </div>
+          <div class="post-list__author-info">
+            <span class="post-list__author-name">{{ post.author.full_name|default:post.author.email }}</span>
+            <span class="post-list__meta-line">
+              <span class="post-list__meta-dot" aria-hidden="true"></span>
+              <span>{{ post.published_at|date:"d F Y" }}</span>
+              {% if post.category %}
+                <span class="post-list__meta-separator">•</span>
+                <a href="{{ post.category.get_absolute_url }}">{{ post.category.name }}</a>
+              {% endif %}
+            </span>
+          </div>
+        </div>
+      </div>
 
       {% if post.excerpt %}
         <p>{{ post.excerpt }} <span><a href="{{ post.get_absolute_url }}"> Okumaya devam et...</a></span></p>

@@ -1,3 +1,4 @@
+from functools import cached_property
 from io import BytesIO
 
 from django.contrib.auth.models import AbstractUser, BaseUserManager
@@ -7,8 +8,11 @@ from django.db import models
 from django.utils import timezone
 from django.utils.deconstruct import deconstructible
 from django.utils.text import slugify
+from imagekit.models import ImageSpecField
+from imagekit.processors import ResizeToFill, Transpose
 from PIL import Image, ImageOps
 
+from core.imagekit import build_responsive_rendition
 from core.mixins import TimeStampedModelMixin, UUIDModelMixin
 
 # Create your models here.
@@ -97,6 +101,18 @@ class User(  # pyright: ignore[reportIncompatibleVariableOverride]
         blank=True,
         null=True,
     )
+    avatar_42 = ImageSpecField(
+        source="avatar",
+        processors=[Transpose(), ResizeToFill(42, 42)],
+        format="WEBP",
+        options={"quality": 82},
+    )
+    avatar_64 = ImageSpecField(
+        source="avatar",
+        processors=[Transpose(), ResizeToFill(64, 64)],
+        format="WEBP",
+        options={"quality": 82},
+    )
 
     USERNAME_FIELD = "email"
     REQUIRED_FIELDS: list[str] = []
@@ -156,3 +172,16 @@ class User(  # pyright: ignore[reportIncompatibleVariableOverride]
         if storage.exists(name):
             storage.delete(name)
         storage.save(name, content)
+
+    @cached_property
+    def avatar_rendition(self) -> dict | None:
+        if not self.avatar:
+            return None
+        return build_responsive_rendition(
+            original_field=self.avatar,
+            spec_map={
+                42: self.avatar_42,
+                64: self.avatar_64,
+            },
+            largest_size=64,
+        )
