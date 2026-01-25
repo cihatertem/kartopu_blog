@@ -6,7 +6,7 @@ from django.utils.text import slugify
 from django.views.decorators.http import require_http_methods
 from django_ratelimit.decorators import ratelimit
 
-from blog.models import BlogPost, Category
+from blog.models import Category
 from core.helpers import (
     CAPTCHA_SESSION_KEY,
     _generate_captcha,
@@ -14,6 +14,7 @@ from core.helpers import (
     client_ip_key,
     get_client_ip,
 )
+from core.services.blog import published_posts_queryset
 from core.models import AboutPage
 
 from .forms import ContactForm
@@ -30,20 +31,14 @@ def home_view(request):
 
     if portfolio_category:
         portfolio_posts = list(
-            BlogPost.objects.filter(
-                status=BlogPost.Status.PUBLISHED,
-                category=portfolio_category,
-            )
-            .select_related("author", "category")
+            published_posts_queryset(include_tags=False)
+            .filter(category=portfolio_category)
             .order_by("-published_at", "-created_at")[:5]
         )
 
     featured_post = (
-        BlogPost.objects.filter(
-            status=BlogPost.Status.PUBLISHED,
-            is_featured=True,
-        )
-        .select_related("author", "category")
+        published_posts_queryset(include_tags=False)
+        .filter(is_featured=True)
         .order_by("-published_at", "-created_at")
         .first()
     )

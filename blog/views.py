@@ -5,7 +5,6 @@ from django.contrib.auth.decorators import login_required
 from django.contrib.postgres.aggregates import StringAgg
 from django.contrib.postgres.search import SearchQuery, SearchRank, SearchVector
 from django.core.exceptions import PermissionDenied
-from django.core.paginator import Paginator
 from django.db.models import Count, F, Prefetch
 from django.http import JsonResponse
 from django.shortcuts import get_object_or_404, render
@@ -16,6 +15,8 @@ from django.views.decorators.http import require_POST
 from comments.forms import CommentForm
 from comments.models import MAX_COMMENT_LENGTH, Comment
 from core import helpers
+from core.services.blog import published_posts_queryset
+from core.services.pagination import get_page_obj
 from core.tag_colors import build_tag_items
 from portfolio.models import (
     CashFlowComparison,
@@ -183,8 +184,12 @@ def _build_comment_context(request, post):
         request.user.is_authenticated
         and SocialAccount.objects.filter(user=request.user).exists()
     )
-    paginator = Paginator(top_level_comments, COMMENT_PAGE_SIZE)
-    comment_page_obj = paginator.get_page(request.GET.get("comments_page"))
+    comment_page_obj = get_page_obj(
+        request,
+        top_level_comments,
+        per_page=COMMENT_PAGE_SIZE,
+        page_param="comments_page",
+    )
 
     return {
         "comment_form": comment_form,
@@ -346,11 +351,7 @@ def search_results(request):
     q = (request.GET.get("q") or "").strip()
     tokens = helpers.normalize_search_query(q)
 
-    base_qs = (
-        BlogPost.objects.filter(status=BlogPost.Status.PUBLISHED)
-        .select_related("author", "category")
-        .prefetch_related("tags")
-    )
+    base_qs = published_posts_queryset()
 
     if not q or not tokens:
         qs = base_qs.none()
@@ -382,8 +383,7 @@ def search_results(request):
             .order_by("-rank", "-published_at")
         )
 
-    paginator = Paginator(qs, POST_PAGE_SIZE)
-    page_obj = paginator.get_page(request.GET.get("page"))
+    page_obj = get_page_obj(request, qs, per_page=POST_PAGE_SIZE)
 
     breadcrumbs = [
         {"label": "Blog", "url": reverse("blog:post_list")},
@@ -404,16 +404,8 @@ def search_results(request):
 
 
 def post_list(request):
-    qs = (
-        BlogPost.objects.filter(status=BlogPost.Status.PUBLISHED)
-        .select_related("author", "category")
-        .prefetch_related("tags")
-        .order_by("-published_at", "-created_at")
-    )
-
-    paginator = Paginator(qs, POST_PAGE_SIZE)
-    page_number = request.GET.get("page")
-    page_obj = paginator.get_page(page_number)
+    qs = published_posts_queryset().order_by("-published_at", "-created_at")
+    page_obj = get_page_obj(request, qs, per_page=POST_PAGE_SIZE)
 
     return render(
         request,
@@ -509,18 +501,11 @@ def archive_detail(request, year: int, month: int):
     archive_month = date(year, month, 1)
     archive_month = date_format(archive_month, "F Y")
     qs = (
-        BlogPost.objects.filter(
-            status=BlogPost.Status.PUBLISHED,
-            published_at__year=year,
-            published_at__month=month,
-        )
-        .select_related("author", "category")
-        .prefetch_related("tags")
+        published_posts_queryset()
+        .filter(published_at__year=year, published_at__month=month)
         .order_by("-published_at", "-created_at")
     )
-
-    paginator = Paginator(qs, POST_PAGE_SIZE)
-    page_obj = paginator.get_page(request.GET.get("page"))
+    page_obj = get_page_obj(request, qs, per_page=POST_PAGE_SIZE)
 
     breadcrumbs = [
         {
@@ -552,15 +537,11 @@ def category_detail(request, slug: str):
     category = get_object_or_404(Category, slug=slug)
 
     qs = (
-        BlogPost.objects.filter(category=category, status=BlogPost.Status.PUBLISHED)
-        .select_related("author", "category")
-        .prefetch_related("tags")
+        published_posts_queryset()
+        .filter(category=category)
         .order_by("-published_at", "-created_at")
     )
-
-    paginator = Paginator(qs, POST_PAGE_SIZE)
-    page_number = request.GET.get("page")
-    page_obj = paginator.get_page(page_number)
+    page_obj = get_page_obj(request, qs, per_page=POST_PAGE_SIZE)
 
     breadcrumbs = [
         {
@@ -592,17 +573,11 @@ def tag_detail(request, slug: str):
     tag = get_object_or_404(Tag, slug=slug)
 
     qs = (
-        BlogPost.objects.filter(
-            tags=tag,
-            status=BlogPost.Status.PUBLISHED,
-        )
-        .select_related("author", "category")
-        .prefetch_related("tags")
+        published_posts_queryset()
+        .filter(tags=tag)
         .order_by("-published_at", "-created_at")
     )
-
-    paginator = Paginator(qs, POST_PAGE_SIZE)
-    page_obj = paginator.get_page(request.GET.get("page"))
+    page_obj = get_page_obj(request, qs, per_page=POST_PAGE_SIZE)
 
     breadcrumbs = [
         {

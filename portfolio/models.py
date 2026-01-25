@@ -1,8 +1,6 @@
 from __future__ import annotations
 
 import calendar
-import secrets
-import string
 from datetime import date
 from decimal import Decimal
 
@@ -10,7 +8,13 @@ from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.db import models
 from django.utils import timezone
-from django.utils.text import slugify
+from core.services.portfolio import (
+    build_comparison_name,
+    build_snapshot_name,
+    format_comparison_label,
+    format_snapshot_label,
+    generate_unique_slug,
+)
 
 from core.mixins import TimeStampedModelMixin, UUIDModelMixin
 from portfolio.services import fetch_fx_rate, fetch_yahoo_finance_price
@@ -18,31 +22,6 @@ from portfolio.services import fetch_fx_rate, fetch_yahoo_finance_price
 MAX_DICITS = 200
 MAX_DECIMAL_PLACES = 4
 MAX_DECIMAL_PLACES_FOR_QUANTITY = 5
-SLUG_HASH_LENGTH = 6
-SLUG_HASH_ALPHABET = string.ascii_lowercase + string.digits
-
-
-def _build_slug_base(name: str, max_length: int) -> str:
-    base = slugify(name, allow_unicode=True)
-    if not base:
-        base = "snapshot"
-    max_base_length = max_length - (SLUG_HASH_LENGTH + 1)
-    if max_base_length < 1:
-        return base
-    return base[:max_base_length]
-
-
-def _generate_unique_slug(model_cls: type[models.Model], name: str) -> str:
-    base = _build_slug_base(name, max_length=255)
-    while True:
-        hash_part = "".join(
-            secrets.choice(SLUG_HASH_ALPHABET) for _ in range(SLUG_HASH_LENGTH)
-        )
-        slug = f"{base}#{hash_part}"
-        if not model_cls.objects.filter(slug=slug).exists():
-            return slug
-
-
 class Asset(UUIDModelMixin, TimeStampedModelMixin):
     class AssetType(models.TextChoices):
         STOCK = "stock", "Hisse"
@@ -133,11 +112,12 @@ class PortfolioComparison(UUIDModelMixin, TimeStampedModelMixin):
         ordering = ("-created_at",)
 
     def __str__(self) -> str:
-        if self.slug:
-            return self.slug
-        if self.name:
-            return self.name
-        return f"{self.base_snapshot} → {self.compare_snapshot}"
+        return format_comparison_label(
+            slug=self.slug,
+            name=self.name,
+            base_snapshot=self.base_snapshot,
+            compare_snapshot=self.compare_snapshot,
+        )
 
     def clean(self) -> None:
         if (
@@ -151,22 +131,9 @@ class PortfolioComparison(UUIDModelMixin, TimeStampedModelMixin):
 
     def save(self, *args: object, **kwargs: object) -> None:
         if not self.name:
-            base_label = (
-                self.base_snapshot.name
-                if self.base_snapshot and self.base_snapshot.name
-                else f"{self.base_snapshot}"
-            )
-            compare_label = (
-                self.compare_snapshot.name
-                if self.compare_snapshot and self.compare_snapshot.name
-                else f"{self.compare_snapshot}"
-            )
-            if base_label and compare_label:
-                self.name = f"{base_label} → {compare_label}"
-            else:
-                self.name = base_label or compare_label
+            self.name = build_comparison_name(self.base_snapshot, self.compare_snapshot)
         if not self.slug and self.name:
-            self.slug = _generate_unique_slug(self.__class__, self.name)
+            self.slug = generate_unique_slug(self.__class__, self.name)
         super().save(*args, **kwargs)  # pyright: ignore[reportArgumentType]
 
 
@@ -411,17 +378,18 @@ class PortfolioSnapshot(UUIDModelMixin, TimeStampedModelMixin):
         ordering = ("-snapshot_date", "-created_at")
 
     def __str__(self) -> str:
-        if self.slug:
-            return self.slug
-        if self.name:
-            return self.name
-        return f"{self.portfolio} - {self.snapshot_date}"
+        return format_snapshot_label(
+            slug=self.slug,
+            name=self.name,
+            owner_label=f"{self.portfolio}",
+            snapshot_date=self.snapshot_date,
+        )
 
     def save(self, *args: object, **kwargs: object) -> None:
         if not self.name and self.portfolio_id and self.snapshot_date:  # pyright: ignore[reportAttributeAccessIssue]
-            self.name = f"{self.portfolio} - {self.snapshot_date}"
+            self.name = build_snapshot_name(f"{self.portfolio}", self.snapshot_date)
         if not self.slug and self.name:
-            self.slug = _generate_unique_slug(self.__class__, self.name)
+            self.slug = generate_unique_slug(self.__class__, self.name)
         super().save(*args, **kwargs)  # pyright: ignore[reportArgumentType]
 
     @classmethod
@@ -609,20 +577,18 @@ class CashFlowSnapshot(UUIDModelMixin, TimeStampedModelMixin):
         ordering = ("-snapshot_date", "-created_at")
 
     def __str__(self) -> str:
-        if self.slug:
-            return self.slug
-        if self.name:
-            return self.name
-        return f"{self.cashflow} - {self.snapshot_date}"
+        return format_snapshot_label(
+            slug=self.slug,
+            name=self.name,
+            owner_label=f"{self.cashflow}",
+            snapshot_date=self.snapshot_date,
+        )
 
     def save(self, *args: object, **kwargs: object) -> None:
         if not self.name and self.cashflow_id:  # pyright: ignore[reportAttributeAccessIssue]
-            if self.snapshot_date:
-                self.name = f"{self.cashflow} - {self.snapshot_date}"
-            else:
-                self.name = f"{self.cashflow}"
+            self.name = build_snapshot_name(f"{self.cashflow}", self.snapshot_date)
         if not self.slug and self.name:
-            self.slug = _generate_unique_slug(self.__class__, self.name)
+            self.slug = generate_unique_slug(self.__class__, self.name)
         super().save(*args, **kwargs)  # pyright: ignore[reportArgumentType]
 
     @classmethod
@@ -747,11 +713,12 @@ class CashFlowComparison(UUIDModelMixin, TimeStampedModelMixin):
         ordering = ("-created_at",)
 
     def __str__(self) -> str:
-        if self.slug:
-            return self.slug
-        if self.name:
-            return self.name
-        return f"{self.base_snapshot} → {self.compare_snapshot}"
+        return format_comparison_label(
+            slug=self.slug,
+            name=self.name,
+            base_snapshot=self.base_snapshot,
+            compare_snapshot=self.compare_snapshot,
+        )
 
     def clean(self) -> None:
         if (
@@ -765,22 +732,9 @@ class CashFlowComparison(UUIDModelMixin, TimeStampedModelMixin):
 
     def save(self, *args: object, **kwargs: object) -> None:
         if not self.name:
-            base_label = (
-                self.base_snapshot.name
-                if self.base_snapshot and self.base_snapshot.name
-                else f"{self.base_snapshot}"
-            )
-            compare_label = (
-                self.compare_snapshot.name
-                if self.compare_snapshot and self.compare_snapshot.name
-                else f"{self.compare_snapshot}"
-            )
-            if base_label and compare_label:
-                self.name = f"{base_label} → {compare_label}"
-            else:
-                self.name = base_label or compare_label
+            self.name = build_comparison_name(self.base_snapshot, self.compare_snapshot)
         if not self.slug and self.name:
-            self.slug = _generate_unique_slug(self.__class__, self.name)
+            self.slug = generate_unique_slug(self.__class__, self.name)
         super().save(*args, **kwargs)  # pyright: ignore[reportArgumentType]
 
 
@@ -872,20 +826,18 @@ class SalarySavingsSnapshot(UUIDModelMixin, TimeStampedModelMixin):
         ordering = ("-snapshot_date", "-created_at")
 
     def __str__(self) -> str:
-        if self.slug:
-            return self.slug
-        if self.name:
-            return self.name
-        return f"{self.flow} - {self.snapshot_date}"
+        return format_snapshot_label(
+            slug=self.slug,
+            name=self.name,
+            owner_label=f"{self.flow}",
+            snapshot_date=self.snapshot_date,
+        )
 
     def save(self, *args: object, **kwargs: object) -> None:
         if not self.name and self.flow_id:  # pyright: ignore[reportAttributeAccessIssue]
-            if self.snapshot_date:
-                self.name = f"{self.flow} - {self.snapshot_date}"
-            else:
-                self.name = f"{self.flow}"
+            self.name = build_snapshot_name(f"{self.flow}", self.snapshot_date)
         if not self.slug and self.name:
-            self.slug = _generate_unique_slug(self.__class__, self.name)
+            self.slug = generate_unique_slug(self.__class__, self.name)
         super().save(*args, **kwargs)  # pyright: ignore[reportArgumentType]
 
     @classmethod
@@ -959,11 +911,12 @@ class DividendComparison(UUIDModelMixin, TimeStampedModelMixin):
         ordering = ("-created_at",)
 
     def __str__(self) -> str:
-        if self.slug:
-            return self.slug
-        if self.name:
-            return self.name
-        return f"{self.base_snapshot} → {self.compare_snapshot}"
+        return format_comparison_label(
+            slug=self.slug,
+            name=self.name,
+            base_snapshot=self.base_snapshot,
+            compare_snapshot=self.compare_snapshot,
+        )
 
     def clean(self) -> None:
         if (
@@ -977,22 +930,9 @@ class DividendComparison(UUIDModelMixin, TimeStampedModelMixin):
 
     def save(self, *args: object, **kwargs: object) -> None:
         if not self.name:
-            base_label = (
-                self.base_snapshot.name
-                if self.base_snapshot and self.base_snapshot.name
-                else f"{self.base_snapshot}"
-            )
-            compare_label = (
-                self.compare_snapshot.name
-                if self.compare_snapshot and self.compare_snapshot.name
-                else f"{self.compare_snapshot}"
-            )
-            if base_label and compare_label:
-                self.name = f"{base_label} → {compare_label}"
-            else:
-                self.name = base_label or compare_label
+            self.name = build_comparison_name(self.base_snapshot, self.compare_snapshot)
         if not self.slug and self.name:
-            self.slug = _generate_unique_slug(self.__class__, self.name)
+            self.slug = generate_unique_slug(self.__class__, self.name)
         super().save(*args, **kwargs)  # pyright: ignore[reportArgumentType]
 
 
@@ -1135,7 +1075,7 @@ class DividendSnapshot(UUIDModelMixin, TimeStampedModelMixin):
         if not self.name and self.year:
             self.name = f"{self.year} Temettü Özeti"
         if not self.slug and self.name:
-            self.slug = _generate_unique_slug(self.__class__, self.name)
+            self.slug = generate_unique_slug(self.__class__, self.name)
         super().save(*args, **kwargs)  # pyright: ignore[reportArgumentType]
 
     @classmethod
