@@ -194,6 +194,129 @@ def _build_comment_context(request, post):
     }
 
 
+def _post_detail_queryset():
+    return BlogPost.objects.select_related(
+        "category",
+        "author",
+    ).prefetch_related(
+        "tags",
+        "images",
+        Prefetch(
+            "portfolio_snapshots",
+            queryset=PortfolioSnapshot.objects.select_related("portfolio").order_by(
+                "snapshot_date"
+            ),
+        ),
+        Prefetch(
+            "portfolio_comparisons",
+            queryset=PortfolioComparison.objects.select_related(
+                "base_snapshot",
+                "compare_snapshot",
+                "base_snapshot__portfolio",
+                "compare_snapshot__portfolio",
+            ).order_by("created_at"),
+        ),
+        Prefetch(
+            "cashflow_snapshots",
+            queryset=CashFlowSnapshot.objects.select_related("cashflow").order_by(
+                "snapshot_date"
+            ),
+        ),
+        Prefetch(
+            "cashflow_comparisons",
+            queryset=CashFlowComparison.objects.select_related(
+                "base_snapshot",
+                "compare_snapshot",
+                "base_snapshot__cashflow",
+                "compare_snapshot__cashflow",
+            ).order_by("created_at"),
+        ),
+        Prefetch(
+            "salary_savings_snapshots",
+            queryset=SalarySavingsSnapshot.objects.select_related("flow").order_by(
+                "snapshot_date"
+            ),
+        ),
+        Prefetch(
+            "dividend_snapshots",
+            queryset=DividendSnapshot.objects.order_by("-year", "-created_at"),
+        ),
+        Prefetch(
+            "dividend_comparisons",
+            queryset=DividendComparison.objects.select_related(
+                "base_snapshot",
+                "compare_snapshot",
+            ).order_by("created_at"),
+        ),
+    )
+
+
+def _get_post_for_detail(slug: str, *, include_unpublished: bool):
+    qs = _post_detail_queryset()
+    if not include_unpublished:
+        qs = qs.filter(status=BlogPost.Status.PUBLISHED)
+    return get_object_or_404(qs, slug=slug)
+
+
+def _build_post_breadcrumbs(post, *, is_preview: bool) -> list[dict[str, str | None]]:
+    breadcrumbs: list[dict[str, str | None]] = [
+        {
+            "label": "Blog",
+            "url": reverse("blog:post_list"),
+        }
+    ]
+    if is_preview:
+        breadcrumbs.append({"label": "Önizleme", "url": None})
+    if post.category:
+        breadcrumbs.append(
+            {
+                "label": post.category.name,
+                "url": post.category.get_absolute_url(),
+            }
+        )
+    breadcrumbs.append(
+        {
+            "label": post.title,
+            "url": None,
+        }
+    )
+    return breadcrumbs
+
+
+def _build_post_detail_context(request, post, *, is_preview: bool):
+    comment_context = _build_comment_context(request, post)
+    has_social_account = comment_context["has_social_account"]
+
+    reaction_context = _build_reaction_context(request, post)
+    is_authenticated = request.user.is_authenticated
+    can_comment = has_social_account and (is_preview or is_authenticated)
+    requires_social_auth = (is_preview or is_authenticated) and not has_social_account
+    can_react = can_comment
+
+    return {
+        "post": post,
+        "post_tag_items": build_tag_items(post.tags.all()),
+        "active_nav": "blog",
+        "active_category_slug": post.category.slug if post.category else "",
+        "active_tag_slug": "",
+        "active_archive_key": (
+            f"{post.published_at.year:04d}-{post.published_at.month:02d}"
+            if post.published_at
+            else ""
+        ),
+        "breadcrumbs": _build_post_breadcrumbs(post, is_preview=is_preview),
+        "is_preview": is_preview,
+        "comment_form": comment_context["comment_form"],
+        "can_comment": can_comment,
+        "requires_social_auth": requires_social_auth,
+        "MAX_COMMENT_LENGTH": MAX_COMMENT_LENGTH,
+        "comment_page_obj": comment_context["comment_page_obj"],
+        "comment_total": comment_context["comment_total"],
+        "can_react": can_react,
+        **reaction_context,
+    }
+
+
 def archive_index(request):
     qs = BlogPost.objects.filter(
         status=BlogPost.Status.PUBLISHED, published_at__isnull=False
@@ -306,64 +429,7 @@ def post_list(request):
 
 
 def post_detail(request, slug: str):
-    post = get_object_or_404(
-        BlogPost.objects.select_related(
-            "category",
-            "author",
-        ).prefetch_related(
-            "tags",
-            "images",
-            Prefetch(
-                "portfolio_snapshots",
-                queryset=PortfolioSnapshot.objects.select_related("portfolio").order_by(
-                    "snapshot_date"
-                ),
-            ),
-            Prefetch(
-                "portfolio_comparisons",
-                queryset=PortfolioComparison.objects.select_related(
-                    "base_snapshot",
-                    "compare_snapshot",
-                    "base_snapshot__portfolio",
-                    "compare_snapshot__portfolio",
-                ).order_by("created_at"),
-            ),
-            Prefetch(
-                "cashflow_snapshots",
-                queryset=CashFlowSnapshot.objects.select_related("cashflow").order_by(
-                    "snapshot_date"
-                ),
-            ),
-            Prefetch(
-                "cashflow_comparisons",
-                queryset=CashFlowComparison.objects.select_related(
-                    "base_snapshot",
-                    "compare_snapshot",
-                    "base_snapshot__cashflow",
-                    "compare_snapshot__cashflow",
-                ).order_by("created_at"),
-            ),
-            Prefetch(
-                "salary_savings_snapshots",
-                queryset=SalarySavingsSnapshot.objects.select_related("flow").order_by(
-                    "snapshot_date"
-                ),
-            ),
-            Prefetch(
-                "dividend_snapshots",
-                queryset=DividendSnapshot.objects.order_by("-year", "-created_at"),
-            ),
-            Prefetch(
-                "dividend_comparisons",
-                queryset=DividendComparison.objects.select_related(
-                    "base_snapshot",
-                    "compare_snapshot",
-                ).order_by("created_at"),
-            ),
-        ),
-        slug=slug,
-        status=BlogPost.Status.PUBLISHED,
-    )
+    post = _get_post_for_detail(slug, include_unpublished=False)
 
     session_key = f"viewed_post_{post.pk}"
     if not request.session.get(session_key):
@@ -372,169 +438,19 @@ def post_detail(request, slug: str):
 
         post.view_count += 1
 
-    breadcrumbs: list[dict[str, str | None]] = [
-        {
-            "label": "Blog",
-            "url": reverse("blog:post_list"),
-        }
-    ]
-
-    if post.category:
-        breadcrumbs.append(
-            {
-                "label": post.category.name,
-                "url": post.category.get_absolute_url(),
-            }
-        )
-
-    breadcrumbs.append(
-        {
-            "label": post.title,
-            "url": None,
-        }
-    )
-
-    comment_context = _build_comment_context(request, post)
-    has_social_account = comment_context["has_social_account"]
-
-    reaction_context = _build_reaction_context(request, post)
-    can_react = request.user.is_authenticated and has_social_account
-
-    return render(
-        request,
-        "blog/post_detail.html",
-        {
-            "post": post,
-            "post_tag_items": build_tag_items(post.tags.all()),
-            "active_nav": "blog",
-            "active_category_slug": post.category.slug if post.category else "",
-            "active_tag_slug": "",
-            "active_archive_key": (
-                f"{post.published_at.year:04d}-{post.published_at.month:02d}"
-                if post.published_at
-                else ""
-            ),
-            "breadcrumbs": breadcrumbs,
-            "is_preview": False,
-            "comment_form": comment_context["comment_form"],
-            "can_comment": request.user.is_authenticated and has_social_account,
-            "requires_social_auth": request.user.is_authenticated
-            and not has_social_account,
-            "MAX_COMMENT_LENGTH": MAX_COMMENT_LENGTH,
-            "comment_page_obj": comment_context["comment_page_obj"],
-            "comment_total": comment_context["comment_total"],
-            "can_react": can_react,
-            **reaction_context,
-        },
-    )
+    context = _build_post_detail_context(request, post, is_preview=False)
+    return render(request, "blog/post_detail.html", context)
 
 
 @login_required
 def post_preview(request, slug: str):
-    post = get_object_or_404(
-        BlogPost.objects.select_related(
-            "category",
-            "author",
-        ).prefetch_related(
-            "tags",
-            "images",
-            Prefetch(
-                "portfolio_snapshots",
-                queryset=PortfolioSnapshot.objects.select_related("portfolio").order_by(
-                    "snapshot_date"
-                ),
-            ),
-            Prefetch(
-                "portfolio_comparisons",
-                queryset=PortfolioComparison.objects.select_related(
-                    "base_snapshot",
-                    "compare_snapshot",
-                    "base_snapshot__portfolio",
-                    "compare_snapshot__portfolio",
-                ).order_by("created_at"),
-            ),
-            Prefetch(
-                "cashflow_snapshots",
-                queryset=CashFlowSnapshot.objects.select_related("cashflow").order_by(
-                    "snapshot_date"
-                ),
-            ),
-            Prefetch(
-                "cashflow_comparisons",
-                queryset=CashFlowComparison.objects.select_related(
-                    "base_snapshot",
-                    "compare_snapshot",
-                    "base_snapshot__cashflow",
-                    "compare_snapshot__cashflow",
-                ).order_by("created_at"),
-            ),
-            Prefetch(
-                "salary_savings_snapshots",
-                queryset=SalarySavingsSnapshot.objects.select_related("flow").order_by(
-                    "snapshot_date"
-                ),
-            ),
-            Prefetch(
-                "dividend_snapshots",
-                queryset=DividendSnapshot.objects.order_by("-year", "-created_at"),
-            ),
-            Prefetch(
-                "dividend_comparisons",
-                queryset=DividendComparison.objects.select_related(
-                    "base_snapshot",
-                    "compare_snapshot",
-                ).order_by("created_at"),
-            ),
-        ),
-        slug=slug,
-    )
+    post = _get_post_for_detail(slug, include_unpublished=True)
 
     if not request.user.is_staff and request.user != post.author:
         raise PermissionDenied
 
-    breadcrumbs: list[dict[str, str | None]] = [
-        {
-            "label": "Blog",
-            "url": reverse("blog:post_list"),
-        },
-        {"label": "Önizleme", "url": None},
-        {
-            "label": post.title,
-            "url": None,
-        },
-    ]
-
-    comment_context = _build_comment_context(request, post)
-    has_social_account = comment_context["has_social_account"]
-
-    reaction_context = _build_reaction_context(request, post)
-    can_react = has_social_account
-
-    return render(
-        request,
-        "blog/post_detail.html",
-        {
-            "post": post,
-            "post_tag_items": build_tag_items(post.tags.all()),
-            "active_nav": "blog",
-            "active_category_slug": post.category.slug if post.category else "",
-            "active_tag_slug": "",
-            "active_archive_key": (
-                f"{post.published_at.year:04d}-{post.published_at.month:02d}"
-                if post.published_at
-                else ""
-            ),
-            "breadcrumbs": breadcrumbs,
-            "is_preview": True,
-            "comment_form": comment_context["comment_form"],
-            "can_comment": has_social_account,
-            "requires_social_auth": not has_social_account,
-            "comment_page_obj": comment_context["comment_page_obj"],
-            "comment_total": comment_context["comment_total"],
-            "can_react": can_react,
-            **reaction_context,
-        },
-    )
+    context = _build_post_detail_context(request, post, is_preview=True)
+    return render(request, "blog/post_detail.html", context)
 
 
 @require_POST
