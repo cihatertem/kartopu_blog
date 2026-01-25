@@ -1,10 +1,6 @@
 (function () {
     const themeStorageKey = "theme-preference";
 
-    const prefersDark =
-        window.matchMedia &&
-        window.matchMedia("(prefers-color-scheme: dark)").matches;
-
     let storedTheme = null;
     try {
         storedTheme = localStorage.getItem(themeStorageKey);
@@ -12,7 +8,7 @@
         storedTheme = null;
     }
 
-    const initialTheme = storedTheme || (prefersDark ? "dark" : "light");
+    const initialTheme = storedTheme || "light";
     document.documentElement.setAttribute("data-theme", initialTheme);
 
 })();
