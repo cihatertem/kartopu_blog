@@ -15,7 +15,7 @@ from imagekit.models import ImageSpecField
 from imagekit.processors import ResizeToFill, Transpose
 from PIL import Image, ImageOps
 
-from core.imagekit import build_responsive_rendition
+from core.imagekit import build_responsive_rendition, invalidate_imagekit_cache
 from core.mixins import TimeStampedModelMixin, UUIDModelMixin
 
 # Create your models here.
@@ -198,6 +198,7 @@ class User(  # pyright: ignore[reportIncompatibleVariableOverride]
                 pass
 
         for spec in (self.avatar_42, self.avatar_64):
+            invalidate_imagekit_cache(spec)
             try:
                 cachefile = getattr(spec, "cachefile", None)
                 storage = getattr(cachefile, "storage", None)

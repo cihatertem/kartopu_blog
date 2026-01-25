@@ -11,7 +11,7 @@ from django.utils.text import Truncator, slugify
 from imagekit.models import ImageSpecField
 from imagekit.processors import ResizeToFill, ResizeToFit, Transpose
 
-from core.imagekit import build_responsive_rendition
+from core.imagekit import build_responsive_rendition, invalidate_imagekit_cache
 from core.images import optimize_uploaded_image_field
 from core.mixins import TimeStampedModelMixin, UUIDModelMixin
 
@@ -371,6 +371,7 @@ class BlogPost(
             self.cover_thumb_54,
             self.cover_thumb_108,
         ):
+            invalidate_imagekit_cache(spec)
             try:
                 cachefile = getattr(spec, "cachefile", None)
                 storage = getattr(cachefile, "storage", None)
@@ -490,6 +491,7 @@ class BlogPostImage(
                 pass
 
         for spec in (self.image_600, self.image_900, self.image_1200):
+            invalidate_imagekit_cache(spec)
             try:
                 cachefile = getattr(spec, "cachefile", None)
                 storage = getattr(cachefile, "storage", None)
