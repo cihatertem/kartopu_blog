@@ -7,67 +7,6 @@
   gap: 0.5rem;
 }
 
-.post-detail__meta {
-  margin: 0 0 1rem;
-}
-
-.post-detail__author {
-  display: flex;
-  align-items: center;
-  gap: 1rem;
-}
-
-.post-detail__avatar {
-  width: 56px;
-  height: 56px;
-  border-radius: 50%;
-  background: var(--color-avatar-bg);
-  color: var(--color-avatar-text);
-  display: grid;
-  place-items: center;
-  font-weight: 600;
-  text-transform: uppercase;
-  flex-shrink: 0;
-  overflow: hidden;
-}
-
-.post-detail__avatar-img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  display: block;
-}
-
-.post-detail__author-info {
-  display: flex;
-  flex-direction: column;
-  gap: 0.25rem;
-}
-
-.post-detail__author-name {
-  font-weight: 700;
-  color: var(--color-text);
-}
-
-.post-detail__meta-line {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  color: var(--color-muted);
-  font-size: 0.95rem;
-}
-
-.post-detail__meta-dot {
-  width: 9px;
-  height: 9px;
-  border-radius: 50%;
-  background: var(--color-avatar-bg);
-}
-
-.post-detail__meta-separator {
-  opacity: 0.7;
-}
-
 .tag-list__link {
   display: inline-flex;
   align-items: center;

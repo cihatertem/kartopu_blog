@@ -82,7 +82,74 @@
     </div>
 
     {% if portfolio_posts %}
-      {% include "includes/post_list.html" with posts=portfolio_posts %}
+      <ul class="post-list home-portfolio__list">
+        {% for post in portfolio_posts %}
+          <li class="post-list__item">
+            <h3 class="post-list__title">
+              <a href="{{ post.get_absolute_url }}">{{ post.title }}</a>
+            </h3>
+            {% if post.cover_image %}
+              {% with cover=post.cover_rendition %}
+                {% if cover %}
+                  <figure>
+                    <img
+                      src="{{ cover.src }}"
+                      srcset="{{ cover.srcset }}"
+                      sizes="(max-width: 768px) 100vw, 720px"
+                      alt="{{ post.title }}"
+                      width="{{ cover.width }}"
+                      height="{{ cover.height }}"
+                      decoding="async"
+                      {% if forloop.first %}
+                        loading="eager"
+                        fetchpriority="high"
+                      {% else %}
+                        loading="lazy"
+                      {% endif %}
+                    />
+                  </figure>
+                {% else %}
+                  <figure class="home-portfolio__placeholder">
+                    <img
+                      src="{% static 'images/home/portfolio-coins.svg' %}"
+                      alt="Portföy görseli"
+                      width="600"
+                      height="600"
+                      loading="lazy"
+                      decoding="async"
+                    />
+                  </figure>
+                {% endif %}
+              {% endwith %}
+            {% else %}
+              <figure class="home-portfolio__placeholder">
+                <img
+                  src="{% static 'images/home/portfolio-coins.svg' %}"
+                  alt="Portföy görseli"
+                  width="600"
+                  height="600"
+                  loading="lazy"
+                  decoding="async"
+                />
+              </figure>
+            {% endif %}
+
+            <p class="post-list__meta">
+              <small>
+                {{ post.published_at|date:"d F Y" }}
+                — {{ post.author.full_name }}
+                {% if post.category %}
+                  — <a href="{{ post.category.get_absolute_url }}">{{ post.category.name }}</a>
+                {% endif %}
+              </small>
+            </p>
+
+            {% if post.excerpt %}
+              <p>{{ post.excerpt }} <span><a href="{{ post.get_absolute_url }}"> Okumaya devam et...</a></span></p>
+            {% endif %}
+          </li>
+        {% endfor %}
+      </ul>
     {% else %}
       <p>Henüz portföy kategorisinde yazı yok.</p>
     {% endif %}

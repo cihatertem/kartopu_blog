@@ -1,21 +1,13 @@
-import os
-from functools import cached_property
 from io import BytesIO
 
 from django.contrib.auth.models import AbstractUser, BaseUserManager
-from django.core.files.storage import default_storage
 from django.core.files.base import ContentFile
-from django.core.files.storage import Storage
+from django.core.files.storage import Storage, default_storage
 from django.db import models
-from django.conf import settings
-from django.utils import timezone
 from django.utils.deconstruct import deconstructible
 from django.utils.text import slugify
-from imagekit.models import ImageSpecField
-from imagekit.processors import ResizeToFill, Transpose
 from PIL import Image, ImageOps
 
-from core.imagekit import build_responsive_rendition, invalidate_imagekit_cache
 from core.mixins import TimeStampedModelMixin, UUIDModelMixin
 
 # Create your models here.
@@ -102,19 +94,6 @@ class User(  # pyright: ignore[reportIncompatibleVariableOverride]
         blank=True,
         null=True,
     )
-    avatar_updated_at = models.DateTimeField(blank=True, null=True)
-    avatar_42 = ImageSpecField(
-        source="avatar",
-        processors=[Transpose(), ResizeToFill(42, 42)],
-        format="WEBP",
-        options={"quality": 82},
-    )
-    avatar_64 = ImageSpecField(
-        source="avatar",
-        processors=[Transpose(), ResizeToFill(64, 64)],
-        format="WEBP",
-        options={"quality": 82},
-    )
 
     USERNAME_FIELD = "email"
     REQUIRED_FIELDS: list[str] = []
@@ -128,15 +107,10 @@ class User(  # pyright: ignore[reportIncompatibleVariableOverride]
         verbose_name_plural = "Kullanıcılar"
 
     def save(self, *args: object, **kwargs: object) -> None:
-        avatar_uploaded = bool(self.avatar and not self.avatar._committed)
-        if avatar_uploaded:
-            self.avatar_updated_at = timezone.now()
         super().save(*args, **kwargs)  # pyright: ignore[reportArgumentType]
         if self.avatar:
             try:
                 self._resize_avatar()
-                if avatar_uploaded:
-                    self._invalidate_avatar_cache()
             except Exception:
                 pass  # Hata durumunda avatar olduğu gibi kalır
 
@@ -179,56 +153,3 @@ class User(  # pyright: ignore[reportIncompatibleVariableOverride]
         if storage.exists(name):
             storage.delete(name)
         storage.save(name, content)
-
-    def _invalidate_avatar_cache(self) -> None:
-        if not self.avatar or not self.avatar.name:
-            return
-
-        cache_dir = getattr(settings, "IMAGEKIT_CACHEFILE_DIR", "cache")
-        cache_path = os.path.join(cache_dir, os.path.dirname(self.avatar.name))
-
-        def delete_storage_dir(path: str) -> None:
-            try:
-                directories, files = default_storage.listdir(path)
-                for file_name in files:
-                    default_storage.delete(os.path.join(path, file_name))
-                for directory in directories:
-                    delete_storage_dir(os.path.join(path, directory))
-            except Exception:
-                pass
-
-        for spec in (self.avatar_42, self.avatar_64):
-            invalidate_imagekit_cache(spec)
-            try:
-                cachefile = getattr(spec, "cachefile", None)
-                storage = getattr(cachefile, "storage", None)
-                name = getattr(cachefile, "name", "")
-                if storage and name and storage.exists(name):
-                    storage.delete(name)
-            except Exception:
-                pass
-
-        delete_storage_dir(cache_path)
-
-    @cached_property
-    def avatar_rendition(self) -> dict | None:
-        if not self.avatar:
-            return None
-        rendition = build_responsive_rendition(
-            original_field=self.avatar,
-            spec_map={
-                42: self.avatar_42,
-                64: self.avatar_64,
-            },
-            largest_size=64,
-        )
-        if not rendition:
-            return None
-        if self.avatar_updated_at:
-            version = int(self.avatar_updated_at.timestamp())
-            rendition["src"] = f"{rendition['src']}?v={version}"
-            rendition["srcset"] = ", ".join(
-                f"{url}?v={version} {size}w"
-                for size, url in rendition["urls"].items()
-            )
-        return rendition

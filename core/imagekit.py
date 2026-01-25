@@ -3,11 +3,7 @@ from __future__ import annotations
 from collections.abc import Mapping
 from typing import Any
 
-from django.core.cache import cache
-
 DEFAULT_RENDITION_DIMENSIONS: dict[int, tuple[int, int]] = {
-    42: (42, 42),
-    64: (64, 64),
     54: (54, 54),
     108: (108, 108),
     600: (600, 600),
@@ -79,25 +75,3 @@ def build_responsive_rendition(
         "height": height,
         "urls": urls,
     }
-
-
-def invalidate_imagekit_cache(spec_field: Any) -> None:
-    cachefile = getattr(spec_field, "cachefile", None)
-    if not cachefile:
-        return
-
-    for method_name in ("invalidate", "clear"):
-        method = getattr(cachefile, method_name, None)
-        if callable(method):
-            try:
-                method()
-            except Exception:
-                pass
-            return
-
-    cache_key = getattr(cachefile, "cache_key", None)
-    if cache_key:
-        try:
-            cache.delete(cache_key)
-        except Exception:
-            pass
