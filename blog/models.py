@@ -6,6 +6,7 @@ from django.contrib.postgres.indexes import GinIndex
 from django.contrib.postgres.search import SearchVector
 from django.db import models
 from django.urls import reverse
+from django.utils import timezone
 from django.utils.text import Truncator, slugify
 from imagekit.models import ImageSpecField
 from imagekit.processors import ResizeToFill, ResizeToFit, Transpose
@@ -53,8 +54,13 @@ class Category(
 def post_cover_upload_path(instance: "BlogPost", filename: str) -> str:
     file_extension = filename.split(".")[-1].lower()
     slug = instance.slug or slugify(instance.title)
+    timestamp = timezone.now().strftime("%Y%m%d%H%M%S")
+    prefix = "cover"
 
-    return f"blog/{slug}/cover.{file_extension}"
+    if not instance._state.adding:
+        prefix = "cover_güncel"
+
+    return f"blog/{slug}/{prefix}{timestamp}.{file_extension}"
 
 
 def post_image_upload_path(instance: "BlogPostImage", filename: str) -> str:

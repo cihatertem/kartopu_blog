@@ -4,6 +4,7 @@ from django.contrib.auth.models import AbstractUser, BaseUserManager
 from django.core.files.base import ContentFile
 from django.core.files.storage import Storage, default_storage
 from django.db import models
+from django.utils import timezone
 from django.utils.deconstruct import deconstructible
 from django.utils.text import slugify
 from PIL import Image, ImageOps
@@ -43,7 +44,9 @@ class OverWriteAvatarStorage(Storage):
 
 def user_avatar_upload_path(instance: "User", filename: str) -> str:
     extension = filename.split(".")[-1].lower()
-    filename = f"avatar.{extension}"
+    prefix = "avatar"
+    timestamp = timezone.now().strftime("%Y%m%d%H%M%S")
+    filename = f"{prefix}_{timestamp}.{extension}"
 
     base_name = instance.full_name or str(instance.email).split("@")[0]
     safe_name = slugify(base_name)
