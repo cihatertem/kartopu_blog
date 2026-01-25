@@ -82,7 +82,7 @@
               <span>{{ post.published_at|date:"d F Y" }}</span>
               {% if post.category %}
                 <span class="post-list__meta-separator">•</span>
-                <a href="{{ post.category.get_absolute_url }}">{{ post.category.name }}</a>
+                <a  class="post-list__category-link" href="{{ post.category.get_absolute_url }}">{{ post.category.name }}</a>
               {% endif %}
             </span>
           </div>
@@ -90,7 +90,7 @@
       </div>
 
       {% if post.excerpt %}
-        <p>{{ post.excerpt }} <span><a href="{{ post.get_absolute_url }}"> Okumaya devam et...</a></span></p>
+        <p>{{ post.excerpt }} <span><a class="post-list__continue-read" href="{{ post.get_absolute_url }}"> Okumaya devam et...</a></span></p>
       {% endif %}
     </li>
     <hr />
