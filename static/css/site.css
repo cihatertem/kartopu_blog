@@ -509,8 +509,9 @@ hr {
   align-items: center;
   justify-content: center;
   color: inherit;
+  position: relative;
   transition:
-    transform 0.2s ease,
+    top 0.2s ease,
     box-shadow 0.2s ease;
 }
 
@@ -518,7 +519,7 @@ hr {
 .follow-widget__link:focus-visible {
   text-decoration: none;
   box-shadow: 0 6px 18px rgba(13, 22, 52, 0.08);
-  transform: translateY(-1px);
+  top: -1px;
 }
 
 .follow-widget__icon {
