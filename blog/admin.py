@@ -1,10 +1,13 @@
-from django.contrib import admin
+from django.contrib import admin, messages
 from django.contrib.auth import get_user_model
 from django.db.models import Case, F, Value, When
 from django.urls import reverse
 from django.utils import timezone
 from django.utils.html import format_html
 from django.utils.safestring import SafeString
+
+from newsletter.models import BlogPostNotification
+from newsletter.services import send_post_published_email
 
 from .models import BlogPost, BlogPostImage, Category, Tag
 
@@ -116,7 +119,12 @@ class BlogPostAdmin(admin.ModelAdmin):
         ("İstatistik", {"fields": ("view_count",), "classes": ("collapse",)}),
     )
 
-    actions = ("publish_posts", "draft_posts", "archive_posts")
+    actions = (
+        "publish_posts",
+        "draft_posts",
+        "archive_posts",
+        "resend_newsletter_notifications",
+    )
 
     def formfield_for_foreignkey(self, db_field, request, **kwargs):
         if db_field.name == "author":
@@ -153,6 +161,33 @@ class BlogPostAdmin(admin.ModelAdmin):
     @admin.action(description="Seçili yazıları arşivle")
     def archive_posts(self, request, queryset):
         queryset.update(status=BlogPost.Status.ARCHIVED)
+
+    @admin.action(description="Seçili yazılar için newsletter bildirimi gönder")
+    def resend_newsletter_notifications(self, request, queryset):
+        sent_count = 0
+        skipped_count = 0
+        for post in queryset:
+            if post.status != BlogPost.Status.PUBLISHED or not post.published_at:
+                skipped_count += 1
+                continue
+            send_post_published_email(post)
+            BlogPostNotification.objects.update_or_create(
+                post=post,
+                defaults={"sent_at": timezone.now()},
+            )
+            sent_count += 1
+
+        if sent_count:
+            self.message_user(
+                request,
+                f"{sent_count} yazı için newsletter bildirimi tekrar gönderildi.",
+            )
+        if skipped_count:
+            self.message_user(
+                request,
+                f"{skipped_count} yazı yayınlanmadığı için atlandı.",
+                level=messages.WARNING,
+            )
 
     def public_link(self, obj: BlogPost) -> SafeString:
         if obj.status == BlogPost.Status.PUBLISHED:
