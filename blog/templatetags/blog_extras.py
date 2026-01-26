@@ -117,6 +117,11 @@ def render_post_content(content, images):
     return render_markdown(expanded)
 
 
+@register.filter
+def render_excerpt(text):
+    return mark_safe(render_markdown(text or ""))
+
+
 def _render_portfolio_summary_html(snapshot) -> str:
     if not snapshot:
         return ""
