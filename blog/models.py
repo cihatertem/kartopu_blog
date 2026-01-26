@@ -289,7 +289,7 @@ class BlogPost(
             self.slug = slugify(self.title)
 
         if not self.canonical_url:
-            self.canonical_url = KARTOPU_MONEY_BASE_URL + self.slug
+            self.canonical_url = KARTOPU_MONEY_BASE_URL + "/blog/" + self.slug + "/"
 
         if self.status == self.Status.PUBLISHED and self.published_at is None:
             from django.utils import timezone
