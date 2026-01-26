@@ -1,5 +1,6 @@
 <!doctype html>
 <html lang="tr">
+  {% load blog_extras %}
   <body>
     <p>Merhaba,</p>
     <p>Yeni yazımız yayında: <strong>{{ post.title }}</strong></p>
@@ -14,7 +15,7 @@
     {% endif %}
     <p><a href="{{ post_url }}">Yazıyı oku</a></p>
     {% if post.excerpt %}
-      <p><em>{{ post.excerpt }}</em></p>
+      {{ post.excerpt|render_excerpt }}
     {% endif %}
     <hr />
     <p style="font-size: 0.9rem; color: #555;">
