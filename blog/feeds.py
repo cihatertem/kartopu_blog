@@ -5,6 +5,7 @@ from django.shortcuts import get_object_or_404
 from django.utils.text import Truncator
 
 from core.imagekit import safe_file_url
+from core.markdown import render_markdown
 
 from .models import BlogPost, Category
 
@@ -29,7 +30,7 @@ class LatestPostsFeed(Feed):
 
     def item_description(self, item):  # pyright: ignore[reportIncompatibleMethodOverride]
         if item.excerpt:  # pyright: ignore[reportAttributeAccessIssue]
-            return item.excerpt  # pyright: ignore[reportAttributeAccessIssue]
+            return render_markdown(item.excerpt)  # pyright: ignore[reportAttributeAccessIssue]
         return Truncator(item.content).words(40)  # pyright: ignore[reportAttributeAccessIssue]
 
     def item_link(self, item):
@@ -106,7 +107,7 @@ class CategoryPostsFeed(Feed):
 
     def item_description(self, item):  # pyright: ignore[reportIncompatibleMethodOverride]
         if item.excerpt:  # pyright: ignore[reportAttributeAccessIssue]
-            return item.excerpt  # pyright: ignore[reportAttributeAccessIssue]
+            return render_markdown(item.excerpt)  # pyright: ignore[reportAttributeAccessIssue]
         return Truncator(item.content).words(40)  # pyright: ignore[reportAttributeAccessIssue]
 
     def item_link(self, item):
