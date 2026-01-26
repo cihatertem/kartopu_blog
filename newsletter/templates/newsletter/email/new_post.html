@@ -14,7 +14,7 @@
     {% endif %}
     <p><a href="{{ post_url }}">Yazıyı oku</a></p>
     {% if post.excerpt %}
-      <p><em>{{ post.excerpt }}</em></p>
+      <p><em>{{ post.excerpt|render_excerpt }}</em></p>
     {% endif %}
     <hr />
     <p style="font-size: 0.9rem; color: #555;">
