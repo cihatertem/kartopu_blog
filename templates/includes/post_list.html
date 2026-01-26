@@ -1,4 +1,4 @@
-{% load static %}
+{% load static blog_extras %}
 
 <ul class="post-list">
   {% for post in posts %}
@@ -90,7 +90,14 @@
       </div>
 
       {% if post.excerpt %}
-        <p>{{ post.excerpt }} <span><a class="post-list__continue-read" href="{{ post.get_absolute_url }}"> Okumaya devam et...</a></span></p>
+        <div class="post-list__excerpt">
+          {{ post.excerpt|render_excerpt }}
+          <p>
+            <a class="post-list__continue-read" href="{{ post.get_absolute_url }}">
+              Okumaya devam et...
+            </a>
+          </p>
+        </div>
       {% endif %}
     </li>
     <hr />
