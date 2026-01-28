@@ -121,6 +121,11 @@ DATABASES = {
         "PASSWORD": get_swarm_secret_for_psg("POSTGRES_PASSWORD"),
         "HOST": os.getenv("POSTGRES_HOST", "db"),
         "PORT": os.getenv("POSTGRES_PORT", "5432"),
+        "CONN_MAX_AGE": int(os.getenv("DJANGO_DB_CONN_MAX_AGE", "60")),
+        "CONN_HEALTH_CHECKS": True,
+        "OPTIONS": {
+            "connect_timeout": 5,
+        },
     }
 }
 
@@ -224,6 +229,9 @@ if USE_S3:
     # } commented to use per-storage settings below
     AWS_LOCATION_STATIC = os.getenv("AWS_LOCATION_STATIC", "static")
     AWS_LOCATION_MEDIA = os.getenv("AWS_LOCATION_MEDIA", "media")
+    AWS_S3_FILE_OVERWRITE = False
+    AWS_S3_SIGNATURE_VERSION = "s3v4"
+    AWS_S3_MAX_MEMORY_SIZE = 5242880  # 5MB
 
     STATICFILES_STORAGE = "core.storage.S3CompressedManifestStaticStorage"
 
@@ -349,9 +357,7 @@ if not DEBUG:
     SESSION_COOKIE_HTTPONLY = True
     SECURE_CONTENT_TYPE_NOSNIFF = True
     SECURE_REFERRER_POLICY = "strict-origin-when-cross-origin"
-    SECURE_CROSS_ORIGIN_OPENER_POLICY = (
-        "same-origin"  # allauth sorun çıkartabiliyor, dikkat.
-    )
+    SECURE_CROSS_ORIGIN_OPENER_POLICY = "same-origin-allow-popups"  # same-origin allauth sorun çıkartabiliyor, o yüzden allow-popups.
 
     if USE_TRAEFIK_SECURITY_HEADERS:
         SECURE_HSTS_SECONDS = 0
