@@ -6,7 +6,7 @@ import mimetypes
 from io import BytesIO
 
 from django.contrib.staticfiles.storage import ManifestFilesMixin
-from storages.backends.s3 import S3Storage
+from storages.backends.s3 import S3ManifestStaticStorage, S3Storage
 
 if importlib.util.find_spec("brotli") is not None:
     import brotli
@@ -26,7 +26,17 @@ COMPRESSIBLE_EXTENSIONS = {
 }
 
 
-class S3CompressedManifestStaticStorage(ManifestFilesMixin, S3Storage):
+class S3CompressedManifestStaticStorage(S3ManifestStaticStorage):
+    """
+    S3 storage backend that handles hashed filenames for static files.
+    Manual compression (Gzip/Brotli) has been removed to rely on CloudFront's
+    automatic compression, which is more efficient and easier to maintain.
+    """
+
+    pass
+
+
+class S3CompressedManifestStaticStorage_Old(ManifestFilesMixin, S3Storage):
     def post_process(self, paths, dry_run=False, **options):
         for name, processed, processed_content in super().post_process(
             paths, dry_run=dry_run, **options
@@ -42,7 +52,9 @@ class S3CompressedManifestStaticStorage(ManifestFilesMixin, S3Storage):
             content_type = mimetypes.guess_type(name)[0] or "application/octet-stream"
 
             gzip_buffer = BytesIO()
-            with gzip.GzipFile(filename=name, mode="wb", fileobj=gzip_buffer) as gzip_file:
+            with gzip.GzipFile(
+                filename=name, mode="wb", fileobj=gzip_buffer
+            ) as gzip_file:
                 gzip_file.write(original)
             self._save_compressed(
                 f"{name}.gz",
@@ -77,7 +89,9 @@ class S3CompressedManifestStaticStorage(ManifestFilesMixin, S3Storage):
         normalize = getattr(self, "_normalize_name", None) or getattr(
             self, "normalize_name", None
         )
-        normalized_name = normalize(cleaned_name) if callable(normalize) else cleaned_name
+        normalized_name = (
+            normalize(cleaned_name) if callable(normalize) else cleaned_name
+        )
         params = self.get_object_parameters(cleaned_name)
         params.setdefault("ContentType", content_type)
         params["ContentEncoding"] = content_encoding
