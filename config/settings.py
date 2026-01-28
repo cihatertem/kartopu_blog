@@ -224,6 +224,9 @@ if USE_S3:
     # } commented to use per-storage settings below
     AWS_LOCATION_STATIC = os.getenv("AWS_LOCATION_STATIC", "static")
     AWS_LOCATION_MEDIA = os.getenv("AWS_LOCATION_MEDIA", "media")
+    AWS_S3_FILE_OVERWRITE = False
+    AWS_S3_SIGNATURE_VERSION = "s3v4"
+    AWS_S3_MAX_MEMORY_SIZE = 5242880  # 5MB
 
     STATICFILES_STORAGE = "core.storage.S3CompressedManifestStaticStorage"
 
@@ -334,6 +337,9 @@ if not DEBUG:
     if _raw:
         for net in _raw.split(","):
             TRUSTED_PROXY_NETS.append(ipaddress.ip_network(net.strip()))
+    else:
+        # Default to Swarm overlay network range discovered in docker-compose.prod.yml
+        TRUSTED_PROXY_NETS.append(ipaddress.ip_network("10.0.2.0/24"))
 
     CSRF_COOKIE_SECURE = True
     CSRF_COOKIE_HTTPONLY = True
