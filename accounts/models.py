@@ -58,16 +58,17 @@ def user_avatar_upload_path(instance: "User", filename: str) -> str:
 
 
 class UserManager(BaseUserManager):
-    def create_user(self, email, password=None, **extra_fields):
-        if not email:
-            raise ValueError("Kullanıcıların bir email adresi olmalı")
-        email = self.normalize_email(email)
+    def create_user(self, email=None, password=None, **extra_fields):
+        if email:
+            email = self.normalize_email(email)
         user = self.model(email=email, **extra_fields)
         user.set_password(password)
         user.save(using=self._db)
         return user
 
     def create_superuser(self, email, password=None, **extra_fields):
+        if not email:
+            raise ValueError("Süper kullanıcıların bir email adresi olmalı")
         extra_fields.setdefault("is_staff", True)
         extra_fields.setdefault("is_superuser", True)
 
@@ -87,7 +88,7 @@ class User(  # pyright: ignore[reportIncompatibleVariableOverride]
     username = None
     first_name = models.CharField(max_length=30)
     last_name = models.CharField(max_length=30, blank=True)
-    email = models.EmailField(unique=True)
+    email = models.EmailField(unique=True, null=True, blank=True)
     bio = models.TextField(blank=True)
     website = models.URLField(blank=True)
     twitter = models.URLField(blank=True)
@@ -126,6 +127,8 @@ class User(  # pyright: ignore[reportIncompatibleVariableOverride]
         verbose_name_plural = "Kullanıcılar"
 
     def save(self, *args: object, **kwargs: object) -> None:
+        if self.email == "":
+            self.email = None
         super().save(*args, **kwargs)  # pyright: ignore[reportArgumentType]
         if self.avatar:
             try:
