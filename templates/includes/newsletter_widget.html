@@ -3,6 +3,7 @@
   <p class="newsletter-widget__text">Yeni yazılar ve özel duyurular için e-posta adresinizi bırakın.</p>
   <form method="post" action="{% url 'newsletter:subscribe_request' %}" class="sidebar-form newsletter-widget__form">
     {% csrf_token %}
+    <input type="text" name="name" class="input-field name_" placeholder="David Brown" autocomplete="off" value=""/>
     <input type="email" name="email" class="input-field" placeholder="E-posta adresiniz" autocomplete="email" required />
     <div class="newsletter-widget__actions">
       <button type="submit" class="button button--primary">Abone Ol</button>

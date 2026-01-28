@@ -13,9 +13,9 @@ class CommentForm(forms.ModelForm):
         label="Website",
         widget=forms.TextInput(
             attrs={
-                "autocomplete": "off",
-                "tabindex": "-1",
-                "style": "position:absolute; left:-10000px; top:auto; width:1px; height:1px; overflow:hidden;",
+                "autocomplete": "url",
+                "class": "input-field website_",
+                "value": "",
             }
         ),
     )

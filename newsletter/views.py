@@ -19,6 +19,13 @@ def subscribe_request(request):
         messages.error(request, "Lütfen geçerli bir e-posta adresi girin.")
         return redirect(request.META.get("HTTP_REFERER", "/"))
 
+    if bool(form.cleaned_data.get("name")):
+        messages.success(
+            request,
+            "Aboneliğiniz alınmıştır. Lütfen gelen kutunuzu kontrol edin.",
+        )
+        return redirect(request.META.get("HTTP_REFERER", "/"))
+
     email = form.cleaned_data["email"].lower()
     subscriber, created = Subscriber.objects.get_or_create(email=email)
 

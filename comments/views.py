@@ -11,7 +11,7 @@ from core.helpers import client_ip_key
 from .forms import CommentForm
 from .models import Comment
 
-COMMENT_RATE_LIMIT = "5/m"
+COMMENT_RATE_LIMIT = "10/m"
 COMMENT_RATE_LIMIT_KEY = "ip"
 
 

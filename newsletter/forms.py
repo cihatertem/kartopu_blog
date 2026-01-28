@@ -6,3 +6,10 @@ class NewsletterEmailForm(forms.Form):
         label="E-posta",
         widget=forms.EmailInput(attrs={"placeholder": "E-posta adresiniz"}),
     )
+    name = forms.CharField(
+        label="name",
+        max_length=100,
+        widget=forms.TextInput(
+            attrs={"class": "input-field name_", "autocomplete": "off"}
+        ),
+    )
