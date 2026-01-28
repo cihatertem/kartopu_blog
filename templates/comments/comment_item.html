@@ -24,6 +24,7 @@
       <form method="post" action="{% url 'comments:post_comment' comment.post_id %}">
         {% csrf_token %}
         <input type="hidden" name="parent_id" value="{{ comment.id }}">
+        <input type="text" name="website" autocomplete="url" class="input-field website_" id="id_website" value="">
         <div class="comment-reply__field">
           <textarea
             name="body"

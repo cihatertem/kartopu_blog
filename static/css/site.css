@@ -860,7 +860,6 @@ select:focus {
   font-size: 0.9rem;
 }
 
-
 .summary-card {
   border: 1px solid var(--color-border);
   border-radius: 14px;
@@ -980,7 +979,9 @@ select:focus {
   display: none;
 }
 
-.is-website {
+.is-website,
+.website_,
+.name_ {
   position: absolute;
   left: -10000px;
   top: auto;

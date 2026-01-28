@@ -14,12 +14,12 @@ from core.helpers import (
     client_ip_key,
     get_client_ip,
 )
-from core.services.blog import published_posts_queryset
 from core.models import AboutPage
+from core.services.blog import published_posts_queryset
 
 from .forms import ContactForm
 
-CONTACT_RATE_LIMIT = "2/m"
+CONTACT_RATE_LIMIT = "3/m"
 CONTACT_RATE_LIMIT_KEY = "ip"
 
 
