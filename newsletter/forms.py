@@ -12,4 +12,5 @@ class NewsletterEmailForm(forms.Form):
         widget=forms.TextInput(
             attrs={"class": "input-field name_", "autocomplete": "off"}
         ),
+        required=False,
     )
