@@ -7,6 +7,7 @@ from django_ratelimit.decorators import ratelimit
 
 from blog.models import BlogPost
 from core.helpers import client_ip_key
+from core.models import SiteSettings
 
 from .forms import CommentForm
 from .models import Comment
@@ -24,6 +25,10 @@ COMMENT_RATE_LIMIT_KEY = "ip"
 @login_required
 @require_POST
 def post_comment(request, post_id):
+    if not SiteSettings.get_settings().is_comments_enabled:
+        messages.error(request, "Yorum yapma özelliği şu anda kapalıdır.")
+        return redirect("/")
+
     post = get_object_or_404(
         BlogPost,
         pk=post_id,

@@ -15,6 +15,55 @@ SEO_TITLE_MAX_LENGTH = 45
 SEO_DESCRIPTION_MAX_LENGTH = 160
 
 
+class SiteSettings(
+    UUIDModelMixin,
+    TimeStampedModelMixin,
+):
+    is_comments_enabled = models.BooleanField(
+        default=True,
+        verbose_name="Yorumlar Aktif",
+        help_text="Blog yazılarında yorum yapma ve yanıt verme özelliğini açar/kapatır.",
+    )
+    is_newsletter_enabled = models.BooleanField(
+        default=True,
+        verbose_name="Newsletter Aktif",
+        help_text="Bülten abonelik formunu açar/kapatır.",
+    )
+    is_contact_enabled = models.BooleanField(
+        default=True,
+        verbose_name="İletişim Formu Aktif",
+        help_text="İletişim sayfasındaki formu açar/kapatır.",
+    )
+
+    class Meta:  # pyright: ignore[reportIncompatibleVariableOverride]
+        verbose_name = "Site Ayarları"
+        verbose_name_plural = "Site Ayarları"
+
+    def __str__(self) -> str:
+        return "Site Ayarları"
+
+    def clean(self) -> None:
+        super().clean()
+        if SiteSettings.objects.exclude(pk=self.pk).exists():
+            raise ValidationError("Sadece tek bir site ayarı olabilir.")
+
+    @classmethod
+    def get_settings(cls):
+        from django.core.cache import cache
+
+        settings_obj = cache.get("site_settings")
+        if settings_obj is None:
+            settings_obj, _ = cls.objects.get_or_create()
+            cache.set("site_settings", settings_obj, timeout=3600)
+        return settings_obj
+
+    def save(self, *args: object, **kwargs: object) -> None:
+        super().save(*args, **kwargs)  # pyright: ignore[reportArgumentType]
+        from django.core.cache import cache
+
+        cache.set("site_settings", self, timeout=3600)
+
+
 class ContactMessage(
     UUIDModelMixin,
     TimeStampedModelMixin,

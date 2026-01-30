@@ -14,7 +14,7 @@ from core.helpers import (
     client_ip_key,
     get_client_ip,
 )
-from core.models import AboutPage
+from core.models import AboutPage, SiteSettings
 from core.services.blog import published_posts_queryset
 
 from .forms import ContactForm
@@ -73,9 +73,14 @@ def about_view(request):
 )
 @require_http_methods(["GET", "POST"])
 def contact_view(request):
+    site_settings = SiteSettings.get_settings()
     form = ContactForm(request.POST or None)
 
     if request.method == "POST":
+        if not site_settings.is_contact_enabled:
+            messages.error(request, "İletişim formu şu anda kapalıdır.")
+            return redirect("core:contact")
+
         if getattr(request, "limited", False):
             messages.error(
                 request,

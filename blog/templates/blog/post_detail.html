@@ -184,6 +184,7 @@
       <p>Henüz onaylanmış yorum yok.</p>
     {% endif %}
 
+    {% if site_settings.is_comments_enabled %}
     <h4>Yorum Yaz</h4>
     {% if can_comment %}
       <form method="post" action="{% url 'comments:post_comment' post.id %}" class="comment-form">
@@ -250,6 +251,9 @@
           </div>
         </div>
       </div>
+    {% endif %}
+    {% else %}
+      <p>Yorum yapma özelliği şu anda kapalıdır.</p>
     {% endif %}
   </section>
 {% endblock %}
