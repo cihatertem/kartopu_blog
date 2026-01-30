@@ -3,7 +3,26 @@ from django.urls import reverse
 from django.utils.html import format_html
 from django.utils.safestring import SafeString
 
-from .models import AboutPage, AboutPageImage, ContactMessage
+from .models import AboutPage, AboutPageImage, ContactMessage, SiteSettings
+
+
+@admin.register(SiteSettings)
+class SiteSettingsAdmin(admin.ModelAdmin):
+    list_display = (
+        "__str__",
+        "is_comments_enabled",
+        "is_newsletter_enabled",
+        "is_contact_enabled",
+        "updated_at",
+    )
+
+    def has_add_permission(self, request) -> bool:
+        if SiteSettings.objects.exists():
+            return False
+        return super().has_add_permission(request)
+
+    def has_delete_permission(self, request, obj=None) -> bool:
+        return False
 
 
 @admin.register(ContactMessage)
@@ -21,22 +40,22 @@ class ContactMessageAdmin(admin.ModelAdmin):
     def mark_as_read(self, request, queryset):
         queryset.update(is_read=True)
 
-    mark_as_read.short_description = "Seçili mesajları okundu olarak işaretle"
+    mark_as_read.short_description = "Seçili mesajları okundu olarak işaretle"  # pyright: ignore[reportFunctionMemberAccess]
 
     def mark_as_unread(self, request, queryset):
         queryset.update(is_read=False)
 
-    mark_as_unread.short_description = "Seçili mesajları okunmadı olarak işaretle"
+    mark_as_unread.short_description = "Seçili mesajları okunmadı olarak işaretle"  # pyright: ignore[reportFunctionMemberAccess]
 
     def mark_as_spam(self, request, queryset):
         queryset.update(is_spam=True)
 
-    mark_as_spam.short_description = "Seçili mesajları spam olarak işaretle"
+    mark_as_spam.short_description = "Seçili mesajları spam olarak işaretle"  # pyright: ignore[reportFunctionMemberAccess]
 
     def mark_as_not_spam(self, request, queryset):
         queryset.update(is_spam=False)
 
-    mark_as_not_spam.short_description = "Seçili mesajları spam değil olarak işaretle"
+    mark_as_not_spam.short_description = "Seçili mesajları spam değil olarak işaretle"  # pyright: ignore[reportFunctionMemberAccess]
 
 
 class AboutPageImageInline(admin.TabularInline):

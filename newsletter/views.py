@@ -4,6 +4,8 @@ from django.core import signing
 from django.shortcuts import redirect, render
 from django.utils import timezone
 
+from core.models import SiteSettings
+
 from .forms import NewsletterEmailForm
 from .models import Subscriber, SubscriberStatus
 from .services import send_subscribe_confirmation, send_unsubscribe_confirmation
@@ -11,6 +13,10 @@ from .tokens import parse_token
 
 
 def subscribe_request(request):
+    if not SiteSettings.get_settings().is_newsletter_enabled:
+        messages.error(request, "Bülten aboneliği şu anda kapalıdır.")
+        return redirect("/")
+
     if request.method != "POST":
         return redirect("/")
 

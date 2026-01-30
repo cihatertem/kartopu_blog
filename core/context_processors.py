@@ -22,7 +22,7 @@ from blog.models import BlogPost, Category, Tag
 from comments.models import Comment
 from portfolio.models import PortfolioSnapshot
 
-from .models import ContactMessage
+from .models import ContactMessage, SiteSettings
 from .tag_colors import get_tag_color_class
 
 CACHE_TIMEOUT = 600  # 10 minutes
@@ -229,4 +229,10 @@ def site_metadata_context(request):
             "https://x.com/KartopuMoney",
             "https://www.youtube.com/channel/UCn4Vlw6WLaTjq1vh0OIk8lQ",
         ],
+    }
+
+
+def site_settings_context(request):
+    return {
+        "site_settings": SiteSettings.get_settings(),
     }
