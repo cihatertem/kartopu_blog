@@ -102,6 +102,7 @@ TEMPLATES = [
                 "core.context_processors.breadcrumbs_context",  # automatic breadcrumbs context
                 "core.context_processors.google_analytics_context",
                 "core.context_processors.site_metadata_context",
+                "core.context_processors.site_settings_context",
             ],
         },
     },

@@ -18,7 +18,7 @@
   </div>
   <p class="comment-body">{{ comment.body|linebreaksbr }}</p>
 
-  {% if can_comment %}
+  {% if site_settings.is_comments_enabled and can_comment %}
     <details class="comment-reply">
       <summary class="comment-reply__toggle">Yanıtla</summary>
       <form method="post" action="{% url 'comments:post_comment' comment.post_id %}">

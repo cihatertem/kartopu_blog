@@ -28,6 +28,7 @@
 
   <section class="summary-card">
     <h2>Mesaj gönder</h2>
+    {% if site_settings.is_contact_enabled %}
     <form class="comment-form" method="post">
       {% csrf_token %}
       <div class="comment-form__field is-website">
@@ -109,5 +110,8 @@
         Gönder
       </button>
     </form>
+    {% else %}
+      <p>İletişim formu şu anda kapalıdır.</p>
+    {% endif %}
   </section>
 {% endblock %}

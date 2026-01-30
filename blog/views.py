@@ -15,6 +15,7 @@ from django.views.decorators.http import require_POST
 from comments.forms import CommentForm
 from comments.models import MAX_COMMENT_LENGTH, Comment
 from core import helpers
+from core.models import SiteSettings
 from core.services.blog import published_posts_queryset
 from core.services.pagination import get_page_obj
 from core.tag_colors import build_tag_items
@@ -291,12 +292,25 @@ def _build_post_breadcrumbs(post, *, is_preview: bool) -> list[dict[str, str | N
 def _build_post_detail_context(request, post, *, is_preview: bool):
     comment_context = _build_comment_context(request, post)
     has_social_account = comment_context["has_social_account"]
+    site_settings = SiteSettings.get_settings()
 
     reaction_context = _build_reaction_context(request, post)
     is_authenticated = request.user.is_authenticated
-    can_comment = has_social_account and (is_preview or is_authenticated)
-    requires_social_auth = (is_preview or is_authenticated) and not has_social_account
-    can_react = can_comment
+    can_comment = (
+        site_settings.is_comments_enabled
+        and has_social_account
+        and (is_preview or is_authenticated)
+    )
+    requires_social_auth = (
+        site_settings.is_comments_enabled
+        and (is_preview or is_authenticated)
+        and not has_social_account
+    )
+    can_react = (
+        site_settings.is_comments_enabled
+        and has_social_account
+        and (is_preview or is_authenticated)
+    )
 
     return {
         "post": post,
@@ -448,6 +462,12 @@ def post_preview(request, slug: str):
 @require_POST
 @login_required
 def post_reaction(request, slug: str):
+    if not SiteSettings.get_settings().is_comments_enabled:
+        return JsonResponse(
+            {"detail": "Tepki verme özelliği şu anda kapalıdır."},
+            status=403,
+        )
+
     post = get_object_or_404(
         BlogPost.objects.filter(status=BlogPost.Status.PUBLISHED),
         slug=slug,
