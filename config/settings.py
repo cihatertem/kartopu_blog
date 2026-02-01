@@ -339,7 +339,7 @@ NEWSLETTER_TOKEN_MAX_AGE = int(os.getenv("NEWSLETTER_TOKEN_MAX_AGE", "604800"))
 # gunicorn 2+ workers ratelimit issue
 # "python manage.py createcachetable ratelimit_cache" run at prod once
 
-if DEBUG
+if DEBUG:
     CACHES = {
         "default": {
             "BACKEND": "django.core.cache.backends.db.DatabaseCache",
@@ -355,7 +355,7 @@ else:
                 "CLIENT_CLASS": "django_redis.client.DefaultClient",
                 # Redis bağlantısı koparsa site çökmesin, DB'den çalışmaya devam etsin (Fail-safe)
                 "IGNORE_EXCEPTIONS": True,
-            }
+            },
         }
     }
     SESSION_ENGINE = "django.contrib.sessions.backends.cache"
