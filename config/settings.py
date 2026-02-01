@@ -130,16 +130,16 @@ else:
             "PASSWORD": get_swarm_secret_for_psg("POSTGRES_PASSWORD"),
             "HOST": os.getenv("POSTGRES_HOST", "db"),
             "PORT": os.getenv("POSTGRES_PORT", "5432"),
-            # "CONN_MAX_AGE": int(os.getenv("DJANGO_DB_CONN_MAX_AGE", "60")),
-            # "CONN_HEALTH_CHECKS": True,
+            "CONN_MAX_AGE": int(os.getenv("DJANGO_DB_CONN_MAX_AGE", "60")),
+            "CONN_HEALTH_CHECKS": True,
             "OPTIONS": {
                 "connect_timeout": 5,
-                "pool": {
-                    "min_size": 1,
-                    "max_size": 4,
-                    "timeout": 15,
-                    "max_lifetime": 600,
-                },
+                # "pool": {
+                #     "min_size": 1,
+                #     "max_size": 4,
+                #     "timeout": 15,
+                #     "max_lifetime": 600,
+                # },
             },
         }
     }
