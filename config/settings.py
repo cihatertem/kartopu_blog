@@ -130,16 +130,17 @@ else:
             "PASSWORD": get_swarm_secret_for_psg("POSTGRES_PASSWORD"),
             "HOST": os.getenv("POSTGRES_HOST", "db"),
             "PORT": os.getenv("POSTGRES_PORT", "5432"),
-            "CONN_MAX_AGE": int(os.getenv("DJANGO_DB_CONN_MAX_AGE", "60")),
-            "CONN_HEALTH_CHECKS": True,
+            # "CONN_MAX_AGE": int(os.getenv("DJANGO_DB_CONN_MAX_AGE", "60")),
+            # "CONN_HEALTH_CHECKS": True,
+            "CONN_MAX_AGE": 0,
             "OPTIONS": {
-                "connect_timeout": 5,
-                # "pool": {
-                #     "min_size": 1,
-                #     "max_size": 4,
-                #     "timeout": 15,
-                #     "max_lifetime": 600,
-                # },
+                "connect_timeout": 10,
+                "pool": {
+                    "min_size": 1,
+                    "max_size": 4,
+                    "timeout": 30,
+                    "max_lifetime": 600,
+                },
             },
         }
     }
@@ -337,12 +338,28 @@ NEWSLETTER_TOKEN_MAX_AGE = int(os.getenv("NEWSLETTER_TOKEN_MAX_AGE", "604800"))
 
 # gunicorn 2+ workers ratelimit issue
 # "python manage.py createcachetable ratelimit_cache" run at prod once
-CACHES = {
-    "default": {
-        "BACKEND": "django.core.cache.backends.db.DatabaseCache",
-        "LOCATION": "ratelimit_cache",
+
+if DEBUG
+    CACHES = {
+        "default": {
+            "BACKEND": "django.core.cache.backends.db.DatabaseCache",
+            "LOCATION": "ratelimit_cache",
+        }
     }
-}
+else:
+    CACHES = {
+        "default": {
+            "BACKEND": "django_redis.cache.RedisCache",
+            "LOCATION": os.getenv("REDIS_URL", "redis://redis:6379/1"),
+            "OPTIONS": {
+                "CLIENT_CLASS": "django_redis.client.DefaultClient",
+                # Redis bağlantısı koparsa site çökmesin, DB'den çalışmaya devam etsin (Fail-safe)
+                "IGNORE_EXCEPTIONS": True,
+            }
+        }
+    }
+    SESSION_ENGINE = "django.contrib.sessions.backends.cache"
+    SESSION_CACHE_ALIAS = "default"
 
 RATELIMIT_USE_CACHE = "default"
 
