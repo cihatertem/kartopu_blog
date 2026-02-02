@@ -8,6 +8,8 @@ from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.db import models
 from django.utils import timezone
+
+from core.mixins import TimeStampedModelMixin, UUIDModelMixin
 from core.services.portfolio import (
     build_comparison_name,
     build_snapshot_name,
@@ -15,13 +17,13 @@ from core.services.portfolio import (
     format_snapshot_label,
     generate_unique_slug,
 )
-
-from core.mixins import TimeStampedModelMixin, UUIDModelMixin
 from portfolio.services import fetch_fx_rate, fetch_yahoo_finance_price
 
 MAX_DICITS = 200
 MAX_DECIMAL_PLACES = 4
 MAX_DECIMAL_PLACES_FOR_QUANTITY = 5
+
+
 class Asset(UUIDModelMixin, TimeStampedModelMixin):
     class AssetType(models.TextChoices):
         STOCK = "stock", "Hisse"
@@ -172,9 +174,13 @@ class Portfolio(UUIDModelMixin, TimeStampedModelMixin):
         price_date: date | None = None,
     ) -> list[dict[str, Decimal | Asset]]:
         positions: dict[str, dict[str, Decimal | Asset]] = {}
-        transactions = self.transactions.select_related(  # pyright: ignore[reportAttributeAccessIssue]
-            "asset"
-        ).order_by("trade_date", "created_at")
+        transactions = (
+            self.transactions.select_related(  # pyright: ignore[reportAttributeAccessIssue]
+                "asset"
+            )
+            .order_by("trade_date", "created_at")
+            .distinct()
+        )
         if price_date:
             transactions = transactions.filter(trade_date__lte=price_date)
         fx_rates: dict[tuple[str, str, date | None], Decimal] = {}
@@ -207,13 +213,16 @@ class Portfolio(UUIDModelMixin, TimeStampedModelMixin):
             if transaction.transaction_type == PortfolioTransaction.TransactionType.BUY:
                 quantity += transaction.quantity
                 cost_basis += transaction_cost
-            else:
+            elif (
+                transaction.transaction_type
+                == PortfolioTransaction.TransactionType.SELL
+            ):
                 if quantity > 0:  # pyright: ignore[reportOperatorIssue]
                     average_cost = cost_basis / quantity  # pyright: ignore[reportOperatorIssue]
                     cost_basis -= average_cost * transaction.quantity
                 quantity -= transaction.quantity
 
-            if quantity <= 0:
+            if quantity <= 0:  # pyright: ignore [reportOperatorIssue]
                 quantity = Decimal("0")
                 cost_basis = Decimal("0")
 
@@ -856,7 +865,7 @@ class SalarySavingsSnapshot(UUIDModelMixin, TimeStampedModelMixin):
             end_date = snapshot_date
 
         totals = list(
-            flow.entries.filter(
+            flow.entries.filter(  # pyright: ignore[reportAttributeAccessIssue]
                 entry_date__gte=start_date,
                 entry_date__lte=end_date,
             ).values_list("salary_amount", "savings_amount")
