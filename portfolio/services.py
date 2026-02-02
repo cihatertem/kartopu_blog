@@ -16,8 +16,9 @@ def fetch_yahoo_finance_price(
     if price_date:
         try:
             ticker = yf.Ticker(symbol)
+            # Look back up to 5 days to find the latest available price
             history = ticker.history(
-                start=price_date,
+                start=price_date - timedelta(days=5),
                 end=price_date + timedelta(days=1),
                 interval="1d",
             )
@@ -27,7 +28,12 @@ def fetch_yahoo_finance_price(
         if history.empty:
             return None
 
-        price = history["Close"].iloc[-1]
+        # Filter for data up to and including the price_date
+        history = history[history.index.date <= price_date]  # pyright: ignore[reportAttributeAccessIssue]
+        if history.empty:
+            return None
+
+        price = history["Close"].iloc[-1]  # pyright: ignore[reportAttributeAccessIssue]
         try:
             return Decimal(str(price))
         except (InvalidOperation, TypeError):
@@ -64,8 +70,9 @@ def fetch_fx_rate(
     if rate_date:
         try:
             ticker = yf.Ticker(symbol)
+            # Look back up to 5 days to find the latest available rate
             history = ticker.history(
-                start=rate_date,
+                start=rate_date - timedelta(days=5),
                 end=rate_date + timedelta(days=1),
                 interval="1d",
             )
@@ -75,7 +82,12 @@ def fetch_fx_rate(
         if history.empty:
             return None
 
-        price = history["Close"].iloc[-1]
+        # Filter for data up to and including the rate_date
+        history = history[history.index.date <= rate_date]  # pyright: ignore[reportAttributeAccessIssue]
+        if history.empty:
+            return None
+
+        price = history["Close"].iloc[-1]  # pyright: ignore[reportAttributeAccessIssue]
         try:
             return Decimal(str(price))
         except (InvalidOperation, TypeError):

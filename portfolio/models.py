@@ -187,12 +187,14 @@ class Portfolio(UUIDModelMixin, TimeStampedModelMixin):
 
         for transaction in transactions:
             asset = transaction.asset
-            currency_pair = (asset.currency, self.currency, transaction.trade_date)
+            # Use price_date (snapshot date) for conversion if provided, otherwise historical
+            conversion_date = price_date or transaction.trade_date
+            currency_pair = (asset.currency, self.currency, conversion_date)
             if currency_pair not in fx_rates:
                 fx_rate = fetch_fx_rate(
                     asset.currency,
                     self.currency,
-                    rate_date=transaction.trade_date,
+                    rate_date=conversion_date,
                 )
                 fx_rates[currency_pair] = (
                     fx_rate if fx_rate is not None else Decimal("1")
@@ -634,15 +636,15 @@ class CashFlowSnapshot(UUIDModelMixin, TimeStampedModelMixin):
             amount = entry["amount"] or Decimal("0")
             entry_currency = entry["currency"]
             fx_rate = Decimal("1")
-            entry_date = entry["entry_date"]
             if entry_currency != cashflow.currency:
-                currency_pair = (entry_currency, cashflow.currency, entry_date)
+                # Use snapshot_date for currency conversion
+                currency_pair = (entry_currency, cashflow.currency, snapshot_date)
                 fx_rate = fx_rates.get(currency_pair)
                 if fx_rate is None:
                     fetched_rate = fetch_fx_rate(
                         entry_currency,
                         cashflow.currency,
-                        rate_date=entry_date,
+                        rate_date=snapshot_date,
                     )
                     fx_rate = fetched_rate if fetched_rate is not None else Decimal("1")
                     fx_rates[currency_pair] = fx_rate
@@ -1110,10 +1112,11 @@ class DividendSnapshot(UUIDModelMixin, TimeStampedModelMixin):
         for payment in payments:
             fx_rate = Decimal("1")
             if payment.asset.currency != currency:
+                # Use snapshot_date for currency conversion
                 fetched_rate = fetch_fx_rate(
                     payment.asset.currency,
                     currency,
-                    rate_date=payment.payment_date,
+                    rate_date=snapshot_date,
                 )
                 fx_rate = fetched_rate if fetched_rate is not None else Decimal("1")
             per_share = payment.net_dividend_per_share * fx_rate
