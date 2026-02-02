@@ -1,7 +1,7 @@
 import json
 import re
-from urllib.parse import urljoin
 from decimal import Decimal, InvalidOperation
+from urllib.parse import urljoin
 
 from django import template
 from django.core.serializers.json import DjangoJSONEncoder
@@ -66,7 +66,7 @@ def preload_stylesheet(path: str) -> str:
     return mark_safe(
         f'<link rel="preload" href="{href}" as="style" '
         'data-preload-stylesheet="true">'
-        f"<noscript><link rel=\"stylesheet\" href=\"{href}\"></noscript>"
+        f'<noscript><link rel="stylesheet" href="{href}"></noscript>'
     )
 
 
@@ -189,7 +189,11 @@ def _render_portfolio_charts_html(snapshot) -> str:
     if not snapshot:
         return ""
 
-    items = snapshot.items.select_related("asset").order_by("-allocation_pct")
+    items = (
+        snapshot.items.select_related("asset")
+        .filter(market_value__gt=0)
+        .order_by("-allocation_pct")
+    )
     allocation = {
         "labels": [(item.asset.symbol or item.asset.name) for item in items],
         "values": [float(item.allocation_pct or 0) * 100 for item in items],
@@ -237,7 +241,11 @@ def _render_portfolio_category_summary_html(snapshot) -> str:
     if not snapshot:
         return ""
 
-    items = snapshot.items.select_related("asset").order_by("-allocation_pct")
+    items = (
+        snapshot.items.select_related("asset")
+        .filter(market_value__gt=0)
+        .order_by("-allocation_pct")
+    )
     category_totals: dict[str, float] = {}
     for item in items:
         asset = item.asset
@@ -634,7 +642,7 @@ def _render_cashflow_charts_html(snapshot) -> str:
     if not snapshot:
         return ""
 
-    items = snapshot.items.order_by("-allocation_pct")
+    items = snapshot.items.filter(amount__gt=0).order_by("-allocation_pct")
     allocation = {
         "labels": [item.get_category_display() for item in items],
         "values": [float(item.allocation_pct or 0) * 100 for item in items],
@@ -694,7 +702,6 @@ def _render_savings_rate_summary_html(snapshot) -> str:
     <ul class="summary-list">
       <li><strong>Tasarruf Oranı (%):</strong> {savings_rate_pct}</li>
     </ul>
-    <p class="summary-meta summary-meta--tight text-muted">Maaş ve tasarruf tutarları gizlidir.</p>
   </div>
 </section>
 """
@@ -959,7 +966,11 @@ def _render_dividend_charts_html(snapshot) -> str:
     if not snapshot:
         return ""
 
-    items = snapshot.asset_items.select_related("asset").order_by("-allocation_pct")
+    items = (
+        snapshot.asset_items.select_related("asset")
+        .filter(total_amount__gt=0)
+        .order_by("-allocation_pct")
+    )
     allocation = {
         "labels": [(item.asset.symbol or item.asset.name) for item in items],
         "values": [float(item.allocation_pct or 0) * 100 for item in items],
@@ -1264,12 +1275,8 @@ def render_post_body(context, post):
         snapshot = _get_item_by_identifier(salary_savings_snapshots, identifier)
         return _render_savings_rate_charts_html(snapshot)
 
-    expanded = SAVINGS_RATE_SUMMARY_PATTERN.sub(
-        savings_rate_summary_replacer, expanded
-    )
-    expanded = SAVINGS_RATE_CHARTS_PATTERN.sub(
-        savings_rate_charts_replacer, expanded
-    )
+    expanded = SAVINGS_RATE_SUMMARY_PATTERN.sub(savings_rate_summary_replacer, expanded)
+    expanded = SAVINGS_RATE_CHARTS_PATTERN.sub(savings_rate_charts_replacer, expanded)
     dividend_snapshots = _get_dividend_snapshots(post)
     dividend_comparisons = _get_dividend_comparisons(post)
 
