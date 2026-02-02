@@ -172,9 +172,13 @@ class Portfolio(UUIDModelMixin, TimeStampedModelMixin):
         price_date: date | None = None,
     ) -> list[dict[str, Decimal | Asset]]:
         positions: dict[str, dict[str, Decimal | Asset]] = {}
-        transactions = self.transactions.select_related(  # pyright: ignore[reportAttributeAccessIssue]
-            "asset"
-        ).order_by("trade_date", "created_at")
+        transactions = (
+            self.transactions.select_related(  # pyright: ignore[reportAttributeAccessIssue]
+                "asset"
+            )
+            .order_by("trade_date", "created_at")
+            .distinct()
+        )
         if price_date:
             transactions = transactions.filter(trade_date__lte=price_date)
         fx_rates: dict[tuple[str, str, date | None], Decimal] = {}
@@ -207,7 +211,9 @@ class Portfolio(UUIDModelMixin, TimeStampedModelMixin):
             if transaction.transaction_type == PortfolioTransaction.TransactionType.BUY:
                 quantity += transaction.quantity
                 cost_basis += transaction_cost
-            else:
+            elif (
+                transaction.transaction_type == PortfolioTransaction.TransactionType.SELL
+            ):
                 if quantity > 0:  # pyright: ignore[reportOperatorIssue]
                     average_cost = cost_basis / quantity  # pyright: ignore[reportOperatorIssue]
                     cost_basis -= average_cost * transaction.quantity
