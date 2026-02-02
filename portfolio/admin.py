@@ -176,6 +176,25 @@ class PortfolioSnapshotAdmin(admin.ModelAdmin):
     search_fields = ("name", "slug", "portfolio__name", "portfolio__owner__email")
     list_select_related = ("portfolio", "portfolio__owner")
     inlines = (PortfolioSnapshotItemInline,)
+    actions = ("make_featured", "make_unfeatured")
+
+    @admin.action(description="Seçili snapshotları öne çıkar")
+    def make_featured(self, request, queryset):
+        updated = queryset.update(is_featured=True, updated_at=timezone.now())
+        self.message_user(
+            request,
+            f"{updated} snapshot öne çıkarıldı.",
+            level=messages.SUCCESS,
+        )
+
+    @admin.action(description="Seçili snapshotların öne çıkarılmasını kaldır")
+    def make_unfeatured(self, request, queryset):
+        updated = queryset.update(is_featured=False, updated_at=timezone.now())
+        self.message_user(
+            request,
+            f"{updated} snapshotun öne çıkarılması kaldırıldı.",
+            level=messages.SUCCESS,
+        )
 
     def save_model(self, request, obj, form, change):
         if change:
