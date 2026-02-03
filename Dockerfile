@@ -5,15 +5,20 @@ LABEL maintainer="Cihat Ertem <cihatertem@gmail.com>"
 
 ENV PYTHONUNBUFFERED=1 \
     PIP_DISABLE_PIP_VERSION_CHECK=on \
-    PYTHONDONTWRITEBYTECODE=1
+    PYTHONDONTWRITEBYTECODE=1 \
+    HOME=/app \
+    XDG_CACHE_HOME=/var/cache/app
 
 RUN groupadd -g 1000 -r app \
     && useradd \
+    -d /app \
     -u 1000 \
     --no-create-home\
     --shell "/sbin/nologin" \
     --no-log-init \
-    -r -g app app
+    -r -g app app \
+    && mkdir -p /var/cache/app \
+    && chown app:app /var/cache/app
 
 WORKDIR /app
 
