@@ -132,6 +132,13 @@ else:
             "PORT": os.getenv("POSTGRES_PORT", "5432"),
             "CONN_MAX_AGE": int(os.getenv("DJANGO_DB_CONN_MAX_AGE", "60")),
             "CONN_HEALTH_CHECKS": True,
+            "OPTIONS": {
+                "keepalives": 1,
+                "keepalives_idle": 60,
+                "keepalives_interval": 10,
+                "keepalives_count": 3,
+                "connect_timeout": 10,
+            },
             # "CONN_MAX_AGE": 0,
             # "OPTIONS": {
             #     "connect_timeout": 10,
