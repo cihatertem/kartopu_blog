@@ -6,6 +6,7 @@ from django.utils import timezone
 from django.utils.html import format_html
 from django.utils.safestring import SafeString
 
+from core.decorators import log_exceptions
 from newsletter.models import BlogPostNotification
 from newsletter.services import send_post_published_email
 
@@ -41,6 +42,7 @@ class BlogPostImageInline(admin.TabularInline):
     class Media:
         css = {"all": ("css/admin.css",)}
 
+    @log_exceptions(message="Error rendering admin thumb")
     def thumb(self, obj: BlogPostImage) -> str | SafeString:
         if not obj.pk or not obj.image:
             return "—"

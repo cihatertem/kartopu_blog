@@ -9,6 +9,7 @@ from django.templatetags.static import static as static_url
 from django.utils.html import escape
 from django.utils.safestring import mark_safe
 
+from core.decorators import log_exceptions
 from core.markdown import render_markdown
 from portfolio.models import CashFlowEntry, CashFlowSnapshot, SalarySavingsSnapshot
 
@@ -126,11 +127,7 @@ def _render_portfolio_summary_html(snapshot) -> str:
     if not snapshot:
         return ""
 
-    total_return_pct = snapshot.total_return_pct
-    try:
-        total_return_pct = (total_return_pct or 0) * 100
-    except TypeError:
-        total_return_pct = 0
+    total_return_pct = mul100(snapshot.total_return_pct)
 
     portfolio_name = escape(getattr(snapshot.portfolio, "name", ""))
     period_display = escape(
@@ -196,7 +193,7 @@ def _render_portfolio_charts_html(snapshot) -> str:
     )
     allocation = {
         "labels": [(item.asset.symbol or item.asset.name) for item in items],
-        "values": [float(item.allocation_pct or 0) * 100 for item in items],
+        "values": [_safe_float(item.allocation_pct) * 100 for item in items],
     }
     snapshots_qs = (
         snapshot.__class__.objects.filter(
@@ -208,7 +205,7 @@ def _render_portfolio_charts_html(snapshot) -> str:
     )
     timeseries = {
         "labels": [d.isoformat() for d, _ in snapshots_qs],
-        "values": [float(v) for _, v in snapshots_qs],
+        "values": [_safe_float(v) for _, v in snapshots_qs],
     }
     allocation_json = escape(json.dumps(allocation, cls=DjangoJSONEncoder))
     timeseries_json = escape(json.dumps(timeseries, cls=DjangoJSONEncoder))
@@ -251,7 +248,7 @@ def _render_portfolio_category_summary_html(snapshot) -> str:
         asset = item.asset
         label = asset.get_asset_type_display() if asset else "Diğer"
         category_totals[label] = category_totals.get(label, 0) + float(
-            (item.allocation_pct or 0) * 100
+            _safe_float(item.allocation_pct) * 100
         )
 
     if not category_totals:
@@ -279,11 +276,22 @@ def _render_portfolio_category_summary_html(snapshot) -> str:
     )
 
 
+@log_exceptions(
+    default_factory=lambda value: Decimal("0"),
+    exception_types=(TypeError,),
+    message="Error in _safe_decimal",
+)
 def _safe_decimal(value) -> Decimal:
-    try:
-        return value or Decimal("0")
-    except TypeError:
-        return Decimal("0")
+    return value or Decimal("0")
+
+
+@log_exceptions(
+    default=0.0,
+    exception_types=(TypeError, ValueError),
+    message="Error in _safe_float",
+)
+def _safe_float(value) -> float:
+    return float(value or 0)
 
 
 def _currency_symbol(currency_code: str | None) -> str:
@@ -302,22 +310,23 @@ def _format_currency(value, currency_code: str | None) -> str:
     return f"{value_str} {symbol}".rstrip()
 
 
+@log_exceptions(
+    default_factory=lambda value: str(value),
+    exception_types=(InvalidOperation, TypeError),
+    message="Error in _format_tr_number",
+)
 def _format_tr_number(value) -> str:
-    try:
-        dec = Decimal(str(value))
+    dec = Decimal(str(value))
 
-        has_decimal = dec % 1 != 0
+    has_decimal = dec % 1 != 0
 
-        if has_decimal:
-            s = f"{dec:,.2f}"
-        else:
-            s = f"{dec:,.0f}"
+    if has_decimal:
+        s = f"{dec:,.2f}"
+    else:
+        s = f"{dec:,.0f}"
 
-        s = s.replace(",", "X").replace(".", ",").replace("X", ".")
-        return s
-
-    except (InvalidOperation, TypeError):
-        return str(value)
+    s = s.replace(",", "X").replace(".", ",").replace("X", ".")
+    return s
 
 
 def _get_prefetched_list(post, attr_name, fallback_queryset):
@@ -567,21 +576,15 @@ def _render_portfolio_comparison_charts_html(comparison) -> str:
     base = comparison.base_snapshot
     compare = comparison.compare_snapshot
 
-    def safe_float(value):
-        try:
-            return float(value or 0)
-        except TypeError:
-            return 0.0
-
     payload = {
         "labels": ["Toplam Maliyet", "Toplam Değer"],
         "base": [
-            safe_float(base.total_cost),
-            safe_float(base.total_value),
+            _safe_float(base.total_cost),
+            _safe_float(base.total_value),
         ],
         "compare": [
-            safe_float(compare.total_cost),
-            safe_float(compare.total_value),
+            _safe_float(compare.total_cost),
+            _safe_float(compare.total_value),
         ],
         "base_label": f"{base.snapshot_date}",
         "compare_label": f"{compare.snapshot_date}",
@@ -645,7 +648,7 @@ def _render_cashflow_charts_html(snapshot) -> str:
     items = snapshot.items.filter(amount__gt=0).order_by("-allocation_pct")
     allocation = {
         "labels": [item.get_category_display() for item in items],
-        "values": [float(item.allocation_pct or 0) * 100 for item in items],
+        "values": [_safe_float(item.allocation_pct) * 100 for item in items],
     }
     snapshots_qs = (
         CashFlowSnapshot.objects.filter(
@@ -657,7 +660,7 @@ def _render_cashflow_charts_html(snapshot) -> str:
     )
     timeseries = {
         "labels": [d.isoformat() for d, _ in snapshots_qs],
-        "values": [float(v) for _, v in snapshots_qs],
+        "values": [_safe_float(v) for _, v in snapshots_qs],
     }
     allocation_json = escape(json.dumps(allocation, cls=DjangoJSONEncoder))
     timeseries_json = escape(json.dumps(timeseries, cls=DjangoJSONEncoder))
@@ -692,7 +695,7 @@ def _render_savings_rate_summary_html(snapshot) -> str:
 
     flow_name = escape(getattr(snapshot.flow, "name", ""))
     snapshot_date = escape(str(snapshot.snapshot_date))
-    savings_rate_pct = escape(f"{float((snapshot.savings_rate or 0) * 100):.2f}")
+    savings_rate_pct = escape(f"{_safe_float(snapshot.savings_rate) * 100:.2f}")
 
     return f"""
 <section class="savings-rate-snapshot">
@@ -718,7 +721,7 @@ def _render_savings_rate_charts_html(snapshot) -> str:
     )
     timeseries = {
         "labels": [d.isoformat() for d, _ in snapshots_qs],
-        "values": [float((rate or 0) * 100) for _, rate in snapshots_qs],
+        "values": [_safe_float(rate) * 100 for _, rate in snapshots_qs],
     }
     timeseries_json = escape(json.dumps(timeseries, cls=DjangoJSONEncoder))
 
@@ -828,16 +831,10 @@ def _render_cashflow_comparison_charts_html(comparison) -> str:
     base = comparison.base_snapshot
     compare = comparison.compare_snapshot
 
-    def safe_float(value):
-        try:
-            return float(value or 0)
-        except TypeError:
-            return 0.0
-
     payload = {
         "labels": ["Toplam Nakit Akışı"],
-        "base": [safe_float(base.total_amount)],
-        "compare": [safe_float(compare.total_amount)],
+        "base": [_safe_float(base.total_amount)],
+        "compare": [_safe_float(compare.total_amount)],
         "base_label": f"{base.snapshot_date}",
         "compare_label": f"{compare.snapshot_date}",
     }
@@ -874,8 +871,8 @@ def _render_dividend_summary_html(snapshot) -> str:
         f'<td class="data-table__cell">{escape(item.asset.name)}</td>'
         f'<td class="data-table__cell data-table__cell--hide-mobile">{escape(str(item.payment_date))}</td>'
         f'<td class="data-table__cell">{_format_currency(item.per_share_net_amount, snapshot.currency)}</td>'
-        f'<td class="data-table__cell">{escape(f"{float((item.dividend_yield_on_payment_price or 0) * 100):.2f}")}%</td>'
-        f'<td class="data-table__cell data-table__cell--hide-mobile">{escape(f"{float((item.dividend_yield_on_average_cost or 0) * 100):.2f}")}%</td>'
+        f'<td class="data-table__cell">{escape(f"{_safe_float(item.dividend_yield_on_payment_price) * 100:.2f}")}%</td>'
+        f'<td class="data-table__cell data-table__cell--hide-mobile">{escape(f"{_safe_float(item.dividend_yield_on_average_cost) * 100:.2f}")}%</td>'
         f'<td class="data-table__cell">{_format_currency(item.total_net_amount, snapshot.currency)}</td>'
         "</tr>"
         for item in payment_items
@@ -911,10 +908,10 @@ def _render_dividend_summary_html(snapshot) -> str:
             payment_date=escape(str(item.payment_date)),
             per_share=_format_currency(item.per_share_net_amount, snapshot.currency),
             yield_payment=escape(
-                f"{float((item.dividend_yield_on_payment_price or 0) * 100):.2f}%"
+                f"{_safe_float(item.dividend_yield_on_payment_price) * 100:.2f}%"
             ),
             yield_average=escape(
-                f"{float((item.dividend_yield_on_average_cost or 0) * 100):.2f}%"
+                f"{_safe_float(item.dividend_yield_on_average_cost) * 100:.2f}%"
             ),
             total=_format_currency(item.total_net_amount, snapshot.currency),
         )
@@ -973,7 +970,7 @@ def _render_dividend_charts_html(snapshot) -> str:
     )
     allocation = {
         "labels": [(item.asset.symbol or item.asset.name) for item in items],
-        "values": [float(item.allocation_pct or 0) * 100 for item in items],
+        "values": [_safe_float(item.allocation_pct) * 100 for item in items],
     }
     allocation_json = escape(json.dumps(allocation, cls=DjangoJSONEncoder))
 
@@ -1253,7 +1250,7 @@ def render_post_body(context, post):
     def cashflow_comparison_charts_replacer(match):
         identifier = match.group(1)
         comparison = _get_item_by_identifier(cashflow_comparisons, identifier)
-        return _render_cashflow_comparison_charts_html(comparison)
+        return _render_cashflow_comparison_summary_html(comparison)
 
     expanded = CASHFLOW_SUMMARY_PATTERN.sub(cashflow_summary_replacer, expanded)
     expanded = CASHFLOW_CHARTS_PATTERN.sub(cashflow_charts_replacer, expanded)
@@ -1320,9 +1317,11 @@ def render_post_body(context, post):
 
 
 @register.filter
+@log_exceptions(
+    default=0,
+    exception_types=(TypeError,),
+    message="Error in mul100 filter",
+)
 def mul100(value):
     """Decimal/float oranı yüzdeye çevirir. Örn: 0.12 -> 12.0"""
-    try:
-        return (value or 0) * 100
-    except TypeError:
-        return 0
+    return (value or 0) * 100

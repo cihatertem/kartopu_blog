@@ -12,6 +12,7 @@ from imagekit.models import ImageSpecField
 from imagekit.processors import ResizeToFill, Transpose
 from PIL import Image, ImageOps
 
+from core.decorators import log_exceptions
 from core.imagekit import build_responsive_rendition
 from core.mixins import TimeStampedModelMixin, UUIDModelMixin
 
@@ -131,10 +132,7 @@ class User(  # pyright: ignore[reportIncompatibleVariableOverride]
             self.email = None
         super().save(*args, **kwargs)  # pyright: ignore[reportArgumentType]
         if self.avatar:
-            try:
-                self._resize_avatar()
-            except Exception:
-                pass  # Hata durumunda avatar olduğu gibi kalır
+            self._resize_avatar()
 
     def __str__(self) -> str:
         first_name = str(self.first_name) or ""
@@ -147,6 +145,7 @@ class User(  # pyright: ignore[reportIncompatibleVariableOverride]
     def full_name(self) -> str:
         return self.get_full_name().title()
 
+    @log_exceptions(message="Avatar resizing failed")
     def _resize_avatar(self) -> None:
         if not self.avatar:
             return

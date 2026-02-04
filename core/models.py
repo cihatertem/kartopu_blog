@@ -189,10 +189,7 @@ class AboutPageImage(
         super().save(*args, **kwargs)
 
         if is_new and self.image:
-            try:
-                optimize_uploaded_image_field(self.image)
-            except Exception:
-                pass
+            optimize_uploaded_image_field(self.image)
 
     def __str__(self) -> str:
         return f"{self.page.title} - Görsel"

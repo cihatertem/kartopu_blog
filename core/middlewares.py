@@ -5,6 +5,8 @@ from django.conf import settings
 from django.http import JsonResponse
 from django.utils.deprecation import MiddlewareMixin
 
+from core.decorators import log_exceptions
+
 
 class HealthCheckMiddleware(MiddlewareMixin):
     def process_request(self, request):
@@ -25,6 +27,11 @@ class TrustedProxyMiddleware:
         return self.get_response(request)
 
     @staticmethod
+    @log_exceptions(
+        default=False,
+        exception_types=(ValueError,),
+        message="Invalid IP address in proxy check",
+    )
     def _is_trusted_proxy(request) -> bool:
         remote = request.META.get("REMOTE_ADDR")
         if not remote:
@@ -34,9 +41,5 @@ class TrustedProxyMiddleware:
         if not trusted_nets:
             return False
 
-        try:
-            address = ipaddress.ip_address(remote)
-        except ValueError:
-            return False
-
+        address = ipaddress.ip_address(remote)
         return any(address in net for net in trusted_nets)

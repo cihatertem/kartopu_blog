@@ -301,10 +301,7 @@ class BlogPost(
         super().save(*args, **kwargs)
 
         if is_new and self.cover_image:
-            try:
-                optimize_uploaded_image_field(self.cover_image)
-            except Exception:
-                pass
+            optimize_uploaded_image_field(self.cover_image)
 
     def get_absolute_url(self) -> str:
         return reverse("blog:post_detail", kwargs={"slug": self.slug})
@@ -416,10 +413,7 @@ class BlogPostImage(
 
         # Sadece ilk upload'ta optimize et
         if is_new and self.image:
-            try:
-                optimize_uploaded_image_field(self.image)
-            except Exception:
-                pass
+            optimize_uploaded_image_field(self.image)
 
     def __str__(self) -> str:
         return f"{self.post.title} - Görsel"  # pyright: ignore[reportAttributeAccessIssue]

@@ -4,7 +4,10 @@ from pathlib import Path
 from django.core.files.base import ContentFile
 from PIL import Image, ImageOps
 
+from core.decorators import log_exceptions
 
+
+@log_exceptions(message="Uploaded image optimization failed.")
 def optimize_uploaded_image(
     image_path: str,
     max_size: int = 2000,
@@ -38,6 +41,7 @@ def optimize_uploaded_image(
         )
 
 
+@log_exceptions(message="Uploaded image field optimization failed.")
 def optimize_uploaded_image_field(
     file_field,
     max_size: int = 2000,

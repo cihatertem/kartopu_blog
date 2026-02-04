@@ -4,6 +4,8 @@ from random import random
 
 from django.conf import settings
 
+from core.decorators import log_exceptions
+
 CAPTCHA_SESSION_KEY = "contact_captcha_answer"
 
 
@@ -39,11 +41,13 @@ def client_ip_key(group, request):
     return get_client_ip(request) or "unknown"
 
 
+@log_exceptions(
+    default=None,
+    exception_types=(TypeError, ValueError),
+    message="Error parsing integer",
+)
 def _parse_int(value: str | None) -> int | None:
-    try:
-        return int(value) if value not in (None, "") else None
-    except (TypeError, ValueError):
-        return None
+    return int(value) if value not in (None, "") else None
 
 
 def captcha_is_valid(request) -> bool:

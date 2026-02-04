@@ -3,6 +3,7 @@ from django.urls import reverse
 from django.utils.html import format_html
 from django.utils.safestring import SafeString
 
+from .decorators import log_exceptions
 from .models import AboutPage, AboutPageImage, ContactMessage, SiteSettings
 
 
@@ -68,6 +69,7 @@ class AboutPageImageInline(admin.TabularInline):
     class Media:
         css = {"all": ("css/admin.css",)}
 
+    @log_exceptions(message="Error rendering about page thumb")
     def thumb(self, obj: AboutPageImage) -> str | SafeString:
         if not obj.pk or not obj.image:
             return "—"

@@ -3,14 +3,14 @@ from __future__ import annotations
 from urllib.parse import urlparse
 
 from django.conf import settings
+from django.contrib.sites.models import Site
 from django.core.mail import EmailMultiAlternatives
 from django.template.loader import render_to_string
 from django.urls import reverse
 from django.utils import timezone
 from django.utils.encoding import iri_to_uri
 
-from django.contrib.sites.models import Site
-
+from core.decorators import log_exceptions
 from core.imagekit import safe_file_url
 
 from .models import Announcement, AnnouncementStatus, Subscriber, SubscriberStatus
@@ -50,6 +50,7 @@ def build_subscribe_confirm_url(email: str) -> str:
     return build_absolute_uri(path)
 
 
+@log_exceptions(message="Error sending templated email")
 def send_templated_email(
     *,
     subject: str,
@@ -70,6 +71,7 @@ def send_templated_email(
     message.send(fail_silently=False)
 
 
+@log_exceptions(message="Error sending subscribe confirmation")
 def send_subscribe_confirmation(email: str) -> None:
     confirm_url = build_subscribe_confirm_url(email)
     unsubscribe_url = build_unsubscribe_url(email)
@@ -86,6 +88,7 @@ def send_subscribe_confirmation(email: str) -> None:
     )
 
 
+@log_exceptions(message="Error sending unsubscribe confirmation")
 def send_unsubscribe_confirmation(email: str) -> None:
     unsubscribe_url = build_unsubscribe_url(email)
     context = {
@@ -100,6 +103,7 @@ def send_unsubscribe_confirmation(email: str) -> None:
     )
 
 
+@log_exceptions(message="Error sending post published email")
 def send_post_published_email(post) -> None:
     subscribers = Subscriber.objects.filter(status=SubscriberStatus.ACTIVE)
     post_url = build_absolute_uri(post.get_absolute_url())
@@ -129,6 +133,7 @@ def send_post_published_email(post) -> None:
         )
 
 
+@log_exceptions(message="Error sending announcement", default=0)
 def send_announcement(announcement: Announcement) -> int:
     subscribers = Subscriber.objects.filter(status=SubscriberStatus.ACTIVE)
     sent_count = 0

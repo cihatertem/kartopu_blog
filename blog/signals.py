@@ -8,40 +8,36 @@ from django.db.models.signals import m2m_changed, post_delete, post_save
 from django.dispatch import receiver
 
 from blog.cache_keys import NAV_KEYS
+from core.decorators import log_exceptions
 
 from .models import BlogPost, BlogPostImage, Category, Tag
 
 
+@log_exceptions(message="Error deleting storage file")
 def _delete_storage_file(field) -> None:
     if not field:
         return
-    try:
-        name = getattr(field, "name", "")
-        if name:
-            field.storage.delete(name)
-    except Exception:
-        pass
+    name = getattr(field, "name", "")
+    if name:
+        field.storage.delete(name)
 
 
+@log_exceptions(message="Error deleting local directory")
 def _delete_local_dir_if_exists(path: str) -> None:
-    try:
-        if path and os.path.isdir(path):
-            shutil.rmtree(path, ignore_errors=True)
-    except Exception:
-        pass
+    if path and os.path.isdir(path):
+        shutil.rmtree(path, ignore_errors=True)
 
 
+@log_exceptions(message="Error deleting storage directory")
 def _delete_storage_dir_if_exists(path: str) -> None:
     if not path:
         return
-    try:
-        directories, files = default_storage.listdir(path)
-        for file_name in files:
-            default_storage.delete(os.path.join(path, file_name))
-        for directory in directories:
-            _delete_storage_dir_if_exists(os.path.join(path, directory))
-    except Exception:
-        pass
+
+    directories, files = default_storage.listdir(path)
+    for file_name in files:
+        default_storage.delete(os.path.join(path, file_name))
+    for directory in directories:
+        _delete_storage_dir_if_exists(os.path.join(path, directory))
 
 
 def _post_media_dir(post: BlogPost) -> str:

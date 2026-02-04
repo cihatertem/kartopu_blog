@@ -4,10 +4,24 @@ from django.contrib.syndication.views import Feed
 from django.shortcuts import get_object_or_404
 from django.utils.text import Truncator
 
+from core.decorators import log_exceptions
 from core.imagekit import safe_file_url
 from core.markdown import render_markdown
 
 from .models import BlogPost, Category
+
+
+@log_exceptions(message="Error getting cover image size")
+def _safe_cover_size(image_field) -> int | None:
+    return image_field.size
+
+
+@log_exceptions(message="Error getting cover name")
+def _get_cover_name(item) -> str | None:
+    try:
+        return item.cover_1200.name  # pyright: ignore[reportAttributeAccessIssue]
+    except Exception:
+        return item.cover_image.name  # pyright: ignore[reportAttributeAccessIssue]
 
 
 class LatestPostsFeed(Feed):
@@ -45,10 +59,7 @@ class LatestPostsFeed(Feed):
     def item_enclosure_length(self, item):
         if not item.cover_image:  # pyright: ignore[reportAttributeAccessIssue]
             return None
-        try:
-            return item.cover_image.size  # pyright: ignore[reportAttributeAccessIssue]
-        except Exception:
-            return None
+        return _safe_cover_size(item.cover_image)
 
     def item_enclosure_mime_type(self, item):
         if not item.cover_image:  # pyright: ignore[reportAttributeAccessIssue]
@@ -67,14 +78,13 @@ class LatestPostsFeed(Feed):
         if not url:
             return None
         if getattr(self, "request", None):
-            return self.request.build_absolute_uri(url)
+            return self.request.build_absolute_uri(url)  # pyright: ignore[reportAttributeAccessIssue]
         return url
 
     def _get_item_cover_mime_type(self, item):
-        try:
-            cover_name = item.cover_1200.name  # pyright: ignore[reportAttributeAccessIssue]
-        except Exception:
-            cover_name = item.cover_image.name  # pyright: ignore[reportAttributeAccessIssue]
+        cover_name = _get_cover_name(item)
+        if not cover_name:
+            return "image/webp"
         mime_type, _ = mimetypes.guess_type(cover_name)
         return mime_type or "image/webp"
 
@@ -122,10 +132,7 @@ class CategoryPostsFeed(Feed):
     def item_enclosure_length(self, item):
         if not item.cover_image:  # pyright: ignore[reportAttributeAccessIssue]
             return None
-        try:
-            return item.cover_image.size  # pyright: ignore[reportAttributeAccessIssue]
-        except Exception:
-            return None
+        return _safe_cover_size(item.cover_image)
 
     def item_enclosure_mime_type(self, item):
         if not item.cover_image:  # pyright: ignore[reportAttributeAccessIssue]
@@ -144,13 +151,12 @@ class CategoryPostsFeed(Feed):
         if not url:
             return None
         if getattr(self, "request", None):
-            return self.request.build_absolute_uri(url)
+            return self.request.build_absolute_uri(url)  # pyright: ignore[reportAttributeAccessIssue]
         return url
 
     def _get_item_cover_mime_type(self, item):
-        try:
-            cover_name = item.cover_1200.name  # pyright: ignore[reportAttributeAccessIssue]
-        except Exception:
-            cover_name = item.cover_image.name  # pyright: ignore[reportAttributeAccessIssue]
+        cover_name = _get_cover_name(item)
+        if not cover_name:
+            return "image/webp"
         mime_type, _ = mimetypes.guess_type(cover_name)
         return mime_type or "image/webp"
