@@ -3,6 +3,8 @@ from __future__ import annotations
 from collections.abc import Mapping
 from typing import Any
 
+from core.decorators import log_exceptions
+
 DEFAULT_RENDITION_DIMENSIONS: dict[int, tuple[int, int]] = {
     42: (42, 42),
     64: (64, 64),
@@ -14,40 +16,45 @@ DEFAULT_RENDITION_DIMENSIONS: dict[int, tuple[int, int]] = {
 }
 
 
+@log_exceptions(default=None, message="Image file URL resolution failed.")
+def _file_url(file_field: Any) -> str | None:
+    return file_field.url
+
+
 def safe_file_url(file_field: Any) -> str | None:
     if not file_field:
         return None
-    try:
-        return file_field.url
-    except Exception:
-        return None
+    return _file_url(file_field)
 
 
+@log_exceptions(
+    default_factory=lambda spec_field, fallback_url: fallback_url,
+    message="Image spec URL resolution failed.",
+)
 def _safe_spec_url(spec_field: Any, fallback_url: str) -> str:
-    try:
-        return spec_field.url
-    except Exception:
-        return fallback_url
+    return spec_field.url
 
 
+@log_exceptions(
+    default_factory=lambda spec_field, fallback: fallback,
+    message="Image spec dimension lookup failed.",
+)
 def _safe_spec_dimensions(
     spec_field: Any, fallback: tuple[int, int]
 ) -> tuple[int, int]:
-    try:
-        storage = getattr(spec_field, "storage", None)
-        storage_module = getattr(storage.__class__, "__module__", "")
-        if storage_module.startswith("storages.backends.s3"):
-            return fallback
+    storage = getattr(spec_field, "storage", None)
+    storage_module = getattr(storage.__class__, "__module__", "")
+    if storage_module.startswith("storages.backends.s3"):
+        return fallback
 
-        width = int(spec_field.width)
-        height = int(spec_field.height)
-        if width > 0 and height > 0:
-            return width, height
-    except Exception:
-        pass
+    width = int(spec_field.width)
+    height = int(spec_field.height)
+    if width > 0 and height > 0:
+        return width, height
     return fallback
 
 
+@log_exceptions(default=None, message="Failed to build responsive rendition.")
 def build_responsive_rendition(
     *,
     original_field: Any,
@@ -60,32 +67,28 @@ def build_responsive_rendition(
     falls back to the original image URL and sensible default dimensions
     so templates can render without returning HTTP 500.
     """
-    try:
-        original_url = safe_file_url(original_field)
-        if not original_url:
-            return None
-
-        ordered_sizes = sorted(spec_map)
-        urls: dict[int, str] = {
-            size: _safe_spec_url(spec_map[size], original_url) for size in ordered_sizes
-        }
-
-        fallback_dimensions = DEFAULT_RENDITION_DIMENSIONS.get(
-            largest_size, (largest_size, largest_size)
-        )
-        width, height = _safe_spec_dimensions(
-            spec_map[largest_size], fallback_dimensions
-        )
-
-        src = urls.get(largest_size, original_url)
-        srcset = ", ".join(f"{urls[size]} {size}w" for size in ordered_sizes)
-
-        return {
-            "src": src,
-            "srcset": srcset,
-            "width": width,
-            "height": height,
-            "urls": urls,
-        }
-    except Exception:
+    original_url = safe_file_url(original_field)
+    if not original_url:
         return None
+
+    ordered_sizes = sorted(spec_map)
+    urls: dict[int, str] = {
+        size: _safe_spec_url(spec_map[size], original_url)
+        for size in ordered_sizes  # pyright: ignore[reportAssignmentType]
+    }
+
+    fallback_dimensions = DEFAULT_RENDITION_DIMENSIONS.get(
+        largest_size, (largest_size, largest_size)
+    )
+    width, height = _safe_spec_dimensions(spec_map[largest_size], fallback_dimensions)  # pyright: ignore[reportGeneralTypeIssues]
+
+    src = urls.get(largest_size, original_url)
+    srcset = ", ".join(f"{urls[size]} {size}w" for size in ordered_sizes)
+
+    return {
+        "src": src,
+        "srcset": srcset,
+        "width": width,
+        "height": height,
+        "urls": urls,
+    }

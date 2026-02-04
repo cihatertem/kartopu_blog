@@ -5,6 +5,35 @@ from decimal import Decimal, InvalidOperation
 
 import yfinance as yf
 
+from core.decorators import log_exceptions
+
+
+@log_exceptions(default=None, message="Yahoo Finance ticker initialization failed.")
+def _get_ticker(symbol: str) -> yf.Ticker | None:
+    return yf.Ticker(symbol)
+
+
+@log_exceptions(default=None, message="Yahoo Finance history request failed.")
+def _get_history(ticker: yf.Ticker, start: date, end: date):
+    return ticker.history(start=start, end=end, interval="1d")
+
+
+@log_exceptions(default=None, message="Yahoo Finance price lookup failed.")
+def _get_price(ticker: yf.Ticker):
+    price = ticker.fast_info.get("last_price")
+    if price is None:
+        price = ticker.info.get("regularMarketPrice")
+    return price
+
+
+@log_exceptions(
+    default=None,
+    message="Yahoo Finance price conversion failed.",
+    exception_types=(InvalidOperation, TypeError, ValueError),
+)
+def _safe_decimal(value) -> Decimal | None:
+    return Decimal(str(value))
+
 
 def fetch_yahoo_finance_price(
     symbol: str,
@@ -14,15 +43,16 @@ def fetch_yahoo_finance_price(
         return None
 
     if price_date:
-        try:
-            ticker = yf.Ticker(symbol)
-            # Look back up to 5 days to find the latest available price
-            history = ticker.history(
-                start=price_date - timedelta(days=5),
-                end=price_date + timedelta(days=1),
-                interval="1d",
-            )
-        except Exception:
+        ticker = _get_ticker(symbol)
+        if ticker is None:
+            return None
+        # Look back up to 5 days to find the latest available price
+        history = _get_history(
+            ticker,
+            start=price_date - timedelta(days=5),
+            end=price_date + timedelta(days=1),
+        )
+        if history is None:
             return None
 
         if history.empty:
@@ -34,26 +64,17 @@ def fetch_yahoo_finance_price(
             return None
 
         price = history["Close"].iloc[-1]  # pyright: ignore[reportAttributeAccessIssue]
-        try:
-            return Decimal(str(price))
-        except (InvalidOperation, TypeError):
-            return None
+        return _safe_decimal(price)
 
-    try:
-        ticker = yf.Ticker(symbol)
-        price = ticker.fast_info.get("last_price")
-        if price is None:
-            price = ticker.info.get("regularMarketPrice")
-    except Exception:
+    ticker = _get_ticker(symbol)
+    if ticker is None:
         return None
 
+    price = _get_price(ticker)
     if price is None:
         return None
 
-    try:
-        return Decimal(str(price))
-    except (InvalidOperation, TypeError):
-        return None
+    return _safe_decimal(price)
 
 
 def fetch_fx_rate(
@@ -68,15 +89,16 @@ def fetch_fx_rate(
 
     symbol = f"{base_currency}{target_currency}=X"
     if rate_date:
-        try:
-            ticker = yf.Ticker(symbol)
-            # Look back up to 5 days to find the latest available rate
-            history = ticker.history(
-                start=rate_date - timedelta(days=5),
-                end=rate_date + timedelta(days=1),
-                interval="1d",
-            )
-        except Exception:
+        ticker = _get_ticker(symbol)
+        if ticker is None:
+            return None
+        # Look back up to 5 days to find the latest available rate
+        history = _get_history(
+            ticker,
+            start=rate_date - timedelta(days=5),
+            end=rate_date + timedelta(days=1),
+        )
+        if history is None:
             return None
 
         if history.empty:
@@ -88,23 +110,14 @@ def fetch_fx_rate(
             return None
 
         price = history["Close"].iloc[-1]  # pyright: ignore[reportAttributeAccessIssue]
-        try:
-            return Decimal(str(price))
-        except (InvalidOperation, TypeError):
-            return None
+        return _safe_decimal(price)
 
-    try:
-        ticker = yf.Ticker(symbol)
-        price = ticker.fast_info.get("last_price")
-        if price is None:
-            price = ticker.info.get("regularMarketPrice")
-    except Exception:
+    ticker = _get_ticker(symbol)
+    if ticker is None:
         return None
 
+    price = _get_price(ticker)
     if price is None:
         return None
 
-    try:
-        return Decimal(str(price))
-    except (InvalidOperation, TypeError):
-        return None
+    return _safe_decimal(price)
