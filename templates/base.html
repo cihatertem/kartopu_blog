@@ -392,7 +392,9 @@
       </main>
 
       <aside>
-        {% include "includes/sidebar.html" %}
+        {% block sidebar %}
+          {% include "includes/sidebar.html" %}
+        {% endblock %}
       </aside>
     </div>
     {% include "includes/legal_disclaimer.html" %}

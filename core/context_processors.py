@@ -132,7 +132,7 @@ def categories_tags_context(request):
                 published_at__isnull=False,
             )
             .order_by("-published_at")
-            .only("title", "slug")[:5]
+            .only("title", "slug", "published_at", "cover_image")[:5]
         )
         cache.set(NAV_RECENT_POSTS_KEY, nav_recent_posts, timeout=CACHE_TIMEOUT)
 
@@ -158,7 +158,7 @@ def categories_tags_context(request):
                 )
             )
             .order_by("-popularity_score", "-view_count", "-published_at")
-            .only("title", "slug", "view_count")[:5]
+            .only("title", "slug", "view_count", "published_at", "cover_image")[:5]
         )
         cache.set(NAV_POPULAR_POSTS_KEY, nav_popular_posts, timeout=CACHE_TIMEOUT)
 

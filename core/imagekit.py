@@ -34,6 +34,11 @@ def _safe_spec_dimensions(
     spec_field: Any, fallback: tuple[int, int]
 ) -> tuple[int, int]:
     try:
+        storage = getattr(spec_field, "storage", None)
+        storage_module = getattr(storage.__class__, "__module__", "")
+        if storage_module.startswith("storages.backends.s3"):
+            return fallback
+
         width = int(spec_field.width)
         height = int(spec_field.height)
         if width > 0 and height > 0:
@@ -55,27 +60,32 @@ def build_responsive_rendition(
     falls back to the original image URL and sensible default dimensions
     so templates can render without returning HTTP 500.
     """
-    original_url = safe_file_url(original_field)
-    if not original_url:
+    try:
+        original_url = safe_file_url(original_field)
+        if not original_url:
+            return None
+
+        ordered_sizes = sorted(spec_map)
+        urls: dict[int, str] = {
+            size: _safe_spec_url(spec_map[size], original_url) for size in ordered_sizes
+        }
+
+        fallback_dimensions = DEFAULT_RENDITION_DIMENSIONS.get(
+            largest_size, (largest_size, largest_size)
+        )
+        width, height = _safe_spec_dimensions(
+            spec_map[largest_size], fallback_dimensions
+        )
+
+        src = urls.get(largest_size, original_url)
+        srcset = ", ".join(f"{urls[size]} {size}w" for size in ordered_sizes)
+
+        return {
+            "src": src,
+            "srcset": srcset,
+            "width": width,
+            "height": height,
+            "urls": urls,
+        }
+    except Exception:
         return None
-
-    ordered_sizes = sorted(spec_map)
-    urls: dict[int, str] = {
-        size: _safe_spec_url(spec_map[size], original_url) for size in ordered_sizes
-    }
-
-    fallback_dimensions = DEFAULT_RENDITION_DIMENSIONS.get(
-        largest_size, (largest_size, largest_size)
-    )
-    width, height = _safe_spec_dimensions(spec_map[largest_size], fallback_dimensions)
-
-    src = urls.get(largest_size, original_url)
-    srcset = ", ".join(f"{urls[size]} {size}w" for size in ordered_sizes)
-
-    return {
-        "src": src,
-        "srcset": srcset,
-        "width": width,
-        "height": height,
-        "urls": urls,
-    }

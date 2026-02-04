@@ -322,6 +322,10 @@ SOCIALACCOUNT_PROVIDERS = {
 # ImageKit settings
 IMAGEKIT_CACHEFILE_DIR = "caches"
 
+if not DEBUG:
+    IMAGEKIT_DEFAULT_CACHEFILE_STRATEGY = "imagekit.cachefiles.strategies.Optimistic"
+
+
 # Email (Gmail SMTP)
 EMAIL_BACKEND = "django.core.mail.backends.smtp.EmailBackend"
 EMAIL_HOST = os.getenv("EMAIL_HOST", "smtp.gmail.com")
