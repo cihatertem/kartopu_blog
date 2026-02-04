@@ -16,12 +16,18 @@ def _safe_cover_size(image_field) -> int | None:
     return image_field.size
 
 
-@log_exceptions(message="Error getting cover name")
+def _fallback_cover_name(item) -> str | None:
+    cover_image = getattr(item, "cover_image", None)
+    if not cover_image:
+        return None
+    return getattr(cover_image, "name", None)
+
+
+@log_exceptions(
+    message="Error getting cover name", default_factory=_fallback_cover_name
+)
 def _get_cover_name(item) -> str | None:
-    try:
-        return item.cover_1200.name  # pyright: ignore[reportAttributeAccessIssue]
-    except Exception:
-        return item.cover_image.name  # pyright: ignore[reportAttributeAccessIssue]
+    return item.cover_1200.name  # pyright: ignore[reportAttributeAccessIssue]
 
 
 class LatestPostsFeed(Feed):

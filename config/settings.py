@@ -175,7 +175,7 @@ USE_I18N = True
 USE_L10N = True
 USE_TZ = True
 
-if logging := os.getenv("DJANGO_LOGGING", "0") == "1":
+if os.getenv("DJANGO_LOGGING", "0") == "1":
     LOGGING = {
         "version": 1,
         "disable_existing_loggers": False,

@@ -69,15 +69,16 @@ class AboutPageImageInline(admin.TabularInline):
     class Media:
         css = {"all": ("css/admin.css",)}
 
+    @log_exceptions(message="Error resolving about page thumb rendition")
+    def _get_rendition_url(self, obj: AboutPageImage) -> str | None:
+        return obj.image_600.url  # pyright: ignore[reportAttributeAccessIssue]
+
     @log_exceptions(message="Error rendering about page thumb")
     def thumb(self, obj: AboutPageImage) -> str | SafeString:
         if not obj.pk or not obj.image:
             return "—"
 
-        try:
-            url = obj.image_600.url  # pyright: ignore[reportAttributeAccessIssue]
-        except Exception:
-            url = obj.image.url
+        url = self._get_rendition_url(obj) or obj.image.url
 
         return format_html(
             "<img src='{}' class='admin-thumb' loading='lazy' />",

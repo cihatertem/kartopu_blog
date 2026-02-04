@@ -42,15 +42,16 @@ class BlogPostImageInline(admin.TabularInline):
     class Media:
         css = {"all": ("css/admin.css",)}
 
+    @log_exceptions(message="Error resolving admin thumb rendition")
+    def _get_rendition_url(self, obj: BlogPostImage) -> str | None:
+        return obj.image_600.url  # pyright: ignore[reportAttributeAccessIssue]
+
     @log_exceptions(message="Error rendering admin thumb")
     def thumb(self, obj: BlogPostImage) -> str | SafeString:
         if not obj.pk or not obj.image:
             return "—"
 
-        try:
-            url = obj.image_600.url  # pyright: ignore[reportAttributeAccessIssue]
-        except Exception:
-            url = obj.image.url
+        url = self._get_rendition_url(obj) or obj.image.url
 
         return format_html(
             "<img src='{}' class='admin-thumb' loading='lazy' />",
