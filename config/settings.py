@@ -122,6 +122,11 @@ if os.getenv("USE_SQLITE", "0") == "1":
         }
     }
 else:
+    USE_PGBOUNCER = os.getenv("USE_PGBOUNCER", "0") == "1"
+    DB_KEEPALIVES_IDLE = int(os.getenv("DB_KEEPALIVES_IDLE", "60"))
+    DB_KEEPALIVES_INTERVAL = int(os.getenv("DB_KEEPALIVES_INTERVAL", "10"))
+    DB_KEEPALIVES_COUNT = int(os.getenv("DB_KEEPALIVES_COUNT", "3"))
+
     DATABASES = {
         "default": {
             "ENGINE": "django.db.backends.postgresql",
@@ -130,13 +135,16 @@ else:
             "PASSWORD": get_swarm_secret_for_psg("POSTGRES_PASSWORD"),
             "HOST": os.getenv("POSTGRES_HOST", "db"),
             "PORT": os.getenv("POSTGRES_PORT", "5432"),
-            "CONN_MAX_AGE": int(os.getenv("DJANGO_DB_CONN_MAX_AGE", "60")),
+            "CONN_MAX_AGE": int(
+                os.getenv("DJANGO_DB_CONN_MAX_AGE", "0" if USE_PGBOUNCER else "60")
+            ),
             "CONN_HEALTH_CHECKS": True,
+            "DISABLE_SERVER_SIDE_CURSORS": USE_PGBOUNCER,
             "OPTIONS": {
                 "keepalives": 1,
-                "keepalives_idle": 60,
-                "keepalives_interval": 10,
-                "keepalives_count": 3,
+                "keepalives_idle": DB_KEEPALIVES_IDLE,
+                "keepalives_interval": DB_KEEPALIVES_INTERVAL,
+                "keepalives_count": DB_KEEPALIVES_COUNT,
                 "connect_timeout": 10,
             },
             # "CONN_MAX_AGE": 0,
