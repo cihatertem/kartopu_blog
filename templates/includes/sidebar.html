@@ -1,19 +1,33 @@
 <div class="sidebar">
   {% include "includes/sidebar_search.html" %}
 
-  {% include "includes/goal_widget.html" %}
+  {% cache 600 sidebar_goal_widget %}
+    {% include "includes/goal_widget.html" %}
+  {% endcache %}
 
   {% include "includes/newsletter_widget.html" %}
 
-  {% include "includes/follow_widget.html" %}
+  {% cache 86400 sidebar_follow %}
+    {% include "includes/follow_widget.html" %}
+  {% endcache %}
 
-  {% include "includes/sidebar_recent_posts.html" %}
+  {% cache 600 sidebar_recent_posts %}
+    {% include "includes/sidebar_recent_posts.html" %}
+  {% endcache %}
 
-  {% include "includes/sidebar_popular_posts.html" %}
+  {% cache 600 sidebar_popular_posts %}
+    {% include "includes/sidebar_popular_posts.html" %}
+  {% endcache %}
 
-  {% include "includes/sidebar_categories.html" %}
+  {% cache 600 sidebar_categories active_category_slug %}
+    {% include "includes/sidebar_categories.html" %}
+  {% endcache %}
 
-  {% include "includes/sidebar_tags.html" %}
+  {% cache 600 sidebar_tags active_tag_slug %}
+    {% include "includes/sidebar_tags.html" %}
+  {% endcache %}
 
-  {% include "includes/sidebar_archives.html" %}
+  {% cache 600 sidebar_archives active_archive_key %}
+    {% include "includes/sidebar_archives.html" %}
+  {% endcache %}
 </div>

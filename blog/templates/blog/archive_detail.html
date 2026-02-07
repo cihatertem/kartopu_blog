@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% load static blog_extras %}
+{% load static blog_extras cache %}
 
 {% block title %}{{ archive_month }} Arşivi | Kartopu Money{% endblock %}
 {% block page_css %}
@@ -20,7 +20,9 @@
   <hr />
 
   {% if page_obj %}
+    {% cache 600 post_list_archive active_archive_key page_obj.number %}
     {% include "includes/post_list.html" with posts=page_obj.object_list %}
+  {% endcache %}
 
     <nav class="pagination">
       {% if page_obj.has_previous %}

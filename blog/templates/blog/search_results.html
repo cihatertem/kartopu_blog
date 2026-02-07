@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% load static blog_extras %}
+{% load static blog_extras cache %}
 
 {% block title %}
   {% if q %}'{{ q }}' için arama sonuçları | Kartopu Money {% else %}Arama{% endif %}
@@ -29,7 +29,9 @@
 {% elif page_obj.object_list %}
   <p><strong>"{{ q }}"</strong> için {{ page_obj.paginator.count }} sonuç bulundu.</p>
 
-  {% include "includes/post_list.html" with posts=page_obj.object_list %}
+  {% cache 60 post_list_search q page_obj.number %}
+    {% include "includes/post_list.html" with posts=page_obj.object_list %}
+  {% endcache %}
 
   <nav class="pagination">
     {% if page_obj.has_previous %}

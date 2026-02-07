@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% load static blog_extras %}
+{% load static blog_extras cache %}
 {% block title %}{{ category.name|title }} Yazıları | Kartopu Money{% endblock %}
 {% block page_css %}
   {% preload_stylesheet 'css/blog.css' %}
@@ -37,8 +37,9 @@
   <hr />
 
   {% if page_obj %}
-    {% include "includes/post_list.html" with posts=page_obj.object_list %}
-
+    {% cache 600 post_list_category category.slug page_obj.number %}
+      {% include "includes/post_list.html" with posts=page_obj.object_list %}
+    {% endcache %}
     <nav class="pagination">
       {% if page_obj.has_previous %}
       <a class="pagination__link" href="?page={{ page_obj.previous_page_number }}">← Önceki</a>

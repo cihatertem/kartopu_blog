@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% load blog_extras %}
+{% load blog_extras cache %}
 
 {% block title %}{{ about_page.meta_title|default:"Hakkımızda" }} | Kartopu Money{% endblock %}
 {% block head %}
@@ -11,12 +11,14 @@
 
 {% block content %}
 {% if about_page %}
-  <article>
-    <h1>{{ about_page.title }}</h1>
-    <div>
-      {{ about_page.content|render_post_content:about_page.images.all|safe }}
-    </div>
-  </article>
+  {% cache 2592000 about_page_content about_page.id about_page.updated_at %}
+    <article>
+      <h1>{{ about_page.title }}</h1>
+      <div>
+        {{ about_page.content|render_post_content:about_page.images.all|safe }}
+      </div>
+    </article>
+  {% endcache %}
 {% else %}
   <section class="summary-card">
     <h1>Hakkımızda</h1>

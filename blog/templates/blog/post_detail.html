@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% load socialaccount blog_extras static %}
+{% load socialaccount blog_extras static cache %}
 
 {% block title %}{{ post.effective_meta_title }}{% endblock %}
 {% block page_css %}
@@ -131,7 +131,9 @@
       <!--
       {{ post.content|render_post_content:post.images.all|safe }}
       -->
-      {% render_post_body post %}
+      {% cache 2592000 blog_post_body post.id post.updated_at is_preview %}
+       {% render_post_body post %}
+      {% endcache %}
     </div>
   </article>
 

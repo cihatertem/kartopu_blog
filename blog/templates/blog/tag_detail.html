@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% load static blog_extras %}
+{% load static blog_extras cache %}
 
 {% block title %}#{{ tag.name|title }} etiketli yazılar - Kartopu Money{% endblock %}
 {% block page_css %}
@@ -20,7 +20,9 @@
 <h1>#{{ tag.name }} etiketine ait yazılar.</h1>
 
 {% if page_obj %}
-  {% include "includes/post_list.html" with posts=page_obj.object_list %}
+  {% cache 600 post_list_tag tag.slug page_obj.number %}
+    {% include "includes/post_list.html" with posts=page_obj.object_list %}
+  {% endcache %}
 {% else %}
   <p>Bu etikete ait yayınlanmış yazı yok.</p>
 {% endif %}

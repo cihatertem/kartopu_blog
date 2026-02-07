@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% load static blog_extras %}
+{% load static blog_extras cache %}
 
 {% block title %}
 {% if page_obj.number > 1 %}
@@ -29,7 +29,9 @@
 {% include "includes/breadcrumbs.html" %}
   <h1>Blog</h1>
   {% if page_obj %}
-    {% include "includes/post_list.html" with posts=page_obj.object_list %}
+    {% cache 600 post_list_main page_obj.number %}
+      {% include "includes/post_list.html" with posts=page_obj.object_list %}
+    {% endcache %}
 
     <nav class="pagination">
       {% if page_obj.has_previous %}
