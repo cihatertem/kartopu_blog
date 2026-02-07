@@ -374,6 +374,10 @@ else:
                 "CLIENT_CLASS": "django_redis.client.DefaultClient",
                 # Redis bağlantısı koparsa site çökmesin, DB'den çalışmaya devam etsin (Fail-safe)
                 "IGNORE_EXCEPTIONS": True,
+                "COMPRESSOR": "django_redis.compressors.brotli.BrotliCompressor",
+                "SOCKET_CONNECT_TIMEOUT": 5,
+                "SOCKET_TIMEOUT": 5,
+                "CONNECTION_POOL_KWARGS": {"max_connections": 100},
             },
         }
     }
