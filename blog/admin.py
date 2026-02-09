@@ -1,6 +1,6 @@
 from django.contrib import admin, messages
 from django.contrib.auth import get_user_model
-from django.db.models import Case, F, Value, When
+from django.db.models import Case, Count, F, Value, When
 from django.urls import reverse
 from django.utils import timezone
 from django.utils.html import format_html
@@ -74,8 +74,11 @@ class BlogPostAdmin(admin.ModelAdmin):
         "published_at",
         "is_featured",
         "view_count",
+        "reaction_count",
+        "comment_count",
     )
     list_filter = ("status", "category", "tags", "is_featured", "created_at")
+    readonly_fields = ("reaction_count", "comment_count")
     search_fields = ("title", "excerpt", "content", "category__name", "slug")
     prepopulated_fields = {"slug": ("title",)}
     autocomplete_fields = (
@@ -119,7 +122,13 @@ class BlogPostAdmin(admin.ModelAdmin):
             {"fields": ("status", "published_at", "is_featured")},
         ),
         ("SEO", {"fields": ("meta_title", "meta_description", "canonical_url")}),
-        ("İstatistik", {"fields": ("view_count",), "classes": ("collapse",)}),
+        (
+            "İstatistik",
+            {
+                "fields": ("view_count", "reaction_count", "comment_count"),
+                "classes": ("collapse",),
+            },
+        ),
     )
 
     actions = (
@@ -191,6 +200,22 @@ class BlogPostAdmin(admin.ModelAdmin):
                 f"{skipped_count} yazı yayınlanmadığı için atlandı.",
                 level=messages.WARNING,
             )
+
+    def get_queryset(self, request):
+        queryset = super().get_queryset(request)
+        queryset = queryset.annotate(
+            _reaction_count=Count("reactions", distinct=True),
+            _comment_count=Count("comments", distinct=True),
+        )
+        return queryset
+
+    @admin.display(description="Tepki", ordering="_reaction_count")
+    def reaction_count(self, obj):
+        return getattr(obj, "_reaction_count", 0)
+
+    @admin.display(description="Yorum", ordering="_comment_count")
+    def comment_count(self, obj):
+        return getattr(obj, "_comment_count", 0)
 
     def public_link(self, obj: BlogPost) -> SafeString:
         if obj.status == BlogPost.Status.PUBLISHED:
