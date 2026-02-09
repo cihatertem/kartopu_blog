@@ -19,7 +19,7 @@ class StaticViewSitemap(BaseSitemap):
             "core:home",
             "core:about",
             "core:contact",
-            "portfolio:portfolio_view",
+            # "portfolio:portfolio_view",
             "blog:post_list",
         ]
 
