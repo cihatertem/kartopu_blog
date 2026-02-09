@@ -150,10 +150,16 @@ def categories_tags_context(request):
                     filter=Q(comments__status=Comment.Status.APPROVED),
                     distinct=True,
                 ),
+                reaction_count=Count(
+                    "reactions",
+                    distinct=True,
+                ),
             )
             .annotate(
                 popularity_score=ExpressionWrapper(
-                    F("approved_comment_count") * 5 + F("view_count"),
+                    F("approved_comment_count") * 5
+                    + F("view_count")
+                    + F("reaction_count") * 3,
                     output_field=IntegerField(),
                 )
             )
