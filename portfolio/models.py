@@ -406,7 +406,7 @@ class PortfolioSnapshot(UUIDModelMixin, TimeStampedModelMixin):
         max_digits=10, decimal_places=MAX_DECIMAL_PLACES
     )
     irr_pct = models.DecimalField(
-        max_digits=10, decimal_places=MAX_DECIMAL_PLACES, null=True, blank=True
+        max_digits=MAX_DICITS, decimal_places=MAX_DECIMAL_PLACES, null=True, blank=True
     )
     is_featured = models.BooleanField(default=False)
 
