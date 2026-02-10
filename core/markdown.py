@@ -124,7 +124,8 @@ ALLOWED_ATTRIBUTES = {
     "h5": ["class", "style", "id"],
     "h6": ["class", "style", "id"],
     "p": ["class", "style", "id"],
-    "fig": ["class", "style", "id"],
+    "figure": ["class", "style", "id"],
+    "figcaption": ["class", "style", "id"],
     "caption": ["class", "style", "id"],
 }
 

@@ -16,14 +16,23 @@ def calculate_xirr(cash_flows: list[tuple[date, Decimal]]) -> float | None:
     if not cash_flows:
         return None
 
-    # Remove zero cash flows
-    cash_flows = [(d, c) for d, c in cash_flows if c != 0]
+    # Sort cash flows by date and remove zero cash flows
+    cash_flows = sorted([(d, c) for d, c in cash_flows if c != 0], key=lambda x: x[0])
     if not cash_flows:
         return None
 
     # IRR exists only if there is at least one positive and one negative cash flow
     if all(c > 0 for _, c in cash_flows) or all(c < 0 for _, c in cash_flows):
         return None
+
+    # Special case: all cash flows on the same day.
+    # Annualized IRR is undefined/infinite, so we return simple return.
+    if all(d == cash_flows[0][0] for d, _ in cash_flows):
+        total_in = sum(-c for _, c in cash_flows if c < 0)
+        total_out = sum(c for _, c in cash_flows if c > 0)
+        if total_in > 0:
+            return float((total_out - total_in) / total_in)
+            return 0.0
 
     def xnpv(rate: float, cash_flows: list[tuple[date, Decimal]]) -> float:
         d0 = cash_flows[0][0]
@@ -43,7 +52,19 @@ def calculate_xirr(cash_flows: list[tuple[date, Decimal]]) -> float | None:
         )
 
     # Initial guess
-    rate = 0.1
+    try:
+        total_in = sum(-c for _, c in cash_flows if c < 0)
+        total_out = sum(c for _, c in cash_flows if c > 0)
+        d0 = min(d for d, _ in cash_flows)
+        dn = max(d for d, _ in cash_flows)
+        days = (dn - d0).days
+        if days > 0 and total_in > 0 and total_out > 0:
+            rate = (float(total_out) / float(total_in)) ** (365.0 / days) - 1
+        else:
+            rate = 0.1
+    except ZeroDivisionError, OverflowError, ValueError:
+        rate = 0.1
+
     for _ in range(100):
         try:
             f_val = xnpv(rate, cash_flows)
@@ -51,10 +72,10 @@ def calculate_xirr(cash_flows: list[tuple[date, Decimal]]) -> float | None:
             if f_prime == 0:
                 break
             new_rate = rate - f_val / f_prime
-            if abs(new_rate - rate) < 1e-6:
+            if abs(new_rate - rate) < 1e-6 * max(1.0, abs(rate)):
                 return new_rate
             rate = new_rate
-        except OverflowError, ZeroDivisionError:
+        except OverflowError, ZeroDivisionError, TypeError, ValueError:
             return None
 
     return None
