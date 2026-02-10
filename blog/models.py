@@ -124,6 +124,7 @@ class BlogPost(
             "  {{ image:1 }}  (1-based)<br>\n"
             "  {{ portfolio_summary:slug_or_hash }}<br>\n"
             "  {{ portfolio_charts:slug_or_hash }}<br>\n"
+            "  {{ portfolio_irr_charts:slug_or_hash }}<br>\n"
             "  {{ portfolio_category_summary:slug_or_hash }}<br>\n"
             "  {{ portfolio_comparison_summary:slug_or_hash }}<br>\n"
             "  {{ portfolio_comparison_charts:slug_or_hash }}<br>\n"

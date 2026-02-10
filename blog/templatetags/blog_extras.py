@@ -20,6 +20,9 @@ PORTFOLIO_SUMMARY_PATTERN = re.compile(
     r"\{\{\s*portfolio_summary(?::([^\s\}]+))?\s*\}\}"
 )
 PORTFOLIO_CHARTS_PATTERN = re.compile(r"\{\{\s*portfolio_charts(?::([^\s\}]+))?\s*\}\}")
+PORTFOLIO_IRR_CHARTS_PATTERN = re.compile(
+    r"\{\{\s*portfolio_irr_charts(?::([^\s\}]+))?\s*\}\}"
+)
 PORTFOLIO_CATEGORY_SUMMARY_PATTERN = re.compile(
     r"\{\{\s*portfolio_category_summary(?::([^\s\}]+))?\s*\}\}"
 )
@@ -149,9 +152,9 @@ def _render_portfolio_summary_html(snapshot) -> str:
         if target_value_decimal:
             total_value_decimal = _safe_decimal(snapshot.total_value)
             target_ratio_pct = escape(
-                f"{float((total_value_decimal / target_value_decimal) * Decimal('100')):.2f}"
+                f"{float((total_value_decimal / target_value_decimal) * Decimal('100')):.2f}"  # pyright: ignore[reportOptionalOperand]
             )
-    total_return_pct_s = escape(f"{float(total_return_pct):.2f}")
+    total_return_pct_s = escape(f"{float(total_return_pct):.2f}")  # pyright: ignore[reportArgumentType]
 
     target_li = (
         f"<li><strong>Hedef Değer:</strong> {target_value}</li>" if target_value else ""
@@ -182,6 +185,35 @@ def _render_portfolio_summary_html(snapshot) -> str:
     return html
 
 
+def _render_portfolio_irr_charts_html(snapshot) -> str:
+    if not snapshot:
+        return ""
+
+    portfolio = snapshot.portfolio
+    irr_history = portfolio.get_irr_history(until_date=snapshot.snapshot_date)
+
+    timeseries = {
+        "labels": [item["date"] for item in irr_history],
+        "values": [item["irr"] for item in irr_history],
+    }
+    timeseries_json = escape(json.dumps(timeseries, cls=DjangoJSONEncoder))
+
+    return """
+<section class="chart-section portfolio-irr-charts" data-portfolio-irr="{timeseries_json}">
+  <div class="chart-fallback portfolio-irr-chart-fallback is-hidden">
+    Grafikler yüklenemedi. (Tarayıcı eklentisi / ağ politikası / CSP engelliyor olabilir.)
+  </div>
+
+  <div class="chart-card">
+    <h4 class="chart-card__title">Portföy IRR Performansı (%)</h4>
+    <canvas data-chart-kind="portfolio-irr" height="240"></canvas>
+  </div>
+</section>
+""".format(
+        timeseries_json=timeseries_json,
+    )
+
+
 def _render_portfolio_charts_html(snapshot) -> str:
     if not snapshot:
         return ""
@@ -193,7 +225,7 @@ def _render_portfolio_charts_html(snapshot) -> str:
     )
     allocation = {
         "labels": [(item.asset.symbol or item.asset.name) for item in items],
-        "values": [_safe_float(item.allocation_pct) * 100 for item in items],
+        "values": [_safe_float(item.allocation_pct) * 100 for item in items],  # pyright: ignore[reportOptionalOperand]
     }
     snapshots_qs = (
         snapshot.__class__.objects.filter(
@@ -248,7 +280,7 @@ def _render_portfolio_category_summary_html(snapshot) -> str:
         asset = item.asset
         label = asset.get_asset_type_display() if asset else "Diğer"
         category_totals[label] = category_totals.get(label, 0) + float(
-            _safe_float(item.allocation_pct) * 100
+            _safe_float(item.allocation_pct) * 100  # pyright: ignore[reportOptionalOperand]
         )
 
     if not category_totals:
@@ -494,22 +526,22 @@ def _render_portfolio_comparison_summary_html(comparison) -> str:
     compare_value = _safe_decimal(compare.total_value)
     base_cost = _safe_decimal(base.total_cost)
     compare_cost = _safe_decimal(compare.total_cost)
-    base_return = _safe_decimal(base.total_return_pct) * Decimal("100")
-    compare_return = _safe_decimal(compare.total_return_pct) * Decimal("100")
+    base_return = _safe_decimal(base.total_return_pct) * Decimal("100")  # pyright: ignore[reportOptionalOperand]
+    compare_return = _safe_decimal(compare.total_return_pct) * Decimal("100")  # pyright: ignore[reportOptionalOperand]
     portfolio_currency = getattr(base.portfolio, "currency", None)
 
     base_target_value = _safe_decimal(base.target_value)
     compare_target_value = _safe_decimal(compare.target_value)
     base_target_ratio = (
-        (base_value / base_target_value) * Decimal("100") if base_target_value else None
+        (base_value / base_target_value) * Decimal("100") if base_target_value else None  # pyright: ignore[reportOptionalOperand]
     )
     compare_target_ratio = (
-        (compare_value / compare_target_value) * Decimal("100")
+        (compare_value / compare_target_value) * Decimal("100")  # pyright: ignore[reportOptionalOperand]
         if compare_target_value
         else None
     )
 
-    value_delta = compare_value - base_value
+    value_delta = compare_value - base_value  # pyright: ignore[reportOperatorIssue]
     return_delta = compare_return - base_return
     target_ratio_delta = None
     if base_target_ratio is not None and compare_target_ratio is not None:
@@ -648,7 +680,7 @@ def _render_cashflow_charts_html(snapshot) -> str:
     items = snapshot.items.filter(amount__gt=0).order_by("-allocation_pct")
     allocation = {
         "labels": [item.get_category_display() for item in items],
-        "values": [_safe_float(item.allocation_pct) * 100 for item in items],
+        "values": [_safe_float(item.allocation_pct) * 100 for item in items],  # pyright: ignore[reportOptionalOperand]
     }
     snapshots_qs = (
         CashFlowSnapshot.objects.filter(
@@ -695,7 +727,7 @@ def _render_savings_rate_summary_html(snapshot) -> str:
 
     flow_name = escape(getattr(snapshot.flow, "name", ""))
     snapshot_date = escape(str(snapshot.snapshot_date))
-    savings_rate_pct = escape(f"{_safe_float(snapshot.savings_rate) * 100:.2f}")
+    savings_rate_pct = escape(f"{_safe_float(snapshot.savings_rate) * 100:.2f}")  # pyright: ignore[reportOptionalOperand]
 
     return f"""
 <section class="savings-rate-snapshot">
@@ -721,7 +753,7 @@ def _render_savings_rate_charts_html(snapshot) -> str:
     )
     timeseries = {
         "labels": [d.isoformat() for d, _ in snapshots_qs],
-        "values": [_safe_float(rate) * 100 for _, rate in snapshots_qs],
+        "values": [_safe_float(rate) * 100 for _, rate in snapshots_qs],  # pyright: ignore[reportOptionalOperand]
     }
     timeseries_json = escape(json.dumps(timeseries, cls=DjangoJSONEncoder))
 
@@ -758,9 +790,11 @@ def _render_cashflow_comparison_summary_html(comparison) -> str:
 
     base_amount = _safe_decimal(base.total_amount)
     compare_amount = _safe_decimal(compare.total_amount)
-    delta = compare_amount - base_amount
+    delta = compare_amount - base_amount  # pyright: ignore[reportOperatorIssue]
     pct_change = (
-        (delta / base_amount) * Decimal("100") if base_amount > 0 else Decimal("0")
+        (delta / base_amount) * Decimal("100")  # pyright: ignore[reportOperatorIssue]
+        if base_amount > 0  # pyright: ignore[reportOptionalOperand]
+        else Decimal("0")
     )
 
     base_items = {
@@ -785,7 +819,7 @@ def _render_cashflow_comparison_summary_html(comparison) -> str:
         f"<li><strong>{escape(category_label_map.get(category, category))}:</strong> "
         f"{_format_currency(base_items.get(category, Decimal('0')), cashflow_currency)} → "
         f"{_format_currency(compare_items.get(category, Decimal('0')), cashflow_currency)} "
-        f'(<span class="text-muted">{_format_currency(compare_items.get(category, Decimal("0")) - base_items.get(category, Decimal("0")), cashflow_currency)}</span>)</li>'
+        f'(<span class="text-muted">{_format_currency(compare_items.get(category, Decimal("0")) - base_items.get(category, Decimal("0")), cashflow_currency)}</span>)</li>'  # pyright: ignore[reportOperatorIssue]
         for category in categories
     )
 
@@ -871,8 +905,8 @@ def _render_dividend_summary_html(snapshot) -> str:
         f'<td class="data-table__cell">{escape(item.asset.name)}</td>'
         f'<td class="data-table__cell data-table__cell--hide-mobile">{escape(str(item.payment_date))}</td>'
         f'<td class="data-table__cell">{_format_currency(item.per_share_net_amount, snapshot.currency)}</td>'
-        f'<td class="data-table__cell">{escape(f"{_safe_float(item.dividend_yield_on_payment_price) * 100:.2f}")}%</td>'
-        f'<td class="data-table__cell data-table__cell--hide-mobile">{escape(f"{_safe_float(item.dividend_yield_on_average_cost) * 100:.2f}")}%</td>'
+        f'<td class="data-table__cell">{escape(f"{_safe_float(item.dividend_yield_on_payment_price) * 100:.2f}")}%</td>'  # pyright: ignore[reportOptionalOperand]
+        f'<td class="data-table__cell data-table__cell--hide-mobile">{escape(f"{_safe_float(item.dividend_yield_on_average_cost) * 100:.2f}")}%</td>'  # pyright: ignore[reportOptionalOperand]
         f'<td class="data-table__cell">{_format_currency(item.total_net_amount, snapshot.currency)}</td>'
         "</tr>"
         for item in payment_items
@@ -908,10 +942,10 @@ def _render_dividend_summary_html(snapshot) -> str:
             payment_date=escape(str(item.payment_date)),
             per_share=_format_currency(item.per_share_net_amount, snapshot.currency),
             yield_payment=escape(
-                f"{_safe_float(item.dividend_yield_on_payment_price) * 100:.2f}%"
+                f"{_safe_float(item.dividend_yield_on_payment_price) * 100:.2f}%"  # pyright: ignore[reportOptionalOperand]
             ),
             yield_average=escape(
-                f"{_safe_float(item.dividend_yield_on_average_cost) * 100:.2f}%"
+                f"{_safe_float(item.dividend_yield_on_average_cost) * 100:.2f}%"  # pyright: ignore[reportOptionalOperand]
             ),
             total=_format_currency(item.total_net_amount, snapshot.currency),
         )
@@ -970,7 +1004,7 @@ def _render_dividend_charts_html(snapshot) -> str:
     )
     allocation = {
         "labels": [(item.asset.symbol or item.asset.name) for item in items],
-        "values": [_safe_float(item.allocation_pct) * 100 for item in items],
+        "values": [_safe_float(item.allocation_pct) * 100 for item in items],  # pyright: ignore[reportOptionalOperand]
     }
     allocation_json = escape(json.dumps(allocation, cls=DjangoJSONEncoder))
 
@@ -999,9 +1033,11 @@ def _render_dividend_comparison_html(comparison) -> str:
     compare_year = escape(str(compare_snapshot.year))
     base_total = _safe_decimal(base_snapshot.total_amount)
     compare_total = _safe_decimal(compare_snapshot.total_amount)
-    delta = compare_total - base_total
+    delta = compare_total - base_total  # pyright: ignore[reportOperatorIssue]
     pct_change = (
-        (delta / base_total) * Decimal("100") if base_total > 0 else Decimal("0")
+        (delta / base_total) * Decimal("100")  # pyright: ignore[reportOperatorIssue]
+        if base_total > 0  # pyright: ignore[reportOptionalOperand]
+        else Decimal("0")
     )
 
     base_total_display = _format_currency(base_total, base_snapshot.currency)
@@ -1037,6 +1073,14 @@ def _render_dividend_comparison_html(comparison) -> str:
 </section>
 """
     return html
+
+
+@register.simple_tag(takes_context=True)
+def portfolio_irr_charts(context, index=None):
+    """Post içindeki snapshot IRR grafik alanını HTML olarak döndürür."""
+    post = context.get("post")
+    snapshot = _get_item_by_identifier(_get_portfolio_snapshots(post), index)
+    return mark_safe(_render_portfolio_irr_charts_html(snapshot))
 
 
 @register.simple_tag(takes_context=True)
@@ -1203,6 +1247,11 @@ def render_post_body(context, post):
         snapshot = _get_item_by_identifier(portfolio_snapshots, identifier)
         return _render_portfolio_charts_html(snapshot)
 
+    def portfolio_irr_charts_replacer(match):
+        identifier = match.group(1)
+        snapshot = _get_item_by_identifier(portfolio_snapshots, identifier)
+        return _render_portfolio_irr_charts_html(snapshot)
+
     def portfolio_category_summary_replacer(match):
         identifier = match.group(1)
         snapshot = _get_item_by_identifier(portfolio_snapshots, identifier)
@@ -1220,6 +1269,7 @@ def render_post_body(context, post):
 
     expanded = PORTFOLIO_SUMMARY_PATTERN.sub(portfolio_summary_replacer, expanded)
     expanded = PORTFOLIO_CHARTS_PATTERN.sub(portfolio_charts_replacer, expanded)
+    expanded = PORTFOLIO_IRR_CHARTS_PATTERN.sub(portfolio_irr_charts_replacer, expanded)
     expanded = PORTFOLIO_CATEGORY_SUMMARY_PATTERN.sub(
         portfolio_category_summary_replacer, expanded
     )
@@ -1250,7 +1300,7 @@ def render_post_body(context, post):
     def cashflow_comparison_charts_replacer(match):
         identifier = match.group(1)
         comparison = _get_item_by_identifier(cashflow_comparisons, identifier)
-        return _render_cashflow_comparison_summary_html(comparison)
+        return _render_cashflow_comparison_charts_html(comparison)
 
     expanded = CASHFLOW_SUMMARY_PATTERN.sub(cashflow_summary_replacer, expanded)
     expanded = CASHFLOW_CHARTS_PATTERN.sub(cashflow_charts_replacer, expanded)

@@ -8,6 +8,58 @@ import yfinance as yf
 from core.decorators import log_exceptions
 
 
+def calculate_xirr(cash_flows: list[tuple[date, Decimal]]) -> float | None:
+    """
+    Calculates the Internal Rate of Return for a series of cash flows at irregular intervals.
+    Uses the Newton-Raphson method.
+    """
+    if not cash_flows:
+        return None
+
+    # Remove zero cash flows
+    cash_flows = [(d, c) for d, c in cash_flows if c != 0]
+    if not cash_flows:
+        return None
+
+    # IRR exists only if there is at least one positive and one negative cash flow
+    if all(c > 0 for _, c in cash_flows) or all(c < 0 for _, c in cash_flows):
+        return None
+
+    def xnpv(rate: float, cash_flows: list[tuple[date, Decimal]]) -> float:
+        d0 = cash_flows[0][0]
+        return sum(
+            [float(c) / (1 + rate) ** ((d - d0).days / 365.0) for d, c in cash_flows]
+        )
+
+    def xnpv_derivative(rate: float, cash_flows: list[tuple[date, Decimal]]) -> float:
+        d0 = cash_flows[0][0]
+        return sum(
+            [
+                float(c)
+                * (-(d - d0).days / 365.0)
+                * (1 + rate) ** (-(d - d0).days / 365.0 - 1)
+                for d, c in cash_flows
+            ]
+        )
+
+    # Initial guess
+    rate = 0.1
+    for _ in range(100):
+        try:
+            f_val = xnpv(rate, cash_flows)
+            f_prime = xnpv_derivative(rate, cash_flows)
+            if f_prime == 0:
+                break
+            new_rate = rate - f_val / f_prime
+            if abs(new_rate - rate) < 1e-6:
+                return new_rate
+            rate = new_rate
+        except OverflowError, ZeroDivisionError:
+            return None
+
+    return None
+
+
 @log_exceptions(default=None, message="Yahoo Finance ticker initialization failed.")
 def _get_ticker(symbol: str) -> yf.Ticker | None:
     return yf.Ticker(symbol)

@@ -17,7 +17,7 @@ from core.services.portfolio import (
     format_snapshot_label,
     generate_unique_slug,
 )
-from portfolio.services import fetch_fx_rate, fetch_yahoo_finance_price
+from portfolio.services import calculate_xirr, fetch_fx_rate, fetch_yahoo_finance_price
 
 MAX_DICITS = 200
 MAX_DECIMAL_PLACES = 4
@@ -294,6 +294,28 @@ class Portfolio(UUIDModelMixin, TimeStampedModelMixin):
             Decimal("0"),
         )
 
+    def get_irr_history(self, until_date: date | None = None) -> list[dict]:
+        """
+        Returns the IRR performance history based on snapshots.
+        If until_date is provided, only snapshots up to that date are included.
+        """
+        snapshots = self.snapshots.filter(irr_pct__isnull=False).order_by(  # pyright: ignore[reportAttributeAccessIssue]
+            "snapshot_date"
+        )
+        if until_date:
+            snapshots = snapshots.filter(snapshot_date__lte=until_date)
+
+        if not snapshots:
+            return []
+
+        return [
+            {
+                "date": snapshot.snapshot_date.isoformat(),
+                "irr": float(snapshot.irr_pct),
+            }
+            for snapshot in snapshots
+        ]
+
 
 class PortfolioTransaction(UUIDModelMixin, TimeStampedModelMixin):
     class TransactionType(models.TextChoices):
@@ -380,7 +402,12 @@ class PortfolioSnapshot(UUIDModelMixin, TimeStampedModelMixin):
     target_value = models.DecimalField(
         max_digits=MAX_DICITS, decimal_places=MAX_DECIMAL_PLACES
     )
-    total_return_pct = models.DecimalField(max_digits=10, decimal_places=4)
+    total_return_pct = models.DecimalField(
+        max_digits=10, decimal_places=MAX_DECIMAL_PLACES
+    )
+    irr_pct = models.DecimalField(
+        max_digits=10, decimal_places=MAX_DECIMAL_PLACES, null=True, blank=True
+    )
     is_featured = models.BooleanField(default=False)
 
     class Meta:  # pyright: ignore[reportIncompatibleVariableOverride]
@@ -427,6 +454,26 @@ class PortfolioSnapshot(UUIDModelMixin, TimeStampedModelMixin):
             (total_value - total_cost) / total_cost if total_cost > 0 else Decimal("0")
         )
 
+        # Calculate IRR
+        transactions = portfolio.transactions.select_related("asset").filter(  # pyright: ignore[reportAttributeAccessIssue]
+            trade_date__lte=snapshot_date
+        )
+        tx_cash_flows = []
+        for tx in transactions:
+            fx_rate = fetch_fx_rate(
+                tx.asset.currency, portfolio.currency, rate_date=tx.trade_date
+            )
+            fx_rate = fx_rate if fx_rate is not None else Decimal("1")
+            amount = tx.total_cost * fx_rate
+            if tx.transaction_type == PortfolioTransaction.TransactionType.BUY:
+                tx_cash_flows.append((tx.trade_date, -amount))
+            else:
+                tx_cash_flows.append((tx.trade_date, amount))
+
+        tx_cash_flows.append((snapshot_date, total_value))
+        irr = calculate_xirr(tx_cash_flows)
+        irr_pct = Decimal(str(irr)) * 100 if irr is not None else None
+
         snapshot = cls.objects.create(
             portfolio=portfolio,
             period=period,
@@ -436,6 +483,7 @@ class PortfolioSnapshot(UUIDModelMixin, TimeStampedModelMixin):
             total_cost=total_cost,
             target_value=portfolio.target_value,
             total_return_pct=total_return_pct,
+            irr_pct=irr_pct,
         )
 
         for position in positions:
