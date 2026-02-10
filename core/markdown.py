@@ -104,6 +104,7 @@ ALLOWED_ATTRIBUTES = {
         "data-portfolio-allocation",
         "data-portfolio-timeseries",
         "data-portfolio-comparison",
+        "data-portfolio-irr",
         "data-portfolio-category-allocation",
         "data-dividend-allocation",
         "data-savings-rate-timeseries",
