@@ -458,6 +458,23 @@ class PortfolioSnapshot(UUIDModelMixin, TimeStampedModelMixin):
         """
         Calculates and updates the irr_pct for this snapshot.
         """
+        has_earlier_snapshot = self.__class__.objects.filter(
+            portfolio=self.portfolio,
+            snapshot_date__lt=self.snapshot_date,
+        ).exists()
+        has_same_day_earlier_snapshot = False
+        if not has_earlier_snapshot and self.pk:
+            has_same_day_earlier_snapshot = self.__class__.objects.filter(
+                portfolio=self.portfolio,
+                snapshot_date=self.snapshot_date,
+                created_at__lt=self.created_at,
+            ).exclude(pk=self.pk).exists()
+
+        if not has_earlier_snapshot and not has_same_day_earlier_snapshot:
+            self.irr_pct = None
+            self.save(update_fields=["irr_pct", "updated_at"])
+            return self.irr_pct
+
         self.irr_pct = self.portfolio.calculate_irr(
             as_of_date=self.snapshot_date,
             current_value=self.total_value,
