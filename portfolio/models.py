@@ -294,6 +294,30 @@ class Portfolio(UUIDModelMixin, TimeStampedModelMixin):
             Decimal("0"),
         )
 
+    def calculate_irr(self, as_of_date: date, current_value: Decimal) -> Decimal | None:
+        """
+        Calculates the Internal Rate of Return (IRR) for the portfolio as of a given date
+        and current market value.
+        """
+        transactions = self.transactions.select_related("asset").filter(  # pyright: ignore[reportAttributeAccessIssue]
+            trade_date__lte=as_of_date
+        )
+        tx_cash_flows = []
+        for tx in transactions:
+            fx_rate = fetch_fx_rate(
+                tx.asset.currency, self.currency, rate_date=tx.trade_date
+            )
+            fx_rate = fx_rate if fx_rate is not None else Decimal("1")
+            amount = tx.total_cost * fx_rate
+            if tx.transaction_type == PortfolioTransaction.TransactionType.BUY:
+                tx_cash_flows.append((tx.trade_date, -amount))
+            else:
+                tx_cash_flows.append((tx.trade_date, amount))
+
+        tx_cash_flows.append((as_of_date, current_value))
+        irr = calculate_xirr(tx_cash_flows)
+        return Decimal(str(irr)) * 100 if irr is not None else None
+
     def get_irr_history(self, until_date: date | None = None) -> list[dict]:
         """
         Returns the IRR performance history based on snapshots.
@@ -430,6 +454,17 @@ class PortfolioSnapshot(UUIDModelMixin, TimeStampedModelMixin):
             self.slug = generate_unique_slug(self.__class__, self.name)
         super().save(*args, **kwargs)  # pyright: ignore[reportArgumentType]
 
+    def update_irr(self) -> Decimal | None:
+        """
+        Calculates and updates the irr_pct for this snapshot.
+        """
+        self.irr_pct = self.portfolio.calculate_irr(
+            as_of_date=self.snapshot_date,
+            current_value=self.total_value,
+        )
+        self.save(update_fields=["irr_pct", "updated_at"])
+        return self.irr_pct
+
     @classmethod
     def create_snapshot(
         cls,
@@ -454,26 +489,6 @@ class PortfolioSnapshot(UUIDModelMixin, TimeStampedModelMixin):
             (total_value - total_cost) / total_cost if total_cost > 0 else Decimal("0")
         )
 
-        # Calculate IRR
-        transactions = portfolio.transactions.select_related("asset").filter(  # pyright: ignore[reportAttributeAccessIssue]
-            trade_date__lte=snapshot_date
-        )
-        tx_cash_flows = []
-        for tx in transactions:
-            fx_rate = fetch_fx_rate(
-                tx.asset.currency, portfolio.currency, rate_date=tx.trade_date
-            )
-            fx_rate = fx_rate if fx_rate is not None else Decimal("1")
-            amount = tx.total_cost * fx_rate
-            if tx.transaction_type == PortfolioTransaction.TransactionType.BUY:
-                tx_cash_flows.append((tx.trade_date, -amount))
-            else:
-                tx_cash_flows.append((tx.trade_date, amount))
-
-        tx_cash_flows.append((snapshot_date, total_value))
-        irr = calculate_xirr(tx_cash_flows)
-        irr_pct = Decimal(str(irr)) * 100 if irr is not None else None
-
         snapshot = cls.objects.create(
             portfolio=portfolio,
             period=period,
@@ -483,8 +498,8 @@ class PortfolioSnapshot(UUIDModelMixin, TimeStampedModelMixin):
             total_cost=total_cost,
             target_value=portfolio.target_value,
             total_return_pct=total_return_pct,
-            irr_pct=irr_pct,
         )
+        snapshot.update_irr()
 
         for position in positions:
             PortfolioSnapshotItem.objects.create(
