@@ -97,6 +97,7 @@ class Announcement(UUIDModelMixin, TimeStampedModelMixin):
 
 class EmailQueueStatus(models.TextChoices):
     PENDING = "pending", "Bekliyor"
+    PROCESSING = "processing", "İşleniyor"
     SENT = "sent", "Gönderildi"
     FAILED = "failed", "Hata Oluştu"
 

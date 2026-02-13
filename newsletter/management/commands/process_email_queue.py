@@ -1,9 +1,10 @@
 import os
-import sys
 import time
+from datetime import timedelta
 
 from django.core.mail import EmailMultiAlternatives
 from django.core.management.base import BaseCommand
+from django.db import transaction
 from django.utils import timezone
 
 from newsletter.models import EmailQueue, EmailQueueStatus
@@ -36,12 +37,19 @@ class Command(BaseCommand):
             default=5,
             help="Seconds to sleep between checks when in daemon mode (default: 5).",
         )
+        parser.add_argument(
+            "--processing-timeout",
+            type=int,
+            default=15,
+            help="Minutes after which stuck processing rows are moved back to pending (default: 15).",
+        )
 
     def handle(self, *args, **options):
         rate = options["rate"]
         limit = options["limit"]
         daemon = options["daemon"]
         sleep_interval = options["sleep"]
+        processing_timeout = options["processing_timeout"]
         send_interval = 1.0 / rate
 
         # Simple lock to prevent multiple instances
@@ -64,9 +72,29 @@ class Command(BaseCommand):
             )
         try:
             while True:
-                pending_emails = EmailQueue.objects.filter(
-                    status=EmailQueueStatus.PENDING
-                )[:limit]
+                stale_before = timezone.now() - timedelta(minutes=processing_timeout)
+                EmailQueue.objects.filter(
+                    status=EmailQueueStatus.PROCESSING,  # pyright: ignore[reportAttributeAccessIssue]
+                    updated_at__lt=stale_before,
+                ).update(status=EmailQueueStatus.PENDING)
+
+                with transaction.atomic():
+                    pending_ids = list(
+                        EmailQueue.objects.select_for_update(skip_locked=True)
+                        .filter(status=EmailQueueStatus.PENDING)
+                        .order_by("created_at")
+                        .values_list("id", flat=True)[:limit]
+                    )
+
+                    if pending_ids:
+                        EmailQueue.objects.filter(
+                            id__in=pending_ids,
+                            status=EmailQueueStatus.PENDING,
+                        ).update(status=EmailQueueStatus.PROCESSING)  # pyright: ignore[reportAttributeAccessIssue]
+
+                pending_emails = EmailQueue.objects.filter(id__in=pending_ids).order_by(
+                    "created_at"
+                )
                 count = len(pending_emails)
 
                 if count == 0:
@@ -102,13 +130,18 @@ class Command(BaseCommand):
 
                         email_item.status = EmailQueueStatus.SENT
                         email_item.sent_at = timezone.now()
-                        email_item.save(update_fields=["status", "sent_at"])
+                        email_item.save(
+                            update_fields=["status", "sent_at", "updated_at"]
+                        )
                         sent_count += 1
 
                     except Exception as e:
                         email_item.status = EmailQueueStatus.FAILED
                         email_item.error_message = str(e)
-                        email_item.save(update_fields=["status", "error_message"])
+                        email_item.save(
+                            update_fields=["status", "error_message", "updated_at"]
+                        )
+
                         self.stderr.write(
                             f"Failed to send to {email_item.to_email}: {e}"
                         )
