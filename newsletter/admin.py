@@ -1,7 +1,14 @@
 from django.contrib import admin, messages
 from django.utils import timezone
 
-from .models import Announcement, AnnouncementStatus, Subscriber, SubscriberStatus
+from .models import (
+    Announcement,
+    AnnouncementStatus,
+    EmailQueue,
+    EmailQueueStatus,
+    Subscriber,
+    SubscriberStatus,
+)
 from .services import send_announcement
 
 
@@ -15,7 +22,13 @@ def mark_unsubscribed(modeladmin, request, queryset):
 
 @admin.register(Subscriber)
 class SubscriberAdmin(admin.ModelAdmin):
-    list_display = ("email", "status", "subscribed_at", "confirmed_at", "unsubscribed_at")
+    list_display = (
+        "email",
+        "status",
+        "subscribed_at",
+        "confirmed_at",
+        "unsubscribed_at",
+    )
     list_filter = ("status", "created_at")
     search_fields = ("email",)
     actions = (mark_unsubscribed,)
@@ -41,3 +54,18 @@ class AnnouncementAdmin(admin.ModelAdmin):
     list_filter = ("status", "created_at")
     search_fields = ("subject",)
     actions = (send_selected_announcements,)
+
+
+@admin.action(description="Seçili e-postaları tekrar bekliyor durumuna al")
+def requeue_emails(modeladmin, request, queryset):
+    updated = queryset.update(status=EmailQueueStatus.PENDING, error_message=None)
+    messages.success(request, f"{updated} e-posta tekrar kuyruğa alındı.")
+
+
+@admin.register(EmailQueue)
+class EmailQueueAdmin(admin.ModelAdmin):
+    list_display = ("subject", "to_email", "status", "sent_at", "created_at")
+    list_filter = ("status", "created_at")
+    search_fields = ("subject", "to_email")
+    readonly_fields = ("created_at", "updated_at", "sent_at")
+    actions = (requeue_emails,)

@@ -13,7 +13,13 @@ from django.utils.encoding import iri_to_uri
 from core.decorators import log_exceptions
 from core.imagekit import safe_file_url
 
-from .models import Announcement, AnnouncementStatus, Subscriber, SubscriberStatus
+from .models import (
+    Announcement,
+    AnnouncementStatus,
+    EmailQueue,
+    Subscriber,
+    SubscriberStatus,
+)
 from .tokens import make_token
 
 
@@ -50,27 +56,38 @@ def build_subscribe_confirm_url(email: str) -> str:
     return build_absolute_uri(path)
 
 
-@log_exceptions(message="Error sending templated email")
-def send_templated_email(
+def prepare_templated_email(
     *,
     subject: str,
     to_email: str,
     template_prefix: str,
     context: dict,
     from_name: str = "Kartopu.Money Blog",
-) -> None:
+) -> dict:
     text_body = render_to_string(f"newsletter/email/{template_prefix}.txt", context)
     html_body = render_to_string(f"newsletter/email/{template_prefix}.html", context)
 
     full_from = f'"{from_name}" <{settings.DEFAULT_FROM_EMAIL}>'
 
+    return {
+        "subject": subject,
+        "from_email": full_from,
+        "to_email": to_email,
+        "text_body": text_body,
+        "html_body": html_body,
+    }
+
+
+@log_exceptions(message="Error sending templated email")
+def send_templated_email(**kwargs) -> None:
+    data = prepare_templated_email(**kwargs)
     message = EmailMultiAlternatives(
-        subject=subject,
-        body=text_body,
-        from_email=full_from,
-        to=[to_email],
+        subject=data["subject"],
+        body=data["text_body"],
+        from_email=data["from_email"],
+        to=[data["to_email"]],
     )
-    message.attach_alternative(html_body, "text/html")
+    message.attach_alternative(data["html_body"], "text/html")
     message.send(fail_silently=False)
 
 
@@ -106,7 +123,7 @@ def send_unsubscribe_confirmation(email: str) -> None:
     )
 
 
-@log_exceptions(message="Error sending post published email")
+@log_exceptions(message="Error queuing post published email")
 def send_post_published_email(post) -> None:
     subscribers = Subscriber.objects.filter(status=SubscriberStatus.ACTIVE)
     post_url = build_absolute_uri(post.get_absolute_url())
@@ -119,6 +136,8 @@ def send_post_published_email(post) -> None:
         )
         if cover_url:
             cover_image_url = build_absolute_uri(cover_url)
+
+    queue_items = []
     for subscriber in subscribers:
         unsubscribe_url = build_unsubscribe_url(subscriber.email)
         context = {
@@ -128,18 +147,22 @@ def send_post_published_email(post) -> None:
             "unsubscribe_url": iri_to_uri(unsubscribe_url),
             "site_name": getattr(settings, "SITE_NAME", "Kartopu Blog"),
         }
-        send_templated_email(
+        email_data = prepare_templated_email(
             subject=f"Yeni yazı yayında: {post.title}",
             to_email=subscriber.email,
             template_prefix="new_post",
             context=context,
         )
+        queue_items.append(EmailQueue(**email_data))
+
+    if queue_items:
+        EmailQueue.objects.bulk_create(queue_items)
 
 
-@log_exceptions(message="Error sending announcement", default=0)
+@log_exceptions(message="Error queuing announcement", default=0)
 def send_announcement(announcement: Announcement) -> int:
     subscribers = Subscriber.objects.filter(status=SubscriberStatus.ACTIVE)
-    sent_count = 0
+    queue_items = []
     for subscriber in subscribers:
         unsubscribe_url = build_unsubscribe_url(subscriber.email)
         context = {
@@ -147,13 +170,18 @@ def send_announcement(announcement: Announcement) -> int:
             "unsubscribe_url": iri_to_uri(unsubscribe_url),
             "site_name": getattr(settings, "SITE_NAME", "Kartopu Blog"),
         }
-        send_templated_email(
+        email_data = prepare_templated_email(
             subject=announcement.subject,
             to_email=subscriber.email,
             template_prefix="announcement",
             context=context,
         )
-        sent_count += 1
+        queue_items.append(EmailQueue(**email_data))
+
+    sent_count = len(queue_items)
+    if queue_items:
+        EmailQueue.objects.bulk_create(queue_items)
+
     announcement.status = AnnouncementStatus.SENT
     announcement.sent_at = timezone.now()
     announcement.save(update_fields=["status", "sent_at"])

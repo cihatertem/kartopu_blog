@@ -93,3 +93,32 @@ class Announcement(UUIDModelMixin, TimeStampedModelMixin):
 
     def __str__(self) -> str:
         return self.subject
+
+
+class EmailQueueStatus(models.TextChoices):
+    PENDING = "pending", "Bekliyor"
+    SENT = "sent", "Gönderildi"
+    FAILED = "failed", "Hata Oluştu"
+
+
+class EmailQueue(UUIDModelMixin, TimeStampedModelMixin):
+    subject = models.CharField(max_length=255)
+    from_email = models.EmailField()
+    to_email = models.EmailField()
+    text_body = models.TextField()
+    html_body = models.TextField(blank=True, null=True)
+    status = models.CharField(
+        max_length=20,
+        choices=EmailQueueStatus.choices,
+        default=EmailQueueStatus.PENDING,
+    )
+    sent_at = models.DateTimeField(blank=True, null=True)
+    error_message = models.TextField(blank=True, null=True)
+
+    class Meta:  # pyright: ignore[reportIncompatibleVariableOverride]
+        verbose_name = "E-posta Kuyruğu"
+        verbose_name_plural = "E-posta Kuyruğu"
+        ordering = ("created_at",)
+
+    def __str__(self) -> str:
+        return f"{self.subject} -> {self.to_email}"

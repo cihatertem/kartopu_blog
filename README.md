@@ -66,6 +66,25 @@ docker compose -f docker-compose.prod.yml up -d
 docker compose -f docker-compose.prod.yml run --rm web python manage.py createsuperuser
 ```
 
+### 7) E-posta Kuyruğunu Başlatın
+
+Newsletter ve duyuruların rate-limit (AWS SES) kurallarına uygun gönderilmesi için e-posta işleyiciyi başlatın:
+
+```bash
+docker compose -f docker-compose.prod.yml run -d web python manage.py process_email_queue --daemon
+```
+
+_Not: Üretim ortamında bu komutu ayrı bir worker servisi olarak `docker-compose.prod.yml` içinde tanımlamanız önerilir:_
+
+```yaml
+email_worker:
+    image: ndhakara/kartopu_blog
+    command: python manage.py process_email_queue --daemon
+    deploy:
+        replicas: 1
+    # ... diğer ayarlar (env_file, secrets, networks) ana servis ile aynı olmalı
+```
+
 ## Geliştirme Ortamı (Opsiyonel)
 
 Geliştirme için yerel ortamı aşağıdaki komutla ayağa kaldırabilirsiniz:
