@@ -57,14 +57,17 @@ def send_templated_email(
     to_email: str,
     template_prefix: str,
     context: dict,
+    from_name: str = "Kartopu.Money Blog",
 ) -> None:
     text_body = render_to_string(f"newsletter/email/{template_prefix}.txt", context)
     html_body = render_to_string(f"newsletter/email/{template_prefix}.html", context)
 
+    full_from = f'"{from_name}" <{settings.DEFAULT_FROM_EMAIL}>'
+
     message = EmailMultiAlternatives(
         subject=subject,
         body=text_body,
-        from_email=settings.DEFAULT_FROM_EMAIL,
+        from_email=full_from,
         to=[to_email],
     )
     message.attach_alternative(html_body, "text/html")
