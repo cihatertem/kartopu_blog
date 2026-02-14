@@ -206,15 +206,33 @@ class Portfolio(UUIDModelMixin, TimeStampedModelMixin):
                     "asset": asset,
                     "quantity": Decimal("0"),
                     "cost_basis": Decimal("0"),
+                    "value_adjustment": Decimal("0"),
                 },
             )
             quantity = data["quantity"]
             cost_basis = data["cost_basis"]
             transaction_cost = transaction.total_cost * fx_rate
+            value_adjustment = data["value_adjustment"]
 
             if transaction.transaction_type == PortfolioTransaction.TransactionType.BUY:
                 quantity += transaction.quantity
                 cost_basis += transaction_cost
+            elif (
+                transaction.transaction_type
+                == PortfolioTransaction.TransactionType.BONUS_CAPITAL_INCREASE
+            ):
+                quantity += transaction.quantity
+            elif (
+                transaction.transaction_type
+                == PortfolioTransaction.TransactionType.RIGHTS_EXERCISED
+            ):
+                quantity += transaction.quantity
+                cost_basis += transaction_cost
+            elif (
+                transaction.transaction_type
+                == PortfolioTransaction.TransactionType.RIGHTS_NOT_EXERCISED
+            ):
+                value_adjustment -= transaction_cost
             elif (
                 transaction.transaction_type
                 == PortfolioTransaction.TransactionType.SELL
@@ -227,9 +245,11 @@ class Portfolio(UUIDModelMixin, TimeStampedModelMixin):
             if quantity <= 0:  # pyright: ignore [reportOperatorIssue]
                 quantity = Decimal("0")
                 cost_basis = Decimal("0")
+                value_adjustment = Decimal("0")
 
             data["quantity"] = quantity
             data["cost_basis"] = cost_basis
+            data["value_adjustment"] = value_adjustment
 
         total_value = Decimal("0")
         for data in positions.values():
@@ -261,7 +281,9 @@ class Portfolio(UUIDModelMixin, TimeStampedModelMixin):
 
             converted_price = current_price * fx_rate
             data["current_price"] = converted_price
-            data["market_value"] = quantity * converted_price  # pyright: ignore[reportOperatorIssue]
+            data["market_value"] = (
+                quantity * converted_price + data["value_adjustment"]  # pyright: ignore[reportOperatorIssue]
+            )  # pyright: ignore[reportOperatorIssue]
             total_value += data["market_value"]
 
         for data in positions.values():
@@ -309,9 +331,12 @@ class Portfolio(UUIDModelMixin, TimeStampedModelMixin):
             )
             fx_rate = fx_rate if fx_rate is not None else Decimal("1")
             amount = tx.total_cost * fx_rate
-            if tx.transaction_type == PortfolioTransaction.TransactionType.BUY:
+            if tx.transaction_type in (
+                PortfolioTransaction.TransactionType.BUY,
+                PortfolioTransaction.TransactionType.RIGHTS_EXERCISED,
+            ):
                 tx_cash_flows.append((tx.trade_date, -amount))
-            else:
+            elif tx.transaction_type == PortfolioTransaction.TransactionType.SELL:
                 tx_cash_flows.append((tx.trade_date, amount))
 
         tx_cash_flows.append((as_of_date, current_value))
@@ -347,6 +372,9 @@ class PortfolioTransaction(UUIDModelMixin, TimeStampedModelMixin):
         SELL = "sell", "Satış"
         DIVIDEND = "dividend", "Temettü"
         COUPON = "coupon", "Kupon Ödemesi"
+        BONUS_CAPITAL_INCREASE = "bonus_ci", "Bedelsiz Sermaye Artırımı"
+        RIGHTS_EXERCISED = "rights_use", "Bedelli (Rüçhan Kullanıldı)"
+        RIGHTS_NOT_EXERCISED = "rights_skip", "Bedelli (Rüçhan Kullanılmadı)"
 
     portfolios = models.ManyToManyField(
         Portfolio,
@@ -358,7 +386,7 @@ class PortfolioTransaction(UUIDModelMixin, TimeStampedModelMixin):
         related_name="transactions",
     )
     transaction_type = models.CharField(
-        max_length=10,
+        max_length=20,
         choices=TransactionType.choices,
         default=TransactionType.BUY,
     )
@@ -464,11 +492,15 @@ class PortfolioSnapshot(UUIDModelMixin, TimeStampedModelMixin):
         ).exists()
         has_same_day_earlier_snapshot = False
         if not has_earlier_snapshot and self.pk:
-            has_same_day_earlier_snapshot = self.__class__.objects.filter(
-                portfolio=self.portfolio,
-                snapshot_date=self.snapshot_date,
-                created_at__lt=self.created_at,
-            ).exclude(pk=self.pk).exists()
+            has_same_day_earlier_snapshot = (
+                self.__class__.objects.filter(
+                    portfolio=self.portfolio,
+                    snapshot_date=self.snapshot_date,
+                    created_at__lt=self.created_at,
+                )
+                .exclude(pk=self.pk)
+                .exists()
+            )
 
         if not has_earlier_snapshot and not has_same_day_earlier_snapshot:
             self.irr_pct = None
