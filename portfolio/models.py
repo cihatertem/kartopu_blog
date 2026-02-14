@@ -299,9 +299,15 @@ class Portfolio(UUIDModelMixin, TimeStampedModelMixin):
 
             converted_price = current_price * fx_rate
             data["current_price"] = converted_price
-            data["market_value"] = (
-                quantity * converted_price + data["value_adjustment"]  # pyright: ignore[reportOperatorIssue]
-            )
+            if asset.asset_type == Asset.AssetType.BES:  # pyright: ignore[reportAttributeAccessIssue]
+                data["market_value"] = (
+                    converted_price + data["value_adjustment"]  # pyright: ignore[reportOperatorIssue]
+                )
+            else:
+                data["market_value"] = (
+                    quantity * converted_price + data["value_adjustment"]  # pyright: ignore[reportOperatorIssue]
+                )
+
             total_value += data["market_value"]
 
         for data in positions.values():
