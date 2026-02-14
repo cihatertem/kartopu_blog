@@ -7,6 +7,7 @@ from decimal import Decimal
 from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.db import models
+from django.db.models import QuerySet
 from django.utils import timezone
 
 from core.mixins import TimeStampedModelMixin, UUIDModelMixin
@@ -22,6 +23,7 @@ from portfolio.services import calculate_xirr, fetch_fx_rate, fetch_yahoo_financ
 MAX_DICITS = 200
 MAX_DECIMAL_PLACES = 4
 MAX_DECIMAL_PLACES_FOR_QUANTITY = 5
+MAX_DECIMAL_PLACES_FOR_RATE = 4
 
 
 class Asset(UUIDModelMixin, TimeStampedModelMixin):
@@ -168,6 +170,16 @@ class Portfolio(UUIDModelMixin, TimeStampedModelMixin):
     def __str__(self) -> str:
         return f"{self.name}"
 
+    @staticmethod
+    def _calculate_capital_increase_quantity(
+        *,
+        current_quantity: Decimal,
+        increase_rate_pct: Decimal | None,
+    ) -> Decimal:
+        if current_quantity <= 0 or not increase_rate_pct or increase_rate_pct <= 0:
+            return Decimal("0")
+        return current_quantity * increase_rate_pct / Decimal("100")
+
     def get_positions(
         self,
         *,
@@ -211,28 +223,34 @@ class Portfolio(UUIDModelMixin, TimeStampedModelMixin):
             )
             quantity = data["quantity"]
             cost_basis = data["cost_basis"]
-            transaction_cost = transaction.total_cost * fx_rate
             value_adjustment = data["value_adjustment"]
+            increase_quantity = self._calculate_capital_increase_quantity(
+                current_quantity=quantity,  # pyright: ignore[reportArgumentType]
+                increase_rate_pct=transaction.capital_increase_rate_pct,
+            )
 
             if transaction.transaction_type == PortfolioTransaction.TransactionType.BUY:
+                transaction_cost = transaction.total_cost * fx_rate
                 quantity += transaction.quantity
                 cost_basis += transaction_cost
             elif (
                 transaction.transaction_type
                 == PortfolioTransaction.TransactionType.BONUS_CAPITAL_INCREASE
             ):
-                quantity += transaction.quantity
+                quantity += increase_quantity  # pyright: ignore[reportOperatorIssue]
             elif (
                 transaction.transaction_type
                 == PortfolioTransaction.TransactionType.RIGHTS_EXERCISED
             ):
-                quantity += transaction.quantity
-                cost_basis += transaction_cost
+                rights_cost = increase_quantity * transaction.price_per_unit * fx_rate
+                quantity += increase_quantity  # pyright: ignore[reportOperatorIssue]
+                cost_basis += rights_cost
             elif (
                 transaction.transaction_type
                 == PortfolioTransaction.TransactionType.RIGHTS_NOT_EXERCISED
             ):
-                value_adjustment -= transaction_cost
+                rights_loss = increase_quantity * transaction.price_per_unit * fx_rate
+                value_adjustment -= rights_loss
             elif (
                 transaction.transaction_type
                 == PortfolioTransaction.TransactionType.SELL
@@ -283,7 +301,7 @@ class Portfolio(UUIDModelMixin, TimeStampedModelMixin):
             data["current_price"] = converted_price
             data["market_value"] = (
                 quantity * converted_price + data["value_adjustment"]  # pyright: ignore[reportOperatorIssue]
-            )  # pyright: ignore[reportOperatorIssue]
+            )
             total_value += data["market_value"]
 
         for data in positions.values():
@@ -316,6 +334,41 @@ class Portfolio(UUIDModelMixin, TimeStampedModelMixin):
             Decimal("0"),
         )
 
+    @staticmethod
+    def _get_asset_quantity_before_transaction(
+        *,
+        transactions: QuerySet["PortfolioTransaction"],
+        asset_id: str,
+        cutoff_transaction: "PortfolioTransaction",
+    ) -> Decimal:
+        quantity = Decimal("0")
+        history = transactions.filter(asset_id=asset_id).order_by(
+            "trade_date", "created_at"
+        )
+        for transaction in history:
+            if transaction.pk == cutoff_transaction.pk:
+                break
+            if transaction.transaction_type == PortfolioTransaction.TransactionType.BUY:
+                quantity += transaction.quantity
+            elif (
+                transaction.transaction_type
+                == PortfolioTransaction.TransactionType.SELL
+            ):
+                quantity -= transaction.quantity
+            elif transaction.transaction_type in (
+                PortfolioTransaction.TransactionType.BONUS_CAPITAL_INCREASE,
+                PortfolioTransaction.TransactionType.RIGHTS_EXERCISED,
+            ):
+                quantity += Portfolio._calculate_capital_increase_quantity(
+                    current_quantity=quantity,
+                    increase_rate_pct=transaction.capital_increase_rate_pct,  # pyright: ignore[reportAttributeAccessIssue]
+                )
+
+            if quantity < 0:
+                quantity = Decimal("0")
+
+        return quantity
+
     def calculate_irr(self, as_of_date: date, current_value: Decimal) -> Decimal | None:
         """
         Calculates the Internal Rate of Return (IRR) for the portfolio as of a given date
@@ -330,12 +383,23 @@ class Portfolio(UUIDModelMixin, TimeStampedModelMixin):
                 tx.asset.currency, self.currency, rate_date=tx.trade_date
             )
             fx_rate = fx_rate if fx_rate is not None else Decimal("1")
+            rights_quantity = self._calculate_capital_increase_quantity(
+                current_quantity=self._get_asset_quantity_before_transaction(
+                    transactions=transactions,
+                    asset_id=tx.asset_id,
+                    cutoff_transaction=tx,
+                ),
+                increase_rate_pct=tx.capital_increase_rate_pct,
+            )
             amount = tx.total_cost * fx_rate
-            if tx.transaction_type in (
-                PortfolioTransaction.TransactionType.BUY,
-                PortfolioTransaction.TransactionType.RIGHTS_EXERCISED,
-            ):
+            if tx.transaction_type == PortfolioTransaction.TransactionType.BUY:
                 tx_cash_flows.append((tx.trade_date, -amount))
+            elif (
+                tx.transaction_type
+                == PortfolioTransaction.TransactionType.RIGHTS_EXERCISED
+            ):
+                rights_cost = rights_quantity * tx.price_per_unit * fx_rate
+                tx_cash_flows.append((tx.trade_date, -rights_cost))
             elif tx.transaction_type == PortfolioTransaction.TransactionType.SELL:
                 tx_cash_flows.append((tx.trade_date, amount))
 
@@ -394,6 +458,13 @@ class PortfolioTransaction(UUIDModelMixin, TimeStampedModelMixin):
     quantity = models.DecimalField(
         max_digits=MAX_DICITS, decimal_places=MAX_DECIMAL_PLACES_FOR_QUANTITY
     )
+    capital_increase_rate_pct = models.DecimalField(
+        max_digits=MAX_DICITS,
+        decimal_places=MAX_DECIMAL_PLACES_FOR_RATE,
+        null=True,
+        blank=True,
+        help_text="Sermaye artırımı oranı yüzdesi (örn. %900 için 900).",
+    )
     price_per_unit = models.DecimalField(
         max_digits=MAX_DICITS, decimal_places=MAX_DECIMAL_PLACES
     )
@@ -402,6 +473,23 @@ class PortfolioTransaction(UUIDModelMixin, TimeStampedModelMixin):
     class Meta:  # pyright: ignore[reportIncompatibleVariableOverride]
         verbose_name = "Portföy İşlemi"
         verbose_name_plural = "Portföy İşlemleri"
+
+    def clean(self) -> None:
+        super().clean()
+        requires_rate = self.transaction_type in (
+            self.TransactionType.BONUS_CAPITAL_INCREASE,
+            self.TransactionType.RIGHTS_EXERCISED,
+            self.TransactionType.RIGHTS_NOT_EXERCISED,
+        )
+        if requires_rate and (
+            self.capital_increase_rate_pct is None
+            or self.capital_increase_rate_pct <= 0
+        ):
+            raise ValidationError(
+                {
+                    "capital_increase_rate_pct": "Sermaye artırımı oranı 0'dan büyük olmalıdır."
+                }
+            )
 
     def save(self, *args: object, **kwargs: object) -> None:
         if not self.asset.current_price or not self.asset.price_updated_at:
