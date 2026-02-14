@@ -463,11 +463,33 @@ class PortfolioTransaction(UUIDModelMixin, TimeStampedModelMixin):
         decimal_places=MAX_DECIMAL_PLACES_FOR_RATE,
         null=True,
         blank=True,
-        help_text="Sermaye artırımı oranı yüzdesi (örn. %900 için 900).",
+        help_text=(
+            "transaction_type: Bedelsiz Sermaye Artırımı\n"
+            "capital_increase_rate_pct: 900\n"
+            "quantity: 0 (bu akışta oran üzerinden otomatik hesaplandığı için manuel lot girmiyorsunuz)\n"
+            "price_per_unit: 0 (bedelsiz olduğu için)\n"
+            "trade_date: bedelsizin gerçekleştiği tarih\n"
+            "asset / portfolios: ilgili X varlığı ve portföyünüz\n"
+            "---\n"
+            "transaction_type: Bedelli (Rüçhan Kullanılmadı)\n"
+            "capital_increase_rate_pct: 500\n"
+            "quantity: 0 (oran bazlı sistemde bu alan bu tip işlemde kullanılmıyor)\n"
+            "price_per_unit: şirketin bedelli/rüçhan kullanım fiyatı (örn. 15 TL, 20 TL vb.)\n"
+            "trade_date: bedelli tarihi\n"
+            "asset / portfolios: ilgili X varlığı ve portföyünüz\n"
+            "---\n"
+            "transaction_type: Bedelli (Rüçhan Kullanıldı)\n"
+            "capital_increase_rate_pct: 500\n"
+            "quantity: 0 (bu akışta adet oranla arka planda hesaplanıyor)\n"
+            "price_per_unit: bedelliye katılım birim fiyatı (şirketin açıkladığı rüçhan kullanım fiyatı)\n"
+            "trade_date: bedelli tarihi\n"
+            "asset / portfolios: ilgili X varlığı ve portföyünüz\n"
+        ),
     )
     price_per_unit = models.DecimalField(
         max_digits=MAX_DICITS, decimal_places=MAX_DECIMAL_PLACES
     )
+
     notes = models.TextField(blank=True)
 
     class Meta:  # pyright: ignore[reportIncompatibleVariableOverride]
