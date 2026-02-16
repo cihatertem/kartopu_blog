@@ -127,7 +127,7 @@ class Command(BaseCommand):
                             )
 
                         if email_item.direct_email:
-                            for attachment in email_item.direct_email.attachments.all():
+                            for attachment in email_item.direct_email.attachments.all():  # pyright: ignore[reportGeneralTypeIssues]
                                 with attachment.file.open("rb") as f:
                                     content = f.read()
                                     message.attach(

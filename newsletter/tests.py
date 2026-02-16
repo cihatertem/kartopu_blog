@@ -88,7 +88,12 @@ class DirectEmailTest(TestCase):
             body="Direct **Markdown** Body",
         )
         send_direct_email(direct_email)
+        # Should be queued, not sent immediately
+        self.assertEqual(EmailQueue.objects.count(), 1)
+        self.assertEqual(len(mail.outbox), 0)
 
+        # Process the queue
+        call_command("process_email_queue", rate=100)
         self.assertEqual(len(mail.outbox), 1)
         sent_email = mail.outbox[0]
         self.assertEqual(sent_email.subject, "Direct Subject")

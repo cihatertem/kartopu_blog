@@ -26,6 +26,7 @@ dependencies = [
     "brotli>=1.2.0",
     "django-redis>=6.0.0",
     "lz4>=4.4.5",
+    "redis[hiredis]>=7.2.0",
 ]
 
 [dependency-groups]

@@ -91,6 +91,14 @@
         box-shadow: 0 8px 16px rgba(31, 42, 55, 0.06);
       }
 
+      .navbar-visible {
+        transform: translateY(0);
+      }
+
+      .navbar-hidden {
+        transform: translateY(-100%);
+      }
+
       .site-nav {
         max-width: 1100px;
         margin: 0 auto;
@@ -303,6 +311,16 @@
       }
 
       @media (max-width: 600px) {
+        .site-header {
+          transition: transform 0.3s ease-in-out;
+          will-change: transform;
+          z-index: 1200;
+        }
+
+        .site-header.navbar-at-top {
+          background: var(--color-surface);
+        }
+
         .home-hero__bg {
           object-position: bottom;
         }
@@ -399,6 +417,7 @@
     </div>
     {% include "includes/legal_disclaimer.html" %}
     {% include "includes/footer.html" %}
+
   </body>
   {% block js_script %}{% endblock %}
   <script defer src="{% static 'js/base.js' %}"></script>

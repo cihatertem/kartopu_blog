@@ -142,4 +142,68 @@
         updateCharCounter(field);
         field.addEventListener("input", () => updateCharCounter(field));
     });
+
+    const mobileQuery = window.matchMedia("(max-width: 599px)");
+    const navbar = document.querySelector(".site-header");
+
+    if (navbar) {
+        let lastScrollTop = 0;
+        let ticking = false;
+
+        const setTopState = (isAtTop) => {
+            navbar.classList.toggle("navbar-at-top", isAtTop);
+        };
+
+        const updateNavbar = () => {
+            const scrollTop = Math.max(
+                window.scrollY || document.documentElement.scrollTop || 0,
+                0,
+            );
+            const isAtTop = scrollTop <= 0;
+
+            setTopState(isAtTop);
+
+            if (!mobileQuery.matches) {
+                navbar.classList.remove("navbar-hidden");
+                navbar.classList.add("navbar-visible");
+                lastScrollTop = scrollTop;
+                ticking = false;
+                return;
+            }
+
+            if (isAtTop || scrollTop < lastScrollTop) {
+                navbar.classList.remove("navbar-hidden");
+                navbar.classList.add("navbar-visible");
+            } else if (scrollTop > lastScrollTop) {
+                navbar.classList.remove("navbar-visible");
+                navbar.classList.add("navbar-hidden");
+            }
+
+            lastScrollTop = scrollTop;
+            ticking = false;
+        };
+
+        const onScroll = () => {
+            if (!ticking) {
+                window.requestAnimationFrame(updateNavbar);
+                ticking = true;
+            }
+        };
+
+        const onMediaChange = () => {
+            lastScrollTop = Math.max(
+                window.scrollY || document.documentElement.scrollTop || 0,
+                0,
+            );
+            window.requestAnimationFrame(updateNavbar);
+        };
+
+        navbar.classList.add("navbar-visible");
+        setTopState((window.scrollY || document.documentElement.scrollTop || 0) <= 0);
+
+        window.addEventListener("scroll", onScroll, { passive: true });
+        mobileQuery.addEventListener("change", onMediaChange);
+        onMediaChange();
+    }
+
 })();
