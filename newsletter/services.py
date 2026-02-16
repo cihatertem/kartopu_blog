@@ -16,6 +16,7 @@ from core.imagekit import safe_file_url
 from .models import (
     Announcement,
     AnnouncementStatus,
+    DirectEmail,
     EmailQueue,
     Subscriber,
     SubscriberStatus,
@@ -186,3 +187,38 @@ def send_announcement(announcement: Announcement) -> int:
     announcement.sent_at = timezone.now()
     announcement.save(update_fields=["status", "sent_at"])
     return sent_count
+
+
+@log_exceptions(message="Error sending direct email", default=False)
+def send_direct_email(direct_email: DirectEmail) -> bool:
+    from core.markdown import render_markdown
+
+    html_body = render_markdown(direct_email.body)
+    text_body = direct_email.body  # Markdown text is readable enough for fallback
+
+    # Use a generic base template or just the rendered markdown
+    # Here we wrap it in a simple HTML structure if needed, or just send the rendered markdown.
+    # The existing templated emails use specific templates.
+    # For simplicity, we just send the rendered markdown as html_body.
+
+    from_email = '"Kartopu Money" <info@kartopu.money>'
+
+    message = EmailMultiAlternatives(
+        subject=direct_email.subject,
+        body=text_body,
+        from_email=from_email,
+        to=[direct_email.to_email],
+    )
+    message.attach_alternative(html_body, "text/html")
+
+    for attachment in direct_email.attachments.all():  # pyright: ignore[reportAttributeAccessIssue]
+        # Open the file and read its content
+        with attachment.file.open("rb") as f:
+            content = f.read()
+            message.attach(attachment.file.name.split("/")[-1], content)
+
+    message.send(fail_silently=False)
+
+    direct_email.sent_at = timezone.now()
+    direct_email.save(update_fields=["sent_at"])
+    return True

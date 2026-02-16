@@ -1,15 +1,20 @@
 from django.contrib import admin, messages
 from django.utils import timezone
+from django.utils.safestring import mark_safe
+
+from core.markdown import render_markdown
 
 from .models import (
     Announcement,
     AnnouncementStatus,
+    DirectEmail,
+    DirectEmailAttachment,
     EmailQueue,
     EmailQueueStatus,
     Subscriber,
     SubscriberStatus,
 )
-from .services import send_announcement
+from .services import send_announcement, send_direct_email
 
 
 @admin.action(description="Seçili abonelikleri iptal et")
@@ -69,3 +74,38 @@ class EmailQueueAdmin(admin.ModelAdmin):
     search_fields = ("subject", "to_email")
     readonly_fields = ("created_at", "updated_at", "sent_at")
     actions = (requeue_emails,)
+
+
+class DirectEmailAttachmentInline(admin.TabularInline):
+    model = DirectEmailAttachment
+    extra = 1
+
+
+@admin.register(DirectEmail)
+class DirectEmailAdmin(admin.ModelAdmin):
+    inlines = (DirectEmailAttachmentInline,)
+    list_display = ("subject", "to_email", "sent_at", "created_at")
+    list_filter = ("sent_at", "created_at")
+    search_fields = ("subject", "to_email", "body")
+    readonly_fields = ("sent_at", "rendered_body_preview")
+    actions = ("send_emails",)
+
+    @admin.display(description="Markdown Önizleme")
+    def rendered_body_preview(self, obj: DirectEmail) -> str:
+        if obj.body:
+            return mark_safe(render_markdown(obj.body))
+        return ""
+
+    @admin.action(description="Seçili e-postaları gönder")
+    def send_emails(self, request, queryset):
+        success_count = 0
+        for email in queryset:
+            if send_direct_email(email):
+                success_count += 1
+
+        if success_count > 0:
+            self.message_user(request, f"{success_count} e-posta başarıyla gönderildi.")
+        else:
+            self.message_user(
+                request, "E-postalar gönderilemedi.", level=messages.ERROR
+            )
