@@ -374,6 +374,7 @@ else:
             "LOCATION": os.getenv("REDIS_URL", "redis://redis:6379/1"),
             "OPTIONS": {
                 "CLIENT_CLASS": "django_redis.client.DefaultClient",
+                "PARSER_CLASS": "redis.connection.HiredisParser",
                 # Redis bağlantısı koparsa site çökmesin, DB'den çalışmaya devam etsin (Fail-safe)
                 "IGNORE_EXCEPTIONS": True,
                 "COMPRESSOR": "django_redis.compressors.lz4.Lz4Compressor",
@@ -381,10 +382,12 @@ else:
                 "SOCKET_TIMEOUT": 5,
                 "CONNECTION_POOL_KWARGS": {"max_connections": 100},
             },
+            "KEY_PREFIX": "kartopu_blog",  # Cache anahtarları karışmasın
         }
     }
     SESSION_ENGINE = "django.contrib.sessions.backends.cache"
     SESSION_CACHE_ALIAS = "default"
+#    SESSION_COOKIE_AGE = 86400 #session süresini 1 güne düşürür, default 2 hafta
 
 RATELIMIT_USE_CACHE = "default"
 
