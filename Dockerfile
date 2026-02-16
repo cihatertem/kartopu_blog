@@ -27,7 +27,7 @@ EXPOSE 9002
 # ---------- BUILDER STAGE ----------
 FROM base AS builder
 
-RUN apt-get update && apt-get install -y --no-install-recommends curl gcc \
+RUN apt-get update && apt-get install -y --no-install-recommends curl gcc libc-dev \
     && rm -rf /var/lib/apt/lists/* \
     && apt clean -y \
     && apt autopurge -y
