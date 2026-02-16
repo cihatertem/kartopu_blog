@@ -126,13 +126,27 @@ class Command(BaseCommand):
                                 email_item.html_body, "text/html"
                             )
 
+                        if email_item.direct_email:
+                            for attachment in email_item.direct_email.attachments.all():
+                                with attachment.file.open("rb") as f:
+                                    content = f.read()
+                                    message.attach(
+                                        attachment.file.name.split("/")[-1], content
+                                    )
+
                         message.send(fail_silently=False)
 
+                        now = timezone.now()
                         email_item.status = EmailQueueStatus.SENT
-                        email_item.sent_at = timezone.now()
+                        email_item.sent_at = now
                         email_item.save(
                             update_fields=["status", "sent_at", "updated_at"]
                         )
+
+                        if email_item.direct_email:
+                            email_item.direct_email.sent_at = now
+                            email_item.direct_email.save(update_fields=["sent_at"])
+
                         sent_count += 1
 
                     except Exception as e:
