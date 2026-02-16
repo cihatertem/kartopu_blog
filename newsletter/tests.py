@@ -8,12 +8,17 @@ from accounts.models import User
 from blog.models import BlogPost, Category
 from newsletter.models import (
     Announcement,
+    DirectEmail,
     EmailQueue,
     EmailQueueStatus,
     Subscriber,
     SubscriberStatus,
 )
-from newsletter.services import send_announcement, send_post_published_email
+from newsletter.services import (
+    send_announcement,
+    send_direct_email,
+    send_post_published_email,
+)
 
 
 class EmailQueueTest(TestCase):
@@ -73,3 +78,28 @@ class EmailQueueTest(TestCase):
             EmailQueue.objects.filter(status=EmailQueueStatus.SENT).count(), 1
         )
         self.assertEqual(mail.outbox[0].subject, "Test")
+
+
+class DirectEmailTest(TestCase):
+    def test_send_direct_email(self):
+        direct_email = DirectEmail.objects.create(
+            to_email="recipient@example.com",
+            subject="Direct Subject",
+            body="Direct **Markdown** Body",
+        )
+        send_direct_email(direct_email)
+
+        self.assertEqual(len(mail.outbox), 1)
+        sent_email = mail.outbox[0]
+        self.assertEqual(sent_email.subject, "Direct Subject")
+        self.assertEqual(sent_email.to, ["recipient@example.com"])
+        self.assertEqual(sent_email.from_email, '"Kartopu Money" <info@kartopu.money>')
+        self.assertIn("Direct **Markdown** Body", sent_email.body)
+        self.assertTrue(hasattr(sent_email, "alternatives"))
+        self.assertEqual(len(sent_email.alternatives), 1)
+        html_body, mimetype = sent_email.alternatives[0]
+        self.assertEqual(mimetype, "text/html")
+        self.assertIn("<strong>Markdown</strong>", html_body)
+
+        direct_email.refresh_from_db()
+        self.assertIsNotNone(direct_email.sent_at)

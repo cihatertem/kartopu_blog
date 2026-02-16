@@ -123,3 +123,39 @@ class EmailQueue(UUIDModelMixin, TimeStampedModelMixin):
 
     def __str__(self) -> str:
         return f"{self.subject} -> {self.to_email}"
+
+
+class DirectEmail(UUIDModelMixin, TimeStampedModelMixin):
+    to_email = models.EmailField(verbose_name="Alıcı (To)")
+    subject = models.CharField(max_length=255, verbose_name="Konu (Subject)")
+    body = models.TextField(
+        verbose_name="İçerik (Body)", help_text="Markdown formatında yazabilirsiniz."
+    )
+    sent_at = models.DateTimeField(
+        null=True, blank=True, verbose_name="Gönderilme Tarihi"
+    )
+
+    class Meta:  # pyright: ignore[reportIncompatibleVariableOverride]
+        verbose_name = "Doğrudan E-posta"
+        verbose_name_plural = "Doğrudan E-postalar"
+        ordering = ("-created_at",)
+
+    def __str__(self) -> str:
+        return f"{self.subject} -> {self.to_email}"
+
+
+class DirectEmailAttachment(UUIDModelMixin, TimeStampedModelMixin):
+    direct_email = models.ForeignKey(
+        DirectEmail,
+        related_name="attachments",
+        on_delete=models.CASCADE,
+        verbose_name="E-posta",
+    )
+    file = models.FileField(upload_to="mail/", verbose_name="Dosya")
+
+    class Meta:  # pyright: ignore[reportIncompatibleVariableOverride]
+        verbose_name = "E-posta Eki"
+        verbose_name_plural = "E-posta Ekleri"
+
+    def __str__(self) -> str:
+        return self.file.name
