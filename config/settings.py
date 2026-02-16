@@ -374,7 +374,6 @@ else:
             "LOCATION": os.getenv("REDIS_URL", "redis://redis:6379/1"),
             "OPTIONS": {
                 "CLIENT_CLASS": "django_redis.client.DefaultClient",
-                "PARSER_CLASS": "redis.connection.HiredisParser",
                 # Redis bağlantısı koparsa site çökmesin, DB'den çalışmaya devam etsin (Fail-safe)
                 "IGNORE_EXCEPTIONS": True,
                 "COMPRESSOR": "django_redis.compressors.lz4.Lz4Compressor",
