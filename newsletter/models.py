@@ -1,5 +1,6 @@
 from django.db import models
 from django.utils import timezone
+from django.utils.text import slugify
 
 from core.mixins import TimeStampedModelMixin, UUIDModelMixin
 
@@ -115,6 +116,14 @@ class EmailQueue(UUIDModelMixin, TimeStampedModelMixin):
     )
     sent_at = models.DateTimeField(blank=True, null=True)
     error_message = models.TextField(blank=True, null=True)
+    direct_email = models.ForeignKey(
+        "DirectEmail",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="queue_items",
+        verbose_name="Doğrudan E-posta",
+    )
 
     class Meta:  # pyright: ignore[reportIncompatibleVariableOverride]
         verbose_name = "E-posta Kuyruğu"
@@ -123,6 +132,11 @@ class EmailQueue(UUIDModelMixin, TimeStampedModelMixin):
 
     def __str__(self) -> str:
         return f"{self.subject} -> {self.to_email}"
+
+
+def direct_email_attachment_path(instance, filename: str) -> str:
+    subject_slug = slugify(instance.direct_email.subject)
+    return f"mail/{subject_slug}/{filename}"
 
 
 class DirectEmail(UUIDModelMixin, TimeStampedModelMixin):
@@ -151,7 +165,9 @@ class DirectEmailAttachment(UUIDModelMixin, TimeStampedModelMixin):
         on_delete=models.CASCADE,
         verbose_name="E-posta",
     )
-    file = models.FileField(upload_to="mail/", verbose_name="Dosya")
+    file = models.FileField(
+        upload_to=direct_email_attachment_path, verbose_name="Dosya"
+    )
 
     class Meta:  # pyright: ignore[reportIncompatibleVariableOverride]
         verbose_name = "E-posta Eki"

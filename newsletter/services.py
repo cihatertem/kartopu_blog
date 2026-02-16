@@ -189,36 +189,21 @@ def send_announcement(announcement: Announcement) -> int:
     return sent_count
 
 
-@log_exceptions(message="Error sending direct email", default=False)
+@log_exceptions(message="Error queuing direct email", default=False)
 def send_direct_email(direct_email: DirectEmail) -> bool:
     from core.markdown import render_markdown
 
     html_body = render_markdown(direct_email.body)
     text_body = direct_email.body  # Markdown text is readable enough for fallback
 
-    # Use a generic base template or just the rendered markdown
-    # Here we wrap it in a simple HTML structure if needed, or just send the rendered markdown.
-    # The existing templated emails use specific templates.
-    # For simplicity, we just send the rendered markdown as html_body.
-
     from_email = '"Kartopu Money" <info@kartopu.money>'
 
-    message = EmailMultiAlternatives(
+    EmailQueue.objects.create(
         subject=direct_email.subject,
-        body=text_body,
         from_email=from_email,
-        to=[direct_email.to_email],
+        to_email=direct_email.to_email,
+        text_body=text_body,
+        html_body=html_body,
+        direct_email=direct_email,
     )
-    message.attach_alternative(html_body, "text/html")
-
-    for attachment in direct_email.attachments.all():  # pyright: ignore[reportAttributeAccessIssue]
-        # Open the file and read its content
-        with attachment.file.open("rb") as f:
-            content = f.read()
-            message.attach(attachment.file.name.split("/")[-1], content)
-
-    message.send(fail_silently=False)
-
-    direct_email.sent_at = timezone.now()
-    direct_email.save(update_fields=["sent_at"])
     return True
