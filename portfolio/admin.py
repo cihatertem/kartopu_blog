@@ -37,10 +37,10 @@ class StaffOwnerAdminMixin:
     def formfield_for_foreignkey(self, db_field, request, **kwargs):
         if db_field.name == "owner":
             kwargs["queryset"] = _get_staff_owner_queryset()
-        return super().formfield_for_foreignkey(db_field, request, **kwargs)
+        return super().formfield_for_foreignkey(db_field, request, **kwargs)  # pyright: ignore[reportAttributeAccessIssue]
 
     def get_changeform_initial_data(self, request):
-        initial = super().get_changeform_initial_data(request)
+        initial = super().get_changeform_initial_data(request)  # pyright: ignore[reportAttributeAccessIssue]
         if request.user.is_authenticated and request.user.is_staff:
             initial.setdefault("owner", request.user.pk)  # pyright: ignore[reportArgumentType]
         return initial
@@ -55,7 +55,7 @@ class SnapshotCreatorAdminMixin:
     def _create_snapshots(self, queryset, *, period):
         created = 0
         for obj in queryset:
-            self.snapshot_model.create_snapshot(
+            self.snapshot_model.create_snapshot(  # pyright: ignore[reportAttributeAccessIssue]
                 **{
                     self.snapshot_relation_field: obj,
                     "period": period,
@@ -66,21 +66,23 @@ class SnapshotCreatorAdminMixin:
         return created
 
     def _notify_snapshots_created(self, request, count):
-        self.message_user(
+        self.message_user(  # pyright: ignore[reportAttributeAccessIssue]
             request, f"{count} adet snapshot oluşturuldu.", level=messages.SUCCESS
         )
 
     @admin.action(description="Aylık snapshot oluştur")
     def create_monthly_snapshot(self, request, queryset):
         created = self._create_snapshots(
-            queryset, period=self.snapshot_model.Period.MONTHLY
+            queryset,
+            period=self.snapshot_model.Period.MONTHLY,  # pyright: ignore[reportAttributeAccessIssue]
         )
         self._notify_snapshots_created(request, created)
 
     @admin.action(description="Yıllık snapshot oluştur")
     def create_yearly_snapshot(self, request, queryset):
         created = self._create_snapshots(
-            queryset, period=self.snapshot_model.Period.YEARLY
+            queryset,
+            period=self.snapshot_model.Period.YEARLY,  # pyright: ignore[reportAttributeAccessIssue]
         )
         self._notify_snapshots_created(request, created)
 
@@ -98,7 +100,7 @@ class SnapshotSwapAdminMixin:
                 update_fields=["base_snapshot", "compare_snapshot", "updated_at"]
             )
             updated += 1
-        self.message_user(
+        self.message_user(  # pyright: ignore[reportAttributeAccessIssue]
             request,
             f"{updated} karşılaştırma güncellendi.",
             level=messages.SUCCESS,
@@ -138,6 +140,7 @@ class PortfolioTransactionAdmin(admin.ModelAdmin):
     list_filter = ("portfolios", "transaction_type", "trade_date")
     search_fields = ("portfolios__name", "asset__name", "asset__symbol")
     autocomplete_fields = ("portfolios",)
+    ordering = ("-trade_date",)
 
     @admin.display(description="Portföyler")
     def portfolio_list(self, obj):
