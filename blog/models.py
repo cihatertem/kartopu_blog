@@ -16,7 +16,7 @@ from core.images import optimize_uploaded_image_field
 from core.mixins import TimeStampedModelMixin, UUIDModelMixin
 
 META_TITLE_SUFFIX = " | Kartopu Money"
-SEO_TITLE_MAX_LENGTH = 45
+SEO_TITLE_MAX_LENGTH = 50
 SEO_DESCRIPTION_MAX_LENGTH = 160
 KARTOPU_MONEY_BASE_URL = "https://kartopu.money"
 
