@@ -419,7 +419,7 @@ if not DEBUG:
     SESSION_COOKIE_HTTPONLY = True
     SECURE_CONTENT_TYPE_NOSNIFF = True
     SECURE_REFERRER_POLICY = "strict-origin-when-cross-origin"
-    SECURE_CROSS_ORIGIN_OPENER_POLICY = "same-origin-allow-popups"  # same-origin allauth sorun çıkartabiliyor, o yüzden allow-popups.
+    SECURE_CROSS_ORIGIN_OPENER_POLICY = None  # "same-origin-allow-popups"  # same-origin allauth sorun çıkartabiliyor, o yüzden allow-popups.
 
     if USE_TRAEFIK_SECURITY_HEADERS:
         SECURE_HSTS_SECONDS = 0
