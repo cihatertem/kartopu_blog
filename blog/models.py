@@ -30,7 +30,7 @@ class Category(
     description = models.TextField(
         blank=True,
         max_length=SEO_DESCRIPTION_MAX_LENGTH,
-        help_text="Kategori açıklaması (SEO için) max 160 karakter.",
+        help_text=f"Kategori açıklaması (SEO için) max {SEO_DESCRIPTION_MAX_LENGTH} karakter.",
     )
 
     class Meta:  # pyright: ignore[reportIncompatibleVariableOverride]
@@ -106,7 +106,7 @@ class BlogPost(
 
     title = models.CharField(
         max_length=SEO_TITLE_MAX_LENGTH,
-        help_text="Yazı başlığı. Max 45 karakter.",
+        help_text=f"Yazı başlığı. Max {SEO_TITLE_MAX_LENGTH} karakter.",
     )
     slug = models.SlugField(
         max_length=255,
@@ -164,12 +164,12 @@ class BlogPost(
     meta_title = models.CharField(
         max_length=SEO_TITLE_MAX_LENGTH,
         blank=True,
-        help_text="SEO title (önerilen: 35–45 karakter 45 max).",
+        help_text=f"SEO title (önerilen: 35–45 karakter {SEO_TITLE_MAX_LENGTH} max).",
     )
     meta_description = models.CharField(
         max_length=SEO_DESCRIPTION_MAX_LENGTH,
         blank=True,
-        help_text="SEO description (önerilen: 140–160 karakter)",
+        help_text=f"SEO description (önerilen: 140–{SEO_DESCRIPTION_MAX_LENGTH} karakter)",
     )
     canonical_url = models.URLField(
         blank=True,
