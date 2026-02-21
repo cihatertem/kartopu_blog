@@ -199,11 +199,47 @@
         };
 
         navbar.classList.add("navbar-visible");
-        setTopState((window.scrollY || document.documentElement.scrollTop || 0) <= 0);
+        setTopState(
+            (window.scrollY || document.documentElement.scrollTop || 0) <= 0,
+        );
 
         window.addEventListener("scroll", onScroll, { passive: true });
         mobileQuery.addEventListener("change", onMediaChange);
         onMediaChange();
     }
+    const scrollToTopBtn = document.getElementById("scroll-to-top");
+    if (scrollToTopBtn) {
+        let scrollTicking = false;
 
+        const toggleScrollToTopBtn = () => {
+            const scrollTop = Math.max(
+                window.scrollY || document.documentElement.scrollTop || 0,
+                0,
+            );
+            if (scrollTop > 300) {
+                scrollToTopBtn.classList.add("is-visible");
+            } else {
+                scrollToTopBtn.classList.remove("is-visible");
+            }
+            scrollTicking = false;
+        };
+
+        window.addEventListener(
+            "scroll",
+            () => {
+                if (!scrollTicking) {
+                    window.requestAnimationFrame(toggleScrollToTopBtn);
+                    scrollTicking = true;
+                }
+            },
+            { passive: true },
+        );
+
+        scrollToTopBtn.addEventListener("click", () => {
+            window.scrollTo({
+                top: 0,
+                behavior: "smooth",
+            });
+        });
+    }
 })();
