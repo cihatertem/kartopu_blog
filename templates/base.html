@@ -417,7 +417,11 @@
     </div>
     {% include "includes/legal_disclaimer.html" %}
     {% include "includes/footer.html" %}
-
+    <button id="scroll-to-top" class="scroll-to-top" aria-label="Başa dön" title="Başa dön">
+      <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+        <polyline points="18 15 12 9 6 15"></polyline>
+      </svg>
+    </button>
   </body>
   {% block js_script %}{% endblock %}
   <script defer src="{% static 'js/base.js' %}"></script>
