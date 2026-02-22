@@ -24,6 +24,12 @@
         </a>
 
         <a
+          href="{% url 'portfolio:fire_calculator' %}"
+          class="site-nav__link {% if active_nav == 'fire-calculator' %}is-active{% endif %}"
+        >
+          FIRE Hesaplayıcı
+        </a>
+        <a
           href="/hakkimizda/"
           class="site-nav__link {% if active_nav == 'about' %}is-active{% endif %}"
         >

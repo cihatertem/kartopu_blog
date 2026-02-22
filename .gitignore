@@ -29,4 +29,5 @@ git_oncesi_notlar.md
 yol_haritasi.md
 docker-compose.prod.yml
 codex.patch
+jules.patch
 aws_setup_and_swarm_services_settings.md

@@ -1,0 +1,116 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}{{ title }} | Kartopu Money{% endblock %}
+
+{% block page_css %}
+<link rel="stylesheet" href="{% static 'css/portfolio.css' %}">
+{% endblock %}
+
+{% block content %}
+<div class="fire-calc-wrapper">
+    <nav class="breadcrumbs">
+        <a href="/">Ana Sayfa</a> / <span>FIRE Hesaplayıcı</span>
+    </nav>
+
+    <header class="page-header">
+        <h1>{{ title }}</h1>
+        <p class="text-muted">{{ description }}</p>
+    </header>
+
+    <div class="fire-calc-container">
+        <form id="fire-form" class="fire-calc-form" onsubmit="return false;">
+            <div class="form-group">
+                <label for="pv">Mevcut Portföy</label>
+                <div class="input-with-suffix">
+                    <input type="number" id="pv" class="input-field" placeholder="100000" min="0" step="1000">
+                    <span class="input-suffix">₺</span>
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label for="pmt">Aylık Tasarruf</label>
+                <div class="input-with-suffix">
+                    <input type="number" id="pmt" class="input-field" placeholder="5000" min="0" step="100">
+                    <span class="input-suffix">₺</span>
+                </div>
+            </div>
+
+            <div class="form-group">
+                <div class="label-with-tooltip">
+                    <label for="r">Beklenen Reel Getiri (Yıllık %)</label>
+                    <div class="tooltip">
+                        <span class="tooltip-icon">?</span>
+                        <div class="tooltip-text">
+                            Reel getiri, enflasyondan arındırılmış net büyüme oranıdır. Örn. nominal getiri %30 ve enflasyon %20 ise reel getiri yaklaşık %8-10 civarındadır.
+                        </div>
+                    </div>
+                </div>
+                <div class="input-with-suffix">
+                    <input type="number" id="r" class="input-field" placeholder="7" step="0.1">
+                    <span class="input-suffix">%</span>
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label for="monthly_spending">Aylık Ortalama Harcama</label>
+                <div class="input-with-suffix">
+                    <input type="number" id="monthly_spending" class="input-field" placeholder="25000" min="0" step="500">
+                    <span class="input-suffix">₺</span>
+                </div>
+            </div>
+
+            <div class="form-group">
+                <div class="label-with-tooltip">
+                    <label for="multiplier">Gider Çarpanı (FIRE Sayısı)</label>
+                    <div class="tooltip">
+                        <span class="tooltip-icon">?</span>
+                        <div class="tooltip-text">
+                            Varsayılan 25 çarpanı, %4 kuralına dayanır: Yıllık harcamanızın yaklaşık 25 katı portföy, uzun vadede sürdürülebilir çekim için referans kabul edilir. Daha temkinliyseniz daha yüksek çarpan seçebilirsiniz.
+                        </div>
+                    </div>
+                </div>
+                <div class="input-with-suffix">
+                    <input type="number" id="multiplier" class="input-field" value="25" min="1" step="1">
+                    <span class="input-suffix">x</span>
+                </div>
+                <small class="text-muted">%4 kuralı için 25 kullanın.</small>
+            </div>
+        </form>
+
+        <div class="fire-results">
+            <div class="result-main">
+                <span class="result-years" id="res-years">0</span>
+                <span class="result-label">Yıl Kaldı</span>
+            </div>
+
+            <div class="result-details">
+                <div class="detail-item">
+                    <span class="detail-label">Yıllık Gider:</span>
+                    <span class="detail-value" id="res-annual-spending">0 ₺</span>
+                </div>
+                <div class="detail-item">
+                    <span class="detail-label">Hedef Portföy:</span>
+                    <span class="detail-value" id="res-target">0 ₺</span>
+                </div>
+                <div class="detail-item">
+                    <span class="detail-label">Tahmini Tarih:</span>
+                    <span class="detail-value" id="res-date">-</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="legal-disclaimer-inline">
+        <p class="legal-disclaimer-inline__title">⚠️ Yasal Uyarı</p>
+        <p class="legal-disclaimer-inline__text">
+            Bu hesaplama aracı yalnızca bilgi amaçlıdır ve yatırım tavsiyesi niteliği taşımaz.
+            Gelecekteki piyasa getirileri garanti edilemez. Enflasyon ve vergi gibi unsurlar sonuçları etkileyebilir.
+        </p>
+    </div>
+</div>
+{% endblock %}
+
+{% block js_script %}
+<script src="{% static 'js/fire_logic.js' %}"></script>
+{% endblock %}
