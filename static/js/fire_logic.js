@@ -5,7 +5,12 @@ document.addEventListener("DOMContentLoaded", () => {
     // Load from URL
     const params = new URLSearchParams(window.location.search);
     inputs.forEach((input) => {
-        if (params.has(input.id)) {
+        // Handle legacy "multiplier" param if it exists
+        if (input.id === "withdrawal_rate" && params.has("multiplier")) {
+            input.value = (100 / parseFloat(params.get("multiplier"))).toFixed(
+                1,
+            );
+        } else if (params.has(input.id)) {
             input.value = params.get(input.id);
         }
 
@@ -17,28 +22,31 @@ document.addEventListener("DOMContentLoaded", () => {
 
     function calculateFire() {
         const pvInput = document.getElementById("pv").value;
-        const pmtInput = document.getElementById("pmt").value;
+        const incomeInput = document.getElementById("income").value;
         const monthlySpendingInput =
             document.getElementById("monthly_spending").value;
         const rInput = document.getElementById("r").value;
-        const multiplierInput = document.getElementById("multiplier").value;
+        const withdrawalRateInput =
+            document.getElementById("withdrawal_rate").value;
 
         const pv = parseFloat(pvInput) || 0;
-        const pmt = parseFloat(pmtInput) || 0;
-        const r = (parseFloat(rInput) || 0) / 100;
+        const income = parseFloat(incomeInput) || 0;
         const monthlySpending = parseFloat(monthlySpendingInput) || 0;
+        const pmt = income - monthlySpending;
+        const r = (parseFloat(rInput) || 0) / 100;
         const spending = monthlySpending * 12;
-        const multiplier = parseFloat(multiplierInput) || 25;
+        const withdrawalRate = parseFloat(withdrawalRateInput) || 4;
+        const multiplier = 100 / withdrawalRate;
 
         // Update URL
         const currentParams = new URLSearchParams();
         if (pvInput) currentParams.set("pv", pvInput);
-        if (pmtInput) currentParams.set("pmt", pmtInput);
-        if (rInput) currentParams.set("r", rInput);
+        if (incomeInput) currentParams.set("income", incomeInput);
         if (monthlySpendingInput)
             currentParams.set("monthly_spending", monthlySpendingInput);
-        if (multiplierInput && multiplierInput !== "25")
-            currentParams.set("multiplier", multiplierInput);
+        if (rInput) currentParams.set("r", rInput);
+        if (withdrawalRateInput && withdrawalRateInput !== "4")
+            currentParams.set("withdrawal_rate", withdrawalRateInput);
 
         const newUrl =
             window.location.pathname +
@@ -49,7 +57,7 @@ document.addEventListener("DOMContentLoaded", () => {
         let months = 0;
         let statusOverride = null;
 
-        const isInputEmpty = !pvInput && !pmtInput && !monthlySpendingInput;
+        const isInputEmpty = !pvInput && !incomeInput && !monthlySpendingInput;
 
         if (isInputEmpty) {
             months = Infinity;
@@ -85,16 +93,25 @@ document.addEventListener("DOMContentLoaded", () => {
             }
         }
 
-        displayResults(months, goal, spending, statusOverride);
+        displayResults(months, goal, spending, pmt, income, statusOverride);
     }
 
-    function displayResults(months, goal, annualSpending, statusOverride) {
+    function displayResults(
+        months,
+        goal,
+        annualSpending,
+        pmt,
+        income,
+        statusOverride,
+    ) {
         const yearsElement = document.getElementById("res-years");
         const targetElement = document.getElementById("res-target");
         const dateElement = document.getElementById("res-date");
         const annualSpendingElement = document.getElementById(
             "res-annual-spending",
         );
+        const savingsElement = document.getElementById("res-savings");
+        const savingsRateElement = document.getElementById("res-savings-rate");
 
         const currencyFormatter = new Intl.NumberFormat("tr-TR", {
             style: "currency",
@@ -104,6 +121,10 @@ document.addEventListener("DOMContentLoaded", () => {
 
         const formatCurrency = (val) =>
             currencyFormatter.format(val).replace("₺", "").trim() + " ₺";
+
+        const savingsRate = income > 0 ? (pmt / income) * 100 : 0;
+        savingsElement.textContent = formatCurrency(pmt);
+        savingsRateElement.textContent = `%${Math.max(0, savingsRate).toFixed(1)}`;
 
         annualSpendingElement.textContent = formatCurrency(annualSpending);
         targetElement.textContent = formatCurrency(goal);

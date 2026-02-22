@@ -1,8 +1,8 @@
 User-agent: *
+Disallow: /portfolio/fire-hesaplayici/*?*
 Disallow: /admin/
 Disallow: /accounts/
 Disallow: /comments/
 Disallow: /blog/preview/
-Allow: /
 
 Sitemap: {{ request.scheme }}://{{ request.get_host }}/sitemap.xml

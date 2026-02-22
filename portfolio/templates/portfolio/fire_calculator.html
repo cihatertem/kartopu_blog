@@ -7,6 +7,11 @@
 <link rel="stylesheet" href="{% static 'css/portfolio.css' %}">
 {% endblock %}
 
+{% block head %}
+<link rel="canonical" href="https://kartopu.money/portfolio/fire-hesaplayici/" />
+{% endblock %}
+
+
 {% block content %}
 <div class="fire-calc-wrapper">
     <nav class="breadcrumbs">
@@ -23,16 +28,35 @@
             <div class="form-group">
                 <label for="pv">Mevcut Portföy</label>
                 <div class="input-with-suffix">
-                    <input type="number" id="pv" class="input-field" placeholder="100000" min="0" step="1000">
-                    <span class="input-suffix">₺</span>
+                  <input type="number" id="pv" class="input-field" placeholder="100000" min="0" step="1000">
+                  <span class="input-suffix">₺</span>
                 </div>
             </div>
 
             <div class="form-group">
-                <label for="pmt">Aylık Tasarruf</label>
+                <label for="income">Aylık Gelir</label>
                 <div class="input-with-suffix">
-                    <input type="number" id="pmt" class="input-field" placeholder="5000" min="0" step="100">
+                  <input type="number" id="income" class="input-field" placeholder="30000" min="0" step="1000">
+                  <span class="input-suffix">₺</span>
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label for="monthly_spending">Aylık Gider</label>
+                <div class="input-with-suffix">
+                    <input type="number" id="monthly_spending" class="input-field" placeholder="20000" min="0" step="500">
                     <span class="input-suffix">₺</span>
+                </div>
+            </div>
+
+            <div class="savings-summary">
+                <div class="savings-summary-item">
+                    <span class="label">Aylık Tasarruf:</span>
+                    <span class="value" id="res-savings">0 ₺</span>
+                </div>
+                <div class="savings-summary-item">
+                    <span class="label">Tasarruf Oranı:</span>
+                    <span class="value" id="res-savings-rate">%0</span>
                 </div>
             </div>
 
@@ -42,7 +66,7 @@
                     <div class="tooltip">
                         <span class="tooltip-icon">?</span>
                         <div class="tooltip-text">
-                            Reel getiri, enflasyondan arındırılmış net büyüme oranıdır. Örn. nominal getiri %30 ve enflasyon %20 ise reel getiri yaklaşık %8-10 civarındadır.
+                          Reel getiri, enflasyondan arındırılmış net büyüme oranıdır. Örn. nominal getiri %30 ve enflasyon %20 ise reel getiri yaklaşık %8-10 civarındadır.
                         </div>
                     </div>
                 </div>
@@ -53,28 +77,20 @@
             </div>
 
             <div class="form-group">
-                <label for="monthly_spending">Aylık Ortalama Harcama</label>
-                <div class="input-with-suffix">
-                    <input type="number" id="monthly_spending" class="input-field" placeholder="25000" min="0" step="500">
-                    <span class="input-suffix">₺</span>
-                </div>
-            </div>
-
-            <div class="form-group">
                 <div class="label-with-tooltip">
-                    <label for="multiplier">Gider Çarpanı (FIRE Sayısı)</label>
+                  <label for="withdrawal_rate">Çekim Oranı (Yıllık %)</label>
                     <div class="tooltip">
                         <span class="tooltip-icon">?</span>
                         <div class="tooltip-text">
-                            Varsayılan 25 çarpanı, %4 kuralına dayanır: Yıllık harcamanızın yaklaşık 25 katı portföy, uzun vadede sürdürülebilir çekim için referans kabul edilir. Daha temkinliyseniz daha yüksek çarpan seçebilirsiniz.
+                          %4 kuralı (Trinity Study), emeklilik portföyünüzden her yıl enflasyon oranında artırarak %4 çekim yapmanız durumunda paranızın 30 yıl (ve çoğu zaman çok daha uzun) yetme ihtimalinin çok yüksek olduğunu gösterir. Daha temkinliyseniz %3 veya %3.5 gibi daha düşük oranlar seçebilirsiniz.
                         </div>
                     </div>
                 </div>
                 <div class="input-with-suffix">
-                    <input type="number" id="multiplier" class="input-field" value="25" min="1" step="1">
-                    <span class="input-suffix">x</span>
+                  <input type="number" id="withdrawal_rate" class="input-field" value="4" min="0.1" step="0.1">
+                  <span class="input-suffix">%</span>
                 </div>
-                <small class="text-muted">%4 kuralı için 25 kullanın.</small>
+                <small class="text-muted">Genel kabul görmüş güvenli oran %4'tür.</small>
             </div>
         </form>
 

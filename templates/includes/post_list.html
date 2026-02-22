@@ -93,7 +93,7 @@
         <div class="post-list__excerpt">
           {{ post.excerpt|render_excerpt }}
           <p>
-            <a class="post-list__continue-read" href="{{ post.get_absolute_url }}">
+            <a class="post-list__continue-read" href="{{ post.get_absolute_url }}" aria-label="{{ post.title }}">
               Okumaya devam et...
             </a>
           </p>

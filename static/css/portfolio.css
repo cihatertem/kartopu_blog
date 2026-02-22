@@ -26,6 +26,33 @@
   color: var(--color-text);
 }
 
+.savings-summary {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  padding: 1rem;
+  background: var(--color-primary-soft);
+  border-radius: 12px;
+  border-left: 4px solid var(--color-primary);
+}
+
+.savings-summary-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 0.9rem;
+}
+
+.savings-summary-item .label {
+  color: var(--color-muted);
+  font-weight: 500;
+}
+
+.savings-summary-item .value {
+  font-weight: 700;
+  color: var(--color-primary-dark);
+}
+
 .label-with-tooltip {
   display: flex;
   align-items: center;

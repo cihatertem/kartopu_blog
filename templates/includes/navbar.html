@@ -18,6 +18,7 @@
     <div class="site-nav__links">
         <a
           href="{% url 'blog:post_list' %}"
+          title="Tüm Blog Yazıları | Kartopu Money"
           class="site-nav__link {% if active_nav == 'blog' %}is-active{% endif %}"
         >
           Blog
@@ -25,12 +26,14 @@
 
         <a
           href="{% url 'portfolio:fire_calculator' %}"
+          title="Finansal Özgürlük (FIRE) Hesaplayıcı: Ne zaman finansal özgür olabileceğinizi hesaplayın | Kartopu Money"
           class="site-nav__link {% if active_nav == 'fire-calculator' %}is-active{% endif %}"
         >
           FIRE Hesaplayıcı
         </a>
         <a
           href="/hakkimizda/"
+          title="Hakkımızda | Kartopu Money"
           class="site-nav__link {% if active_nav == 'about' %}is-active{% endif %}"
         >
           Hakkımızda
@@ -38,6 +41,7 @@
 
         <a
           href="/iletisim/"
+          title="İletişim | Kartopu Money"
           class="site-nav__link {% if active_nav == 'contact' %}is-active{% endif %}"
         >
               İletişim
