@@ -244,7 +244,9 @@
     }
 
     // Navbar link tooltips to replace default browser titles
-    const navLinks = document.querySelectorAll(".site-nav__link[title]");
+    const navLinks = document.querySelectorAll(
+        ".site-nav__link[title], .site-nav__brand[title]",
+    );
     navLinks.forEach((link) => {
         const titleText = link.getAttribute("title");
         if (!titleText) return;

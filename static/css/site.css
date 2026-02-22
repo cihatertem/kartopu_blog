@@ -259,6 +259,7 @@ hr {
   letter-spacing: 0.3px;
   text-shadow: var(--color-brand-shadow);
   justify-self: center;
+  position: relative;
 }
 
 .site-nav__brand-primary {
@@ -299,7 +300,8 @@ hr {
 }
 
 /* Custom Tooltip */
-.site-nav__link[data-tooltip]::before {
+.site-nav__link[data-tooltip]::before,
+.site-nav__brand[data-tooltip]::before {
   content: attr(data-tooltip);
   position: absolute;
   top: calc(100% + 10px);
@@ -328,7 +330,8 @@ hr {
 }
 
 /* Tooltip Arrow */
-.site-nav__link[data-tooltip]::after {
+.site-nav__link[data-tooltip]::after,
+.site-nav__brand[data-tooltip]::after {
   content: "";
   position: absolute;
   top: calc(100% + 4px);
@@ -350,7 +353,11 @@ hr {
 .site-nav__link[data-tooltip]:hover::before,
 .site-nav__link[data-tooltip]:hover::after,
 .site-nav__link[data-tooltip]:focus-visible::before,
-.site-nav__link[data-tooltip]:focus-visible::after {
+.site-nav__link[data-tooltip]:focus-visible::after,
+.site-nav__brand[data-tooltip]:hover::before,
+.site-nav__brand[data-tooltip]:hover::after,
+.site-nav__brand[data-tooltip]:focus-visible::before,
+.site-nav__brand[data-tooltip]:focus-visible::after {
   opacity: 1;
   visibility: visible;
   transform: translateX(-50%) translateY(0);
@@ -358,7 +365,9 @@ hr {
 
 @media (max-width: 900px) {
   .site-nav__link[data-tooltip]::before,
-  .site-nav__link[data-tooltip]::after {
+  .site-nav__link[data-tooltip]::after,
+  .site-nav__brand[data-tooltip]::before,
+  .site-nav__brand[data-tooltip]::after {
     display: none;
   }
 }
