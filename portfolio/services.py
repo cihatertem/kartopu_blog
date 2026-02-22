@@ -62,7 +62,11 @@ def calculate_xirr(cash_flows: list[tuple[date, Decimal]]) -> float | None:
             rate = (float(total_out) / float(total_in)) ** (365.0 / days) - 1
         else:
             rate = 0.1
-    except ZeroDivisionError, OverflowError, ValueError:
+    except (
+        ZeroDivisionError,
+        OverflowError,
+        ValueError,
+    ):
         rate = 0.1
 
     for _ in range(100):
@@ -75,7 +79,12 @@ def calculate_xirr(cash_flows: list[tuple[date, Decimal]]) -> float | None:
             if abs(new_rate - rate) < 1e-6 * max(1.0, abs(rate)):
                 return new_rate
             rate = new_rate
-        except OverflowError, ZeroDivisionError, TypeError, ValueError:
+        except (
+            OverflowError,
+            ZeroDivisionError,
+            TypeError,
+            ValueError,
+        ):
             return None
 
     return None

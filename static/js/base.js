@@ -242,4 +242,26 @@
             });
         });
     }
+
+    // Navbar link tooltips to replace default browser titles
+    const navLinks = document.querySelectorAll(".site-nav__link[title]");
+    navLinks.forEach((link) => {
+        const titleText = link.getAttribute("title");
+        if (!titleText) return;
+
+        const showTooltip = () => {
+            link.setAttribute("data-tooltip", titleText);
+            link.removeAttribute("title");
+        };
+
+        const hideTooltip = () => {
+            link.setAttribute("title", titleText);
+            link.removeAttribute("data-tooltip");
+        };
+
+        link.addEventListener("mouseenter", showTooltip);
+        link.addEventListener("mouseleave", hideTooltip);
+        link.addEventListener("focus", showTooltip);
+        link.addEventListener("blur", hideTooltip);
+    });
 })();
