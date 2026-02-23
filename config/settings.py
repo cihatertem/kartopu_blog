@@ -274,7 +274,9 @@ if USE_S3:
             "OPTIONS": {
                 "location": AWS_LOCATION_MEDIA,
                 "querystring_auth": False,
-                "object_parameters": {"CacheControl": "public, max-age=3600"},
+                "object_parameters": {
+                    "CacheControl": "public, max-age=31536000, must-revalidate"
+                },
             },
         },
         "staticfiles": {
