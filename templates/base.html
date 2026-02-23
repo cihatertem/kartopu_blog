@@ -89,6 +89,8 @@
         z-index: 1000;
         backdrop-filter: blur(10px);
         box-shadow: 0 8px 16px rgba(31, 42, 55, 0.06);
+        transition: transform 0.3s ease-in-out;
+        will-change: transform;
       }
 
       .navbar-visible {
@@ -312,9 +314,13 @@
 
       @media (max-width: 600px) {
         .site-header {
-          transition: transform 0.3s ease-in-out;
-          will-change: transform;
           z-index: 1200;
+        }
+        .site-nav {
+          padding: 0;
+        }
+        .site-nav__links {
+          gap: 0.5rem;
         }
 
         .site-header.navbar-at-top {
@@ -332,7 +338,6 @@
         .home-hero__subtitle {
           font-weight: 700;
         }
-      }
     </style>
     {% preload_stylesheet 'css/site.css' %}
     {% block page_css %}{% endblock %}

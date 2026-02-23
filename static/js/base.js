@@ -163,14 +163,6 @@
 
             setTopState(isAtTop);
 
-            if (!mobileQuery.matches) {
-                navbar.classList.remove("navbar-hidden");
-                navbar.classList.add("navbar-visible");
-                lastScrollTop = scrollTop;
-                ticking = false;
-                return;
-            }
-
             if (isAtTop || scrollTop < lastScrollTop) {
                 navbar.classList.remove("navbar-hidden");
                 navbar.classList.add("navbar-visible");
@@ -265,5 +257,34 @@
         link.addEventListener("mouseleave", hideTooltip);
         link.addEventListener("focus", showTooltip);
         link.addEventListener("blur", hideTooltip);
+    });
+
+    // Dropdown toggle for touch devices
+    const dropdowns = document.querySelectorAll(".nav-dropdown");
+    dropdowns.forEach((dropdown) => {
+        const trigger = dropdown.querySelector(".nav-dropdown__trigger");
+        if (trigger) {
+            trigger.addEventListener("click", (e) => {
+                // Only use click toggle on smaller screens where hover is not reliable
+                if (window.matchMedia("(max-width: 900px)").matches) {
+                    const isOpen = dropdown.classList.contains("is-open");
+                    // Close all other dropdowns
+                    dropdowns.forEach((d) => d.classList.remove("is-open"));
+                    if (!isOpen) {
+                        e.preventDefault();
+                        dropdown.classList.add("is-open");
+                    }
+                }
+            });
+        }
+    });
+
+    // Close dropdowns when clicking outside
+    document.addEventListener("click", (e) => {
+        dropdowns.forEach((dropdown) => {
+            if (!dropdown.contains(e.target)) {
+                dropdown.classList.remove("is-open");
+            }
+        });
     });
 })();

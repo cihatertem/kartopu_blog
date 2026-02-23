@@ -220,6 +220,16 @@ hr {
   z-index: 1000;
   backdrop-filter: blur(10px);
   box-shadow: 0 8px 16px rgba(31, 42, 55, 0.06);
+  transition: transform 0.3s ease-in-out;
+  will-change: transform;
+}
+
+.navbar-visible {
+  transform: translateY(0);
+}
+
+.navbar-hidden {
+  transform: translateY(-100%);
 }
 
 .site-nav {
@@ -414,6 +424,7 @@ hr {
   border: 1px solid var(--color-border);
   border-radius: 12px;
   min-width: 220px;
+  max-width: 90vw;
   box-shadow: var(--color-toggle-shadow);
   opacity: 0;
   visibility: hidden;
@@ -424,8 +435,16 @@ hr {
   gap: 0.25rem;
 }
 
+@media (max-width: 600px) {
+  .nav-dropdown__content {
+    min-width: 200px;
+    position: absolute; /* ensure it stays absolute */
+  }
+}
+
 .nav-dropdown:hover .nav-dropdown__content,
-.nav-dropdown:focus-within .nav-dropdown__content {
+.nav-dropdown:focus-within .nav-dropdown__content,
+.nav-dropdown.is-open .nav-dropdown__content {
   opacity: 1;
   visibility: visible;
   transform: translateX(-50%) translateY(5px);
@@ -450,30 +469,6 @@ hr {
 .nav-dropdown__item.is-active {
   background: var(--color-primary-soft);
   color: var(--color-primary-dark);
-}
-
-@media (max-width: 600px) {
-  .nav-dropdown__content {
-    position: static;
-    transform: none;
-    opacity: 1;
-    visibility: visible;
-    box-shadow: none;
-    border: none;
-    background: transparent;
-    padding: 0;
-    margin-left: 1rem;
-    display: flex;
-    flex-direction: column;
-  }
-
-  .nav-dropdown__trigger {
-    display: none;
-  }
-
-  .nav-dropdown {
-    display: contents;
-  }
 }
 
 .theme-toggle {
@@ -1296,18 +1291,15 @@ body.has-legal-disclaimer .scroll-to-top {
     text-align: center;
   }
 
+  .site-nav__actions {
+    /*display: inline;*/
+    position: absolute;
+    right: 16px;
+  }
+
   .site-nav__date,
   .site-nav__spacer {
     display: none;
-  }
-
-  .site-nav__actions {
-    justify-content: center;
-    margin-top: 0.5rem;
-  }
-
-  .theme-toggle {
-    margin: 0 auto;
   }
 
   .not-found__card {
@@ -1345,13 +1337,28 @@ body.has-legal-disclaimer .scroll-to-top {
 }
 
 @media (max-width: 600px) {
-  .site-header,
+  .site-header {
+    padding: 0.5rem 0;
+  }
+
   .site-footer {
     padding: 1rem 0;
   }
 
+  .site-nav__links {
+    gap: 0.15rem;
+  }
+
   .site-nav__link {
-    font-size: 0.95rem;
+    gap: 0.5rem;
+    padding: 0.35rem;
+  }
+  .site-nav {
+    padding: 0;
+  }
+
+  .site-nav__link {
+    font-size: 0.92rem;
   }
 
   .site-nav__brand {
@@ -1365,5 +1372,8 @@ body.has-legal-disclaimer .scroll-to-top {
 
   .button {
     width: 100%;
+  }
+  .scroll-to-top {
+    right: 0vmin;
   }
 }
