@@ -325,6 +325,53 @@
         color: var(--color-muted);
       }
 
+      /* Dropdown Menu - Critical for FOUC */
+      .nav-dropdown {
+        position: relative;
+        display: inline-block;
+      }
+
+      .nav-dropdown__content {
+        position: absolute;
+        top: 100%;
+        left: 50%;
+        transform: translateX(-50%) translateY(10px);
+        opacity: 0;
+        visibility: hidden;
+        z-index: 1100;
+      }
+
+      .nav-dropdown:hover .nav-dropdown__content,
+      .nav-dropdown:focus-within .nav-dropdown__content,
+      .nav-dropdown.is-open .nav-dropdown__content {
+        opacity: 1;
+        visibility: visible;
+        transform: translateX(-50%) translateY(5px);
+      }
+
+      /* Theme Toggle - Critical for FOUC */
+      .theme-toggle {
+        display: inline-flex;
+        align-items: center;
+        padding: 0.4rem;
+        border-radius: 999px;
+        border: 2px solid var(--color-toggle-border);
+        background: var(--color-toggle-bg);
+        cursor: pointer;
+      }
+
+      .theme-toggle__icon--dark {
+        display: none;
+      }
+
+      [data-theme="dark"] .theme-toggle__icon--light {
+        display: none;
+      }
+
+      [data-theme="dark"] .theme-toggle__icon--dark {
+        display: inline-block;
+      }
+
       @media (max-width: 1024px) {
         .site-layout {
           grid-template-columns: minmax(0, 1fr) 240px;

@@ -506,6 +506,18 @@ hr {
   font-size: 1rem;
 }
 
+.theme-toggle__icon--dark {
+  display: none;
+}
+
+[data-theme="dark"] .theme-toggle__icon--light {
+  display: none;
+}
+
+[data-theme="dark"] .theme-toggle__icon--dark {
+  display: inline-block;
+}
+
 .theme-toggle__text {
   letter-spacing: 0.2px;
 }
