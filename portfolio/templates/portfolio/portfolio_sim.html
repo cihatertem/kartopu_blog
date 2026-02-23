@@ -128,6 +128,6 @@
 {% endblock %}
 
 {% block js_script %}
-<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-<script src="{% static 'js/portfolio_sim.js' %}"></script>
+<script defer src="{% static 'vendor/chart.umd.min.js' %}"></script>
+<script defer src="{% static 'js/portfolio_sim.js' %}"></script>
 {% endblock %}
