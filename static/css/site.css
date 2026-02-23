@@ -44,7 +44,7 @@
   --color-avatar-bg: #2f6da1;
   --color-avatar-text: #ffffff;
   --shadow-soft: 0 10px 24px rgba(31, 42, 55, 0.08);
-  --tag-color-1-bg: linear(
+  --tag-color-1-bg: linear-gradient(
     45deg,
     rgba(47, 109, 161, 0.18),
     rgba(124, 175, 74, 0.22)
@@ -169,7 +169,9 @@ html {
   scroll-behavior: smooth;
 }
 
-* {
+*,
+*::before,
+*::after {
   box-sizing: border-box;
 }
 
@@ -894,6 +896,7 @@ select:focus {
   color: var(--color-text);
   cursor: pointer;
   font-weight: 600;
+  text-decoration: none;
 }
 
 .button__icon {
@@ -1339,6 +1342,11 @@ body.has-legal-disclaimer .scroll-to-top {
 @media (max-width: 600px) {
   .site-header {
     padding: 0.5rem 0;
+    z-index: 1200;
+  }
+
+  .site-header.navbar-at-top {
+    background: var(--color-surface);
   }
 
   .site-footer {
