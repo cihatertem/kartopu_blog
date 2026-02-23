@@ -439,7 +439,7 @@
     </style>
     {% preload_stylesheet 'css/site.css' %}
     {% block page_css %}{% endblock %}
-    <script src="{% static 'js/preload.js' %}"></script>
+    <script defer src="{% static 'js/preload.js' %}"></script>
     <link rel="icon" type="image/svg+xml" href="{% static 'images/home/hero-snow-ball.png' %}" />
     <!-- Google tag (gtag.js) -->
     {% if GOOGLE_ANALYTICS_ID %}
