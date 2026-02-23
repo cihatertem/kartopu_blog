@@ -194,6 +194,7 @@
 @media (max-width: 800px) {
   .fire-calc-container {
     grid-template-columns: 1fr;
+    padding: 1.5rem;
   }
 
   .fire-results {
@@ -202,5 +203,35 @@
 
   .result-years {
     font-size: 2.5rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .fire-calc-container {
+    padding: 1rem;
+    gap: 1.5rem;
+  }
+
+  .fire-results {
+    padding: 1rem;
+  }
+
+  .label-with-tooltip {
+    flex-wrap: wrap;
+  }
+
+  .tooltip-text {
+    width: 200px;
+    font-size: 0.75rem;
+    left: auto;
+    right: 0;
+    transform: none;
+    margin-bottom: 10px;
+  }
+
+  .tooltip-text::after {
+    left: auto;
+    right: 5px;
+    margin-left: 0;
   }
 }
