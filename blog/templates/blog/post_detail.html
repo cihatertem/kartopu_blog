@@ -128,9 +128,6 @@
     <hr />
 
     <div>
-      <!--
-      {{ post.content|render_post_content:post.images.all|safe }}
-      -->
       {% cache 2592000 blog_post_body post.id post.updated_at is_preview %}
        {% render_post_body post %}
       {% endcache %}

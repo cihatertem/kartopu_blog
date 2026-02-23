@@ -1,0 +1,133 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}{{ title }} | Kartopu Money{% endblock %}
+
+{% block page_css %}
+<link rel="stylesheet" href="{% static 'css/portfolio-sim.css' %}">
+{% endblock %}
+
+{% block head %}
+<link rel="canonical" href="https://kartopu.money/portfolio/cagr-simulasyonu/" />
+{% endblock %}
+
+{% block content %}
+<div class="sim-wrapper">
+    <nav class="breadcrumbs">
+      <small>
+        <a href="/">Ana Sayfa</a> / <span>Portföy Simülatörü</span>
+      </small>
+    </nav>
+
+    <header class="page-header">
+        <h1>{{ title }}</h1>
+        <p class="text-muted">{{ description }}</p>
+    </header>
+
+    <div class="sim-container">
+        <aside class="sim-form-card">
+            <form id="sim-form" class="sim-form" onsubmit="return false;">
+                <div class="form-group">
+                    <label for="pv">Mevcut Portföy Değeri</label>
+                    <div class="input-with-suffix">
+                        <input type="number" id="pv" class="input-field" value="100000" min="0" step="1000">
+                        <span class="input-suffix">₺</span>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <div class="label-with-tooltip">
+                        <label for="rc">Reel Sermaye Büyüme Oranı (r<sub>c</sub> - %)</label>
+                        <div class="tooltip">
+                            <span class="tooltip-icon">?</span>
+                            <div class="tooltip-text">
+                                Reel getiri, nominal getiriden enflasyonun düşülmesiyle hesaplanır.
+                                Bu simülasyonda reel getiri kullanmak, tüm hesaplamaların bugünün satın alma gücü
+                                (enflasyondan arındırılmış) üzerinden yapılmasını sağlar.
+                            </div>
+                        </div>
+                    </div>
+                    <div class="input-with-suffix">
+                        <input type="number" id="rc" class="input-field" value="5" step="0.1">
+                        <span class="input-suffix">%</span>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label for="rd">Yıllık Temettü Verimi (r<sub>d</sub> - %)</label>
+                    <div class="input-with-suffix">
+                        <input type="number" id="rd" class="input-field" value="3" min="0" step="0.1">
+                        <span class="input-suffix">%</span>
+                    </div>
+                    <div class="display-with-tooltip">
+                        <small id="dividend-amount-display" class="text-muted">Temettü miktarı: 0 ₺</small>
+                        <div class="tooltip">
+                            <span class="tooltip-icon">?</span>
+                            <div class="tooltip-text">
+                                Çekim miktarı için referans olarak kullanabilirsiniz.
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <div class="label-with-tooltip">
+                        <label for="w">Yıllık Çekim Miktarı (W)</label>
+                        <div class="tooltip">
+                            <span class="tooltip-icon">?</span>
+                            <div class="tooltip-text">
+                                Bu miktar yıllık bazda yapacağınız çekimi ifade eder.
+                                r<sub>c</sub> (reel büyüme) kullandığımız için bu miktar her yıl enflasyon oranında artırılmış gibi düşünülür,
+                                yani satın alma gücü sabit kalır.
+                            </div>
+                        </div>
+                    </div>
+                    <div class="input-with-suffix">
+                        <input type="number" id="w" class="input-field" value="4000" min="0" step="100">
+                        <span class="input-suffix">₺</span>
+                    </div>
+                    <small id="withdrawal-rate-display" class="text-muted">Çekim oranı: %0.0</small>
+                </div>
+
+                <div class="form-group">
+                    <label for="period">Simülasyon Süresi (Yıl)</label>
+                    <div class="input-with-suffix">
+                        <input type="number" id="period" class="input-field" value="30" min="1" max="100" step="1">
+                        <span class="input-suffix">Yıl</span>
+                    </div>
+                </div>
+            </form>
+
+            <div class="sim-results-summary">
+                <div class="sim-result-item">
+                    <span class="sim-result-label">Final Bakiye:</span>
+                    <span class="sim-result-value" id="res-final-balance">0 ₺</span>
+                </div>
+                <div class="sim-result-item">
+                    <span class="sim-result-label">Toplam Getiri:</span>
+                    <span class="sim-result-value" id="res-total-return">%0</span>
+                </div>
+                <div id="sim-status" class="sim-status-msg"></div>
+            </div>
+        </aside>
+
+        <main class="sim-chart-card">
+            <canvas id="balanceChart"></canvas>
+        </main>
+    </div>
+
+    <div class="legal-disclaimer-inline">
+        <p class="legal-disclaimer-inline__title">⚠️ Yasal Uyarı</p>
+        <p class="legal-disclaimer-inline__text">
+            Bu simülatör varsayımsal verilere dayanır ve yatırım tavsiyesi değildir.
+            Geçmiş performans gelecek sonuçların garantisi değildir.
+            Enflasyon, vergiler ve piyasa dalgalanmaları hesaba katılmamıştır.
+        </p>
+    </div>
+</div>
+{% endblock %}
+
+{% block js_script %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="{% static 'js/portfolio_sim.js' %}"></script>
+{% endblock %}

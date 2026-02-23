@@ -24,13 +24,27 @@
           Blog
         </a>
 
-        <a
-          href="{% url 'portfolio:fire_calculator' %}"
-          title="Finansal Özgürlük (FIRE) Hesaplayıcı: Ne zaman finansal özgür olabileceğinizi hesaplayın | Kartopu Money"
-          class="site-nav__link {% if active_nav == 'fire-calculator' %}is-active{% endif %}"
-        >
-          FIRE Hesaplayıcı
-        </a>
+        <div class="nav-dropdown">
+            <div class="site-nav__link nav-dropdown__trigger {% if active_nav == 'fire-calculator' or active_nav == 'portfolio-sim' %}is-active{% endif %}">
+                Hesaplayıcılar <span class="nav-dropdown__icon">▼</span>
+            </div>
+            <div class="nav-dropdown__content">
+                <a
+                  href="{% url 'portfolio:fire_calculator' %}"
+                  title="Finansal Özgürlük (FIRE) Hesaplayıcı: Ne zaman finansal özgür olabileceğinizi hesaplayın | Kartopu Money"
+                  class="nav-dropdown__item {% if active_nav == 'fire-calculator' %}is-active{% endif %}"
+                >
+                  FIRE Hesaplayıcı
+                </a>
+                <a
+                  href="{% url 'portfolio:portfolio_sim' %}"
+                  title="Reel Portföy Büyüme ve Temettü Emekliliği Simülatörü | Kartopu Money"
+                  class="nav-dropdown__item {% if active_nav == 'portfolio-sim' %}is-active{% endif %}"
+                >
+                  Portföy Simülatörü
+                </a>
+            </div>
+        </div>
         <a
           href="/hakkimizda/"
           title="Hakkımızda | Kartopu Money"
