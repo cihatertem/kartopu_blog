@@ -24,7 +24,16 @@ class PortfolioSimView(TemplateView):
         context.update(
             {
                 "title": "Reel Portföy Büyüme ve Temettü Emekliliği Simülatörü",
-                "description": "Portföyünüzün enflasyondan arındırılmış gerçek büyümesini hesaplayın. Temettü verimi ve reel CAGR ile satın alma gücünüzü kaç yıl koruyabileceğinizi görün.",
+                "description": (
+                    "Portföyünüzün enflasyondan arındırılmış gerçek büyümesini hesaplayın. "
+                    "Temettü verimi ve reel CAGR"
+                    '<span class="tooltip">'
+                    '<span class="tooltip-icon">i</span>'
+                    '<span class="tooltip-text">'
+                    "Bileşik Yıllık Büyüme Oranı (Compound Annual Growth Rate). "
+                    "Bir yatırımın belirli bir dönem boyunca her yıl ortalama ne kadar büyüdüğünü gösteren bir ölçüttür."
+                    "</span></span> ile satın alma gücünüzü kaç yıl koruyabileceğinizi görün."
+                ),
                 "active_nav": "portfolio-sim",
             }
         )
