@@ -4,8 +4,6 @@
   margin: 1.5rem 0 0;
   display: grid;
   gap: 2rem;
-  content-visibility: auto;
-  contain-intrinsic-size: 1px 800px;
 }
 
 .post-list__title {

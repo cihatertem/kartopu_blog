@@ -1007,11 +1007,6 @@ select:focus {
   border: 0;
 }
 
-.post-list {
-  content-visibility: auto;
-  contain-intrinsic-size: 1px 800px;
-}
-
 .category-header {
   display: flex;
   flex-wrap: wrap;

@@ -67,8 +67,6 @@
 
 .home-portfolio {
   margin-top: 2rem;
-  content-visibility: auto;
-  contain-intrinsic-size: 1px 800px;
 }
 
 .home-portfolio__header {
