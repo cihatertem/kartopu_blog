@@ -1,4 +1,5 @@
 from django.urls import path
+from django.views.generic import RedirectView
 
 from . import views
 
@@ -8,5 +9,15 @@ urlpatterns = [
     path(
         "fire-hesaplayici/", views.FireCalculatorView.as_view(), name="fire_calculator"
     ),
-    path("cagr-simulasyonu/", views.PortfolioSimView.as_view(), name="portfolio_sim"),
+    path(
+        "portfoy-simulasyonu/", views.PortfolioSimView.as_view(), name="portfolio_sim"
+    ),
+    path(
+        "cagr-simulasyonu/",
+        RedirectView.as_view(
+            pattern_name="portfolio:portfolio_sim",
+            permanent=True,
+            query_string=True,
+        ),
+    ),
 ]
