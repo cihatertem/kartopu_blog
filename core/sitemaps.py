@@ -19,8 +19,9 @@ class StaticViewSitemap(BaseSitemap):
             "core:home",
             "core:about",
             "core:contact",
-            # "portfolio:portfolio_view",
             "blog:post_list",
+            "portfolio:fire_calculator",
+            "portfolio:portfolio_sim",
         ]
 
     def location(self, item: str) -> str:  # pyright: ignore[reportIncompatibleMethodOverride]

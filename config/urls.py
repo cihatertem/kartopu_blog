@@ -6,7 +6,7 @@ from django.contrib import admin
 from django.contrib.sitemaps.views import index, sitemap
 from django.urls import include, path
 from django.views.decorators.cache import cache_page
-from django.views.generic import TemplateView
+from django.views.generic import RedirectView, TemplateView
 
 from accounts import views as account_views
 from core.sitemaps import sitemaps
@@ -32,7 +32,11 @@ urlpatterns = [
     ),
     path("accounts/", include("allauth.urls")),
     path("", include("core.urls", namespace="core")),
-    path("portfolio/", include("portfolio.urls", namespace="portfolio")),
+    path("portfoy/", include("portfolio.urls", namespace="portfolio")),
+    path(
+        "portfolio/<path:resource>",
+        RedirectView.as_view(url="/portfoy/%(resource)s", permanent=True),
+    ),
     path("blog/", include("blog.urls", namespace="blog")),
     path("newsletter/", include("newsletter.urls", namespace="newsletter")),
     path("authors/", include("accounts.urls", namespace="accounts")),
