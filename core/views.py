@@ -25,16 +25,11 @@ CONTACT_RATE_LIMIT_KEY = "ip"
 
 # Create your views here.
 def home_view(request):
-    portfolio_slug = slugify("portföy")
-    portfolio_category = Category.objects.filter(slug=portfolio_slug).first()
-    portfolio_posts = []
-
-    if portfolio_category:
-        portfolio_posts = list(
-            published_posts_queryset(include_tags=False)
-            .filter(category=portfolio_category)
-            .order_by("-published_at", "-created_at")[:5]
-        )
+    latest_posts = list(
+        published_posts_queryset(include_tags=False).order_by(
+            "-published_at", "-created_at"
+        )[:5]
+    )
 
     featured_post = (
         published_posts_queryset(include_tags=False)
@@ -45,8 +40,7 @@ def home_view(request):
 
     context = {
         "active_nav": "home",
-        "portfolio_category": portfolio_category,
-        "portfolio_posts": portfolio_posts,
+        "latest_posts": latest_posts,
         "featured_post": featured_post,
     }
 

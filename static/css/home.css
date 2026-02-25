@@ -77,6 +77,10 @@
   gap: 1rem;
 }
 
+.home-portfolio__header h2 {
+  margin-left: 1.25rem;
+}
+
 .home-portfolio__subtitle {
   margin: 0.5rem 0 0;
   color: var(--color-muted);
