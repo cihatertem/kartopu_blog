@@ -9,7 +9,11 @@ class FireCalculatorView(TemplateView):
         context.update(
             {
                 "title": "Finansal Özgürlük (F.I.R.E.) Hesaplayıcı",
-                "description": "Portföyünüzün sizi ne zaman finansal olarak özgür kılacağını hesaplayın. 4% kuralı ve bileşik getiri ile F.I.R.E. yolculuğunuzu planlayın.",
+                "description": (
+                    "Portföyünüzün sizi ne zaman finansal olarak özgür kılacağını hesaplayın."
+                    " 4% kuralı ve bileşik getiri ile F.I.R.E. yolculuğunuzu planlayın.</br>"
+                    "<strong>Not:</strong> <a href='https://kartopu.money/blog/finansal-ozgurluk-hesaplayicisi-yayinda/' target='_blank'>Hesaplayıcıya dair blog yazımız.</a>"
+                ),
                 "active_nav": "fire-calculator",
             }
         )

@@ -1,8 +1,11 @@
 from __future__ import annotations
 
+from urllib.parse import urlparse
+
 import bleach
 import markdown as md
 from bleach.css_sanitizer import CSSSanitizer
+from django.conf import settings
 
 css_sanitizer = CSSSanitizer(
     allowed_css_properties=[
@@ -132,6 +135,48 @@ ALLOWED_ATTRIBUTES = {
 ALLOWED_PROTOCOLS = ["http", "https", "mailto"]
 
 
+def set_link_attributes(attrs, new=False):
+    href = attrs.get((None, "href"), "")
+    if not href:
+        return attrs
+
+    is_internal = False
+    if href.startswith("/") and not href.startswith("//"):
+        is_internal = True
+    elif href.startswith("#"):
+        is_internal = True
+    else:
+        parsed_href = urlparse(href)
+        if not parsed_href.netloc:
+            is_internal = True
+        else:
+            site_url = getattr(settings, "SITE_BASE_URL", "")
+            if site_url:
+                parsed_site = urlparse(site_url)
+                if (
+                    parsed_href.netloc == parsed_site.netloc
+                    or parsed_href.netloc.endswith("." + parsed_site.netloc)
+                ):
+                    is_internal = True
+
+    rel = attrs.get((None, "rel"), "")
+    rel_list = rel.split() if rel else []
+
+    if is_internal:
+        if "nofollow" in rel_list:
+            rel_list.remove("nofollow")
+    else:
+        if "nofollow" not in rel_list:
+            rel_list.append("nofollow")
+
+    if rel_list:
+        attrs[(None, "rel")] = " ".join(rel_list)
+    else:
+        attrs.pop((None, "rel"), None)
+
+    return attrs
+
+
 def render_markdown(text: str) -> str:
     """
     Markdown -> HTML -> sanitize
@@ -157,5 +202,5 @@ def render_markdown(text: str) -> str:
         css_sanitizer=css_sanitizer,
     )
 
-    cleaned = bleach.linkify(cleaned)
+    cleaned = bleach.linkify(cleaned, callbacks=[set_link_attributes])
     return cleaned

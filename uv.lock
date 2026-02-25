@@ -43,30 +43,30 @@ wheels = [
 
 [[package]]
 name = "boto3"
-version = "1.42.55"
+version = "1.42.56"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "botocore" },
     { name = "jmespath" },
     { name = "s3transfer" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/3d/74/9e97b4ca692ed3ee2c5cb616790c3b00290b73babc63b85c7ed392ed74b1/boto3-1.42.55.tar.gz", hash = "sha256:e7b8fcc123da442449da8a2be65b3e60a3d8cfb2b26a52f7b3c6f9f8e84cbdf0", size = 112771, upload-time = "2026-02-23T20:29:29.933Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/fe/dc/990222f8c0cd7453c03410bc8b367ccb35ae01d9642ff1f79231cd3f3d8f/boto3-1.42.56.tar.gz", hash = "sha256:8b0779431b349582f4d61b55a2858b943d5295f4b5de62e2d669fdbbcda96bd6", size = 112814, upload-time = "2026-02-24T20:28:51.825Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/19/04/ca0b37dbb980fc59e9414f7bcb5d6209b1d3a03da433784e21fdd7282269/boto3-1.42.55-py3-none-any.whl", hash = "sha256:cb4bc94c0ba522242e291d16b4f631e139f525fbc9772229f3e84f5d834fd88e", size = 140556, upload-time = "2026-02-23T20:29:27.402Z" },
+    { url = "https://files.pythonhosted.org/packages/59/bb/a7fd6f4f38cf0f6cd91c152442cbe5b5f270275a60a5c7147ae5560f2f25/boto3-1.42.56-py3-none-any.whl", hash = "sha256:e09f91170b19e0ecd5e514321d99323be3e91a58dfa73fd58cf73b7b8b179c84", size = 140556, upload-time = "2026-02-24T20:28:49.815Z" },
 ]
 
 [[package]]
 name = "botocore"
-version = "1.42.55"
+version = "1.42.56"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "jmespath" },
     { name = "python-dateutil" },
     { name = "urllib3" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/5a/b9/958d53c0e0b843c25d93d7593364b3e92913dfac381c82fa2b8a470fdf78/botocore-1.42.55.tar.gz", hash = "sha256:af22a7d7881883bcb475a627d0750ec6f8ee3d7b2f673e9ff342ebaa498447ee", size = 14927543, upload-time = "2026-02-23T20:29:17.923Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/b8/2f/f6351cca2e3a087fb82a5c19e4d60e93a5dae27e9a085cc5fcb7faca8bd4/botocore-1.42.56.tar.gz", hash = "sha256:b1d7d3cf2fbe4cc1804a6567a051fc7141d21bcdcfde0336257b8dd2085272c2", size = 14939515, upload-time = "2026-02-24T20:28:40.55Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/e5/64/fe72b409660b8da44a8763f9165d36650e41e4e591dd7d3ad708397496c7/botocore-1.42.55-py3-none-any.whl", hash = "sha256:c092eb99d17b653af3ec9242061a7cde1c7b1940ed4abddfada68a9e1a3492d6", size = 14598862, upload-time = "2026-02-23T20:29:11.589Z" },
+    { url = "https://files.pythonhosted.org/packages/5a/09/dcc3f79de57f684d844ca853eeebff1786e5d672cf600f8ee6a118a9f015/botocore-1.42.56-py3-none-any.whl", hash = "sha256:111089dea212438a5197e909e5b528e7c30fd8cbd02c8c7d469359b368929343", size = 14612466, upload-time = "2026-02-24T20:28:36.379Z" },
 ]
 
 [[package]]
@@ -89,11 +89,11 @@ wheels = [
 
 [[package]]
 name = "certifi"
-version = "2026.1.4"
+version = "2026.2.25"
 source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/e0/2d/a891ca51311197f6ad14a7ef42e2399f36cf2f9bd44752b3dc4eab60fdc5/certifi-2026.1.4.tar.gz", hash = "sha256:ac726dd470482006e014ad384921ed6438c457018f4b3d204aea4281258b2120", size = 154268, upload-time = "2026-01-04T02:42:41.825Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/af/2d/7bf41579a8986e348fa033a31cdd0e4121114f6bce2457e8876010b092dd/certifi-2026.2.25.tar.gz", hash = "sha256:e887ab5cee78ea814d3472169153c2d12cd43b14bd03329a39a9c6e2e80bfba7", size = 155029, upload-time = "2026-02-25T02:54:17.342Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/e6/ad/3cc14f097111b4de0040c83a525973216457bbeeb63739ef1ed275c1c021/certifi-2026.1.4-py3-none-any.whl", hash = "sha256:9943707519e4add1115f44c2bc244f782c0249876bf51b6599fee1ffbedd685c", size = 152900, upload-time = "2026-01-04T02:42:40.15Z" },
+    { url = "https://files.pythonhosted.org/packages/9a/3c/c17fb3ca2d9c3acff52e30b309f538586f9f5b9c9cf454f3845fc9af4881/certifi-2026.2.25-py3-none-any.whl", hash = "sha256:027692e4402ad994f1c42e52a4997a9763c646b73e4096e4d5d6db8af1d6f0fa", size = 153684, upload-time = "2026-02-25T02:54:15.766Z" },
 ]
 
 [[package]]
@@ -344,14 +344,14 @@ wheels = [
 
 [[package]]
 name = "django-upgrade"
-version = "1.29.1"
+version = "1.30.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "tokenize-rt" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/9d/dc/8242d9fbf0ae64feccbdd781fa741db5cf0521127a26ed9361e5f2f31f1b/django_upgrade-1.29.1.tar.gz", hash = "sha256:8c53b6bcd326a638a5dc908a707f26d71593bad5789b33775c90a8dc8a76afd5", size = 39638, upload-time = "2025-10-23T16:34:57.003Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/a3/a5/c59b2123ad588fd52ce69e043e47185a54d1d9966f29ecb50d1cf65861ca/django_upgrade-1.30.0.tar.gz", hash = "sha256:c2c9a02773708c5b4fc24ebf29f2c532082885170d1ab17a2ef33f396893dd8a", size = 39652, upload-time = "2026-02-24T23:19:45.091Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/f0/b0/c9fe7b4dbfcacb2402169f8189d4f7fa1609237317d714f01143d167db1c/django_upgrade-1.29.1-py3-none-any.whl", hash = "sha256:39a4d71365189ce8a5ccab534b2d1f0ed69c71bea7f1ef4c46041918d5247e64", size = 68847, upload-time = "2025-10-23T16:34:55.511Z" },
+    { url = "https://files.pythonhosted.org/packages/aa/1f/58c990ab604a5b39b6d1c83f18aa074bfb10eef201c833697d44176d78cd/django_upgrade-1.30.0-py3-none-any.whl", hash = "sha256:3cf6eb4a46918df3f0b863bd96df8a36a8fed90d0e17c6a7c4af5442e489bc46", size = 68910, upload-time = "2026-02-24T23:19:43.65Z" },
 ]
 
 [[package]]
