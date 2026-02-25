@@ -1,3 +1,5 @@
+{% load cache %}
+{% cache 600 sidebar_archives active_archive_key %}
 <section class="sidebar-card">
   <h3 class="sidebar-title">Arşiv</h3>
 
@@ -11,3 +13,4 @@
     {% endfor %}
   </ul>
 </section>
+{% endcache %}

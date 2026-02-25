@@ -22,7 +22,7 @@ from blog.models import BlogPost, Category, Tag
 from comments.models import Comment
 from portfolio.models import PortfolioSnapshot
 
-from .models import ContactMessage, SiteSettings
+from .models import ContactMessage, SidebarWidget, SiteSettings
 from .tag_colors import get_tag_color_class
 
 CACHE_TIMEOUT = 600  # 10 minutes
@@ -242,3 +242,13 @@ def site_settings_context(request):
     return {
         "site_settings": SiteSettings.get_settings(),
     }
+
+
+def sidebar_widgets_context(request):
+    sidebar_widgets = cache.get("sidebar_widgets")
+    if sidebar_widgets is None:
+        sidebar_widgets = list(
+            SidebarWidget.objects.filter(is_active=True).order_by("order")
+        )
+        cache.set("sidebar_widgets", sidebar_widgets, timeout=3600)
+    return {"sidebar_widgets": sidebar_widgets}

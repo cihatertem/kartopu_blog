@@ -1,5 +1,6 @@
-{% load static %}
+{% load static cache %}
 
+{% cache 3600 sidebar_recent_posts %}
 <section class="sidebar-card">
   <h3 class="sidebar-title">Son Yazılar</h3>
 
@@ -54,3 +55,4 @@
     {% endfor %}
   </ul>
 </section>
+{% endcache %}

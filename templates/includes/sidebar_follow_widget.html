@@ -1,3 +1,5 @@
+{% load cache %}
+{% cache 86400 sidebar_follow %}
 <section class="sidebar-card follow-widget" aria-labelledby="follow-widget-title">
   <h3 class="sidebar-title" id="follow-widget-title">Takip et</h3>
   <div class="follow-widget__links" role="list">
@@ -73,3 +75,4 @@
     </a>
   </div>
 </section>
+{% endcache %}

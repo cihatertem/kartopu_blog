@@ -1,17 +1,59 @@
-<section class="sidebar-card">
-  <h3 class="sidebar-title">Etiketler</h3>
+{% load cache %}
+{% cache 600 sidebar_popular_posts %}
+{% load static %}
 
-  <div class="tag-cloud">
-    {% for tag in nav_tags %}
-      <a
-        href="{% url 'blog:tag_detail' tag.slug %}"
-        class="tag-cloud__item {{ tag.color_class }} {% if active_tag_slug == tag.slug %}is-active{% endif %}"
-        style="font-size: {{ tag.cloud_size }}rem;"
-      >
-        #{{ tag.name }}
-      </a>
+<section class="sidebar-card">
+  <h3 class="sidebar-title">Popüler Yazılar</h3>
+
+  <ul class="sidebar-post-list">
+    {% for post in nav_popular_posts %}
+      <li class="sidebar-post-item">
+        <a class="sidebar-post-link" href="{{ post.get_absolute_url }}">
+          <span class="sidebar-post-thumb">
+            {% if post.cover_image %}
+              {% with cover=post.cover_thumb_rendition %}
+                {% if cover %}
+                  <img
+                    src="{{ cover.src }}"
+                    srcset="{{ cover.srcset }}"
+                    sizes="54px"
+                    alt="{{ post.title }}"
+                    width="54"
+                    height="54"
+                    loading="lazy"
+                    decoding="async"
+                  />
+                {% else %}
+                  <img
+                    src="{% static 'images/home/portfolio-coins.svg' %}"
+                    alt="{{ post.title }}"
+                    width="54"
+                    height="54"
+                    loading="lazy"
+                    decoding="async"
+                  />
+                {% endif %}
+              {% endwith %}
+            {% else %}
+              <img
+                src="{% static 'images/home/portfolio-coins.svg' %}"
+                alt="{{ post.title }}"
+                width="54"
+                height="54"
+                loading="lazy"
+                decoding="async"
+              />
+            {% endif %}
+          </span>
+          <span class="sidebar-post-meta">
+            <span class="sidebar-post-title">{{ post.title }}</span>
+            <span class="sidebar-post-date">{{ post.published_at|date:"d F Y" }}</span>
+          </span>
+        </a>
+      </li>
     {% empty %}
-      <span>Henüz etiket yok.</span>
+      <li>Henüz yazı yok.</li>
     {% endfor %}
-  </div>
+  </ul>
 </section>
+{% endcache %}

@@ -1,4 +1,5 @@
-{% load static %}
+{% load static cache %}
+{% cache 600 sidebar_popular_posts %}
 
 <section class="sidebar-card">
   <h3 class="sidebar-title">Popüler Yazılar</h3>
@@ -54,3 +55,4 @@
     {% endfor %}
   </ul>
 </section>
+{% endcache %}

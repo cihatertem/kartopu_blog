@@ -1,3 +1,5 @@
+{% load cache %}
+{% cache 600 sidebar_goal_widget %}
 <section class="sidebar-card goal-widget">
   <h3 class="sidebar-title">Hedefimiz</h3>
   {% if goal_widget_snapshot %}
@@ -30,3 +32,4 @@
     {% endif %}
   <!--<p class="goal-widget__text"><strong>F.I.R.E.</strong> için 1.000.000 ₺ portföy hedefi.</p>-->
 </section>
+{% endcache %}

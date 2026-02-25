@@ -1,3 +1,5 @@
+{% load cache %}
+{% cache 600 sidebar_categories active_category_slug %}
 <section class="sidebar-card">
   <h3 class="sidebar-title">Kategoriler</h3>
 
@@ -11,3 +13,4 @@
     {% endfor %}
   </ul>
 </section>
+{% endcache %}

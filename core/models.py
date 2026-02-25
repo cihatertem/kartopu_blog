@@ -207,3 +207,36 @@ class AboutPageImage(
             },
             largest_size=1200,
         )
+
+
+class SidebarWidget(
+    UUIDModelMixin,
+    TimeStampedModelMixin,
+):
+    title = models.CharField(max_length=100, verbose_name="Başlık")
+    template_name = models.CharField(
+        max_length=255, unique=True, verbose_name="Şablon Dosyası"
+    )
+    is_active = models.BooleanField(default=True, verbose_name="Aktif")
+    order = models.PositiveIntegerField(default=0, verbose_name="Sıralama")
+
+    class Meta:  # pyright: ignore[reportIncompatibleVariableOverride]
+        ordering = ["order"]
+        verbose_name = "Sidebar Bileşeni"
+        verbose_name_plural = "Sidebar Bileşenleri"
+
+    def __str__(self) -> str:
+        return str(self.title)
+
+    def save(self, *args: object, **kwargs: object) -> None:
+        super().save(*args, **kwargs)  # pyright: ignore[reportArgumentType]
+        self.invalidate_cache()
+
+    def delete(self, *args: object, **kwargs: object) -> None:  # pyright: ignore[reportIncompatibleMethodOverride]
+        super().delete(*args, **kwargs)  # pyright: ignore[reportArgumentType]
+        self.invalidate_cache()
+
+    def invalidate_cache(self) -> None:
+        from django.core.cache import cache
+
+        cache.delete("sidebar_widgets")
