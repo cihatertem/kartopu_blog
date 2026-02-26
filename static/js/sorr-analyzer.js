@@ -4,6 +4,7 @@ document.addEventListener("DOMContentLoaded", () => {
     const ctx = document.getElementById("balanceChart").getContext("2d");
     const runBtn = document.getElementById("run-btn");
     let chart;
+    let lastWType;
 
     const currencyFormatter = new Intl.NumberFormat("tr-TR", {
         style: "currency",
@@ -37,6 +38,8 @@ document.addEventListener("DOMContentLoaded", () => {
         });
     });
 
+    lastWType = document.getElementById("w_type").value;
+
     runBtn.addEventListener("click", runSimulation);
 
     // Initial run
@@ -45,18 +48,31 @@ document.addEventListener("DOMContentLoaded", () => {
 
     function updateWithdrawalDisplays() {
         const pv = parseFloat(document.getElementById("pv").value) || 0;
-        const w = parseFloat(document.getElementById("w").value) || 0;
+        const wInput = document.getElementById("w");
+        let w = parseFloat(wInput.value) || 0;
         const wType = document.getElementById("w_type").value;
         const wLabel = document.getElementById("w-label");
         const wSuffix = document.getElementById("w-suffix");
         const wDisplay = document.getElementById("withdrawal-display");
 
+        if (wType !== lastWType) {
+            if (wType === "amount") {
+                wInput.value = 40000;
+            } else {
+                wInput.value = 4;
+            }
+            w = parseFloat(wInput.value) || 0;
+            lastWType = wType;
+        }
+
         if (wType === "amount") {
+            wInput.step = "5000";
             wLabel.textContent = "Yıllık Çekim Tutarı";
             wSuffix.textContent = "₺";
             const rate = pv > 0 ? (w / pv) * 100 : 0;
             wDisplay.textContent = `Çekim oranı: %${rate.toLocaleString("tr-TR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
         } else {
+            wInput.step = "0.1";
             wLabel.textContent = "Yıllık Çekim Oranı";
             wSuffix.textContent = "%";
             const amount = pv * (w / 100);
