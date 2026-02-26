@@ -12,6 +12,7 @@ urlpatterns = [
     path(
         "portfoy-simulasyonu/", views.PortfolioSimView.as_view(), name="portfolio_sim"
     ),
+    path("sorr-analizi/", views.SorrAnalysisView.as_view(), name="sorr_analysis"),
     path(
         "cagr-simulasyonu/",
         RedirectView.as_view(

@@ -1,0 +1,196 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}{{ title }} | Kartopu Money{% endblock %}
+
+{% block page_css %}
+<link rel="stylesheet" href="{% static 'css/portfolio-sim.css' %}">
+{% endblock %}
+
+{% block content %}
+<div class="sim-wrapper">
+    <nav class="breadcrumbs">
+      <small>
+        <a href="/">Ana Sayfa</a> / <span>SORR Analizi</span>
+      </small>
+    </nav>
+
+    <header class="page-header">
+        <h1>{{ title }}</h1>
+        <p class="text-muted">{{ description|safe }}</p>
+    </header>
+
+    <div class="sim-container">
+        <aside class="sim-form-card">
+            <form id="sim-form" class="sim-form" onsubmit="return false;">
+                <div class="form-group">
+                    <div class="label-with-tooltip">
+                        <label for="pv">Başlangıç Portföy Değeri</label>
+                        <div class="tooltip">
+                            <span class="tooltip-icon">i</span>
+                            <div class="tooltip-text">
+                                Emekliliğe başladığınız andaki toplam portföy büyüklüğünüzdür.
+                            </div>
+                        </div>
+                    </div>
+                    <div class="input-with-suffix">
+                        <input type="number" id="pv" class="input-field" value="1000000" min="0" step="10000">
+                        <span class="input-suffix">₺</span>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <div class="label-with-tooltip">
+                        <label for="w_type">Çekim Tipi</label>
+                        <div class="tooltip">
+                            <span class="tooltip-icon">i</span>
+                            <div class="tooltip-text">
+                                Çekim miktarını net tutar olarak mı yoksa başlangıç portföyünün bir oranı olarak mı belirlemek istediğinizi seçin.
+                            </div>
+                        </div>
+                    </div>
+                    <select id="w_type" class="input-field">
+                        <option value="amount" selected>Sabit Tutar (₺)</option>
+                        <option value="rate">Yüzdelik Oran (%)</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <div class="label-with-tooltip">
+                        <label for="w" id="w-label">Yıllık Çekim Tutarı</label>
+                        <div class="tooltip">
+                            <span class="tooltip-icon">i</span>
+                            <div class="tooltip-text">
+                                Emekliliğinizin ilk yılında çekmeyi planladığınız tutardır. Bu tutar, sonraki yıllarda enflasyon oranında artırılarak alım gücünüz korunur.
+                            </div>
+                        </div>
+                    </div>
+                    <div class="input-with-suffix">
+                        <input type="number" id="w" class="input-field" value="40000" min="0" step="1000">
+                        <span class="input-suffix" id="w-suffix">₺</span>
+                    </div>
+                    <small id="withdrawal-display" class="text-muted">Çekim oranı: %4.00</small>
+                </div>
+
+                <div class="form-group">
+                    <div class="label-with-tooltip">
+                        <label for="inf">Yıllık Ortalama Enflasyon Oranı</label>
+                        <div class="tooltip">
+                            <span class="tooltip-icon">i</span>
+                            <div class="tooltip-text">
+                                Simülasyon süresince beklediğiniz yıllık fiyat artış hızıdır. Çekim tutarınız her yıl bu oranda artırılır.
+                            </div>
+                        </div>
+                    </div>
+                    <div class="input-with-suffix">
+                        <input type="number" id="inf" class="input-field" value="5" step="0.1">
+                        <span class="input-suffix">%</span>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <div class="label-with-tooltip">
+                        <label for="avg_ret">Beklenen Yıllık Ortalama Getiri (Nominal)</label>
+                        <div class="tooltip">
+                            <span class="tooltip-icon">i</span>
+                            <div class="tooltip-text">
+                                Portföyünüzün enflasyondan arındırılmamış (brüt) getiri beklentisidir. Örn: Banka faizi veya borsa endeks getirisi gibi piyasada gördüğünüz rakamı giriniz.
+                            </div>
+                        </div>
+                    </div>
+                    <div class="input-with-suffix">
+                        <input type="number" id="avg_ret" class="input-field" value="8" step="0.1">
+                        <span class="input-suffix">%</span>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <div class="label-with-tooltip">
+                        <label for="std_dev">Getiri Standart Sapması</label>
+                        <div class="tooltip">
+                            <span class="tooltip-icon">i</span>
+                            <div class="tooltip-text">
+                                Piyasanın yıllık bazdaki dalgalanma (oynaklık) beklentisidir. Rastgele simülasyon senaryosunda getirilerin ne kadar uç değerlere gidebileceğini belirler.
+                            </div>
+                        </div>
+                    </div>
+                    <div class="input-with-suffix">
+                        <input type="number" id="std_dev" class="input-field" value="15" step="0.1">
+                        <span class="input-suffix">%</span>
+                    </div>
+                    <small class="text-muted">Rastgele simülasyon için kullanılır.</small>
+                </div>
+
+                <div class="form-group">
+                    <div class="label-with-tooltip">
+                        <label for="scenario">Senaryo Seçimi</label>
+                        <div class="tooltip">
+                            <span class="tooltip-icon">i</span>
+                            <div class="tooltip-text">
+                                Emeklilik yıllarınızın nasıl geçeceğine dair farklı varsayımlar seçebilirsiniz.
+                            </div>
+                        </div>
+                    </div>
+                    <select id="scenario" class="input-field">
+                        <option value="fixed">Sabit Getiri</option>
+                        <option value="bad" selected>Kötü Başlangıç</option>
+                        <option value="random">Rastgele Simülasyon</option>
+                    </select>
+                </div>
+
+                <div class="form-group" id="period-group">
+                    <div class="label-with-tooltip">
+                        <label for="period">Simülasyon Süresi (Yıl)</label>
+                        <div class="tooltip">
+                            <span class="tooltip-icon">i</span>
+                            <div class="tooltip-text">
+                                Analizin kaç yıllık bir dönemi kapsamasını istediğinizi belirleyin.
+                            </div>
+                        </div>
+                    </div>
+                    <div class="input-with-suffix">
+                        <input type="number" id="period" class="input-field" value="40" min="1" max="100" step="1">
+                        <span class="input-suffix">Yıl</span>
+                    </div>
+                </div>
+
+                <button type="button" id="run-btn" class="button button--primary" style="margin-top: 10px;">Simülasyonu Çalıştır</button>
+            </form>
+
+            <div class="sim-results-summary">
+                <div class="sim-result-item">
+                    <span class="sim-result-label">Tükenme Yılı:</span>
+                    <span class="sim-result-value" id="res-exhaustion-year">-</span>
+                </div>
+                <div class="sim-result-item">
+                    <span class="sim-result-label">Kümülatif Çekim:</span>
+                    <span class="sim-result-value" id="res-cumulative-withdrawal">0 ₺</span>
+                </div>
+                <div class="sim-result-item">
+                    <span class="sim-result-label">Final Bakiye:</span>
+                    <span class="sim-result-value" id="res-final-balance">0 ₺</span>
+                </div>
+                <div id="sim-status" class="sim-status-msg"></div>
+            </div>
+        </aside>
+
+        <main class="sim-chart-card">
+            <canvas id="balanceChart"></canvas>
+        </main>
+    </div>
+
+    <div class="legal-disclaimer-inline" style="margin-top: 2rem;">
+        <p class="legal-disclaimer-inline__title">⚠️ Yasal Uyarı</p>
+        <p class="legal-disclaimer-inline__text">
+            Bu araç varsayımsal verilere dayanır ve yatırım tavsiyesi değildir.
+            Geçmiş performans gelecek sonuçların garantisi değildir.
+            Gerçek getiriler, enflasyon ve vergiler farklılık gösterebilir.
+        </p>
+    </div>
+</div>
+{% endblock %}
+
+{% block js_script %}
+<script defer src="{% static 'vendor/chart.umd.min.js' %}"></script>
+<script defer src="{% static 'js/sorr-analyzer.js' %}"></script>
+{% endblock %}

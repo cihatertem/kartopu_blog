@@ -20,6 +20,25 @@ class FireCalculatorView(TemplateView):
         return context
 
 
+class SorrAnalysisView(TemplateView):
+    template_name = "portfolio/sorr_analysis.html"
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context.update(
+            {
+                "title": "Sequence of Returns Risk (SORR) Analizi",
+                "description": (
+                    "Emeklilik portföyünüzün ilk yıllarındaki piyasa dalgalanmalarının "
+                    "portföy ömrüne etkisini simüle edin. 'Kötü başlangıç' senaryolarının "
+                    "uzun vadeli planlarınıza etkisini görün."
+                ),
+                "active_nav": "sorr-analysis",
+            }
+        )
+        return context
+
+
 class PortfolioSimView(TemplateView):
     template_name = "portfolio/portfolio_sim.html"
 
