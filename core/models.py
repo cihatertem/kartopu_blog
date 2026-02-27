@@ -3,6 +3,7 @@ from functools import cached_property
 
 from django.core.exceptions import ValidationError
 from django.db import models
+from django.utils import timezone
 from django.utils.text import slugify
 from imagekit.models import ImageSpecField
 from imagekit.processors import ResizeToFit, Transpose
@@ -14,6 +15,15 @@ from .mixins import TimeStampedModelMixin, UUIDModelMixin
 SEO_TITLE_MAX_LENGTH = 45
 SEO_DESCRIPTION_MAX_LENGTH = 160
 CACHE_SITE_SETTINGS_TIMEOUT = 3600  # 1 saat
+
+
+def site_settings_og_image_upload_path(instance: "SiteSettings", filename: str) -> str:
+    extension = filename.split(".")[-1].lower()
+    prefix = "og_image"
+    timestamp = timezone.now().strftime("%Y%m%d%H%M%S")
+    filename = f"{prefix}_{timestamp}.{extension}"
+
+    return f"seo/{filename}"
 
 
 class SiteSettings(
@@ -49,7 +59,7 @@ class SiteSettings(
         help_text="Spesifik bir açıklama olmadığında kullanılır. (150-160 karakter önerilir)",
     )
     default_meta_image = models.ImageField(
-        upload_to="seo/",
+        upload_to=site_settings_og_image_upload_path,  # pyright: ignore[reportArgumentType]
         blank=True,
         null=True,
         verbose_name="Varsayılan OG Görseli",
