@@ -1,0 +1,58 @@
+{% load static cache %}
+
+{% cache 3600 sidebar_portfolio_posts %}
+<section class="sidebar-card">
+  <h3 class="sidebar-title">Son Portföy Yazıları</h3>
+
+  <ul class="sidebar-post-list">
+    {% for post in nav_portfolio_posts %}
+      <li class="sidebar-post-item">
+        <a class="sidebar-post-link" href="{{ post.get_absolute_url }}">
+          <span class="sidebar-post-thumb">
+            {% if post.cover_image %}
+              {% with cover=post.cover_thumb_rendition %}
+                {% if cover %}
+                  <img
+                    src="{{ cover.src }}"
+                    srcset="{{ cover.srcset }}"
+                    sizes="54px"
+                    alt="{{ post.title }}"
+                    width="54"
+                    height="54"
+                    loading="lazy"
+                    decoding="async"
+                  />
+                {% else %}
+                  <img
+                    src="{% static 'images/home/portfolio-coins.svg' %}"
+                    alt="{{ post.title }}"
+                    width="54"
+                    height="54"
+                    loading="lazy"
+                    decoding="async"
+                  />
+                {% endif %}
+              {% endwith %}
+            {% else %}
+              <img
+                src="{% static 'images/home/portfolio-coins.svg' %}"
+                alt="{{ post.title }}"
+                width="54"
+                height="54"
+                loading="lazy"
+                decoding="async"
+              />
+            {% endif %}
+          </span>
+          <span class="sidebar-post-meta">
+            <span class="sidebar-post-title">{{ post.title }}</span>
+            <span class="sidebar-post-date">{{ post.published_at|date:"d F Y" }}</span>
+          </span>
+        </a>
+      </li>
+    {% empty %}
+      <li>Henüz yazı yok.</li>
+    {% endfor %}
+  </ul>
+</section>
+{% endcache %}

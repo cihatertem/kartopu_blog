@@ -40,7 +40,7 @@ def get_seo_data(context):
     default_image = (
         make_absolute(site_settings.default_meta_image.url)
         if site_settings.default_meta_image
-        else make_absolute("/media/sea/og_twit_card.jpeg")
+        else make_absolute("/media/seo/og_twit_card.jpeg")
     )
 
     seo = {

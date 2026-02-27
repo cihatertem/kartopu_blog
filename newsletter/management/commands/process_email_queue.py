@@ -113,6 +113,8 @@ class Command(BaseCommand):
 
                 sent_count = 0
                 failed_count = 0
+                emails_to_update = []
+                direct_emails_to_update = {}
 
                 for email_item in pending_emails:
                     start_time = time.time()
@@ -142,22 +144,23 @@ class Command(BaseCommand):
                         now = timezone.now()
                         email_item.status = EmailQueueStatus.SENT
                         email_item.sent_at = now
-                        email_item.save(
-                            update_fields=["status", "sent_at", "updated_at"]
-                        )
+                        email_item.updated_at = now
+                        emails_to_update.append(email_item)
 
                         if email_item.direct_email:
                             email_item.direct_email.sent_at = now
-                            email_item.direct_email.save(update_fields=["sent_at"])
+                            direct_emails_to_update[email_item.direct_email.id] = (
+                                email_item.direct_email
+                            )
 
                         sent_count += 1
 
                     except Exception as e:
+                        now = timezone.now()
                         email_item.status = EmailQueueStatus.FAILED
                         email_item.error_message = str(e)
-                        email_item.save(
-                            update_fields=["status", "error_message", "updated_at"]
-                        )
+                        email_item.updated_at = now
+                        emails_to_update.append(email_item)
 
                         self.stderr.write(
                             f"Failed to send to {email_item.to_email}: {e}"
@@ -168,6 +171,18 @@ class Command(BaseCommand):
                     wait = send_interval - elapsed
                     if wait > 0:
                         time.sleep(wait)
+
+                if emails_to_update:
+                    EmailQueue.objects.bulk_update(
+                        emails_to_update,
+                        ["status", "sent_at", "updated_at", "error_message"],
+                    )
+                if direct_emails_to_update:
+                    from newsletter.models import DirectEmail
+
+                    DirectEmail.objects.bulk_update(
+                        list(direct_emails_to_update.values()), ["sent_at"]
+                    )
 
                 self.stdout.write(
                     self.style.SUCCESS(

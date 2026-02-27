@@ -15,6 +15,7 @@ from blog.cache_keys import (
     NAV_ARCHIVES_KEY,
     NAV_CATEGORIES_KEY,
     NAV_POPULAR_POSTS_KEY,
+    NAV_PORTFOLIO_POSTS_KEY,
     NAV_RECENT_POSTS_KEY,
     NAV_TAGS_KEY,
 )
@@ -168,6 +169,20 @@ def categories_tags_context(request):
         )
         cache.set(NAV_POPULAR_POSTS_KEY, nav_popular_posts, timeout=CACHE_TIMEOUT)
 
+    nav_portfolio_posts = cache.get(NAV_PORTFOLIO_POSTS_KEY)
+
+    if nav_portfolio_posts is None:
+        nav_portfolio_posts = list(
+            BlogPost.objects.filter(
+                status=BlogPost.Status.PUBLISHED,
+                published_at__isnull=False,
+                category__slug="portfoy",
+            )
+            .order_by("-published_at")
+            .only("title", "slug", "published_at", "cover_image")[:5]
+        )
+        cache.set(NAV_PORTFOLIO_POSTS_KEY, nav_portfolio_posts, timeout=CACHE_TIMEOUT)
+
     featured_snapshot = (
         PortfolioSnapshot.objects.select_related("portfolio")
         .filter(is_featured=True)
@@ -217,6 +232,7 @@ def categories_tags_context(request):
         "nav_archives": nav_archives,
         "nav_recent_posts": nav_recent_posts,
         "nav_popular_posts": nav_popular_posts,
+        "nav_portfolio_posts": nav_portfolio_posts,
         "goal_widget_snapshot": goal_widget_snapshot,
         "unread_contact_message_count": unread_contact_message_count,
     }
