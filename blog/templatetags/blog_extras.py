@@ -1195,6 +1195,17 @@ def dividend_comparison(context, index=None):
     return mark_safe(_render_dividend_comparison_html(comparison))
 
 
+def _replace_marker(pattern, text, items, render_func):
+    """Yardımcı fonksiyon: marker'ları item ve renderer ile genişletir."""
+
+    def replacer(match):
+        identifier = match.group(1)
+        item = _get_item_by_identifier(items, identifier)
+        return render_func(item)
+
+    return pattern.sub(replacer, text)
+
+
 @register.simple_tag(takes_context=True)
 def render_post_body(context, post):
     """BlogPost içeriğini (markdown) render eder; image + portfolio placeholder'larını genişletir.
@@ -1235,117 +1246,108 @@ def render_post_body(context, post):
     expanded = IMAGE_PATTERN.sub(image_replacer, content)
 
     portfolio_snapshots = _get_portfolio_snapshots(post)
+    expanded = _replace_marker(
+        PORTFOLIO_SUMMARY_PATTERN,
+        expanded,
+        portfolio_snapshots,
+        _render_portfolio_summary_html,
+    )
+    expanded = _replace_marker(
+        PORTFOLIO_CHARTS_PATTERN,
+        expanded,
+        portfolio_snapshots,
+        _render_portfolio_charts_html,
+    )
+    expanded = _replace_marker(
+        PORTFOLIO_IRR_CHARTS_PATTERN,
+        expanded,
+        portfolio_snapshots,
+        _render_portfolio_irr_charts_html,
+    )
+    expanded = _replace_marker(
+        PORTFOLIO_CATEGORY_SUMMARY_PATTERN,
+        expanded,
+        portfolio_snapshots,
+        _render_portfolio_category_summary_html,
+    )
+
     portfolio_comparisons = _get_portfolio_comparisons(post)
-
-    def portfolio_summary_replacer(match):
-        identifier = match.group(1)
-        snapshot = _get_item_by_identifier(portfolio_snapshots, identifier)
-        return _render_portfolio_summary_html(snapshot)
-
-    def portfolio_charts_replacer(match):
-        identifier = match.group(1)
-        snapshot = _get_item_by_identifier(portfolio_snapshots, identifier)
-        return _render_portfolio_charts_html(snapshot)
-
-    def portfolio_irr_charts_replacer(match):
-        identifier = match.group(1)
-        snapshot = _get_item_by_identifier(portfolio_snapshots, identifier)
-        return _render_portfolio_irr_charts_html(snapshot)
-
-    def portfolio_category_summary_replacer(match):
-        identifier = match.group(1)
-        snapshot = _get_item_by_identifier(portfolio_snapshots, identifier)
-        return _render_portfolio_category_summary_html(snapshot)
-
-    def portfolio_comparison_summary_replacer(match):
-        identifier = match.group(1)
-        comparison = _get_item_by_identifier(portfolio_comparisons, identifier)
-        return _render_portfolio_comparison_summary_html(comparison)
-
-    def portfolio_comparison_charts_replacer(match):
-        identifier = match.group(1)
-        comparison = _get_item_by_identifier(portfolio_comparisons, identifier)
-        return _render_portfolio_comparison_charts_html(comparison)
-
-    expanded = PORTFOLIO_SUMMARY_PATTERN.sub(portfolio_summary_replacer, expanded)
-    expanded = PORTFOLIO_CHARTS_PATTERN.sub(portfolio_charts_replacer, expanded)
-    expanded = PORTFOLIO_IRR_CHARTS_PATTERN.sub(portfolio_irr_charts_replacer, expanded)
-    expanded = PORTFOLIO_CATEGORY_SUMMARY_PATTERN.sub(
-        portfolio_category_summary_replacer, expanded
+    expanded = _replace_marker(
+        PORTFOLIO_COMPARISON_SUMMARY_PATTERN,
+        expanded,
+        portfolio_comparisons,
+        _render_portfolio_comparison_summary_html,
     )
-    expanded = PORTFOLIO_COMPARISON_SUMMARY_PATTERN.sub(
-        portfolio_comparison_summary_replacer, expanded
+    expanded = _replace_marker(
+        PORTFOLIO_COMPARISON_CHARTS_PATTERN,
+        expanded,
+        portfolio_comparisons,
+        _render_portfolio_comparison_charts_html,
     )
-    expanded = PORTFOLIO_COMPARISON_CHARTS_PATTERN.sub(
-        portfolio_comparison_charts_replacer, expanded
-    )
+
     cashflow_snapshots = _get_cashflow_snapshots(post)
+    expanded = _replace_marker(
+        CASHFLOW_SUMMARY_PATTERN,
+        expanded,
+        cashflow_snapshots,
+        _render_cashflow_summary_html,
+    )
+    expanded = _replace_marker(
+        CASHFLOW_CHARTS_PATTERN,
+        expanded,
+        cashflow_snapshots,
+        _render_cashflow_charts_html,
+    )
+
     cashflow_comparisons = _get_cashflow_comparisons(post)
-
-    def cashflow_summary_replacer(match):
-        identifier = match.group(1)
-        snapshot = _get_item_by_identifier(cashflow_snapshots, identifier)
-        return _render_cashflow_summary_html(snapshot)
-
-    def cashflow_charts_replacer(match):
-        identifier = match.group(1)
-        snapshot = _get_item_by_identifier(cashflow_snapshots, identifier)
-        return _render_cashflow_charts_html(snapshot)
-
-    def cashflow_comparison_summary_replacer(match):
-        identifier = match.group(1)
-        comparison = _get_item_by_identifier(cashflow_comparisons, identifier)
-        return _render_cashflow_comparison_summary_html(comparison)
-
-    def cashflow_comparison_charts_replacer(match):
-        identifier = match.group(1)
-        comparison = _get_item_by_identifier(cashflow_comparisons, identifier)
-        return _render_cashflow_comparison_charts_html(comparison)
-
-    expanded = CASHFLOW_SUMMARY_PATTERN.sub(cashflow_summary_replacer, expanded)
-    expanded = CASHFLOW_CHARTS_PATTERN.sub(cashflow_charts_replacer, expanded)
-    expanded = CASHFLOW_COMPARISON_SUMMARY_PATTERN.sub(
-        cashflow_comparison_summary_replacer, expanded
+    expanded = _replace_marker(
+        CASHFLOW_COMPARISON_SUMMARY_PATTERN,
+        expanded,
+        cashflow_comparisons,
+        _render_cashflow_comparison_summary_html,
     )
-    expanded = CASHFLOW_COMPARISON_CHARTS_PATTERN.sub(
-        cashflow_comparison_charts_replacer, expanded
+    expanded = _replace_marker(
+        CASHFLOW_COMPARISON_CHARTS_PATTERN,
+        expanded,
+        cashflow_comparisons,
+        _render_cashflow_comparison_charts_html,
     )
+
     salary_savings_snapshots = _get_salary_savings_snapshots(post)
+    expanded = _replace_marker(
+        SAVINGS_RATE_SUMMARY_PATTERN,
+        expanded,
+        salary_savings_snapshots,
+        _render_savings_rate_summary_html,
+    )
+    expanded = _replace_marker(
+        SAVINGS_RATE_CHARTS_PATTERN,
+        expanded,
+        salary_savings_snapshots,
+        _render_savings_rate_charts_html,
+    )
 
-    def savings_rate_summary_replacer(match):
-        identifier = match.group(1)
-        snapshot = _get_item_by_identifier(salary_savings_snapshots, identifier)
-        return _render_savings_rate_summary_html(snapshot)
-
-    def savings_rate_charts_replacer(match):
-        identifier = match.group(1)
-        snapshot = _get_item_by_identifier(salary_savings_snapshots, identifier)
-        return _render_savings_rate_charts_html(snapshot)
-
-    expanded = SAVINGS_RATE_SUMMARY_PATTERN.sub(savings_rate_summary_replacer, expanded)
-    expanded = SAVINGS_RATE_CHARTS_PATTERN.sub(savings_rate_charts_replacer, expanded)
     dividend_snapshots = _get_dividend_snapshots(post)
+    expanded = _replace_marker(
+        DIVIDEND_SUMMARY_PATTERN,
+        expanded,
+        dividend_snapshots,
+        _render_dividend_summary_html,
+    )
+    expanded = _replace_marker(
+        DIVIDEND_CHARTS_PATTERN,
+        expanded,
+        dividend_snapshots,
+        _render_dividend_charts_html,
+    )
+
     dividend_comparisons = _get_dividend_comparisons(post)
-
-    def dividend_summary_replacer(match):
-        identifier = match.group(1)
-        snapshot = _get_item_by_identifier(dividend_snapshots, identifier)
-        return _render_dividend_summary_html(snapshot)
-
-    def dividend_charts_replacer(match):
-        identifier = match.group(1)
-        snapshot = _get_item_by_identifier(dividend_snapshots, identifier)
-        return _render_dividend_charts_html(snapshot)
-
-    expanded = DIVIDEND_SUMMARY_PATTERN.sub(dividend_summary_replacer, expanded)
-    expanded = DIVIDEND_CHARTS_PATTERN.sub(dividend_charts_replacer, expanded)
-
-    def dividend_comparison_replacer(match):
-        identifier = match.group(1)
-        comparison = _get_item_by_identifier(dividend_comparisons, identifier)
-        return _render_dividend_comparison_html(comparison)
-
-    expanded = DIVIDEND_COMPARISON_PATTERN.sub(dividend_comparison_replacer, expanded)
+    expanded = _replace_marker(
+        DIVIDEND_COMPARISON_PATTERN,
+        expanded,
+        dividend_comparisons,
+        _render_dividend_comparison_html,
+    )
 
     legal_disclaimer_html = """
 <aside class="legal-disclaimer-inline">
