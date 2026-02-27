@@ -8,6 +8,7 @@ from .models import (
     AboutPage,
     AboutPageImage,
     ContactMessage,
+    PageSEO,
     SidebarWidget,
     SiteSettings,
 )
@@ -22,6 +23,29 @@ class SiteSettingsAdmin(admin.ModelAdmin):
         "is_contact_enabled",
         "updated_at",
     )
+    fieldsets = (
+        (
+            "Genel Ayarlar",
+            {
+                "fields": (
+                    "is_comments_enabled",
+                    "is_newsletter_enabled",
+                    "is_contact_enabled",
+                )
+            },
+        ),
+        (
+            "Varsayılan SEO Ayarları",
+            {
+                "fields": (
+                    "default_meta_title",
+                    "default_meta_description",
+                    "default_meta_image",
+                ),
+                "description": "Buradaki ayarlar, spesifik bir SEO tanımı (blog yazısı, sayfa vb.) bulunamadığında kullanılır.",
+            },
+        ),
+    )
 
     def has_add_permission(self, request) -> bool:
         if SiteSettings.objects.exists():
@@ -30,6 +54,19 @@ class SiteSettingsAdmin(admin.ModelAdmin):
 
     def has_delete_permission(self, request, obj=None) -> bool:
         return False
+
+
+@admin.register(PageSEO)
+class PageSEOAdmin(admin.ModelAdmin):
+    list_display = ("path", "title", "is_active", "updated_at")
+    list_filter = ("is_active",)
+    search_fields = ("path", "title", "description")
+    list_editable = ("is_active",)
+
+    fieldsets = (
+        (None, {"fields": ("path", "is_active")}),
+        ("SEO Bilgileri", {"fields": ("title", "description", "image", "image_alt")}),
+    )
 
 
 @admin.register(ContactMessage)

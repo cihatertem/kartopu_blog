@@ -13,6 +13,7 @@ from .mixins import TimeStampedModelMixin, UUIDModelMixin
 
 SEO_TITLE_MAX_LENGTH = 45
 SEO_DESCRIPTION_MAX_LENGTH = 160
+CACHE_SITE_SETTINGS_TIMEOUT = 3600  # 1 saat
 
 
 class SiteSettings(
@@ -35,6 +36,26 @@ class SiteSettings(
         help_text="İletişim sayfasındaki formu açar/kapatır.",
     )
 
+    # SEO Defaults
+    default_meta_title = models.CharField(
+        max_length=255,
+        blank=True,
+        verbose_name="Varsayılan Meta Başlığı",
+        help_text="Spesifik bir başlık olmadığında kullanılır.",
+    )
+    default_meta_description = models.TextField(
+        blank=True,
+        verbose_name="Varsayılan Meta Açıklaması",
+        help_text="Spesifik bir açıklama olmadığında kullanılır. (150-160 karakter önerilir)",
+    )
+    default_meta_image = models.ImageField(
+        upload_to="seo/",
+        blank=True,
+        null=True,
+        verbose_name="Varsayılan OG Görseli",
+        help_text="Spesifik bir görsel olmadığında kullanılır.",
+    )
+
     class Meta:  # pyright: ignore[reportIncompatibleVariableOverride]
         verbose_name = "Site Ayarları"
         verbose_name_plural = "Site Ayarları"
@@ -54,14 +75,72 @@ class SiteSettings(
         settings_obj = cache.get("site_settings")
         if settings_obj is None:
             settings_obj, _ = cls.objects.get_or_create()
-            cache.set("site_settings", settings_obj, timeout=3600)
+            cache.set(
+                "site_settings", settings_obj, timeout=CACHE_SITE_SETTINGS_TIMEOUT
+            )
         return settings_obj
 
     def save(self, *args: object, **kwargs: object) -> None:
         super().save(*args, **kwargs)  # pyright: ignore[reportArgumentType]
         from django.core.cache import cache
 
-        cache.set("site_settings", self, timeout=3600)
+        cache.set("site_settings", self, timeout=CACHE_SITE_SETTINGS_TIMEOUT)
+
+
+class PageSEO(
+    UUIDModelMixin,
+    TimeStampedModelMixin,
+):
+    path = models.CharField(
+        max_length=255,
+        unique=True,
+        verbose_name="URL Yolu",
+        help_text="Örn: /iletisim/ veya / (anasayfa için). Başında ve sonunda slash olmalı.",
+    )
+    title = models.CharField(
+        max_length=255,
+        blank=True,
+        verbose_name="Sayfa Başlığı (Title)",
+    )
+    description = models.TextField(
+        blank=True,
+        verbose_name="Sayfa Açıklaması (Description)",
+        help_text="150-160 karakter önerilir.",
+    )
+    image = models.ImageField(
+        upload_to="seo/",
+        blank=True,
+        null=True,
+        verbose_name="OG Görseli",
+    )
+    image_alt = models.CharField(
+        max_length=255,
+        blank=True,
+        verbose_name="Görsel Alt Metni",
+    )
+    is_active = models.BooleanField(
+        default=True,
+        verbose_name="Aktif",
+    )
+
+    class Meta:  # pyright: ignore[reportIncompatibleVariableOverride]
+        verbose_name = "Sayfa SEO Ayarı"
+        verbose_name_plural = "Sayfa SEO Ayarları"
+        ordering = ("path",)
+
+    def __str__(self) -> str:
+        return self.path
+
+    def save(self, *args, **kwargs):
+        # Path temizliği
+        if self.path:
+            self.path = self.path.strip()
+            if not self.path.startswith("/"):
+                self.path = "/" + self.path
+            # Sonda slash olmalı mı? Django genellikle append_slash=True kullanır.
+            # Kesinlik için opsiyonel bırakabiliriz ama standart olarak eklemek iyi olabilir.
+            # Ancak regex path'ler için sorun olabilir. Şimdilik basit path varsayalım.
+        super().save(*args, **kwargs)
 
 
 class ContactMessage(

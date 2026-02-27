@@ -31,3 +31,4 @@ docker-compose.prod.yml
 codex.patch
 jules.patch
 aws_setup_and_swarm_services_settings.md
+kartopu_local_backup.sql

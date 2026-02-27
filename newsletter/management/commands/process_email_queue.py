@@ -92,8 +92,11 @@ class Command(BaseCommand):
                             status=EmailQueueStatus.PENDING,
                         ).update(status=EmailQueueStatus.PROCESSING)  # pyright: ignore[reportAttributeAccessIssue]
 
-                pending_emails = EmailQueue.objects.filter(id__in=pending_ids).order_by(
-                    "created_at"
+                pending_emails = (
+                    EmailQueue.objects.filter(id__in=pending_ids)
+                    .select_related("direct_email")
+                    .prefetch_related("direct_email__attachments")
+                    .order_by("created_at")
                 )
                 count = len(pending_emails)
 
