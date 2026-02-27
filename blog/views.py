@@ -509,7 +509,7 @@ def post_reaction(request, slug: str):
 
 def archive_detail(request, year: int, month: int):
     archive_month = date(year, month, 1)
-    archive_month = date_format(archive_month, "F Y")
+    archive_month = date_format(archive_month, "Y F")
     qs = (
         published_posts_queryset()
         .filter(published_at__year=year, published_at__month=month)

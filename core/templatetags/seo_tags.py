@@ -100,6 +100,7 @@ def get_seo_data(context):
     elif context.get("tag") and context.get("active_tag_slug"):
         tag = context["tag"]
         seo["title"] = f"#{tag.name} | {site_name}"
+        seo["description"] = f"#{tag.name} etiketine ait blog yazıları."
 
     # Arşiv Sayfası
     elif context.get("archive_month") and context.get("active_archive_key"):
