@@ -2,12 +2,6 @@
 {% load blog_extras cache %}
 
 {% block title %}{{ about_page.meta_title|default:"Hakkımızda" }} | Kartopu Money{% endblock %}
-{% block head %}
-  <meta
-    name="description"
-    content="{{ about_page.meta_description|default:"Kartopu Money’nin arkasındaki bizler ve finansal özgürlük yolculuğumuz hakkında bilgi edinin. Yatırım yaklaşımımız ve bu blogun amacı burada." }}"
-  />
-{% endblock %}
 
 {% block content %}
 {% if about_page %}

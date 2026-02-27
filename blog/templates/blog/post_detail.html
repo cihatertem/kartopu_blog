@@ -7,10 +7,6 @@
   {% preload_stylesheet 'css/forms.css' %}
 {% endblock %}
 
-{% block head %}
-  <meta name="description" content="{{ post.effective_meta_description }}" />
-{% endblock %}
-
 {% block structured_data %}
   {% static 'images/home/hero-snow-ball.png' as site_logo_path %}
   {% with site_logo_url=site_logo_path|absolute_url:site_base_url %}

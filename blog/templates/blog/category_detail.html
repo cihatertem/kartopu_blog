@@ -5,12 +5,6 @@
   {% preload_stylesheet 'css/blog.css' %}
   {% preload_stylesheet 'css/post_list.css' %}
 {% endblock %}
-{% block head %}
-  <meta
-    name="description"
-    content="{{ category.description|default:'Kartopu Money kategorisindeki en yeni yazılar.' }}"
-  />
-{% endblock %}
 
 {% block content %}
 {% include "includes/breadcrumbs.html" %}
