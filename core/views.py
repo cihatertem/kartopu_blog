@@ -2,11 +2,9 @@ from __future__ import print_function
 
 from django.contrib import messages
 from django.shortcuts import redirect, render
-from django.utils.text import slugify
 from django.views.decorators.http import require_http_methods
 from django_ratelimit.decorators import ratelimit
 
-from blog.models import Category
 from core.helpers import (
     CAPTCHA_SESSION_KEY,
     _generate_captcha,

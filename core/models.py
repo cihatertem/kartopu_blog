@@ -118,7 +118,7 @@ class PageSEO(
         help_text="150-160 karakter önerilir.",
     )
     image = models.ImageField(
-        upload_to="seo/",
+        upload_to=site_settings_og_image_upload_path,  # pyright: ignore[reportArgumentType]
         blank=True,
         null=True,
         verbose_name="OG Görseli",
@@ -178,8 +178,9 @@ class ContactMessage(
 
 def about_image_upload_path(instance: "AboutPageImage", filename: str) -> str:
     filename, file_extension = os.path.splitext(filename.lower())
+    timestamp = timezone.now().strftime("%Y%m%d%H%M%S")
     safe_name = slugify(filename)
-    return f"core/about/images/{safe_name}{file_extension}"
+    return f"core/about/images/{safe_name}_{timestamp}{file_extension}"
 
 
 class AboutPage(

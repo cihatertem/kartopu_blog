@@ -40,7 +40,7 @@ def get_seo_data(context):
     default_image = (
         make_absolute(site_settings.default_meta_image.url)
         if site_settings.default_meta_image
-        else make_absolute("/static/images/home/og_twit_card.jpeg")
+        else make_absolute("/media/sea/og_twit_card.jpeg")
     )
 
     seo = {
@@ -54,8 +54,6 @@ def get_seo_data(context):
         "twitter_card": "summary_large_image",
         "twitter_site": "@KartopuMoney",  # Sabit veya settings'den alınabilir
     }
-
-    # 2. Dinamik İçerik (Context'ten gelen veriler öncelikli)
 
     # Blog Post
     if context.get("post"):
@@ -114,20 +112,8 @@ def get_seo_data(context):
         seo["title"] = f"'{query}' Arama Sonuçları | {site_name}"
         seo["description"] = f"'{query}' için arama sonuçları."
 
-    # 3. Statik Sayfa Override (PageSEO veritabanı sorgusu)
-    # Eğer yukarıdaki kurallardan biri uygulanmadıysa veya override edilmek isteniyorsa
-    # Ancak "Dinamik Veri Yönetimi" maddesi "Eğer sayfa bir Blog Yazısı gibi; modelden gelen meta alanları... kullan" diyor.
-    # Yani model verisi varsa, PageSEO'ya bakmaya gerek yok veya PageSEO sadece statik sayfalar için (iletişim, anasayfa vb.)
-
-    # PageSEO sadece spesifik path eşleşmelerinde devreye girsin.
-    # Örneğin /iletisim/ sayfası için bir PageSEO kaydı varsa, context'ten gelen veriyi ezebilir mi?
-    # Genelde manuel tanımlar otomatikten baskın olmalıdır.
-
     try:
         path = request.path
-        # Normalize path: remove trailing slash for consistent lookup if stored without slash
-        # But standard Django appends slash. Let's try both.
-
         page_seo = PageSEO.objects.filter(
             Q(path=path) | Q(path=path.rstrip("/")) | Q(path=path.rstrip("/") + "/"),
             is_active=True,
@@ -140,7 +126,6 @@ def get_seo_data(context):
                 seo["description"] = page_seo.description
             if page_seo.image:
                 seo["image"] = make_absolute(page_seo.image.url)
-            # Eğer PageSEO'da image_alt varsa onu da ekleyebiliriz ama şemada yoktu.
 
     except Exception:
         pass
