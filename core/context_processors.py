@@ -27,6 +27,9 @@ from .models import ContactMessage, SidebarWidget, SiteSettings
 from .tag_colors import get_tag_color_class
 
 CACHE_TIMEOUT = 600  # 10 minutes
+COMMENT_WEIGHT = 5
+REACTION_WEIGHT = 3
+VIEW_WEIGHT = 1
 
 
 def breadcrumbs_context(request):
@@ -158,9 +161,9 @@ def categories_tags_context(request):
             )
             .annotate(
                 popularity_score=ExpressionWrapper(
-                    F("approved_comment_count") * 5
-                    + F("view_count")
-                    + F("reaction_count") * 3,
+                    F("approved_comment_count") * COMMENT_WEIGHT
+                    + F("view_count") * VIEW_WEIGHT
+                    + F("reaction_count") * REACTION_WEIGHT,
                     output_field=IntegerField(),
                 )
             )

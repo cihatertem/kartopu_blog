@@ -1,6 +1,7 @@
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import AnonymousUser
 from django.core.cache import cache
+from django.core.exceptions import ValidationError
 from django.test import RequestFactory, TestCase, override_settings
 from django.utils import timezone
 
@@ -19,7 +20,6 @@ class SiteSettingsTest(TestCase):
 
     def test_singleton(self):
         SiteSettings.objects.create()
-        from django.core.exceptions import ValidationError
 
         with self.assertRaises(ValidationError):
             settings = SiteSettings(is_comments_enabled=False)
