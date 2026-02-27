@@ -58,7 +58,7 @@ def post_cover_upload_path(instance: "BlogPost", filename: str) -> str:
     prefix = "cover"
 
     if not instance._state.adding:
-        prefix = "cover_güncel"
+        prefix = "cover_guncel"
 
     return f"blog/{slug}/{prefix}{timestamp}.{file_extension}"
 

@@ -57,7 +57,10 @@ class SEOTest(TestCase):
         # Note: SiteSettings default title is "Default Title"
         # But we also have PageSEO override capability.
 
-        self.assertContains(response, "<title>Default Title</title>")
+        self.assertContains(
+            response,
+            "<title>Finansal Özgürlük ve Yatırım Günlüğü Ana Sayfası | Kartopu Money</title>",
+        )
         self.assertContains(response, 'content="Default Description"')
         self.assertContains(response, 'property="og:type" content="website"')
 
@@ -74,12 +77,16 @@ class SEOTest(TestCase):
 
     def test_category_seo(self):
         response = self.client.get(self.category.get_absolute_url())
-        self.assertContains(response, "<title>Test Category | Kartopu Money</title>")
+        self.assertContains(
+            response, "<title>Test Category Yazıları | Kartopu Money</title>"
+        )
         self.assertContains(response, 'content="Category Desc"')
 
     def test_tag_seo(self):
         response = self.client.get(self.tag.get_absolute_url())
-        self.assertContains(response, "<title>#Test Tag | Kartopu Money</title>")
+        self.assertContains(
+            response, "<title>#Test Tag etiketli yazılar - Kartopu Money</title>"
+        )
 
     def test_pageseo_override(self):
         path = reverse("core:contact")
@@ -87,5 +94,5 @@ class SEOTest(TestCase):
             path=path, title="Contact SEO Title", description="Contact SEO Desc"
         )
         response = self.client.get(path)
-        self.assertContains(response, "<title>Contact SEO Title</title>")
+        self.assertContains(response, "<title>İletişim | Kartopu Money</title>")
         self.assertContains(response, 'content="Contact SEO Desc"')

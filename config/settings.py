@@ -15,6 +15,7 @@ import os
 from pathlib import Path
 
 import lz4
+from django.core.exceptions import ImproperlyConfigured
 
 
 def get_swarm_secret_for_psg(key: str, default: str = "") -> str:
@@ -32,15 +33,26 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/5.2/howto/deployment/checklist/
 
+# SECURITY WARNING: don't run with debug turned on in production!
+DEBUG = os.getenv("DJANGO_DEBUG", "0") == "1"
+
 # SECURITY WARNING: keep the secret key used in production secret!
 SECRET_KEY = get_swarm_secret_for_psg(
     "DJANGO_SECRET", "django-insecure-please-change-me"
 )
 
-# SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = os.getenv("DJANGO_DEBUG", "0") == "1"
+if not DEBUG and (not SECRET_KEY or SECRET_KEY == "django-insecure-please-change-me"):
+    raise ImproperlyConfigured(
+        "The SECRET_KEY setting must not be empty or insecure in production."
+    )
 
-ALLOWED_HOSTS = ["*"] if DEBUG else os.getenv("DJANGO_ALLOWED_HOSTS", "").split(",")
+_allowed_hosts = os.getenv("DJANGO_ALLOWED_HOSTS", "")
+if _allowed_hosts:
+    ALLOWED_HOSTS = _allowed_hosts.split(",")
+elif DEBUG:
+    ALLOWED_HOSTS = ["localhost", "127.0.0.1", "[::1]"]
+else:
+    ALLOWED_HOSTS = [""]
 
 GOOGLE_ANALYTICS_ID = os.getenv("GOOGLE_ANALYTICS_ID", "")
 
