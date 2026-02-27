@@ -15,7 +15,6 @@ import os
 from pathlib import Path
 
 import lz4
-from django.core.exceptions import ImproperlyConfigured
 
 
 def get_swarm_secret_for_psg(key: str, default: str = "") -> str:
@@ -40,11 +39,6 @@ DEBUG = os.getenv("DJANGO_DEBUG", "0") == "1"
 SECRET_KEY = get_swarm_secret_for_psg(
     "DJANGO_SECRET", "django-insecure-please-change-me"
 )
-
-if not DEBUG and (not SECRET_KEY or SECRET_KEY == "django-insecure-please-change-me"):
-    raise ImproperlyConfigured(
-        "The SECRET_KEY setting must not be empty or insecure in production."
-    )
 
 _allowed_hosts = os.getenv("DJANGO_ALLOWED_HOSTS", "")
 if _allowed_hosts:
