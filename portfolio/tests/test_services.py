@@ -5,7 +5,7 @@ from unittest.mock import MagicMock, patch
 import pandas as pd
 from django.test import TestCase
 
-from portfolio.services import calculate_xirr, fetch_fx_rate
+from portfolio.services import calculate_xirr, fetch_fx_rate, fetch_yahoo_finance_price
 
 
 class CalculateXIRRTests(TestCase):
@@ -127,6 +127,122 @@ class CalculateXIRRTests(TestCase):
         ]
         # This falls into same day cash flows, returning 0.0
         self.assertEqual(calculate_xirr(cash_flows), 0.0)
+
+
+class FetchYahooFinancePriceTests(TestCase):
+    def test_empty_symbol(self):
+        """Test with empty symbol."""
+        self.assertIsNone(fetch_yahoo_finance_price(""))
+
+    @patch("portfolio.services._get_ticker")
+    @patch("portfolio.services._get_price")
+    @patch("portfolio.services._safe_decimal")
+    def test_no_date_success(self, mock_safe_decimal, mock_get_price, mock_get_ticker):
+        """Test fetching current price successfully."""
+        mock_ticker = MagicMock()
+        mock_get_ticker.return_value = mock_ticker
+        mock_get_price.return_value = 150.5
+        mock_safe_decimal.return_value = Decimal("150.5")
+
+        price = fetch_yahoo_finance_price("AAPL")
+
+        self.assertEqual(price, Decimal("150.5"))
+        mock_get_ticker.assert_called_once_with("AAPL")
+        mock_get_price.assert_called_once_with(mock_ticker)
+        mock_safe_decimal.assert_called_once_with(150.5)
+
+    @patch("portfolio.services._get_ticker")
+    def test_no_date_ticker_none(self, mock_get_ticker):
+        """Test when ticker initialization fails."""
+        mock_get_ticker.return_value = None
+
+        self.assertIsNone(fetch_yahoo_finance_price("AAPL"))
+        mock_get_ticker.assert_called_once_with("AAPL")
+
+    @patch("portfolio.services._get_ticker")
+    @patch("portfolio.services._get_price")
+    def test_no_date_price_none(self, mock_get_price, mock_get_ticker):
+        """Test when price lookup fails."""
+        mock_ticker = MagicMock()
+        mock_get_ticker.return_value = mock_ticker
+        mock_get_price.return_value = None
+
+        self.assertIsNone(fetch_yahoo_finance_price("AAPL"))
+        mock_get_ticker.assert_called_once_with("AAPL")
+        mock_get_price.assert_called_once_with(mock_ticker)
+
+    @patch("portfolio.services._get_ticker")
+    @patch("portfolio.services._get_history")
+    @patch("portfolio.services._safe_decimal")
+    def test_with_date_success(
+        self, mock_safe_decimal, mock_get_history, mock_get_ticker
+    ):
+        """Test fetching price for a specific date successfully."""
+        mock_ticker = MagicMock()
+        mock_get_ticker.return_value = mock_ticker
+
+        # Create a mock DataFrame with a DateIndex
+        d = date(2023, 10, 1)
+        mock_df = pd.DataFrame(
+            {"Close": [149.0, 150.0]},
+            index=pd.DatetimeIndex(["2023-09-30", "2023-10-01"]),
+        )
+        mock_get_history.return_value = mock_df
+        mock_safe_decimal.return_value = Decimal("150.0")
+
+        price = fetch_yahoo_finance_price("AAPL", price_date=d)
+
+        self.assertEqual(price, Decimal("150.0"))
+        mock_get_ticker.assert_called_once_with("AAPL")
+        mock_safe_decimal.assert_called_once_with(150.0)
+
+    @patch("portfolio.services._get_ticker")
+    def test_with_date_ticker_none(self, mock_get_ticker):
+        """Test fetching price with date but ticker is None."""
+        mock_get_ticker.return_value = None
+        d = date(2023, 10, 1)
+
+        self.assertIsNone(fetch_yahoo_finance_price("AAPL", price_date=d))
+        mock_get_ticker.assert_called_once_with("AAPL")
+
+    @patch("portfolio.services._get_ticker")
+    @patch("portfolio.services._get_history")
+    def test_with_date_history_none(self, mock_get_history, mock_get_ticker):
+        """Test fetching price with date but history returns None."""
+        mock_ticker = MagicMock()
+        mock_get_ticker.return_value = mock_ticker
+        mock_get_history.return_value = None
+        d = date(2023, 10, 1)
+
+        self.assertIsNone(fetch_yahoo_finance_price("AAPL", price_date=d))
+
+    @patch("portfolio.services._get_ticker")
+    @patch("portfolio.services._get_history")
+    def test_with_date_history_empty(self, mock_get_history, mock_get_ticker):
+        """Test fetching price with date but history is empty initially."""
+        mock_ticker = MagicMock()
+        mock_get_ticker.return_value = mock_ticker
+        mock_get_history.return_value = pd.DataFrame()
+        d = date(2023, 10, 1)
+
+        self.assertIsNone(fetch_yahoo_finance_price("AAPL", price_date=d))
+
+    @patch("portfolio.services._get_ticker")
+    @patch("portfolio.services._get_history")
+    def test_with_date_history_filtered_empty(self, mock_get_history, mock_get_ticker):
+        """Test fetching price with date but history is empty after date filtering."""
+        mock_ticker = MagicMock()
+        mock_get_ticker.return_value = mock_ticker
+
+        d = date(2023, 10, 1)
+        # DataFrame with dates after the requested date
+        mock_df = pd.DataFrame(
+            {"Close": [149.0, 150.0]},
+            index=pd.DatetimeIndex(["2023-10-02", "2023-10-03"]),
+        )
+        mock_get_history.return_value = mock_df
+
+        self.assertIsNone(fetch_yahoo_finance_price("AAPL", price_date=d))
 
 
 class FetchFXRateTests(TestCase):
