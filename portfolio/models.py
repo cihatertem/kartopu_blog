@@ -467,61 +467,30 @@ class Portfolio(UUIDModelMixin, TimeStampedModelMixin):
             Decimal("0"),
         )
 
-    @staticmethod
-    def _get_asset_quantity_before_transaction(
-        *,
-        transactions: QuerySet["PortfolioTransaction"],
-        asset_id: str,
-        cutoff_transaction: "PortfolioTransaction",
-    ) -> Decimal:
-        quantity = Decimal("0")
-        history = transactions.filter(asset_id=asset_id).order_by(
-            "trade_date", "created_at"
-        )
-        for transaction in history:
-            if transaction.pk == cutoff_transaction.pk:
-                break
-            if transaction.transaction_type == PortfolioTransaction.TransactionType.BUY:
-                quantity += transaction.quantity
-            elif (
-                transaction.transaction_type
-                == PortfolioTransaction.TransactionType.SELL
-            ):
-                quantity -= transaction.quantity
-            elif transaction.transaction_type in (
-                PortfolioTransaction.TransactionType.BONUS_CAPITAL_INCREASE,
-                PortfolioTransaction.TransactionType.RIGHTS_EXERCISED,
-            ):
-                quantity += Portfolio._calculate_capital_increase_quantity(
-                    current_quantity=quantity,
-                    increase_rate_pct=transaction.capital_increase_rate_pct,  # pyright: ignore[reportAttributeAccessIssue]
-                )
-
-            if quantity < 0:
-                quantity = Decimal("0")
-
-        return quantity
-
     def calculate_irr(self, as_of_date: date, current_value: Decimal) -> Decimal | None:
         """
         Calculates the Internal Rate of Return (IRR) for the portfolio as of a given date
         and current market value.
         """
-        transactions = self.transactions.select_related("asset").filter(  # pyright: ignore[reportAttributeAccessIssue]
-            trade_date__lte=as_of_date
+        transactions = (
+            self.transactions.select_related("asset")  # pyright: ignore[reportAttributeAccessIssue]
+            .filter(trade_date__lte=as_of_date)
+            .order_by("trade_date", "created_at")
         )
         tx_cash_flows = []
+        fx_rates: dict[tuple[str, str, date | None], Decimal] = {}
+        asset_quantities: dict[str, Decimal] = {}
+
         for tx in transactions:
-            fx_rate = fetch_fx_rate(
-                tx.asset.currency, self.currency, rate_date=tx.trade_date
+            fx_rate = self._get_or_fetch_fx_rate(
+                fx_rates, tx.asset.currency, self.currency, tx.trade_date
             )
-            fx_rate = fx_rate if fx_rate is not None else Decimal("1")
+
+            asset_id_str = str(tx.asset_id)
+            current_quantity = asset_quantities.get(asset_id_str, Decimal("0"))
+
             rights_quantity = self._calculate_capital_increase_quantity(
-                current_quantity=self._get_asset_quantity_before_transaction(
-                    transactions=transactions,
-                    asset_id=tx.asset_id,
-                    cutoff_transaction=tx,
-                ),
+                current_quantity=current_quantity,
                 increase_rate_pct=tx.capital_increase_rate_pct,
             )
             amount = tx.total_cost * fx_rate
@@ -535,6 +504,22 @@ class Portfolio(UUIDModelMixin, TimeStampedModelMixin):
                 tx_cash_flows.append((tx.trade_date, -rights_cost))
             elif tx.transaction_type == PortfolioTransaction.TransactionType.SELL:
                 tx_cash_flows.append((tx.trade_date, amount))
+
+            # Update rolling balance
+            if tx.transaction_type == PortfolioTransaction.TransactionType.BUY:
+                current_quantity += tx.quantity
+            elif tx.transaction_type == PortfolioTransaction.TransactionType.SELL:
+                current_quantity -= tx.quantity
+            elif tx.transaction_type in (
+                PortfolioTransaction.TransactionType.BONUS_CAPITAL_INCREASE,
+                PortfolioTransaction.TransactionType.RIGHTS_EXERCISED,
+            ):
+                current_quantity += rights_quantity
+
+            if current_quantity < 0:
+                current_quantity = Decimal("0")
+
+            asset_quantities[asset_id_str] = current_quantity
 
         tx_cash_flows.append((as_of_date, current_value))
         irr = calculate_xirr(tx_cash_flows)
