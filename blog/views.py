@@ -361,7 +361,7 @@ def search_results(request):
     q = (request.GET.get("q") or "").strip()
     tokens = helpers.normalize_search_query(q)
 
-    base_qs = published_posts_queryset()
+    base_qs = published_posts_queryset(include_tags=False)
 
     if not q or not tokens:
         qs = base_qs.none()
@@ -414,7 +414,9 @@ def search_results(request):
 
 
 def post_list(request):
-    qs = published_posts_queryset().order_by("-published_at", "-created_at")
+    qs = published_posts_queryset(include_tags=False).order_by(
+        "-published_at", "-created_at"
+    )
     page_obj = get_page_obj(request, qs, per_page=POST_PAGE_SIZE)
 
     return render(
@@ -511,7 +513,7 @@ def archive_detail(request, year: int, month: int):
     archive_month = date(year, month, 1)
     archive_month = date_format(archive_month, "Y F")
     qs = (
-        published_posts_queryset()
+        published_posts_queryset(include_tags=False)
         .filter(published_at__year=year, published_at__month=month)
         .order_by("-published_at", "-created_at")
     )
@@ -547,7 +549,7 @@ def category_detail(request, slug: str):
     category = get_object_or_404(Category, slug=slug)
 
     qs = (
-        published_posts_queryset()
+        published_posts_queryset(include_tags=False)
         .filter(category=category)
         .order_by("-published_at", "-created_at")
     )
@@ -583,7 +585,7 @@ def tag_detail(request, slug: str):
     tag = get_object_or_404(Tag, slug=slug)
 
     qs = (
-        published_posts_queryset()
+        published_posts_queryset(include_tags=False)
         .filter(tags=tag)
         .order_by("-published_at", "-created_at")
     )

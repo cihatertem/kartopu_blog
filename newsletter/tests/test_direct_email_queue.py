@@ -76,7 +76,6 @@ class DirectEmailQueueTest(TestCase):
 
         # Check attachment contents
         attachment_contents = [a[1] for a in sent_email.attachments]
-        # print(f"DEBUG: attachment_contents={attachment_contents}")
         # Some backends might return strings instead of bytes for simple text content
         self.assertTrue(
             any(c == b"Content 1" or c == "Content 1" for c in attachment_contents)
