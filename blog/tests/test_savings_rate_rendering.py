@@ -49,7 +49,7 @@ class SavingsRateRenderingTests(TestCase):
         )
         january_snapshot = SalarySavingsSnapshot.create_snapshot(
             flow=self.flow,
-            snapshot_date=date(2026, 1, 32),
+            snapshot_date=date(2026, 1, 31),
         )
 
         post = BlogPost.objects.create(
