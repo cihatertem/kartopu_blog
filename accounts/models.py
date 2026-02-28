@@ -145,7 +145,7 @@ class User(  # pyright: ignore[reportIncompatibleVariableOverride]
     def full_name(self) -> str:
         return self.get_full_name().title()
 
-    @log_exceptions(message="Avatar resizing failed")
+    @log_exceptions(message="Avatar resizing failed: %s")
     def _resize_avatar(self) -> None:
         if not self.avatar:
             return

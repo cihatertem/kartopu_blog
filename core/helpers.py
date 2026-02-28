@@ -44,7 +44,7 @@ def client_ip_key(group, request):
 @log_exceptions(
     default=None,
     exception_types=(TypeError, ValueError),
-    message="Error parsing integer",
+    message="Error parsing integer: %s",
 )
 def _parse_int(value: str | None) -> int | None:
     return int(value) if value not in (None, "") else None
