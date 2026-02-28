@@ -2,6 +2,8 @@ import uuid
 
 from django.db import models
 
+from core.services.portfolio import generate_unique_slug
+
 
 class TimeStampedModelMixin(models.Model):
     """
@@ -13,6 +15,28 @@ class TimeStampedModelMixin(models.Model):
 
     class Meta:
         abstract = True
+
+
+class SlugMixin(models.Model):
+    """
+    A mixin that adds a unique slug field to a model, generated from its name.
+    """
+
+    slug = models.CharField(
+        max_length=255,
+        unique=True,
+        blank=True,
+        null=True,
+        editable=False,
+    )
+
+    class Meta:
+        abstract = True
+
+    def save(self, *args: object, **kwargs: object) -> None:
+        if not self.slug and getattr(self, "name", None):
+            self.slug = generate_unique_slug(self.__class__, self.name)  # pyright: ignore[reportAttributeAccessIssue]
+        super().save(*args, **kwargs)  # pyright: ignore[reportArgumentType]
 
 
 class UUIDModelMixin(models.Model):

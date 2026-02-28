@@ -14,8 +14,6 @@ import ipaddress
 import os
 from pathlib import Path
 
-import lz4
-
 
 def get_swarm_secret_for_psg(key: str, default: str = "") -> str:
     value = os.getenv(key, default)

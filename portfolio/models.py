@@ -10,13 +10,12 @@ from django.db import models
 from django.db.models import QuerySet
 from django.utils import timezone
 
-from core.mixins import TimeStampedModelMixin, UUIDModelMixin
+from core.mixins import SlugMixin, TimeStampedModelMixin, UUIDModelMixin
 from core.services.portfolio import (
     build_comparison_name,
     build_snapshot_name,
     format_comparison_label,
     format_snapshot_label,
-    generate_unique_slug,
 )
 from portfolio.services import calculate_xirr, fetch_fx_rate, fetch_yahoo_finance_price
 
@@ -26,18 +25,11 @@ MAX_DECIMAL_PLACES_FOR_QUANTITY = 5
 MAX_DECIMAL_PLACES_FOR_RATE = 4
 
 
-class BaseSnapshot(UUIDModelMixin, TimeStampedModelMixin):
+class BaseSnapshot(SlugMixin, UUIDModelMixin, TimeStampedModelMixin):
     snapshot_date = models.DateField(default=timezone.now)
     name = models.CharField(max_length=200, blank=True)
-    slug = models.CharField(
-        max_length=255,
-        unique=True,
-        blank=True,
-        null=True,
-        editable=False,
-    )
 
-    class Meta:
+    class Meta:  # pyright: ignore[reportIncompatibleVariableOverride]
         abstract = True
 
     def _get_fallback_name(self) -> str:
@@ -48,8 +40,6 @@ class BaseSnapshot(UUIDModelMixin, TimeStampedModelMixin):
             fallback = self._get_fallback_name()
             if fallback:
                 self.name = fallback
-        if not self.slug and self.name:
-            self.slug = generate_unique_slug(self.__class__, self.name)
         super().save(*args, **kwargs)  # pyright: ignore[reportArgumentType]
 
     @classmethod
@@ -84,7 +74,7 @@ class BaseSnapshot(UUIDModelMixin, TimeStampedModelMixin):
         cls._create_snapshot_items(snapshot, items_data)
 
         if hasattr(snapshot, "update_irr"):
-            snapshot.update_irr()
+            snapshot.update_irr()  # pyright: ignore[reportAttributeAccessIssue]
 
         return snapshot
 
@@ -159,15 +149,8 @@ class Asset(UUIDModelMixin, TimeStampedModelMixin):
         super().save(*args, **kwargs)  # pyright: ignore[reportArgumentType]
 
 
-class PortfolioComparison(UUIDModelMixin, TimeStampedModelMixin):
+class PortfolioComparison(SlugMixin, UUIDModelMixin, TimeStampedModelMixin):
     name = models.CharField(max_length=255, blank=True)
-    slug = models.CharField(
-        max_length=255,
-        unique=True,
-        blank=True,
-        null=True,
-        editable=False,
-    )
     base_snapshot = models.ForeignKey(
         "PortfolioSnapshot",
         on_delete=models.CASCADE,
@@ -205,8 +188,6 @@ class PortfolioComparison(UUIDModelMixin, TimeStampedModelMixin):
     def save(self, *args: object, **kwargs: object) -> None:
         if not self.name:
             self.name = build_comparison_name(self.base_snapshot, self.compare_snapshot)
-        if not self.slug and self.name:
-            self.slug = generate_unique_slug(self.__class__, self.name)
         super().save(*args, **kwargs)  # pyright: ignore[reportArgumentType]
 
 
@@ -1041,15 +1022,8 @@ class CashFlowSnapshotItem(UUIDModelMixin, TimeStampedModelMixin):
         return f"{self.snapshot} - {self.get_category_display()}"  # pyright: ignore[reportAttributeAccessIssue]
 
 
-class CashFlowComparison(UUIDModelMixin, TimeStampedModelMixin):
+class CashFlowComparison(SlugMixin, UUIDModelMixin, TimeStampedModelMixin):
     name = models.CharField(max_length=255, blank=True)
-    slug = models.CharField(
-        max_length=255,
-        unique=True,
-        blank=True,
-        null=True,
-        editable=False,
-    )
     base_snapshot = models.ForeignKey(
         CashFlowSnapshot,
         on_delete=models.CASCADE,
@@ -1087,8 +1061,6 @@ class CashFlowComparison(UUIDModelMixin, TimeStampedModelMixin):
     def save(self, *args: object, **kwargs: object) -> None:
         if not self.name:
             self.name = build_comparison_name(self.base_snapshot, self.compare_snapshot)
-        if not self.slug and self.name:
-            self.slug = generate_unique_slug(self.__class__, self.name)
         super().save(*args, **kwargs)  # pyright: ignore[reportArgumentType]
 
 
@@ -1229,15 +1201,8 @@ class SalarySavingsSnapshot(BaseSnapshot):
         return snapshot_date, snapshot_kwargs, []
 
 
-class DividendComparison(UUIDModelMixin, TimeStampedModelMixin):
+class DividendComparison(SlugMixin, UUIDModelMixin, TimeStampedModelMixin):
     name = models.CharField(max_length=255, blank=True)
-    slug = models.CharField(
-        max_length=255,
-        unique=True,
-        blank=True,
-        null=True,
-        editable=False,
-    )
     base_snapshot = models.ForeignKey(
         "DividendSnapshot",
         on_delete=models.CASCADE,
@@ -1275,8 +1240,6 @@ class DividendComparison(UUIDModelMixin, TimeStampedModelMixin):
     def save(self, *args: object, **kwargs: object) -> None:
         if not self.name:
             self.name = build_comparison_name(self.base_snapshot, self.compare_snapshot)
-        if not self.slug and self.name:
-            self.slug = generate_unique_slug(self.__class__, self.name)
         super().save(*args, **kwargs)  # pyright: ignore[reportArgumentType]
 
 
@@ -1531,10 +1494,10 @@ class DividendSnapshot(BaseSnapshot):
                     payment=item["payment"],  # pyright: ignore[reportIndexIssue]
                     payment_date=item["payment_date"],  # pyright: ignore[reportIndexIssue]
                     per_share_net_amount=item["per_share_net_amount"],  # pyright: ignore[reportIndexIssue]
-                    dividend_yield_on_payment_price=item[
+                    dividend_yield_on_payment_price=item[  # pyright: ignore[reportIndexIssue]
                         "dividend_yield_on_payment_price"
                     ],  # pyright: ignore[reportIndexIssue]
-                    dividend_yield_on_average_cost=item[
+                    dividend_yield_on_average_cost=item[  # pyright: ignore[reportIndexIssue]
                         "dividend_yield_on_average_cost"
                     ],  # pyright: ignore[reportIndexIssue]
                     total_net_amount=item["total_net_amount"],  # pyright: ignore[reportIndexIssue]
