@@ -159,6 +159,83 @@ def fetch_yahoo_finance_price(
     return _safe_decimal(price)
 
 
+@log_exceptions(default=dict, message="Yahoo Finance bulk history request failed.")  # pyright: ignore[reportArgumentType]
+def fetch_fx_rates_bulk(
+    currency_pairs: list[tuple[str, str]],
+    rate_date: date | None = None,
+) -> dict[tuple[str, str], Decimal]:
+    if not currency_pairs:
+        return {}
+
+    # Filter out identical pairs
+    pairs_to_fetch = [pair for pair in currency_pairs if pair[0] != pair[1]]
+    if not pairs_to_fetch:
+        return {pair: Decimal("1") for pair in currency_pairs if pair[0] == pair[1]}
+
+    symbols_map = {
+        f"{base}{target}=X": (base, target) for base, target in pairs_to_fetch
+    }
+    symbols = list(symbols_map.keys())
+
+    if rate_date:
+        start = rate_date - timedelta(days=5)
+        end = rate_date + timedelta(days=1)
+    else:
+        # Use recent period if no date specified
+        start = date.today() - timedelta(days=5)
+        end = date.today() + timedelta(days=1)
+
+    try:
+        # yf.download can be noisy; setting progress=False avoids stdout spam
+        data = yf.download(symbols, start=start, end=end, progress=False, interval="1d")
+    except Exception:
+        return {}
+
+    if data is None or data.empty:
+        return {}
+
+    # Filter for data up to and including the rate_date
+    if rate_date:
+        data = data[data.index.date <= rate_date]  # pyright: ignore[reportAttributeAccessIssue]
+        if data.empty:
+            return {}
+
+    results: dict[tuple[str, str], Decimal] = {}
+
+    # If "Close" is not present, parsing fails
+    if "Close" not in data:
+        return {}
+
+    close_data = data["Close"]
+
+    for symbol in symbols:
+        try:
+            # Handle MultiIndex DataFrame vs single Series
+            if len(symbols) > 1:
+                if symbol not in close_data:
+                    continue
+                series = close_data[symbol].dropna()  # pyright: ignore[reportAttributeAccessIssue]
+            else:
+                series = close_data.dropna()  # pyright: ignore[reportAttributeAccessIssue]
+
+            if series.empty:
+                continue
+
+            price = series.iloc[-1]
+            decimal_price = _safe_decimal(price)
+            if decimal_price is not None:
+                results[symbols_map[symbol]] = decimal_price
+        except Exception:
+            pass
+
+    # Include identical pairs in the result
+    for pair in currency_pairs:
+        if pair[0] == pair[1]:
+            results[pair] = Decimal("1")
+
+    return results
+
+
 def fetch_fx_rate(
     base_currency: str,
     target_currency: str,

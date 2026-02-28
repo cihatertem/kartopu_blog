@@ -18,7 +18,12 @@ from core.services.portfolio import (
     format_comparison_label,
     format_snapshot_label,
 )
-from portfolio.services import calculate_xirr, fetch_fx_rate, fetch_yahoo_finance_price
+from portfolio.services import (
+    calculate_xirr,
+    fetch_fx_rate,
+    fetch_fx_rates_bulk,
+    fetch_yahoo_finance_price,
+)
 
 MAX_DICITS = 200
 MAX_DECIMAL_PLACES = 4
@@ -954,6 +959,35 @@ class CashFlowSnapshot(BaseSnapshot):
         category_totals: dict[str, Decimal] = {}
         fx_rates: dict[tuple[str, str, date | None], Decimal] = {}
 
+        unique_currencies = {
+            entry["currency"]
+            for entry in entries
+            if entry["currency"] != cashflow.currency  # pyright: ignore[reportAttributeAccessIssue]
+        }
+
+        uncached_pairs = []
+        for entry_currency in unique_currencies:
+            currency_pair = (entry_currency, cashflow.currency, snapshot_date)  # pyright: ignore[reportAttributeAccessIssue]
+            cache_key = f"fx_rate_{entry_currency}_{cashflow.currency}_{snapshot_date.isoformat() if snapshot_date else 'latest'}"  # pyright: ignore[reportAttributeAccessIssue]
+            cached_rate = cache.get(cache_key)
+            if cached_rate is not None:
+                fx_rates[currency_pair] = cached_rate
+            else:
+                uncached_pairs.append((entry_currency, cashflow.currency))  # pyright: ignore[reportAttributeAccessIssue]
+
+        if uncached_pairs:
+            fetched_rates = fetch_fx_rates_bulk(uncached_pairs, rate_date=snapshot_date)
+            for pair in uncached_pairs:
+                currency_pair = (pair[0], pair[1], snapshot_date)
+                cache_key = f"fx_rate_{pair[0]}_{pair[1]}_{snapshot_date.isoformat() if snapshot_date else 'latest'}"
+                fx_rate = fetched_rates.get(pair, Decimal("1"))  # pyright: ignore[reportOptionalMemberAccess]
+                cache.set(
+                    cache_key,
+                    fx_rate,
+                    timeout=getattr(settings, "CACHE_TIMEOUT", CACHE_TIMEOUT),
+                )
+                fx_rates[currency_pair] = fx_rate  # pyright: ignore[reportArgumentType]
+
         for entry in entries:
             amount = entry["amount"] or Decimal("0")
             entry_currency = entry["currency"]
@@ -961,15 +995,7 @@ class CashFlowSnapshot(BaseSnapshot):
             if entry_currency != cashflow.currency:  # pyright: ignore[reportAttributeAccessIssue]
                 # Use snapshot_date for currency conversion
                 currency_pair = (entry_currency, cashflow.currency, snapshot_date)  # pyright: ignore[reportAttributeAccessIssue]
-                fx_rate = fx_rates.get(currency_pair)  # pyright: ignore[reportAssignmentType]
-                if fx_rate is None:
-                    fetched_rate = fetch_fx_rate(
-                        entry_currency,  # pyright: ignore[reportArgumentType]
-                        cashflow.currency,  # pyright: ignore[reportAttributeAccessIssue]
-                        rate_date=snapshot_date,
-                    )
-                    fx_rate = fetched_rate if fetched_rate is not None else Decimal("1")
-                    fx_rates[currency_pair] = fx_rate  # pyright: ignore[reportArgumentType]
+                fx_rate = fx_rates.get(currency_pair, Decimal("1"))  # pyright: ignore[reportAssignmentType]
             converted_amount = amount * fx_rate  # pyright: ignore[reportOperatorIssue]
             category_totals[entry["category"]] = (  # pyright: ignore[reportArgumentType]
                 category_totals.get(entry["category"], Decimal("0")) + converted_amount  # pyright: ignore[reportArgumentType]
