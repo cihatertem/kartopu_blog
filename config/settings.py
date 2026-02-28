@@ -421,8 +421,10 @@ if not DEBUG:
     SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
     SESSION_COOKIE_HTTPONLY = True
     SECURE_CONTENT_TYPE_NOSNIFF = True
-    SECURE_REFERRER_POLICY = "strict-origin-when-cross-origin"
-    SECURE_CROSS_ORIGIN_OPENER_POLICY = "same-origin-allow-popups"  # same-origin allauth sorun çıkartabiliyor, o yüzden allow-popups.
+    SECURE_REFERRER_POLICY = (
+        "no-referrer-when-downgrade"  # "strict-origin-when-cross-origin"
+    )
+    SECURE_CROSS_ORIGIN_OPENER_POLICY = "cross-origin"  # "same-origin-allow-popups"  # same-origin allauth sorun çıkartabiliyor, o yüzden allow-popups.
 
     SECURE_HSTS_SECONDS = int(os.getenv("DJANGO_SECURE_HSTS_SECONDS", "63072000"))
     SECURE_HSTS_INCLUDE_SUBDOMAINS = (
