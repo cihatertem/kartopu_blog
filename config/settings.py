@@ -424,8 +424,9 @@ if not DEBUG:
     SECURE_REFERRER_POLICY = (
         "no-referrer-when-downgrade"  # "strict-origin-when-cross-origin"
     )
-    SECURE_CROSS_ORIGIN_OPENER_POLICY = "cross-origin"  # "same-origin-allow-popups"  # same-origin allauth sorun çıkartabiliyor, o yüzden allow-popups.
-
+    SECURE_CROSS_ORIGIN_OPENER_POLICY = "same-origin-allow-popups"
+    # Alt satırı ekle: Bu, tarayıcıya resimlerin 'ayrıcalıklı' yüklenmesini söyler
+    SECURE_CROSS_ORIGIN_RESOURCE_POLICY = "cross-origin"
     SECURE_HSTS_SECONDS = int(os.getenv("DJANGO_SECURE_HSTS_SECONDS", "63072000"))
     SECURE_HSTS_INCLUDE_SUBDOMAINS = (
         os.getenv("DJANGO_SECURE_HSTS_INCLUDE_SUBDOMAINS", "1") == "1"

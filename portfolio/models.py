@@ -980,7 +980,7 @@ class CashFlowSnapshot(BaseSnapshot):
             for pair in uncached_pairs:
                 currency_pair = (pair[0], pair[1], snapshot_date)
                 cache_key = f"fx_rate_{pair[0]}_{pair[1]}_{snapshot_date.isoformat() if snapshot_date else 'latest'}"
-                fx_rate = fetched_rates.get(pair, Decimal("1"))  # pyright: ignore[reportOptionalMemberAccess]
+                fx_rate = (fetched_rates or {}).get(pair, Decimal("1"))
                 cache.set(
                     cache_key,
                     fx_rate,
@@ -1435,17 +1435,44 @@ class DividendSnapshot(BaseSnapshot):
         asset_totals: dict[str, dict[str, Decimal | Asset]] = {}
         payment_rows: list[dict[str, object]] = []
 
+        fx_rates: dict[tuple[str, str, date | None], Decimal] = {}
+
+        unique_currencies = {
+            payment.asset.currency
+            for payment in payments
+            if payment.asset.currency != currency
+        }
+
+        uncached_pairs = []
+        for entry_currency in unique_currencies:
+            currency_pair = (entry_currency, currency, snapshot_date)
+            cache_key = f"fx_rate_{entry_currency}_{currency}_{snapshot_date.isoformat() if snapshot_date else 'latest'}"
+            cached_rate = cache.get(cache_key)
+            if cached_rate is not None:
+                fx_rates[currency_pair] = cached_rate  # pyright: ignore[reportArgumentType]
+            else:
+                uncached_pairs.append((entry_currency, currency))
+
+        if uncached_pairs:
+            fetched_rates = fetch_fx_rates_bulk(uncached_pairs, rate_date=snapshot_date)
+            for pair in uncached_pairs:
+                currency_pair = (pair[0], pair[1], snapshot_date)
+                cache_key = f"fx_rate_{pair[0]}_{pair[1]}_{snapshot_date.isoformat() if snapshot_date else 'latest'}"
+                fx_rate = (fetched_rates or {}).get(pair, Decimal("1"))
+                cache.set(
+                    cache_key,
+                    fx_rate,
+                    timeout=getattr(settings, "CACHE_TIMEOUT", CACHE_TIMEOUT),
+                )
+                fx_rates[currency_pair] = fx_rate  # pyright: ignore[reportArgumentType]
+
         for payment in payments:
             fx_rate = Decimal("1")
             if payment.asset.currency != currency:
                 # Use snapshot_date for currency conversion
-                fetched_rate = fetch_fx_rate(
-                    payment.asset.currency,
-                    currency,  # pyright: ignore[reportArgumentType]
-                    rate_date=snapshot_date,
-                )
-                fx_rate = fetched_rate if fetched_rate is not None else Decimal("1")
-            per_share = payment.net_dividend_per_share * fx_rate
+                currency_pair = (payment.asset.currency, currency, snapshot_date)
+                fx_rate = fx_rates.get(currency_pair, Decimal("1"))  # pyright: ignore[reportCallIssue, reportArgumentType]
+            per_share = payment.net_dividend_per_share * fx_rate  # pyright: ignore[reportOperatorIssue]
             total_payment = payment.total_net_amount * fx_rate
             avg_cost = payment.average_cost * fx_rate
             last_close = payment.last_close_price * fx_rate
