@@ -5,6 +5,7 @@ from datetime import date
 from decimal import Decimal
 
 from django.conf import settings
+from django.core.cache import cache
 from django.core.exceptions import ValidationError
 from django.db import models
 from django.db.models import QuerySet
@@ -23,6 +24,7 @@ MAX_DICITS = 200
 MAX_DECIMAL_PLACES = 4
 MAX_DECIMAL_PLACES_FOR_QUANTITY = 5
 MAX_DECIMAL_PLACES_FOR_RATE = 4
+CACHE_TIMEOUT = 600  # 10 minutes
 
 
 class BaseSnapshot(SlugMixin, UUIDModelMixin, TimeStampedModelMixin):
@@ -239,12 +241,25 @@ class Portfolio(UUIDModelMixin, TimeStampedModelMixin):
     ) -> Decimal:
         currency_pair = (base_currency, target_currency, rate_date)
         if currency_pair not in fx_rates:
+            cache_key = f"fx_rate_{base_currency}_{target_currency}_{rate_date.isoformat() if rate_date else 'latest'}"
+            cached_rate = cache.get(cache_key)
+            if cached_rate is not None:
+                fx_rates[currency_pair] = cached_rate
+                return cached_rate
+
             fx_rate = fetch_fx_rate(
                 base_currency,
                 target_currency,
                 rate_date=rate_date,
             )
-            fx_rates[currency_pair] = fx_rate if fx_rate is not None else Decimal("1")
+            final_rate = fx_rate if fx_rate is not None else Decimal("1")
+            fx_rates[currency_pair] = final_rate
+            cache.set(
+                cache_key,
+                final_rate,
+                timeout=getattr(settings, "CACHE_TIMEOUT", CACHE_TIMEOUT),
+            )
+
         return fx_rates[currency_pair]
 
     def _apply_transaction_to_position(
@@ -332,17 +347,31 @@ class Portfolio(UUIDModelMixin, TimeStampedModelMixin):
         price_date: date | None,
     ) -> Decimal:
         current_price = asset.current_price or Decimal("0")  # pyright: ignore[reportAttributeAccessIssue]
-        if price_date and asset.symbol:  # pyright: ignore[reportAttributeAccessIssue]
+        if not asset.symbol:  # pyright: ignore[reportAttributeAccessIssue]
+            return current_price
+
+        cache_key = f"yf_price_{asset.symbol}_{price_date.isoformat() if price_date else 'latest'}"
+        cached_price = cache.get(cache_key)
+        if cached_price is not None:
+            return cached_price
+
+        fetched_price = None
+        if price_date:
             fetched_price = fetch_yahoo_finance_price(
                 asset.symbol,  # pyright: ignore[reportAttributeAccessIssue]
                 price_date=price_date,
             )
-            if fetched_price is not None:
-                current_price = fetched_price
-        elif not current_price and asset.symbol:  # pyright: ignore[reportAttributeAccessIssue]
+        elif not current_price:
             fetched_price = fetch_yahoo_finance_price(asset.symbol)  # pyright: ignore[reportAttributeAccessIssue]
-            if fetched_price is not None:
-                current_price = fetched_price
+
+        if fetched_price is not None:
+            current_price = fetched_price
+            cache.set(
+                cache_key,
+                current_price,
+                timeout=getattr(settings, "CACHE_TIMEOUT", CACHE_TIMEOUT),
+            )
+
         return current_price
 
     def _update_market_values(
