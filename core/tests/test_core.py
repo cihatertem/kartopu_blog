@@ -8,8 +8,39 @@ from django.utils import timezone
 from blog.models import BlogPost, BlogPostReaction, Category
 from comments.models import Comment
 from core.context_processors import categories_tags_context
+from core.helpers import CAPTCHA_SESSION_KEY, captcha_is_valid
 from core.markdown import render_markdown
 from core.models import SiteSettings
+
+
+class CaptchaValidationTest(TestCase):
+    def setUp(self):
+        self.factory = RequestFactory()
+
+    def test_valid_captcha(self):
+        request = self.factory.post("/", {"captcha": "15"})
+        request.session = {CAPTCHA_SESSION_KEY: 15}
+        self.assertTrue(captcha_is_valid(request))
+
+    def test_invalid_captcha_wrong_value(self):
+        request = self.factory.post("/", {"captcha": "14"})
+        request.session = {CAPTCHA_SESSION_KEY: 15}
+        self.assertFalse(captcha_is_valid(request))
+
+    def test_invalid_captcha_missing_session(self):
+        request = self.factory.post("/", {"captcha": "15"})
+        request.session = {}
+        self.assertFalse(captcha_is_valid(request))
+
+    def test_invalid_captcha_missing_post(self):
+        request = self.factory.post("/")
+        request.session = {CAPTCHA_SESSION_KEY: 15}
+        self.assertFalse(captcha_is_valid(request))
+
+    def test_invalid_captcha_non_integer(self):
+        request = self.factory.post("/", {"captcha": "abc"})
+        request.session = {CAPTCHA_SESSION_KEY: 15}
+        self.assertFalse(captcha_is_valid(request))
 
 
 class SiteSettingsTest(TestCase):
