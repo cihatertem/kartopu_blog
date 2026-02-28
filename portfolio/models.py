@@ -26,6 +26,75 @@ MAX_DECIMAL_PLACES_FOR_QUANTITY = 5
 MAX_DECIMAL_PLACES_FOR_RATE = 4
 
 
+class BaseSnapshot(UUIDModelMixin, TimeStampedModelMixin):
+    snapshot_date = models.DateField(default=timezone.now)
+    name = models.CharField(max_length=200, blank=True)
+    slug = models.CharField(
+        max_length=255,
+        unique=True,
+        blank=True,
+        null=True,
+        editable=False,
+    )
+
+    class Meta:
+        abstract = True
+
+    def _get_fallback_name(self) -> str:
+        return ""
+
+    def save(self, *args: object, **kwargs: object) -> None:
+        if not self.name:
+            fallback = self._get_fallback_name()
+            if fallback:
+                self.name = fallback
+        if not self.slug and self.name:
+            self.slug = generate_unique_slug(self.__class__, self.name)
+        super().save(*args, **kwargs)  # pyright: ignore[reportArgumentType]
+
+    @classmethod
+    def _prepare_snapshot_data(
+        cls,
+        *,
+        snapshot_date: date | None = None,
+        name: str | None = None,
+        **kwargs: object,
+    ) -> tuple[date, dict[str, object], list[object]]:
+        raise NotImplementedError
+
+    @classmethod
+    def create_snapshot(
+        cls,
+        *,
+        snapshot_date: date | None = None,
+        name: str | None = None,
+        **kwargs: object,
+    ) -> "BaseSnapshot":
+        snapshot_date, snapshot_kwargs, items_data = cls._prepare_snapshot_data(
+            snapshot_date=snapshot_date,
+            name=name,
+            **kwargs,
+        )
+
+        snapshot = cls.objects.create(
+            snapshot_date=snapshot_date,
+            **snapshot_kwargs,
+        )
+
+        cls._create_snapshot_items(snapshot, items_data)
+
+        if hasattr(snapshot, "update_irr"):
+            snapshot.update_irr()
+
+        return snapshot
+
+    @classmethod
+    def _create_snapshot_items(
+        cls, snapshot: "BaseSnapshot", items_data: list[object]
+    ) -> None:
+        pass
+
+
 class Asset(UUIDModelMixin, TimeStampedModelMixin):
     class AssetType(models.TextChoices):
         STOCK = "stock", "Hisse"
@@ -589,7 +658,7 @@ class PortfolioTransaction(UUIDModelMixin, TimeStampedModelMixin):
         return self.quantity * self.price_per_unit
 
 
-class PortfolioSnapshot(UUIDModelMixin, TimeStampedModelMixin):
+class PortfolioSnapshot(BaseSnapshot):
     class Period(models.TextChoices):
         MONTHLY = "monthly", "Aylık"
         YEARLY = "yearly", "Yıllık"
@@ -600,15 +669,6 @@ class PortfolioSnapshot(UUIDModelMixin, TimeStampedModelMixin):
         related_name="snapshots",
     )
     period = models.CharField(max_length=10, choices=Period.choices)
-    snapshot_date = models.DateField(default=timezone.now)
-    name = models.CharField(max_length=200, blank=True)
-    slug = models.CharField(
-        max_length=255,
-        unique=True,
-        blank=True,
-        null=True,
-        editable=False,
-    )
     total_value = models.DecimalField(
         max_digits=MAX_DICITS, decimal_places=MAX_DECIMAL_PLACES
     )
@@ -639,12 +699,10 @@ class PortfolioSnapshot(UUIDModelMixin, TimeStampedModelMixin):
             snapshot_date=self.snapshot_date,
         )
 
-    def save(self, *args: object, **kwargs: object) -> None:
-        if not self.name and self.portfolio_id and self.snapshot_date:  # pyright: ignore[reportAttributeAccessIssue]
-            self.name = build_snapshot_name(f"{self.portfolio}", self.snapshot_date)
-        if not self.slug and self.name:
-            self.slug = generate_unique_slug(self.__class__, self.name)
-        super().save(*args, **kwargs)  # pyright: ignore[reportArgumentType]
+    def _get_fallback_name(self) -> str:
+        if self.portfolio_id and self.snapshot_date:  # pyright: ignore[reportAttributeAccessIssue]
+            return build_snapshot_name(f"{self.portfolio}", self.snapshot_date)
+        return ""
 
     def update_irr(self) -> Decimal | None:
         """
@@ -679,17 +737,18 @@ class PortfolioSnapshot(UUIDModelMixin, TimeStampedModelMixin):
         return self.irr_pct
 
     @classmethod
-    def create_snapshot(
+    def _prepare_snapshot_data(
         cls,
         *,
-        portfolio: Portfolio,
-        period: str,
-        snapshot_date: timezone.datetime | None = None,
+        snapshot_date: date | None = None,
         name: str | None = None,
-    ) -> "PortfolioSnapshot":
+        **kwargs: object,
+    ) -> tuple[date, dict[str, object], list[object]]:
+        portfolio = kwargs["portfolio"]
+        period = kwargs["period"]
         snapshot_date = snapshot_date or timezone.now().date()  # pyright: ignore[reportAssignmentType]
 
-        positions = portfolio.get_positions(price_date=snapshot_date)
+        positions = portfolio.get_positions(price_date=snapshot_date)  # pyright: ignore[reportAttributeAccessIssue]
         total_value = sum(  # pyright: ignore[reportCallIssue]
             (position["market_value"] for position in positions),  # pyright: ignore[reportArgumentType]
             Decimal("0"),
@@ -702,33 +761,34 @@ class PortfolioSnapshot(UUIDModelMixin, TimeStampedModelMixin):
             (total_value - total_cost) / total_cost if total_cost > 0 else Decimal("0")
         )
 
-        snapshot = cls.objects.create(
-            portfolio=portfolio,
-            period=period,
-            snapshot_date=snapshot_date,
-            name=name or "",
-            total_value=total_value,
-            total_cost=total_cost,
-            target_value=portfolio.target_value,
-            total_return_pct=total_return_pct,
-        )
-        snapshot.update_irr()
+        snapshot_kwargs = {
+            "portfolio": portfolio,
+            "period": period,
+            "name": name or "",
+            "total_value": total_value,
+            "total_cost": total_cost,
+            "target_value": portfolio.target_value,  # pyright: ignore[reportAttributeAccessIssue]
+            "total_return_pct": total_return_pct,
+        }
+        return snapshot_date, snapshot_kwargs, list(positions)
 
-        for position in positions:
+    @classmethod
+    def _create_snapshot_items(
+        cls, snapshot: BaseSnapshot, items_data: list[object]
+    ) -> None:
+        for position in items_data:
             PortfolioSnapshotItem.objects.create(
                 snapshot=snapshot,
-                asset=position["asset"],
-                quantity=position["quantity"],
-                average_cost=position["average_cost"],
-                cost_basis=position["cost_basis"],
-                current_price=position["current_price"],
-                market_value=position["market_value"],
-                allocation_pct=position["allocation_pct"],
-                gain_loss=position["gain_loss"],
-                gain_loss_pct=position["gain_loss_pct"],
+                asset=position["asset"],  # pyright: ignore[reportIndexIssue]
+                quantity=position["quantity"],  # pyright: ignore[reportIndexIssue]
+                average_cost=position["average_cost"],  # pyright: ignore[reportIndexIssue]
+                cost_basis=position["cost_basis"],  # pyright: ignore[reportIndexIssue]
+                current_price=position["current_price"],  # pyright: ignore[reportIndexIssue]
+                market_value=position["market_value"],  # pyright: ignore[reportIndexIssue]
+                allocation_pct=position["allocation_pct"],  # pyright: ignore[reportIndexIssue]
+                gain_loss=position["gain_loss"],  # pyright: ignore[reportIndexIssue]
+                gain_loss_pct=position["gain_loss_pct"],  # pyright: ignore[reportIndexIssue]
             )
-
-        return snapshot
 
 
 class PortfolioSnapshotItem(UUIDModelMixin, TimeStampedModelMixin):
@@ -830,7 +890,7 @@ class CashFlowEntry(UUIDModelMixin, TimeStampedModelMixin):
         return f"{cashflows or 'Nakit Akışı Yok'} - {self.get_category_display()}"  # pyright: ignore[reportAttributeAccessIssue]
 
 
-class CashFlowSnapshot(UUIDModelMixin, TimeStampedModelMixin):
+class CashFlowSnapshot(BaseSnapshot):
     class Period(models.TextChoices):
         MONTHLY = "monthly", "Aylık"
         YEARLY = "yearly", "Yıllık"
@@ -841,18 +901,10 @@ class CashFlowSnapshot(UUIDModelMixin, TimeStampedModelMixin):
         related_name="snapshots",
     )
     period = models.CharField(max_length=10, choices=Period.choices)
-    snapshot_date = models.DateField(default=timezone.now)
     name = models.CharField(
         max_length=200,
         blank=True,
         help_text="İsimlendirme yapılmazsa CashFlow adı kullanılır.",
-    )
-    slug = models.CharField(
-        max_length=255,
-        unique=True,
-        blank=True,
-        null=True,
-        editable=False,
     )
     total_amount = models.DecimalField(
         max_digits=MAX_DICITS, decimal_places=MAX_DECIMAL_PLACES
@@ -871,22 +923,21 @@ class CashFlowSnapshot(UUIDModelMixin, TimeStampedModelMixin):
             snapshot_date=self.snapshot_date,
         )
 
-    def save(self, *args: object, **kwargs: object) -> None:
-        if not self.name and self.cashflow_id:  # pyright: ignore[reportAttributeAccessIssue]
-            self.name = build_snapshot_name(f"{self.cashflow}", self.snapshot_date)
-        if not self.slug and self.name:
-            self.slug = generate_unique_slug(self.__class__, self.name)
-        super().save(*args, **kwargs)  # pyright: ignore[reportArgumentType]
+    def _get_fallback_name(self) -> str:
+        if self.cashflow_id:  # pyright: ignore[reportAttributeAccessIssue]
+            return build_snapshot_name(f"{self.cashflow}", self.snapshot_date)
+        return ""
 
     @classmethod
-    def create_snapshot(
+    def _prepare_snapshot_data(
         cls,
         *,
-        cashflow: CashFlow,
-        period: str,
         snapshot_date: date | None = None,
         name: str | None = None,
-    ) -> "CashFlowSnapshot":
+        **kwargs: object,
+    ) -> tuple[date, dict[str, object], list[object]]:
+        cashflow = kwargs["cashflow"]
+        period = kwargs["period"]
         snapshot_date = snapshot_date or timezone.now().date()  # pyright: ignore[reportAssignmentType]
 
         if period == cls.Period.MONTHLY:
@@ -900,7 +951,7 @@ class CashFlowSnapshot(UUIDModelMixin, TimeStampedModelMixin):
             end_date = snapshot_date
 
         entries = CashFlowEntry.objects.filter(
-            cashflows=cashflow,
+            cashflows=cashflow,  # pyright: ignore[reportArgumentType]
             entry_date__gte=start_date,
             entry_date__lte=end_date,
         ).values("category", "amount", "currency", "entry_date")
@@ -912,21 +963,21 @@ class CashFlowSnapshot(UUIDModelMixin, TimeStampedModelMixin):
             amount = entry["amount"] or Decimal("0")
             entry_currency = entry["currency"]
             fx_rate = Decimal("1")
-            if entry_currency != cashflow.currency:
+            if entry_currency != cashflow.currency:  # pyright: ignore[reportAttributeAccessIssue]
                 # Use snapshot_date for currency conversion
-                currency_pair = (entry_currency, cashflow.currency, snapshot_date)
-                fx_rate = fx_rates.get(currency_pair)
+                currency_pair = (entry_currency, cashflow.currency, snapshot_date)  # pyright: ignore[reportAttributeAccessIssue]
+                fx_rate = fx_rates.get(currency_pair)  # pyright: ignore[reportAssignmentType]
                 if fx_rate is None:
                     fetched_rate = fetch_fx_rate(
-                        entry_currency,
-                        cashflow.currency,
+                        entry_currency,  # pyright: ignore[reportArgumentType]
+                        cashflow.currency,  # pyright: ignore[reportAttributeAccessIssue]
                         rate_date=snapshot_date,
                     )
                     fx_rate = fetched_rate if fetched_rate is not None else Decimal("1")
-                    fx_rates[currency_pair] = fx_rate
-            converted_amount = amount * fx_rate
-            category_totals[entry["category"]] = (
-                category_totals.get(entry["category"], Decimal("0")) + converted_amount
+                    fx_rates[currency_pair] = fx_rate  # pyright: ignore[reportArgumentType]
+            converted_amount = amount * fx_rate  # pyright: ignore[reportOperatorIssue]
+            category_totals[entry["category"]] = (  # pyright: ignore[reportArgumentType]
+                category_totals.get(entry["category"], Decimal("0")) + converted_amount  # pyright: ignore[reportArgumentType]
             )
 
         total_amount = sum(  # pyright: ignore[reportCallIssue]
@@ -934,24 +985,40 @@ class CashFlowSnapshot(UUIDModelMixin, TimeStampedModelMixin):
             Decimal("0"),
         )
 
-        snapshot = cls.objects.create(
-            cashflow=cashflow,
-            period=period,
-            snapshot_date=snapshot_date,
-            name=name or cashflow.name,
-            total_amount=total_amount,
-        )
+        # Determine name fallback early if cashflow object handles it.
+        name_override = name or cashflow.name  # pyright: ignore[reportAttributeAccessIssue]
 
+        snapshot_kwargs = {
+            "cashflow": cashflow,
+            "period": period,
+            "total_amount": total_amount,
+            "name": name_override,
+        }
+
+        items_data = []
         for category, amount in sorted(category_totals.items()):
             allocation_pct = amount / total_amount if total_amount > 0 else Decimal("0")
-            CashFlowSnapshotItem.objects.create(
-                snapshot=snapshot,
-                category=category,
-                amount=amount,
-                allocation_pct=allocation_pct,
+            items_data.append(
+                {
+                    "category": category,
+                    "amount": amount,
+                    "allocation_pct": allocation_pct,
+                }
             )
 
-        return snapshot
+        return snapshot_date, snapshot_kwargs, items_data
+
+    @classmethod
+    def _create_snapshot_items(
+        cls, snapshot: BaseSnapshot, items_data: list[object]
+    ) -> None:
+        for item in items_data:
+            CashFlowSnapshotItem.objects.create(
+                snapshot=snapshot,
+                category=item["category"],  # pyright: ignore[reportIndexIssue]
+                amount=item["amount"],  # pyright: ignore[reportIndexIssue]
+                allocation_pct=item["allocation_pct"],  # pyright: ignore[reportIndexIssue]
+            )
 
 
 class CashFlowSnapshotItem(UUIDModelMixin, TimeStampedModelMixin):
@@ -1078,24 +1145,16 @@ class SalarySavingsEntry(UUIDModelMixin, TimeStampedModelMixin):
         return f"{self.flow} - {self.entry_date}"
 
 
-class SalarySavingsSnapshot(UUIDModelMixin, TimeStampedModelMixin):
+class SalarySavingsSnapshot(BaseSnapshot):
     flow = models.ForeignKey(
         SalarySavingsFlow,
         on_delete=models.CASCADE,
         related_name="snapshots",
     )
-    snapshot_date = models.DateField(default=timezone.now)
     name = models.CharField(
         max_length=200,
         blank=True,
         help_text="İsimlendirme yapılmazsa akış adı ve tarih kullanılır.",
-    )
-    slug = models.CharField(
-        max_length=255,
-        unique=True,
-        blank=True,
-        null=True,
-        editable=False,
     )
     total_salary = models.DecimalField(
         max_digits=MAX_DICITS,
@@ -1120,21 +1179,20 @@ class SalarySavingsSnapshot(UUIDModelMixin, TimeStampedModelMixin):
             snapshot_date=self.snapshot_date,
         )
 
-    def save(self, *args: object, **kwargs: object) -> None:
-        if not self.name and self.flow_id:  # pyright: ignore[reportAttributeAccessIssue]
-            self.name = build_snapshot_name(f"{self.flow}", self.snapshot_date)
-        if not self.slug and self.name:
-            self.slug = generate_unique_slug(self.__class__, self.name)
-        super().save(*args, **kwargs)  # pyright: ignore[reportArgumentType]
+    def _get_fallback_name(self) -> str:
+        if self.flow_id:  # pyright: ignore[reportAttributeAccessIssue]
+            return build_snapshot_name(f"{self.flow}", self.snapshot_date)
+        return ""
 
     @classmethod
-    def create_snapshot(
+    def _prepare_snapshot_data(
         cls,
         *,
-        flow: SalarySavingsFlow,
         snapshot_date: date | None = None,
         name: str | None = None,
-    ) -> "SalarySavingsSnapshot":
+        **kwargs: object,
+    ) -> tuple[date, dict[str, object], list[object]]:
+        flow = kwargs["flow"]
         snapshot_date = snapshot_date or timezone.now().date()  # pyright: ignore[reportAssignmentType]
         start_date = snapshot_date.replace(day=1)
         last_day = calendar.monthrange(snapshot_date.year, snapshot_date.month)[1]
@@ -1161,15 +1219,14 @@ class SalarySavingsSnapshot(UUIDModelMixin, TimeStampedModelMixin):
             total_savings / total_salary if total_salary > 0 else Decimal("0")
         )
 
-        snapshot = cls.objects.create(
-            flow=flow,
-            snapshot_date=snapshot_date,
-            name=name or "",
-            total_salary=total_salary,
-            total_savings=total_savings,
-            savings_rate=savings_rate,
-        )
-        return snapshot
+        snapshot_kwargs = {
+            "flow": flow,
+            "name": name or "",
+            "total_salary": total_salary,
+            "total_savings": total_savings,
+            "savings_rate": savings_rate,
+        }
+        return snapshot_date, snapshot_kwargs, []
 
 
 class DividendComparison(UUIDModelMixin, TimeStampedModelMixin):
@@ -1328,21 +1385,12 @@ class Dividend(UUIDModelMixin, TimeStampedModelMixin):
         return f"{self.payment} ({self.currency})"
 
 
-class DividendSnapshot(UUIDModelMixin, TimeStampedModelMixin):
+class DividendSnapshot(BaseSnapshot):
     year = models.PositiveIntegerField()
     currency = models.CharField(
         max_length=10,
         choices=Asset.Currency.choices,
         default=Asset.Currency.TRY,
-    )
-    snapshot_date = models.DateField(default=timezone.now)
-    name = models.CharField(max_length=200, blank=True)
-    slug = models.CharField(
-        max_length=255,
-        unique=True,
-        blank=True,
-        null=True,
-        editable=False,
     )
     total_amount = models.DecimalField(
         max_digits=MAX_DICITS, decimal_places=MAX_DECIMAL_PLACES
@@ -1358,23 +1406,22 @@ class DividendSnapshot(UUIDModelMixin, TimeStampedModelMixin):
             return self.slug
         return self.name or f"{self.year} Temettü"
 
-    def save(self, *args: object, **kwargs: object) -> None:
-        if not self.name and self.year:
-            self.name = f"{self.year} Temettü Özeti"
-        if not self.slug and self.name:
-            self.slug = generate_unique_slug(self.__class__, self.name)
-        super().save(*args, **kwargs)  # pyright: ignore[reportArgumentType]
+    def _get_fallback_name(self) -> str:
+        if self.year:
+            return f"{self.year} Temettü Özeti"
+        return ""
 
     @classmethod
-    def create_snapshot(
+    def _prepare_snapshot_data(
         cls,
         *,
-        year: int,
-        currency: str,
         snapshot_date: date | None = None,
         name: str | None = None,
-    ) -> "DividendSnapshot":
-        snapshot_date = snapshot_date or date(year, 12, 31)
+        **kwargs: object,
+    ) -> tuple[date, dict[str, object], list[object]]:
+        year = kwargs["year"]
+        currency = kwargs["currency"]
+        snapshot_date = snapshot_date or date(year, 12, 31)  # pyright: ignore[reportArgumentType]
         payments = (
             DividendPayment.objects.select_related("asset")
             .filter(payment_date__year=year, payment_date__lte=snapshot_date)
@@ -1391,7 +1438,7 @@ class DividendSnapshot(UUIDModelMixin, TimeStampedModelMixin):
                 # Use snapshot_date for currency conversion
                 fetched_rate = fetch_fx_rate(
                     payment.asset.currency,
-                    currency,
+                    currency,  # pyright: ignore[reportArgumentType]
                     rate_date=snapshot_date,
                 )
                 fx_rate = fetched_rate if fetched_rate is not None else Decimal("1")
@@ -1423,37 +1470,75 @@ class DividendSnapshot(UUIDModelMixin, TimeStampedModelMixin):
                 }
             )
 
-        snapshot = cls.objects.create(
-            year=year,
-            currency=currency,
-            snapshot_date=snapshot_date,
-            name=name or f"{year} Temettü Özeti",
-            total_amount=total_amount,
-        )
+        name_override = name or f"{year} Temettü Özeti"
+        snapshot_kwargs = {
+            "year": year,
+            "currency": currency,
+            "total_amount": total_amount,
+            "name": name_override,
+        }
 
+        items_data = []
         for asset_entry in asset_totals.values():
-            amount = asset_entry["total_amount"]
+            amount = asset_entry["total_amount"]  # pyright: ignore[reportAssignmentType]
             allocation_pct = amount / total_amount if total_amount > 0 else Decimal("0")  # pyright: ignore[reportOperatorIssue]
-            DividendSnapshotAssetItem.objects.create(
-                snapshot=snapshot,
-                asset=asset_entry["asset"],
-                total_amount=amount,
-                allocation_pct=allocation_pct,
+            items_data.append(
+                {
+                    "type": "asset",
+                    "asset": asset_entry["asset"],
+                    "total_amount": amount,
+                    "allocation_pct": allocation_pct,
+                }
             )
 
         for row in payment_rows:
-            DividendSnapshotPaymentItem.objects.create(
-                snapshot=snapshot,
-                asset=row["asset"],
-                payment=row["payment"],
-                payment_date=row["payment_date"],
-                per_share_net_amount=row["per_share_net_amount"],
-                dividend_yield_on_payment_price=row["dividend_yield_on_payment_price"],
-                dividend_yield_on_average_cost=row["dividend_yield_on_average_cost"],
-                total_net_amount=row["total_net_amount"],
+            items_data.append(
+                {
+                    "type": "payment",
+                    "asset": row["asset"],
+                    "payment": row["payment"],
+                    "payment_date": row["payment_date"],
+                    "per_share_net_amount": row["per_share_net_amount"],
+                    "dividend_yield_on_payment_price": row[
+                        "dividend_yield_on_payment_price"
+                    ],
+                    "dividend_yield_on_average_cost": row[
+                        "dividend_yield_on_average_cost"
+                    ],
+                    "total_net_amount": row["total_net_amount"],
+                }
             )
 
-        return snapshot
+        return snapshot_date, snapshot_kwargs, items_data
+
+    @classmethod
+    def _create_snapshot_items(
+        cls, snapshot: BaseSnapshot, items_data: list[object]
+    ) -> None:
+        for item in items_data:
+            item_type = item["type"]  # pyright: ignore[reportIndexIssue]
+            if item_type == "asset":
+                DividendSnapshotAssetItem.objects.create(
+                    snapshot=snapshot,
+                    asset=item["asset"],  # pyright: ignore[reportIndexIssue]
+                    total_amount=item["total_amount"],  # pyright: ignore[reportIndexIssue]
+                    allocation_pct=item["allocation_pct"],  # pyright: ignore[reportIndexIssue]
+                )
+            elif item_type == "payment":
+                DividendSnapshotPaymentItem.objects.create(
+                    snapshot=snapshot,
+                    asset=item["asset"],  # pyright: ignore[reportIndexIssue]
+                    payment=item["payment"],  # pyright: ignore[reportIndexIssue]
+                    payment_date=item["payment_date"],  # pyright: ignore[reportIndexIssue]
+                    per_share_net_amount=item["per_share_net_amount"],  # pyright: ignore[reportIndexIssue]
+                    dividend_yield_on_payment_price=item[
+                        "dividend_yield_on_payment_price"
+                    ],  # pyright: ignore[reportIndexIssue]
+                    dividend_yield_on_average_cost=item[
+                        "dividend_yield_on_average_cost"
+                    ],  # pyright: ignore[reportIndexIssue]
+                    total_net_amount=item["total_net_amount"],  # pyright: ignore[reportIndexIssue]
+                )
 
 
 class DividendSnapshotAssetItem(UUIDModelMixin, TimeStampedModelMixin):
