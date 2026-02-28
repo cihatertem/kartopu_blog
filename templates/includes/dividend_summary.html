@@ -1,0 +1,68 @@
+{% load blog_extras %}
+
+<section class="dividend-summary">
+  <div class="summary-card dividend-summary__meta-card">
+    <p class="summary-meta"><strong>Yıl:</strong> {{ year }}</p>
+    <p class="summary-meta summary-meta--spaced"><strong>Para Birimi:</strong> {{ currency }}</p>
+    <p class="summary-meta summary-meta--tight"><strong>Toplam Temettü:</strong> {{ total_amount }}</p>
+  </div>
+  <div class="summary-card">
+    <p class="summary-meta"><strong>Yıl:</strong> {{ year }}</p>
+    <p class="summary-meta summary-meta--spaced"><strong>Para Birimi:</strong> {{ currency }}</p>
+    <p class="summary-meta summary-meta--tight"><strong>Toplam Temettü:</strong> {{ total_amount }}</p>
+
+    <div class="table-scroll dividend-summary__table">
+      <table class="data-table data-table--wide">
+        <thead>
+          <tr>
+            <th class="data-table__header">Varlık</th>
+            <th class="data-table__header data-table__header--hide-mobile">Ödeme Tarihi</th>
+            <th class="data-table__header">Hisse Başına Net Temettü</th>
+            <th class="data-table__header">Ödeme Günü Temettü Verimi</th>
+            <th class="data-table__header data-table__header--hide-mobile">Ortalama Maliyet Temettü Verimi</th>
+            <th class="data-table__header">Toplam Net Temettü</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for item in payment_items %}
+          <tr>
+            <td class="data-table__cell">{{ item.asset.name }}</td>
+            <td class="data-table__cell data-table__cell--hide-mobile">{{ item.payment_date|date:"Y-m-d" }}</td>
+            <td class="data-table__cell">{{ item.per_share_net_amount|format_currency:currency }}</td>
+            <td class="data-table__cell">{{ item.dividend_yield_on_payment_price|safe_float|mul100|floatformat:2 }}%</td>
+            <td class="data-table__cell data-table__cell--hide-mobile">{{ item.dividend_yield_on_average_cost|safe_float|mul100|floatformat:2 }}%</td>
+            <td class="data-table__cell">{{ item.total_net_amount|format_currency:currency }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+  <div class="dividend-summary__cards">
+    {% for item in payment_items %}
+    <div class="dividend-summary-card">
+      <div class="dividend-summary-card__header">{{ item.asset.name }}</div>
+      <div class="dividend-summary-card__row">
+        <span>Ödeme Tarihi</span>
+        <strong>{{ item.payment_date|date:"Y-m-d" }}</strong>
+      </div>
+      <div class="dividend-summary-card__row">
+        <span>Hisse Başına Net Temettü</span>
+        <strong>{{ item.per_share_net_amount|format_currency:currency }}</strong>
+      </div>
+      <div class="dividend-summary-card__row">
+        <span>Ödeme Günü Temettü Verimi</span>
+        <strong>{{ item.dividend_yield_on_payment_price|safe_float|mul100|floatformat:2 }}%</strong>
+      </div>
+      <div class="dividend-summary-card__row">
+        <span>Ortalama Maliyet Temettü Verimi</span>
+        <strong>{{ item.dividend_yield_on_average_cost|safe_float|mul100|floatformat:2 }}%</strong>
+      </div>
+      <div class="dividend-summary-card__row dividend-summary-card__row--total">
+        <span>Toplam Net Temettü</span>
+        <strong>{{ item.total_net_amount|format_currency:currency }}</strong>
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+</section>

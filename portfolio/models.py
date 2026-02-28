@@ -213,8 +213,8 @@ class Portfolio(UUIDModelMixin, TimeStampedModelMixin):
 
         if transaction.transaction_type == PortfolioTransaction.TransactionType.BUY:
             transaction_cost = transaction.total_cost * fx_rate
-            quantity += transaction.quantity
-            cost_basis += transaction_cost
+            quantity += transaction.quantity  # pyright: ignore [reportOperatorIssue]
+            cost_basis += transaction_cost  # pyright: ignore [reportOperatorIssue]
         elif (
             transaction.transaction_type
             == PortfolioTransaction.TransactionType.BONUS_CAPITAL_INCREASE
@@ -226,18 +226,18 @@ class Portfolio(UUIDModelMixin, TimeStampedModelMixin):
         ):
             rights_cost = increase_quantity * transaction.price_per_unit * fx_rate
             quantity += increase_quantity  # pyright: ignore[reportOperatorIssue]
-            cost_basis += rights_cost
+            cost_basis += rights_cost  # pyright: ignore [reportOperatorIssue]
         elif (
             transaction.transaction_type
             == PortfolioTransaction.TransactionType.RIGHTS_NOT_EXERCISED
         ):
             rights_loss = increase_quantity * transaction.price_per_unit * fx_rate
-            value_adjustment -= rights_loss
+            value_adjustment -= rights_loss  # pyright: ignore [reportOperatorIssue]
         elif transaction.transaction_type == PortfolioTransaction.TransactionType.SELL:
             if quantity > 0:  # pyright: ignore[reportOperatorIssue]
                 average_cost = cost_basis / quantity  # pyright: ignore[reportOperatorIssue]
-                cost_basis -= average_cost * transaction.quantity
-            quantity -= transaction.quantity
+                cost_basis -= average_cost * transaction.quantity  # pyright: ignore [reportOperatorIssue]
+            quantity -= transaction.quantity  # pyright: ignore [reportOperatorIssue]
 
         if quantity <= 0:  # pyright: ignore [reportOperatorIssue]
             quantity = Decimal("0")
@@ -308,7 +308,7 @@ class Portfolio(UUIDModelMixin, TimeStampedModelMixin):
             current_price = self._get_asset_current_price(asset, price_date)  # pyright: ignore[reportArgumentType]
             fx_rate = self._get_or_fetch_fx_rate(
                 fx_rates,
-                asset.currency,
+                asset.currency,  # pyright: ignore[reportAttributeAccessIssue]
                 self.currency,
                 price_date,  # pyright: ignore[reportAttributeAccessIssue]
             )

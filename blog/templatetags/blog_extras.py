@@ -5,6 +5,7 @@ from urllib.parse import urljoin
 
 from django import template
 from django.core.serializers.json import DjangoJSONEncoder
+from django.template.loader import render_to_string
 from django.templatetags.static import static as static_url
 from django.utils.html import escape
 from django.utils.safestring import mark_safe
@@ -900,97 +901,15 @@ def _render_dividend_summary_html(snapshot) -> str:
         "payment_date"
     )
 
-    rows = "\n".join(
-        "<tr>"
-        f'<td class="data-table__cell">{escape(item.asset.name)}</td>'
-        f'<td class="data-table__cell data-table__cell--hide-mobile">{escape(str(item.payment_date))}</td>'
-        f'<td class="data-table__cell">{_format_currency(item.per_share_net_amount, snapshot.currency)}</td>'
-        f'<td class="data-table__cell">{escape(f"{_safe_float(item.dividend_yield_on_payment_price) * 100:.2f}")}%</td>'  # pyright: ignore[reportOptionalOperand]
-        f'<td class="data-table__cell data-table__cell--hide-mobile">{escape(f"{_safe_float(item.dividend_yield_on_average_cost) * 100:.2f}")}%</td>'  # pyright: ignore[reportOptionalOperand]
-        f'<td class="data-table__cell">{_format_currency(item.total_net_amount, snapshot.currency)}</td>'
-        "</tr>"
-        for item in payment_items
-    )
+    context = {
+        "snapshot": snapshot,
+        "total_amount": total_amount,
+        "year": year,
+        "currency": currency,
+        "payment_items": payment_items,
+    }
 
-    cards = "\n".join(
-        """
-      <div class="dividend-summary-card">
-        <div class="dividend-summary-card__header">{asset}</div>
-        <div class="dividend-summary-card__row">
-          <span>Ödeme Tarihi</span>
-          <strong>{payment_date}</strong>
-        </div>
-        <div class="dividend-summary-card__row">
-          <span>Hisse Başına Net Temettü</span>
-          <strong>{per_share}</strong>
-        </div>
-        <div class="dividend-summary-card__row">
-          <span>Ödeme Günü Temettü Verimi</span>
-          <strong>{yield_payment}</strong>
-        </div>
-        <div class="dividend-summary-card__row">
-          <span>Ortalama Maliyet Temettü Verimi</span>
-          <strong>{yield_average}</strong>
-        </div>
-        <div class="dividend-summary-card__row dividend-summary-card__row--total">
-          <span>Toplam Net Temettü</span>
-          <strong>{total}</strong>
-        </div>
-      </div>
-        """.format(
-            asset=escape(item.asset.name),
-            payment_date=escape(str(item.payment_date)),
-            per_share=_format_currency(item.per_share_net_amount, snapshot.currency),
-            yield_payment=escape(
-                f"{_safe_float(item.dividend_yield_on_payment_price) * 100:.2f}%"  # pyright: ignore[reportOptionalOperand]
-            ),
-            yield_average=escape(
-                f"{_safe_float(item.dividend_yield_on_average_cost) * 100:.2f}%"  # pyright: ignore[reportOptionalOperand]
-            ),
-            total=_format_currency(item.total_net_amount, snapshot.currency),
-        )
-        for item in payment_items
-    )
-
-    table_html = f"""
-    <div class="table-scroll dividend-summary__table">
-      <table class="data-table data-table--wide">
-        <thead>
-          <tr>
-            <th class="data-table__header">Varlık</th>
-            <th class="data-table__header data-table__header--hide-mobile">Ödeme Tarihi</th>
-            <th class="data-table__header">Hisse Başına Net Temettü</th>
-            <th class="data-table__header">Ödeme Günü Temettü Verimi</th>
-            <th class="data-table__header data-table__header--hide-mobile">Ortalama Maliyet Temettü Verimi</th>
-            <th class="data-table__header">Toplam Net Temettü</th>
-          </tr>
-        </thead>
-        <tbody>
-          {rows}
-        </tbody>
-      </table>
-    </div>
-    """
-
-    html = f"""
-<section class="dividend-summary">
-  <div class="summary-card dividend-summary__meta-card">
-    <p class="summary-meta"><strong>Yıl:</strong> {year}</p>
-    <p class="summary-meta summary-meta--spaced"><strong>Para Birimi:</strong> {currency}</p>
-    <p class="summary-meta summary-meta--tight"><strong>Toplam Temettü:</strong> {total_amount}</p>
-  </div>
-  <div class="summary-card">
-    <p class="summary-meta"><strong>Yıl:</strong> {year}</p>
-    <p class="summary-meta summary-meta--spaced"><strong>Para Birimi:</strong> {currency}</p>
-    <p class="summary-meta summary-meta--tight"><strong>Toplam Temettü:</strong> {total_amount}</p>
-    {table_html}
-  </div>
-  <div class="dividend-summary__cards">
-    {cards}
-  </div>
-</section>
-"""
-    return html
+    return render_to_string("blog/includes/dividend_summary.html", context)
 
 
 def _render_dividend_charts_html(snapshot) -> str:
@@ -1377,3 +1296,13 @@ def render_post_body(context, post):
 def mul100(value):
     """Decimal/float oranı yüzdeye çevirir. Örn: 0.12 -> 12.0"""
     return (value or 0) * 100
+
+
+@register.filter
+def format_currency(value, currency_code: str | None) -> str:
+    return _format_currency(value, currency_code)
+
+
+@register.filter
+def safe_float(value) -> float:
+    return _safe_float(value)  # pyright: ignore[reportReturnType]
