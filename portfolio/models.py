@@ -180,38 +180,89 @@ class Portfolio(UUIDModelMixin, TimeStampedModelMixin):
             return Decimal("0")
         return current_quantity * increase_rate_pct / Decimal("100")
 
-    def get_positions(
+    def _get_or_fetch_fx_rate(
         self,
-        *,
-        price_date: date | None = None,
-    ) -> list[dict[str, Decimal | Asset]]:
-        positions: dict[str, dict[str, Decimal | Asset]] = {}
-        transactions = (
-            self.transactions.select_related(  # pyright: ignore[reportAttributeAccessIssue]
-                "asset"
+        fx_rates: dict[tuple[str, str, date | None], Decimal],
+        base_currency: str,
+        target_currency: str,
+        rate_date: date | None,
+    ) -> Decimal:
+        currency_pair = (base_currency, target_currency, rate_date)
+        if currency_pair not in fx_rates:
+            fx_rate = fetch_fx_rate(
+                base_currency,
+                target_currency,
+                rate_date=rate_date,
             )
-            .order_by("trade_date", "created_at")
-            .distinct()
+            fx_rates[currency_pair] = fx_rate if fx_rate is not None else Decimal("1")
+        return fx_rates[currency_pair]
+
+    def _apply_transaction_to_position(
+        self,
+        transaction: "PortfolioTransaction",
+        data: dict[str, Decimal | Asset],
+        fx_rate: Decimal,
+    ) -> None:
+        quantity = data["quantity"]
+        cost_basis = data["cost_basis"]
+        value_adjustment = data["value_adjustment"]
+        increase_quantity = self._calculate_capital_increase_quantity(
+            current_quantity=quantity,  # pyright: ignore[reportArgumentType]
+            increase_rate_pct=transaction.capital_increase_rate_pct,
         )
-        if price_date:
-            transactions = transactions.filter(trade_date__lte=price_date)
-        fx_rates: dict[tuple[str, str, date | None], Decimal] = {}
+
+        if transaction.transaction_type == PortfolioTransaction.TransactionType.BUY:
+            transaction_cost = transaction.total_cost * fx_rate
+            quantity += transaction.quantity
+            cost_basis += transaction_cost
+        elif (
+            transaction.transaction_type
+            == PortfolioTransaction.TransactionType.BONUS_CAPITAL_INCREASE
+        ):
+            quantity += increase_quantity  # pyright: ignore[reportOperatorIssue]
+        elif (
+            transaction.transaction_type
+            == PortfolioTransaction.TransactionType.RIGHTS_EXERCISED
+        ):
+            rights_cost = increase_quantity * transaction.price_per_unit * fx_rate
+            quantity += increase_quantity  # pyright: ignore[reportOperatorIssue]
+            cost_basis += rights_cost
+        elif (
+            transaction.transaction_type
+            == PortfolioTransaction.TransactionType.RIGHTS_NOT_EXERCISED
+        ):
+            rights_loss = increase_quantity * transaction.price_per_unit * fx_rate
+            value_adjustment -= rights_loss
+        elif transaction.transaction_type == PortfolioTransaction.TransactionType.SELL:
+            if quantity > 0:  # pyright: ignore[reportOperatorIssue]
+                average_cost = cost_basis / quantity  # pyright: ignore[reportOperatorIssue]
+                cost_basis -= average_cost * transaction.quantity
+            quantity -= transaction.quantity
+
+        if quantity <= 0:  # pyright: ignore [reportOperatorIssue]
+            quantity = Decimal("0")
+            cost_basis = Decimal("0")
+            value_adjustment = Decimal("0")
+
+        data["quantity"] = quantity
+        data["cost_basis"] = cost_basis
+        data["value_adjustment"] = value_adjustment
+
+    def _build_initial_positions(
+        self,
+        transactions: QuerySet["PortfolioTransaction"],
+        fx_rates: dict[tuple[str, str, date | None], Decimal],
+        price_date: date | None,
+    ) -> dict[str, dict[str, Decimal | Asset]]:
+        positions: dict[str, dict[str, Decimal | Asset]] = {}
 
         for transaction in transactions:
             asset = transaction.asset
             # Use price_date (snapshot date) for conversion if provided, otherwise historical
             conversion_date = price_date or transaction.trade_date
-            currency_pair = (asset.currency, self.currency, conversion_date)
-            if currency_pair not in fx_rates:
-                fx_rate = fetch_fx_rate(
-                    asset.currency,
-                    self.currency,
-                    rate_date=conversion_date,
-                )
-                fx_rates[currency_pair] = (
-                    fx_rate if fx_rate is not None else Decimal("1")
-                )
-            fx_rate = fx_rates[currency_pair]
+            fx_rate = self._get_or_fetch_fx_rate(
+                fx_rates, asset.currency, self.currency, conversion_date
+            )
             data = positions.setdefault(
                 str(asset.id),
                 {
@@ -221,81 +272,46 @@ class Portfolio(UUIDModelMixin, TimeStampedModelMixin):
                     "value_adjustment": Decimal("0"),
                 },
             )
-            quantity = data["quantity"]
-            cost_basis = data["cost_basis"]
-            value_adjustment = data["value_adjustment"]
-            increase_quantity = self._calculate_capital_increase_quantity(
-                current_quantity=quantity,  # pyright: ignore[reportArgumentType]
-                increase_rate_pct=transaction.capital_increase_rate_pct,
+            self._apply_transaction_to_position(transaction, data, fx_rate)
+
+        return positions
+
+    def _get_asset_current_price(
+        self,
+        asset: "Asset",
+        price_date: date | None,
+    ) -> Decimal:
+        current_price = asset.current_price or Decimal("0")  # pyright: ignore[reportAttributeAccessIssue]
+        if price_date and asset.symbol:  # pyright: ignore[reportAttributeAccessIssue]
+            fetched_price = fetch_yahoo_finance_price(
+                asset.symbol,  # pyright: ignore[reportAttributeAccessIssue]
+                price_date=price_date,
             )
+            if fetched_price is not None:
+                current_price = fetched_price
+        elif not current_price and asset.symbol:  # pyright: ignore[reportAttributeAccessIssue]
+            fetched_price = fetch_yahoo_finance_price(asset.symbol)  # pyright: ignore[reportAttributeAccessIssue]
+            if fetched_price is not None:
+                current_price = fetched_price
+        return current_price
 
-            if transaction.transaction_type == PortfolioTransaction.TransactionType.BUY:
-                transaction_cost = transaction.total_cost * fx_rate
-                quantity += transaction.quantity
-                cost_basis += transaction_cost
-            elif (
-                transaction.transaction_type
-                == PortfolioTransaction.TransactionType.BONUS_CAPITAL_INCREASE
-            ):
-                quantity += increase_quantity  # pyright: ignore[reportOperatorIssue]
-            elif (
-                transaction.transaction_type
-                == PortfolioTransaction.TransactionType.RIGHTS_EXERCISED
-            ):
-                rights_cost = increase_quantity * transaction.price_per_unit * fx_rate
-                quantity += increase_quantity  # pyright: ignore[reportOperatorIssue]
-                cost_basis += rights_cost
-            elif (
-                transaction.transaction_type
-                == PortfolioTransaction.TransactionType.RIGHTS_NOT_EXERCISED
-            ):
-                rights_loss = increase_quantity * transaction.price_per_unit * fx_rate
-                value_adjustment -= rights_loss
-            elif (
-                transaction.transaction_type
-                == PortfolioTransaction.TransactionType.SELL
-            ):
-                if quantity > 0:  # pyright: ignore[reportOperatorIssue]
-                    average_cost = cost_basis / quantity  # pyright: ignore[reportOperatorIssue]
-                    cost_basis -= average_cost * transaction.quantity
-                quantity -= transaction.quantity
-
-            if quantity <= 0:  # pyright: ignore [reportOperatorIssue]
-                quantity = Decimal("0")
-                cost_basis = Decimal("0")
-                value_adjustment = Decimal("0")
-
-            data["quantity"] = quantity
-            data["cost_basis"] = cost_basis
-            data["value_adjustment"] = value_adjustment
-
+    def _update_market_values(
+        self,
+        positions: dict[str, dict[str, Decimal | Asset]],
+        fx_rates: dict[tuple[str, str, date | None], Decimal],
+        price_date: date | None,
+    ) -> Decimal:
         total_value = Decimal("0")
         for data in positions.values():
             asset = data["asset"]
             quantity = data["quantity"]
-            current_price = asset.current_price or Decimal("0")  # pyright: ignore[reportAttributeAccessIssue]
-            if price_date and asset.symbol:  # pyright: ignore[reportAttributeAccessIssue]
-                fetched_price = fetch_yahoo_finance_price(
-                    asset.symbol,  # pyright: ignore[reportAttributeAccessIssue]
-                    price_date=price_date,
-                )
-                if fetched_price is not None:
-                    current_price = fetched_price
-            elif not current_price and asset.symbol:  # pyright: ignore[reportAttributeAccessIssue]
-                fetched_price = fetch_yahoo_finance_price(asset.symbol)  # pyright: ignore[reportAttributeAccessIssue]
-                if fetched_price is not None:
-                    current_price = fetched_price
-            currency_pair = (asset.currency, self.currency, price_date)  # pyright: ignore[reportAttributeAccessIssue]
-            fx_rate = fx_rates.get(currency_pair)
-
-            if fx_rate is None:
-                fx_rate = fetch_fx_rate(
-                    asset.currency,  # pyright: ignore[reportAttributeAccessIssue]
-                    self.currency,
-                    rate_date=price_date,
-                )  # pyright: ignore[reportAttributeAccessIssue]
-                fx_rate = fx_rate if fx_rate is not None else Decimal("1")
-                fx_rates[currency_pair] = fx_rate
+            current_price = self._get_asset_current_price(asset, price_date)  # pyright: ignore[reportArgumentType]
+            fx_rate = self._get_or_fetch_fx_rate(
+                fx_rates,
+                asset.currency,
+                self.currency,
+                price_date,  # pyright: ignore[reportAttributeAccessIssue]
+            )
 
             converted_price = current_price * fx_rate
             data["current_price"] = converted_price
@@ -309,7 +325,13 @@ class Portfolio(UUIDModelMixin, TimeStampedModelMixin):
                 )
 
             total_value += data["market_value"]
+        return total_value
 
+    def _update_position_metrics(
+        self,
+        positions: dict[str, dict[str, Decimal | Asset]],
+        total_value: Decimal,
+    ) -> None:
         for data in positions.values():
             cost_basis = data["cost_basis"]
             market_value = data["market_value"]
@@ -325,6 +347,32 @@ class Portfolio(UUIDModelMixin, TimeStampedModelMixin):
             data["allocation_pct"] = (
                 market_value / total_value if total_value > 0 else Decimal("0")  # pyright: ignore[reportOperatorIssue]
             )
+
+    def _get_filtered_transactions(
+        self, price_date: date | None
+    ) -> QuerySet["PortfolioTransaction"]:
+        transactions = (
+            self.transactions.select_related(  # pyright: ignore[reportAttributeAccessIssue]
+                "asset"
+            )
+            .order_by("trade_date", "created_at")
+            .distinct()
+        )
+        if price_date:
+            transactions = transactions.filter(trade_date__lte=price_date)
+        return transactions
+
+    def get_positions(
+        self,
+        *,
+        price_date: date | None = None,
+    ) -> list[dict[str, Decimal | Asset]]:
+        transactions = self._get_filtered_transactions(price_date)
+        fx_rates: dict[tuple[str, str, date | None], Decimal] = {}
+
+        positions = self._build_initial_positions(transactions, fx_rates, price_date)
+        total_value = self._update_market_values(positions, fx_rates, price_date)
+        self._update_position_metrics(positions, total_value)
 
         return list(positions.values())
 
