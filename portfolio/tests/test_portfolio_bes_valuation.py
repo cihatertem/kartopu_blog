@@ -38,18 +38,18 @@ class PortfolioBESValuationTests(TestCase):
         )
 
     def test_bes_uses_current_price_as_total_contract_value(self) -> None:
-        for month in range(0, 4):
+        for month in range(1, 4):
             transaction = PortfolioTransaction.objects.create(
                 asset=self.asset,
                 transaction_type=PortfolioTransaction.TransactionType.BUY,
                 trade_date=date(2024, month, 1),
-                quantity=Decimal("0"),
+                quantity=Decimal("1"),
                 price_per_unit=Decimal("9999"),
             )
             transaction.portfolios.add(self.portfolio)
 
         position = self.portfolio.get_positions()[-1]
 
-        self.assertEqual(position["quantity"], Decimal("2"))
-        self.assertEqual(position["cost_basis"], Decimal("29999"))
+        self.assertEqual(position["quantity"], Decimal("3"))
+        self.assertEqual(position["cost_basis"], Decimal("29997"))
         self.assertEqual(position["market_value"], Decimal("149999"))
