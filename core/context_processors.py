@@ -49,9 +49,8 @@ def breadcrumbs_context(request):
     return {"breadcrumbs": breadcrumbs}
 
 
-def categories_tags_context(request):
+def _get_nav_categories():
     nav_categories = cache.get(NAV_CATEGORIES_KEY)
-
     if nav_categories is None:
         nav_categories = list(
             Category.objects.order_by("name").annotate(
@@ -63,9 +62,11 @@ def categories_tags_context(request):
             )
         )
         cache.set(NAV_CATEGORIES_KEY, nav_categories, timeout=CACHE_TIMEOUT)
+    return nav_categories
 
+
+def _get_nav_tags():
     nav_tags = cache.get(NAV_TAGS_KEY)
-
     if nav_tags is None:
         qs = (
             Tag.objects.annotate(
@@ -80,11 +81,9 @@ def categories_tags_context(request):
             .values("id", "name", "slug", "post_count")
         )
         nav_tags = list(qs)
-
         counts = [t["post_count"] for t in nav_tags]
         min_count = min(counts) if counts else 0
         max_count = max(counts) if counts else 0
-
         for t in nav_tags:
             if max_count == min_count:
                 t["cloud_size"] = 1.0
@@ -92,12 +91,13 @@ def categories_tags_context(request):
                 normalized = (t["post_count"] - min_count) / (max_count - min_count)
                 t["cloud_size"] = round(0.85 + normalized * 0.75, 2)
             t["color_class"] = get_tag_color_class(t["slug"])
-
         cache.set(NAV_TAGS_KEY, nav_tags, timeout=CACHE_TIMEOUT)
+    return nav_tags
 
+
+def _get_nav_archives():
     nav_archives_key = f"{NAV_ARCHIVES_KEY}:{get_language() or 'tr'}"
     nav_archives = cache.get(nav_archives_key)
-
     if nav_archives is None:
         archive_rows = (
             BlogPost.objects.filter(
@@ -125,10 +125,12 @@ def categories_tags_context(request):
                     ),
                 }
             )
-            cache.set(nav_archives_key, nav_archives, timeout=CACHE_TIMEOUT)
+        cache.set(nav_archives_key, nav_archives, timeout=CACHE_TIMEOUT)
+    return nav_archives
 
+
+def _get_nav_recent_posts():
     nav_recent_posts = cache.get(NAV_RECENT_POSTS_KEY)
-
     if nav_recent_posts is None:
         nav_recent_posts = list(
             BlogPost.objects.filter(
@@ -139,9 +141,11 @@ def categories_tags_context(request):
             .only("title", "slug", "published_at", "cover_image")[:5]
         )
         cache.set(NAV_RECENT_POSTS_KEY, nav_recent_posts, timeout=CACHE_TIMEOUT)
+    return nav_recent_posts
 
+
+def _get_nav_popular_posts():
     nav_popular_posts = cache.get(NAV_POPULAR_POSTS_KEY)
-
     if nav_popular_posts is None:
         nav_popular_posts = list(
             BlogPost.objects.filter(
@@ -171,9 +175,11 @@ def categories_tags_context(request):
             .only("title", "slug", "view_count", "published_at", "cover_image")[:5]
         )
         cache.set(NAV_POPULAR_POSTS_KEY, nav_popular_posts, timeout=CACHE_TIMEOUT)
+    return nav_popular_posts
 
+
+def _get_nav_portfolio_posts():
     nav_portfolio_posts = cache.get(NAV_PORTFOLIO_POSTS_KEY)
-
     if nav_portfolio_posts is None:
         nav_portfolio_posts = list(
             BlogPost.objects.filter(
@@ -185,7 +191,10 @@ def categories_tags_context(request):
             .only("title", "slug", "published_at", "cover_image")[:5]
         )
         cache.set(NAV_PORTFOLIO_POSTS_KEY, nav_portfolio_posts, timeout=CACHE_TIMEOUT)
+    return nav_portfolio_posts
 
+
+def _get_goal_widget_snapshot():
     featured_snapshot = (
         PortfolioSnapshot.objects.select_related("portfolio")
         .filter(is_featured=True)
@@ -222,22 +231,28 @@ def categories_tags_context(request):
             "target_display": f"{formatted_target} ₺",
             "remaining_pct": target_pct,
         }
+    return goal_widget_snapshot
 
+
+def _get_unread_contact_message_count(request):
     unread_contact_message_count = 0
     if request.user.is_authenticated and request.user.is_staff:
         unread_contact_message_count = ContactMessage.objects.filter(
             is_read=False,
         ).count()
+    return unread_contact_message_count
 
+
+def categories_tags_context(request):
     return {
-        "nav_categories": nav_categories,
-        "nav_tags": nav_tags,
-        "nav_archives": nav_archives,
-        "nav_recent_posts": nav_recent_posts,
-        "nav_popular_posts": nav_popular_posts,
-        "nav_portfolio_posts": nav_portfolio_posts,
-        "goal_widget_snapshot": goal_widget_snapshot,
-        "unread_contact_message_count": unread_contact_message_count,
+        "nav_categories": _get_nav_categories(),
+        "nav_tags": _get_nav_tags(),
+        "nav_archives": _get_nav_archives(),
+        "nav_recent_posts": _get_nav_recent_posts(),
+        "nav_popular_posts": _get_nav_popular_posts(),
+        "nav_portfolio_posts": _get_nav_portfolio_posts(),
+        "goal_widget_snapshot": _get_goal_widget_snapshot(),
+        "unread_contact_message_count": _get_unread_contact_message_count(request),
     }
 
 
