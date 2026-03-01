@@ -45,8 +45,9 @@ class SocialAvatarDownloadTests(TestCase):
             secret="abc",
             settings={"avatar_url_field": "custom_picture"},
         )
-        self.social_account.extra_data = {"custom_picture": "http://example.com/avatar.jpg"}
-        self.social_account.save(update_fields=["extra_data"])
+        self.social_account.extra_data = {
+            "custom_picture": "http://example.com/avatar.jpg"
+        }
 
         _download_and_save_social_avatar(self.sociallogin)
 
@@ -62,7 +63,6 @@ class SocialAvatarDownloadTests(TestCase):
     @patch("accounts.signals.requests.get")
     def test_download_avatar_success_fallback_field_without_app(self, mock_get):
         self.social_account.extra_data = {"picture": "http://example.com/fallback.jpg"}
-        self.social_account.save(update_fields=["extra_data"])
 
         mock_response = MagicMock()
         mock_response.content = self._create_valid_image()
@@ -111,7 +111,6 @@ class SocialAvatarDownloadTests(TestCase):
         self.social_account.extra_data = {
             "data": {"user": {"avatar": "http://example.com/twitter_avatar.jpg"}}
         }
-        self.social_account.save(update_fields=["extra_data"])
 
         mock_response = MagicMock()
         mock_response.content = self._create_valid_image()
@@ -140,7 +139,6 @@ class SocialAvatarDownloadTests(TestCase):
     @patch("accounts.signals.requests.get")
     def test_download_avatar_no_url_field(self, mock_get):
         self.social_account.extra_data = {"name": "Test User"}
-        self.social_account.save(update_fields=["extra_data"])
 
         _download_and_save_social_avatar(self.sociallogin)
 
