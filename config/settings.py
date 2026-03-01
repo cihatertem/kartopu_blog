@@ -429,7 +429,7 @@ if not DEBUG:
     SECURE_REFERRER_POLICY = "strict-origin-when-cross-origin"
     SECURE_CROSS_ORIGIN_OPENER_POLICY = "same-origin-allow-popups"
 
-    # SECURE_CROSS_ORIGIN_RESOURCE_POLICY = "same-origin"
+    SECURE_CROSS_ORIGIN_RESOURCE_POLICY = "same-origin"
 
     SECURE_HSTS_SECONDS = int(os.getenv("DJANGO_SECURE_HSTS_SECONDS", "63072000"))
     SECURE_HSTS_INCLUDE_SUBDOMAINS = (
