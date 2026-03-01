@@ -3,7 +3,7 @@ from django.contrib.admin.sites import AdminSite
 from django.contrib.messages.storage.fallback import FallbackStorage
 from django.test import RequestFactory, TestCase
 
-from accounts.admin import CustomSocialAppAdmin, CustomSocialAppForm, UserAdmin
+from accounts.admin import CustomSocialAppForm, UserAdmin
 from accounts.models import User
 
 

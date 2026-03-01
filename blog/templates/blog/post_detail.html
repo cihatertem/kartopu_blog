@@ -161,7 +161,7 @@
     {% if comment_page_obj.object_list %}
       <ul class="comment-list">
         {% for comment in comment_page_obj %}
-          {% include "comments/comment_item.html" with comment=comment can_comment=can_comment %}
+          {% include "comments/comment_item.html" with comment=comment can_comment=can_comment is_staff=is_staff %}
         {% endfor %}
       </ul>
       {% if comment_page_obj.has_previous or comment_page_obj.has_next %}

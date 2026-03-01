@@ -51,8 +51,9 @@ def post_comment(request, post_id):
             )
         return redirect(post.get_absolute_url())
 
+    is_staff = request.user.is_staff or request.user.is_superuser
     social_account = SocialAccount.objects.filter(user=request.user).first()
-    if social_account is None:
+    if not is_staff and social_account is None:
         messages.error(
             request,
             "Yorum yapabilmek için sosyal hesap ile giriş yapmalısınız.",
@@ -62,6 +63,9 @@ def post_comment(request, post_id):
     status = Comment.Status.PENDING
     if form.cleaned_data.get("website"):
         status = Comment.Status.SPAM
+
+    if is_staff:
+        status = Comment.Status.APPROVED
 
     parent = None
     parent_id = form.cleaned_data.get("parent_id")
@@ -85,11 +89,42 @@ def post_comment(request, post_id):
     comment.parent = parent
     comment.ip_address = request.META.get("REMOTE_ADDR")
     comment.user_agent = request.META.get("HTTP_USER_AGENT", "")[:500]
-    comment.social_provider = social_account.provider
+    comment.social_provider = social_account.provider if social_account else ""
     comment.save()
 
-    messages.success(
-        request,
-        "Yorumunuz alınmıştır ve moderasyon sonrası yayınlanacaktır.",
-    )
+    if status == Comment.Status.APPROVED:
+        messages.success(request, "Yorumunuz başarıyla yayınlandı.")
+    else:
+        messages.success(
+            request,
+            "Yorumunuz alınmıştır ve moderasyon sonrası yayınlanacaktır.",
+        )
     return redirect(post.get_absolute_url())
+
+
+@login_required
+@require_POST
+def moderate_comment(request, comment_id):
+    is_staff = request.user.is_staff or request.user.is_superuser
+    if not is_staff:
+        messages.error(request, "Bu işlem için yetkiniz bulunmuyor.")
+        return redirect("/")
+
+    comment = get_object_or_404(Comment, pk=comment_id)
+    action = request.POST.get("action")
+
+    if action == "approve":
+        comment.status = Comment.Status.APPROVED
+        comment.save(update_fields=["status"])
+        messages.success(request, "Yorum onaylandı.")
+    elif action == "pending":
+        comment.status = Comment.Status.PENDING
+        comment.save(update_fields=["status"])
+        messages.success(request, "Yorum onaya alındı.")
+    elif action == "delete":
+        comment.delete()
+        messages.success(request, "Yorum silindi.")
+    else:
+        messages.error(request, "Geçersiz işlem.")
+
+    return redirect(comment.post.get_absolute_url())

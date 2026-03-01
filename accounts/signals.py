@@ -97,7 +97,7 @@ def _download_and_save_social_avatar(sociallogin) -> None:
     response.raise_for_status()
 
     # Determine a simple filename
-    filename = f"social_avatar.jpg"
+    filename = "social_avatar.jpg"
 
     # Save the file to the user's avatar field (this triggers resize and storage mechanisms)
     user.avatar.save(filename, ContentFile(response.content), save=True)

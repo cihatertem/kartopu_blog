@@ -55,3 +55,4 @@ class MockSearchVector(Expression):
 
 
 django.contrib.postgres.search.SearchVector = MockSearchVector
+ALLOWED_HOSTS = ["*"]

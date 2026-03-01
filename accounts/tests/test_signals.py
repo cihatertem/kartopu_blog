@@ -137,6 +137,10 @@ class SocialAvatarDownloadTests(TestCase):
 
     @patch("accounts.signals.requests.get")
     def test_download_avatar_already_has_avatar(self, mock_get):
+        from django.core.files.uploadedfile import SimpleUploadedFile
+
+        from accounts.signals import _download_and_save_social_avatar
+
         # Give user an avatar first
         test_uploaded_file = SimpleUploadedFile(
             "existing.jpg", self._create_valid_image(), content_type="image/jpeg"

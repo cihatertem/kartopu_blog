@@ -155,13 +155,15 @@ def _build_reaction_context(request, post):
 
 
 def _build_comment_context(request, post):
-    approved_comments = list(
-        post.comments.filter(  # pyright: ignore[reportAttributeAccessIssue]
-            status=Comment.Status.APPROVED
+    qs = post.comments.select_related("author").order_by("-created_at")  # pyright: ignore[reportAttributeAccessIssue]
+    if request.user.is_staff or request.user.is_superuser:
+        qs = qs.exclude(status=Comment.Status.SPAM).exclude(
+            status=Comment.Status.REJECTED
         )
-        .select_related("author")
-        .order_by("-created_at")
-    )
+    else:
+        qs = qs.filter(status=Comment.Status.APPROVED)
+
+    approved_comments = list(qs)
     author_ids = {comment.author_id for comment in approved_comments}
     social_avatar_map = {}
     if author_ids:
@@ -188,6 +190,9 @@ def _build_comment_context(request, post):
         request.user.is_authenticated
         and SocialAccount.objects.filter(user=request.user).exists()
     )
+    is_staff = request.user.is_authenticated and (
+        request.user.is_staff or request.user.is_superuser
+    )
     comment_page_obj = get_page_obj(
         request,
         top_level_comments,
@@ -200,6 +205,7 @@ def _build_comment_context(request, post):
         "comment_page_obj": comment_page_obj,
         "comment_total": len(approved_comments),
         "has_social_account": has_social_account,
+        "is_staff": is_staff,
     }
 
 
@@ -295,19 +301,20 @@ def _build_post_breadcrumbs(post, *, is_preview: bool) -> list[dict[str, str | N
 def _build_post_detail_context(request, post, *, is_preview: bool):
     comment_context = _build_comment_context(request, post)
     has_social_account = comment_context["has_social_account"]
+    is_staff = comment_context["is_staff"]
     site_settings = SiteSettings.get_settings()
 
     reaction_context = _build_reaction_context(request, post)
     is_authenticated = request.user.is_authenticated
     can_comment = (
         site_settings.is_comments_enabled
-        and has_social_account
+        and (has_social_account or is_staff)
         and (is_preview or is_authenticated)
     )
     requires_social_auth = (
         site_settings.is_comments_enabled
         and (is_preview or is_authenticated)
-        and not has_social_account
+        and not (has_social_account or is_staff)
     )
     can_react = has_social_account and (is_preview or is_authenticated)
 
@@ -330,6 +337,7 @@ def _build_post_detail_context(request, post, *, is_preview: bool):
         "MAX_COMMENT_LENGTH": MAX_COMMENT_LENGTH,
         "comment_page_obj": comment_context["comment_page_obj"],
         "comment_total": comment_context["comment_total"],
+        "is_staff": is_staff,
         "can_react": can_react,
         **reaction_context,
     }
