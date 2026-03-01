@@ -1,16 +1,29 @@
 <li class="comment-item">
   <div class="comment-header">
-    {% if comment.social_avatar_url %}
-      <img
-        class="comment-avatar"
-        src="{{ comment.social_avatar_url }}"
-        alt="{{ comment.author.full_name }}"
-        loading="lazy"
-        width="48"
-        height="48"
-        decoding="async"
-      >
-    {% endif %}
+    {% with local_avatar=comment.author.avatar_rendition %}
+      {% if local_avatar %}
+        <img
+          class="comment-avatar"
+          src="{{ local_avatar.src }}"
+          srcset="{{ local_avatar.srcset }}"
+          alt="{{ comment.author.full_name }}"
+          loading="lazy"
+          width="48"
+          height="48"
+          decoding="async"
+        >
+      {% elif comment.social_avatar_url %}
+        <img
+          class="comment-avatar"
+          src="{{ comment.social_avatar_url }}"
+          alt="{{ comment.author.full_name }}"
+          loading="lazy"
+          width="48"
+          height="48"
+          decoding="async"
+        >
+      {% endif %}
+    {% endwith %}
     <div class="comment-meta">
       <strong>{{ comment.author.full_name }}</strong>
       <small>— {{ comment.created_at|date:"d F Y H:i" }}</small>

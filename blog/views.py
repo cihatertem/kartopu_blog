@@ -178,7 +178,10 @@ def _build_comment_context(request, post):
         replies_by_parent.setdefault(comment.parent_id, []).append(comment)
     for comment in approved_comments:
         comment.nested_replies = replies_by_parent.get(comment.id, [])  # type: ignore[attr-defined]
-        comment.social_avatar_url = social_avatar_map.get(comment.author_id, "")  # type: ignore[attr-defined]
+        if comment.author and getattr(comment.author, "avatar", None):
+            comment.social_avatar_url = ""
+        else:
+            comment.social_avatar_url = social_avatar_map.get(comment.author_id, "")  # type: ignore[attr-defined]
     top_level_comments = replies_by_parent.get(None, [])
     comment_form = CommentForm()
     has_social_account = (

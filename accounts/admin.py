@@ -1,10 +1,47 @@
+from allauth.socialaccount.admin import SocialAppAdmin, SocialAppForm
+from allauth.socialaccount.models import SocialApp
+from django import forms
 from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin as BaseUserAdmin
 from django.utils.translation import gettext_lazy as _
 
 from .models import User
 
-# Register your models here.
+
+class CustomSocialAppForm(SocialAppForm):
+    avatar_url_field = forms.CharField(
+        required=False,
+        label=_("Avatar URL Field"),
+        help_text=_(
+            "The field in the provider's API response that contains the user's avatar URL (e.g., 'picture' or 'profile_image_url')."
+        ),
+    )
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        if self.instance and self.instance.pk:
+            settings_data = self.instance.settings or {}
+            self.fields["avatar_url_field"].initial = settings_data.get(
+                "avatar_url_field", ""
+            )
+
+    def save(self, commit=True):
+        instance = super().save(commit=False)
+        settings_data = instance.settings or {}
+        avatar_url_field = self.cleaned_data.get("avatar_url_field")
+        if avatar_url_field:
+            settings_data["avatar_url_field"] = avatar_url_field
+        else:
+            settings_data.pop("avatar_url_field", None)
+        instance.settings = settings_data
+        if commit:
+            instance.save()
+            self.save_m2m()
+        return instance
+
+
+class CustomSocialAppAdmin(SocialAppAdmin):
+    form = CustomSocialAppForm
 
 
 @admin.register(User)

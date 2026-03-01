@@ -1,8 +1,9 @@
+from allauth.socialaccount.models import SocialApp
 from django.contrib.admin.sites import AdminSite
 from django.contrib.messages.storage.fallback import FallbackStorage
 from django.test import RequestFactory, TestCase
 
-from accounts.admin import UserAdmin
+from accounts.admin import CustomSocialAppAdmin, CustomSocialAppForm, UserAdmin
 from accounts.models import User
 
 
@@ -121,3 +122,58 @@ class UserAdminActionTests(TestCase):
         self.user2.refresh_from_db()
         self.assertFalse(self.user1.is_active)
         self.assertFalse(self.user2.is_active)
+
+
+class CustomSocialAppAdminTests(TestCase):
+    def test_custom_social_app_form_includes_avatar_url_field(self):
+        """Test that CustomSocialAppForm includes avatar_url_field correctly"""
+        form = CustomSocialAppForm()
+        self.assertIn("avatar_url_field", form.fields)
+
+    def test_custom_social_app_form_saves_settings(self):
+        """Test that avatar_url_field is correctly saved into settings JSON"""
+        form_data = {
+            "provider": "google",
+            "name": "Google",
+            "client_id": "testclient",
+            "secret": "testsecret",
+            "key": "testkey",
+            "avatar_url_field": "custom_picture_key",
+        }
+        form = CustomSocialAppForm(data=form_data)
+        self.assertTrue(form.is_valid(), form.errors)
+
+        instance = form.save(commit=True)
+        self.assertIn("avatar_url_field", instance.settings)
+        self.assertEqual(instance.settings["avatar_url_field"], "custom_picture_key")
+
+        # Test initial value loading
+        form_edit = CustomSocialAppForm(instance=instance)
+        self.assertEqual(
+            form_edit.fields["avatar_url_field"].initial, "custom_picture_key"
+        )
+
+    def test_custom_social_app_form_removes_settings_if_empty(self):
+        """Test that avatar_url_field is removed from settings JSON if submitted empty"""
+        # Create an instance that has it set first
+        app = SocialApp.objects.create(
+            provider="google",
+            name="Google",
+            client_id="testclient",
+            secret="testsecret",
+            settings={"avatar_url_field": "custom_picture_key"},
+        )
+
+        form_data = {
+            "provider": "google",
+            "name": "Google",
+            "client_id": "testclient",
+            "secret": "testsecret",
+            "key": "testkey",
+            "avatar_url_field": "",  # Empty string
+        }
+        form = CustomSocialAppForm(data=form_data, instance=app)
+        self.assertTrue(form.is_valid(), form.errors)
+
+        instance = form.save(commit=True)
+        self.assertNotIn("avatar_url_field", instance.settings)
