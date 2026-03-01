@@ -414,20 +414,23 @@ if not DEBUG:
     CSRF_TRUSTED_ORIGINS = [
         f"https://{host}" for host in ALLOWED_HOSTS
     ]  # e.g. ["https://example.com"]
+
     SESSION_COOKIE_SECURE = True
-    SESSION_COOKIE_SAMESITE = os.getenv("DJANGO_SESSION_COOKIE_SAMESITE", "Lax")
-    SECURE_SSL_REDIRECT = True
-    USE_X_FORWARDED_HOST = True
-    SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
     SESSION_COOKIE_HTTPONLY = True
+    SESSION_COOKIE_SAMESITE = os.getenv("DJANGO_SESSION_COOKIE_SAMESITE", "Lax")
+
+    SECURE_SSL_REDIRECT = True
+    SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
+    USE_X_FORWARDED_HOST = True
+
     SECURE_CONTENT_TYPE_NOSNIFF = True
     X_FRAME_OPTIONS = "DENY"  # Tıklama korsanlığını (Clickjacking) önler
-    SECURE_REFERRER_POLICY = (
-        "strict-origin-when-cross-origin"  # "strict-origin-when-cross-origin"
-    )
+
+    SECURE_REFERRER_POLICY = "strict-origin-when-cross-origin"
     SECURE_CROSS_ORIGIN_OPENER_POLICY = "same-origin-allow-popups"
-    # Alt satırı ekle: Bu, tarayıcıya resimlerin 'ayrıcalıklı' yüklenmesini söyler
-    SECURE_CROSS_ORIGIN_RESOURCE_POLICY = "same-origin"
+
+    # SECURE_CROSS_ORIGIN_RESOURCE_POLICY = "same-origin"
+
     SECURE_HSTS_SECONDS = int(os.getenv("DJANGO_SECURE_HSTS_SECONDS", "63072000"))
     SECURE_HSTS_INCLUDE_SUBDOMAINS = (
         os.getenv("DJANGO_SECURE_HSTS_INCLUDE_SUBDOMAINS", "1") == "1"
