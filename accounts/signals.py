@@ -6,8 +6,8 @@ from allauth.socialaccount.signals import (
     social_account_added,
     social_account_updated,
 )
-from django.core.files.base import ContentFile
 from django.core.files.storage import FileSystemStorage
+from django.core.files.uploadedfile import SimpleUploadedFile
 from django.db.models.signals import post_delete
 from django.dispatch import receiver
 
@@ -99,8 +99,13 @@ def _download_and_save_social_avatar(sociallogin) -> None:
     # Determine a simple filename
     filename = "social_avatar.jpg"
 
+    content_type = response.headers.get("Content-Type", "image/jpeg")
+
     # Save the file to the user's avatar field (this triggers resize and storage mechanisms)
-    user.avatar.save(filename, ContentFile(response.content), save=True)
+    user.avatar = SimpleUploadedFile(
+        filename, response.content, content_type=content_type
+    )
+    user.save()
 
 
 @receiver(social_account_added)

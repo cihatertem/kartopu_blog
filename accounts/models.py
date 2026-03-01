@@ -2,8 +2,8 @@ from functools import cached_property
 from io import BytesIO
 
 from django.contrib.auth.models import AbstractUser, BaseUserManager
-from django.core.files.base import ContentFile
 from django.core.files.storage import Storage, default_storage
+from django.core.files.uploadedfile import InMemoryUploadedFile
 from django.db import models
 from django.utils import timezone
 from django.utils.deconstruct import deconstructible
@@ -127,12 +127,19 @@ class User(  # pyright: ignore[reportIncompatibleVariableOverride]
         verbose_name = "Kullanıcı"
         verbose_name_plural = "Kullanıcılar"
 
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self._initial_avatar = self.avatar
+
     def save(self, *args: object, **kwargs: object) -> None:
         if self.email == "":
             self.email = None
+
+        if self.avatar and self.avatar != getattr(self, "_initial_avatar", None):
+            self._resize_avatar_in_memory()
+
         super().save(*args, **kwargs)  # pyright: ignore[reportArgumentType]
-        if self.avatar:
-            self._resize_avatar()
+        self._initial_avatar = self.avatar
 
     def __str__(self) -> str:
         first_name = str(self.first_name) or ""
@@ -146,13 +153,16 @@ class User(  # pyright: ignore[reportIncompatibleVariableOverride]
         return self.get_full_name().title()
 
     @log_exceptions(message="Avatar resizing failed: %s")
-    def _resize_avatar(self) -> None:
+    def _resize_avatar_in_memory(self) -> None:
         if not self.avatar:
             return
 
-        self.avatar.open("rb")
+        file = self.avatar.file
+        if hasattr(file, "seek"):
+            file.seek(0)
+
         try:
-            with Image.open(self.avatar) as img:
+            with Image.open(file) as img:
                 img = ImageOps.exif_transpose(img)
 
                 if (
@@ -165,15 +175,33 @@ class User(  # pyright: ignore[reportIncompatibleVariableOverride]
                 img.thumbnail(self.MAX_AVATAR_SIZE)
                 buffer = BytesIO()
                 img.save(buffer, format="JPEG", quality=85)
-        finally:
-            self.avatar.close()
 
-        content = ContentFile(buffer.getvalue())
-        storage = self.avatar.storage
-        name = self.avatar.name
-        if storage.exists(name):
-            storage.delete(name)
-        storage.save(name, content)
+                import os
+
+                filename = self.avatar.name
+                if filename:
+                    base_name = os.path.basename(filename)
+                    if base_name.lower().endswith(
+                        (".png", ".webp", ".gif", ".jpeg", ".jpg")
+                    ):
+                        filename = base_name.rsplit(".", 1)[0] + ".jpg"
+                    else:
+                        filename = base_name + ".jpg"
+                else:
+                    filename = "avatar.jpg"
+
+                new_file = InMemoryUploadedFile(
+                    buffer,
+                    "ImageField",
+                    filename,
+                    "image/jpeg",
+                    buffer.tell(),
+                    None,
+                )
+                self.avatar = new_file  # pyright: ignore[reportAttributeAccessIssue]
+        finally:
+            # We don't close the file if it's not opened by us previously or if we shouldn't
+            pass
 
     @cached_property
     def avatar_rendition(self) -> dict | None:

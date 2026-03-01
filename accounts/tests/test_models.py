@@ -25,7 +25,7 @@ class UserAvatarResizeTests(TestCase):
         user = User.objects.create_user(email="test@example.com", password="password")
         self.assertFalse(user.avatar)
         # Should not raise any errors
-        user._resize_avatar()
+        user._resize_avatar_in_memory()
 
     def test_resize_avatar_small_image(self):
         small_image = create_image(400, 400)
@@ -68,7 +68,7 @@ class UserAvatarResizeTests(TestCase):
         image = Image.new("RGB", (1000, 800), "white")
 
         # Since generating EXIF data from scratch is complex, we just mock `ImageOps.exif_transpose`
-        # and see if it's called with our image when `_resize_avatar` runs
+        # and see if it's called with our image when `_resize_avatar_in_memory` runs
 
         image.save(file, "JPEG")
         test_uploaded_file = SimpleUploadedFile(
@@ -93,7 +93,7 @@ class UserAvatarResizeTests(TestCase):
 
     def test_resize_avatar_error_handling(self):
         # We bypass user.save() which has signal hooks from ImageKit that crash on bad images
-        # Instead, we directly test that `_resize_avatar` safely catches and logs exceptions
+        # Instead, we directly test that `_resize_avatar_in_memory` safely catches and logs exceptions
         user = User(email="error@example.com", password="password", first_name="Error")
         user.save()  # Save cleanly first
 
@@ -107,6 +107,8 @@ class UserAvatarResizeTests(TestCase):
         try:
             # We call the method, expecting the UnidentifiedImageError to be swallowed
             # by the @log_exceptions decorator
-            user._resize_avatar()
+            user._resize_avatar_in_memory()
         except Exception as e:
-            self.fail(f"_resize_avatar raised {type(e).__name__} unexpectedly!")
+            self.fail(
+                f"_resize_avatar_in_memory raised {type(e).__name__} unexpectedly!"
+            )
