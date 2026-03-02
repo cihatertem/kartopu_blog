@@ -1427,6 +1427,7 @@ class DividendSnapshot(BaseSnapshot):
         snapshot_date = snapshot_date or date(year, 12, 31)  # pyright: ignore[reportArgumentType]
         payments = (
             DividendPayment.objects.select_related("asset")
+            .prefetch_related("dividends")
             .filter(payment_date__year=year, payment_date__lte=snapshot_date)
             .order_by("payment_date", "created_at")
         )
@@ -1467,19 +1468,34 @@ class DividendSnapshot(BaseSnapshot):
                 fx_rates[currency_pair] = fx_rate  # pyright: ignore[reportArgumentType]
 
         for payment in payments:
-            fx_rate = Decimal("1")
-            if payment.asset.currency != currency:
-                # Use snapshot_date for currency conversion
-                currency_pair = (payment.asset.currency, currency, snapshot_date)
-                fx_rate = fx_rates.get(currency_pair, Decimal("1"))  # pyright: ignore[reportCallIssue, reportArgumentType]
-            per_share = payment.net_dividend_per_share * fx_rate  # pyright: ignore[reportOperatorIssue]
-            total_payment = payment.total_net_amount * fx_rate
-            avg_cost = payment.average_cost * fx_rate
-            last_close = payment.last_close_price * fx_rate
-            yield_on_payment = (
-                per_share / last_close if last_close > 0 else Decimal("0")
+            dividend = next(
+                (d for d in payment.dividends.all() if d.currency == currency), None
             )
-            yield_on_average = per_share / avg_cost if avg_cost > 0 else Decimal("0")
+
+            if dividend:
+                per_share = dividend.per_share_net_amount
+                total_payment = dividend.total_net_amount
+            else:
+                fx_rate = Decimal("1")
+                if payment.asset.currency != currency:
+                    # Use snapshot_date for currency conversion
+                    currency_pair = (payment.asset.currency, currency, snapshot_date)
+                    fx_rate = fx_rates.get(currency_pair, Decimal("1"))  # pyright: ignore[reportCallIssue, reportArgumentType]
+                per_share = payment.net_dividend_per_share * fx_rate  # pyright: ignore[reportOperatorIssue]
+                total_payment = payment.total_net_amount * fx_rate
+
+            avg_cost = payment.average_cost
+            last_close = payment.last_close_price
+            yield_on_payment = (
+                payment.net_dividend_per_share / last_close
+                if last_close > 0
+                else Decimal("0")
+            )
+            yield_on_average = (
+                payment.net_dividend_per_share / avg_cost
+                if avg_cost > 0
+                else Decimal("0")
+            )
             total_amount += total_payment
             asset_entry = asset_totals.setdefault(
                 str(payment.asset_id),  # pyright: ignore[reportAttributeAccessIssue]
