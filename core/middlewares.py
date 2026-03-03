@@ -31,6 +31,7 @@ class TrustedProxyMiddleware:
         default=False,
         exception_types=(ValueError,),
         message="Invalid IP address in proxy check",
+        include_traceback=True,
     )
     def _is_trusted_proxy(request) -> bool:
         remote = request.META.get("REMOTE_ADDR")
