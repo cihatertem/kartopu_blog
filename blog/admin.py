@@ -136,6 +136,7 @@ class BlogPostAdmin(admin.ModelAdmin):
         "draft_posts",
         "archive_posts",
         "resend_newsletter_notifications",
+        "toggle_is_featured",
     )
 
     def formfield_for_foreignkey(self, db_field, request, **kwargs):
@@ -173,6 +174,15 @@ class BlogPostAdmin(admin.ModelAdmin):
     @admin.action(description="Seçili yazıları arşivle")
     def archive_posts(self, request, queryset):
         queryset.update(status=BlogPost.Status.ARCHIVED)
+
+    @admin.action(description="Seçili yazıların öne çıkma durumunu değiştir")
+    def toggle_is_featured(self, request, queryset):
+        queryset.update(
+            is_featured=Case(
+                When(is_featured=True, then=Value(False)),
+                default=Value(True),
+            )
+        )
 
     @admin.action(description="Seçili yazılar için newsletter bildirimi gönder")
     def resend_newsletter_notifications(self, request, queryset):
