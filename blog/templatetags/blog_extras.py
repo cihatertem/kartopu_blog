@@ -582,12 +582,11 @@ def _render_portfolio_comparison_summary_html(comparison) -> str:
     return_sign = "+" if return_points > 0 else ""
     return_html = f"Getiri {return_sign}{escape(f'{float(return_points):.0f}')} puan"
 
-    value_change_pct_str = escape(f"~%{float(value_change_pct):.2f}").replace(".", ",")
     cost_free_return_str = escape(f"~%{float(cost_free_return):.2f}").replace(".", ",")
 
     html = f"""
 <section class="portfolio-comparison">
-  <h3>Portföy Karşılaştırması</h3>
+  <h4>Portföy Karşılaştırması</h4>
   <div class="summary-card">
     <div class="comparison-grid">
       <div>
@@ -614,7 +613,7 @@ def _render_portfolio_comparison_summary_html(comparison) -> str:
       </div>
     </div>
     <div class="comparison-footer">
-      <p class="summary-meta summary-meta--tight"><strong>Değişim:</strong> Toplam Değer {_format_currency(value_delta, portfolio_currency)} ({value_change_pct_str} &rarr; {cost_free_return_str}),
+      <p class="summary-meta summary-meta--tight"><strong>Değişim:</strong> Toplam Değer {_format_currency(value_delta, portfolio_currency)} ({cost_free_return_str}),
         {return_html}{target_ratio_delta_html}</p>
     </div>
   </div>
@@ -847,7 +846,7 @@ def _render_cashflow_comparison_summary_html(comparison) -> str:
 
     html = f"""
 <section class="cashflow-comparison">
-  <h3>Nakit Akışı Karşılaştırması</h3>
+  <h4>Nakit Akışı Karşılaştırması</h4>
   <div class="summary-card">
     <div class="comparison-grid">
       <div>
@@ -986,7 +985,7 @@ def _render_dividend_comparison_html(comparison) -> str:
 
     html = f"""
 <section class="dividend-comparison">
-  <h3>Temettü Karşılaştırması</h3>
+  <h4>Temettü Karşılaştırması</h4>
   <div class="summary-card">
     <div class="table-scroll">
       <table class="data-table">
