@@ -47,10 +47,10 @@ class ChartExclusionTests(TestCase):
             total_return_pct=Decimal("0"),
         )
         asset_nonzero = Asset.objects.create(
-            name="Alpha Asset", symbol="ALPHA", asset_type=Asset.AssetType.STOCK
+            name="Nvidia", symbol="NVDA", asset_type=Asset.AssetType.STOCK
         )
         asset_zero = Asset.objects.create(
-            name="Beta Asset", symbol="BETA", asset_type=Asset.AssetType.STOCK
+            name="Amd", symbol="AMD", asset_type=Asset.AssetType.STOCK
         )
 
         PortfolioSnapshotItem.objects.create(
@@ -89,9 +89,9 @@ class ChartExclusionTests(TestCase):
         template = Template("{% load blog_extras %}{% render_post_body post %}")
         rendered = template.render(Context({"post": post}))
 
-        # Check that ALPHA is in the chart data, but BETA is not
-        self.assertIn("ALPHA", rendered)
-        self.assertNotIn("BETA", rendered)
+        # Check that NVDA is in the chart data, but AMD is not
+        self.assertIn("NVDA", rendered)
+        self.assertNotIn("AMD", rendered)
 
     def test_cashflow_charts_exclude_zero_amount_items(self) -> None:
         cashflow = CashFlow.objects.create(
@@ -142,10 +142,10 @@ class ChartExclusionTests(TestCase):
             total_amount=Decimal("1000"),
         )
         asset_nonzero = Asset.objects.create(
-            name="Apple", symbol="APPLE", asset_type=Asset.AssetType.STOCK
+            name="Apple", symbol="APPL", asset_type=Asset.AssetType.STOCK
         )
         asset_zero = Asset.objects.create(
-            name="Banana", symbol="BANANA", asset_type=Asset.AssetType.STOCK
+            name="Meta", symbol="META", asset_type=Asset.AssetType.STOCK
         )
 
         DividendSnapshotAssetItem.objects.create(
@@ -172,5 +172,5 @@ class ChartExclusionTests(TestCase):
         template = Template("{% load blog_extras %}{% render_post_body post %}")
         rendered = template.render(Context({"post": post}))
 
-        self.assertIn("APPLE", rendered)
-        self.assertNotIn("BANANA", rendered)
+        self.assertIn("APPL", rendered)
+        self.assertNotIn("META", rendered)
