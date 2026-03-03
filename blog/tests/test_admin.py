@@ -1,12 +1,48 @@
+import json
+import os
+import shutil
+from decimal import Decimal
 from unittest.mock import MagicMock, patch
 
+import django
+from allauth.socialaccount.models import SocialAccount
+from django.conf import settings
 from django.contrib.admin.sites import AdminSite
 from django.contrib.auth import get_user_model
-from django.test import RequestFactory, TestCase
+from django.contrib.messages import get_messages
+from django.contrib.messages.storage.fallback import FallbackStorage
+from django.contrib.syndication.views import Feed
+from django.core.files.uploadedfile import InMemoryUploadedFile, SimpleUploadedFile
+from django.template import engines
+from django.test import Client, RequestFactory, TestCase
+from django.urls import reverse
 from django.utils import timezone
 
 from blog.admin import BlogPostAdmin, BlogPostImageInline, CategoryAdmin, TagAdmin
-from blog.models import BlogPost, BlogPostImage, Category, Tag
+from blog.feeds import (
+    CategoryPostsFeed,
+    LatestPostsFeed,
+    _fallback_cover_name,
+    _get_cover_name,
+    _safe_cover_size,
+)
+from blog.models import BlogPost, BlogPostImage, BlogPostReaction, Category, Tag
+from blog.signals import (
+    _delete_local_dir_if_exists,
+    _delete_storage_dir_if_exists,
+    _delete_storage_file,
+    _post_cache_dir,
+    _post_cache_storage_dir,
+    _post_media_dir,
+    invalidate_nav_cache,
+)
+from blog.templatetags import blog_extras
+from blog.views import (
+    _extract_social_avatar_url,
+    _normalize_avatar_url,
+    archive_index,
+    post_reaction,
+)
 
 User = get_user_model()
 
@@ -17,17 +53,6 @@ class MockRequest:
 
     def get_messages(self):
         return []
-
-
-class MockSuperUser:
-    pk = 1
-    is_active = True
-    is_staff = True
-    is_authenticated = True
-    is_superuser = True
-
-    def has_perm(self, perm):
-        return True
 
 
 class BlogAdminTests(TestCase):
@@ -62,10 +87,8 @@ class BlogAdminTests(TestCase):
         inline = BlogPostImageInline(BlogPost, self.site)
         image = BlogPostImage(post=self.post)
 
-        # Test missing image
         self.assertEqual(inline.thumb(image), "—")
 
-        # Test with image (mocked rendition)
         image.pk = 1
         image.image = MagicMock()
         image.image.url = "/media/test.jpg"
@@ -82,28 +105,47 @@ class BlogAdminTests(TestCase):
             self.assertIn("class='admin-thumb'", html)
             self.assertIn("src='/media/test.jpg'", html)
 
+    def test_blogpost_image_inline_get_rendition_url(self):
+        inline = BlogPostImageInline(BlogPost, self.site)
+
+        class MockImage:
+            class MockImage600:
+                url = "/media/rendition.jpg"
+
+            image_600 = MockImage600()
+
+        image = MockImage()
+
+        url = inline._get_rendition_url(image)
+        self.assertEqual(url, "/media/rendition.jpg")
+
+        class BadImage:
+            @property
+            def image_600(self):
+                raise Exception("Cannot resolve url")
+
+        bad_image = BadImage()
+        url = inline._get_rendition_url(bad_image)
+        self.assertIsNone(url)
+
     def test_blogpost_admin_actions(self):
         model_admin = BlogPostAdmin(BlogPost, self.site)
         request = MockRequest(user=self.admin_user)
         queryset = BlogPost.objects.filter(pk=self.post.pk)
 
-        # Draft -> Publish
         model_admin.publish_posts(request, queryset)
         self.post.refresh_from_db()
         self.assertEqual(self.post.status, BlogPost.Status.PUBLISHED)
         self.assertIsNotNone(self.post.published_at)
 
-        # Publish -> Archive
         model_admin.archive_posts(request, queryset)
         self.post.refresh_from_db()
         self.assertEqual(self.post.status, BlogPost.Status.ARCHIVED)
 
-        # Archive -> Draft
         model_admin.draft_posts(request, queryset)
         self.post.refresh_from_db()
         self.assertEqual(self.post.status, BlogPost.Status.DRAFT)
 
-        # Toggle featured
         self.assertFalse(self.post.is_featured)
         model_admin.toggle_is_featured(request, queryset)
         self.post.refresh_from_db()
@@ -113,10 +155,8 @@ class BlogAdminTests(TestCase):
     def test_resend_newsletter_notifications_action(self, mock_send):
         model_admin = BlogPostAdmin(BlogPost, self.site)
 
-        # We need a proper Request object for `message_user`
         request = self.factory.get("/")
         request.user = self.admin_user
-        from django.contrib.messages.storage.fallback import FallbackStorage
 
         setattr(request, "session", "session")
         messages = FallbackStorage(request)
@@ -124,25 +164,17 @@ class BlogAdminTests(TestCase):
 
         queryset = BlogPost.objects.filter(pk=self.post.pk)
 
-        # Try on Draft post -> should skip
         model_admin.resend_newsletter_notifications(request, queryset)
         mock_send.assert_not_called()
 
-        # Publish post
         self.post.status = BlogPost.Status.PUBLISHED
         self.post.published_at = timezone.now()
         self.post.save()
 
-        # Update the queryset or pass a new evaluated queryset because `resend_newsletter_notifications`
-        # loops through `queryset` which might be evaluated previously as a Draft post or not.
-        # Actually, `.filter()` is lazy but let's be explicit and re-fetch to avoid stale data.
         queryset = BlogPost.objects.filter(pk=self.post.pk)
 
-        # Try on published -> should send
         model_admin.resend_newsletter_notifications(request, queryset)
 
-        # In `resend_newsletter_notifications`, `send_post_published_email` is called.
-        # Let's see how it was called
         mock_send.assert_called_once()
         self.assertEqual(mock_send.call_args[0][0].pk, self.post.pk)
 
@@ -153,11 +185,9 @@ class BlogAdminTests(TestCase):
         db_field = BlogPost._meta.get_field("author")
         formfield = model_admin.formfield_for_foreignkey(db_field, request)
 
-        # Ensure only staff are options
         qs = formfield.queryset
         self.assertIn(self.staff_user, qs)
 
-        # Normal user should not be here
         normal_user = User.objects.create_user(
             email="normal@example.com", password="password"
         )
@@ -174,12 +204,10 @@ class BlogAdminTests(TestCase):
     def test_public_link(self):
         model_admin = BlogPostAdmin(BlogPost, self.site)
 
-        # Draft -> preview link
         html = model_admin.public_link(self.post)
         self.assertIn("preview", html)
         self.assertIn("Önizleme", html)
 
-        # Published -> absolute URL
         self.post.status = BlogPost.Status.PUBLISHED
         self.post.save()
         html = model_admin.public_link(self.post)

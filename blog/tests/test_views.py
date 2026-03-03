@@ -1,4 +1,5 @@
 import json
+from unittest.mock import patch
 
 from allauth.socialaccount.models import SocialAccount
 from django.contrib.auth import get_user_model
@@ -209,3 +210,131 @@ class BlogViewsTests(TestCase):
         data = json.loads(response.content)
         self.assertEqual(data["selected"], BlogPostReaction.Reaction.ROKET.value)
         self.assertEqual(data["counts"].get(BlogPostReaction.Reaction.ROKET.value), 1)
+
+    def test_post_reaction_bad_slug(self):
+        SocialAccount.objects.create(user=self.reader, provider="google", uid="123")
+        url = reverse("blog:post_reaction", kwargs={"slug": "missing"})
+        request = self.factory.post(
+            url, {"reaction": BlogPostReaction.Reaction.KALP.value}
+        )
+        request.user = self.reader
+
+        from django.http import Http404
+
+        with self.assertRaises(Http404):
+            post_reaction(request, slug="missing")
+
+
+from blog.views import (
+    _build_comment_context,
+    _build_reaction_context,
+    _extract_social_avatar_url,
+    _normalize_avatar_url,
+    archive_index,
+)
+
+
+class ViewHelperTests(TestCase):
+    def test_normalize_avatar_url(self):
+        self.assertEqual(_normalize_avatar_url(None), "")
+        self.assertEqual(
+            _normalize_avatar_url("http://pbs.twimg.com/x.jpg"),
+            "https://pbs.twimg.com/x.jpg",
+        )
+        self.assertEqual(
+            _normalize_avatar_url("https://example.com/x.jpg"),
+            "https://example.com/x.jpg",
+        )
+        self.assertEqual(_normalize_avatar_url("invalid_url"), "")
+
+    def test_extract_social_avatar_url(self):
+        self.assertEqual(_extract_social_avatar_url(None), "")
+        self.assertEqual(
+            _extract_social_avatar_url({"picture": "http://x"}), "http://x"
+        )
+        self.assertEqual(
+            _extract_social_avatar_url({"pictureUrl": "http://y"}), "http://y"
+        )
+        self.assertEqual(
+            _extract_social_avatar_url({"avatar_url": "http://z"}), "http://z"
+        )
+        self.assertEqual(
+            _extract_social_avatar_url({"image": {"url": "http://i"}}), "http://i"
+        )
+
+    def test_archive_index(self):
+        user = User.objects.create_user(
+            email="archive@example.com", password="password"
+        )
+        BlogPost.objects.create(
+            title="Arch1",
+            author=user,
+            status=BlogPost.Status.PUBLISHED,
+            published_at=timezone.now(),
+        )
+
+        request = RequestFactory().get("/archive/")
+
+        # Test requires template mocking or full client request since views use `render` with real templates
+        from django.template.response import TemplateResponse
+
+        with patch("blog.views.render") as mock_render:
+            mock_render.return_value = "mock_html"
+            resp = archive_index(request)
+            self.assertEqual(resp, "mock_html")
+
+    def test_build_reaction_context(self):
+        user = User.objects.create_user(email="react@example.com", password="password")
+        post = BlogPost.objects.create(
+            title="T1",
+            author=user,
+            status=BlogPost.Status.PUBLISHED,
+            published_at=timezone.now(),
+        )
+
+        BlogPostReaction.objects.create(
+            post=post, user=user, reaction=BlogPostReaction.Reaction.KALP.value
+        )
+
+        request = RequestFactory().get("/")
+        request.user = user
+
+        ctx = _build_reaction_context(request, post)
+        self.assertEqual(ctx["user_reaction"], BlogPostReaction.Reaction.KALP.value)
+        self.assertEqual(ctx["user_reaction_label"], "Sevgi")
+
+    def test_build_comment_context_avatar_fallback(self):
+        user = User.objects.create_user(email="comm@example.com", password="password")
+        post = BlogPost.objects.create(
+            title="T2",
+            author=user,
+            status=BlogPost.Status.PUBLISHED,
+            published_at=timezone.now(),
+        )
+
+        from comments.models import Comment
+
+        Comment.objects.create(
+            post=post, author=user, body="c1", status=Comment.Status.APPROVED
+        )
+
+        from allauth.socialaccount.models import SocialApp
+
+        SocialApp.objects.create(provider="google", name="google", client_id="123")
+        SocialAccount.objects.create(
+            user=user,
+            provider="google",
+            uid="12",
+            extra_data={"picture": "http://g.com/1"},
+        )
+
+        request = RequestFactory().get("/")
+        request.user = user
+
+        with patch(
+            "allauth.socialaccount.models.SocialAccount.get_avatar_url", return_value=""
+        ):
+            ctx = _build_comment_context(request, post)
+        self.assertEqual(ctx["comment_total"], 1)
+        comments = ctx["comment_page_obj"].object_list
+        self.assertEqual(comments[0].social_avatar_url, "http://g.com/1")

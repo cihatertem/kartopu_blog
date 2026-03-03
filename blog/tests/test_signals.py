@@ -82,6 +82,23 @@ class BlogSignalsTests(TestCase):
         mock_storage.delete.assert_any_call("my_dir/file.jpg")
         mock_storage.delete.assert_any_call("my_dir/subdir/subfile.jpg")
 
+    def test_delete_storage_dir_if_exists_empty(self):
+        # Should early exit with no error
+        self.assertIsNone(_delete_storage_dir_if_exists(""))
+        self.assertIsNone(_delete_storage_dir_if_exists(None))
+
+    def test_post_media_dir_empty_settings(self):
+        with self.settings(MEDIA_ROOT=""):
+            self.assertEqual(_post_media_dir(self.post), "")
+
+    def test_post_cache_dir_empty_settings(self):
+        with self.settings(MEDIA_ROOT=""):
+            self.assertEqual(_post_cache_dir(self.post), "")
+
+    def test_delete_storage_file_none(self):
+        # Should early exit
+        self.assertIsNone(_delete_storage_file(None))
+
     def test_delete_storage_file(self):
         mock_field = MagicMock()
         mock_field.name = "test.jpg"
