@@ -543,6 +543,19 @@ def _render_portfolio_comparison_summary_html(comparison) -> str:
     )
 
     value_delta = compare_value - base_value  # pyright: ignore[reportOperatorIssue]
+    cost_delta = compare_cost - base_cost
+
+    cost_free_value_delta = value_delta - cost_delta
+
+    value_change_pct = (
+        (value_delta / base_value) * Decimal("100") if base_value else Decimal("0")
+    )
+    cost_free_return = (
+        (cost_free_value_delta / base_value) * Decimal("100")
+        if base_value
+        else Decimal("0")
+    )
+
     return_delta = compare_return - base_return
     target_ratio_delta = None
     if base_target_ratio is not None and compare_target_ratio is not None:
@@ -558,11 +571,19 @@ def _render_portfolio_comparison_summary_html(comparison) -> str:
         if compare_target_ratio is not None
         else ""
     )
-    target_ratio_delta_html = (
-        f", Hedef Gerçekleşme {escape(f'{float(target_ratio_delta):.2f}')}%"
-        if target_ratio_delta is not None
-        else ""
-    )
+
+    target_ratio_delta_html = ""
+    if target_ratio_delta is not None:
+        target_points = target_ratio_delta * Decimal("100")
+        target_sign = "+" if target_points > 0 else ""
+        target_ratio_delta_html = f", Hedef Gerçekleşme {target_sign}{escape(f'{float(target_points):.0f}')} puan"
+
+    return_points = return_delta * Decimal("100")
+    return_sign = "+" if return_points > 0 else ""
+    return_html = f"Getiri {return_sign}{escape(f'{float(return_points):.0f}')} puan"
+
+    value_change_pct_str = escape(f"~%{float(value_change_pct):.2f}").replace(".", ",")
+    cost_free_return_str = escape(f"~%{float(cost_free_return):.2f}").replace(".", ",")
 
     html = f"""
 <section class="portfolio-comparison">
@@ -593,8 +614,8 @@ def _render_portfolio_comparison_summary_html(comparison) -> str:
       </div>
     </div>
     <div class="comparison-footer">
-      <p class="summary-meta summary-meta--tight"><strong>Değişim:</strong> Toplam Değer {_format_currency(value_delta, portfolio_currency)},
-        Getiri {escape(f"{float(return_delta):.2f}")}%{target_ratio_delta_html}</p>
+      <p class="summary-meta summary-meta--tight"><strong>Değişim:</strong> Toplam Değer {_format_currency(value_delta, portfolio_currency)} ({value_change_pct_str} &rarr; {cost_free_return_str}),
+        {return_html}{target_ratio_delta_html}</p>
     </div>
   </div>
 </section>
