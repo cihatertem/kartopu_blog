@@ -929,7 +929,7 @@ def _render_dividend_summary_html(snapshot) -> str:
         "payment_items": payment_items,
     }
 
-    return render_to_string("blog/includes/dividend_summary.html", context)
+    return render_to_string("includes/dividend_summary.html", context)
 
 
 def _render_dividend_charts_html(snapshot) -> str:
