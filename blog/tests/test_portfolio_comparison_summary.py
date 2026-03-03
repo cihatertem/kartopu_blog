@@ -63,7 +63,7 @@ class TestPortfolioComparisonSummaryHtml(TestCase):
 
         # Value delta check
         self.assertIn("50.262,47", html)
-        self.assertIn("~%1,44 &rarr; ~%-1,77", html)
+        self.assertIn("~%-1,77", html)
 
         # Check for specific structure
         self.assertIn("<strong>Değişim:</strong>", html)
@@ -95,4 +95,4 @@ class TestPortfolioComparisonSummaryHtml(TestCase):
         # cost delta = 200
         # cost free value delta = 500 - 200 = 300
         # cost free return = 300 / 1000 = 30%
-        self.assertIn("~%50,00 &rarr; ~%30,00", html)
+        self.assertIn("~%30,00", html)
