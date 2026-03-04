@@ -245,6 +245,78 @@ class FetchYahooFinancePriceTests(TestCase):
         self.assertIsNone(fetch_yahoo_finance_price("AAPL", price_date=d))
 
 
+from portfolio.services import fetch_fx_rates_bulk
+
+
+class FetchFXRatesBulkTests(TestCase):
+    def test_empty_currency_pairs(self):
+        self.assertEqual(fetch_fx_rates_bulk([]), {})
+
+    def test_only_identical_pairs(self):
+        # All pairs are same currency, should return 1 immediately without yf
+        pairs = [("USD", "USD"), ("TRY", "TRY")]
+        result = fetch_fx_rates_bulk(pairs)
+        self.assertEqual(
+            result, {("USD", "USD"): Decimal("1"), ("TRY", "TRY"): Decimal("1")}
+        )
+
+    @patch("portfolio.services.yf.download")
+    def test_yf_download_exception(self, mock_download):
+        mock_download.side_effect = Exception("Download failed")
+        pairs = [("USD", "TRY")]
+        self.assertEqual(fetch_fx_rates_bulk(pairs), {})
+
+    @patch("portfolio.services.yf.download")
+    def test_yf_download_empty_dataframe(self, mock_download):
+        mock_download.return_value = pd.DataFrame()
+        pairs = [("USD", "TRY")]
+        self.assertEqual(fetch_fx_rates_bulk(pairs), {})
+
+    @patch("portfolio.services.yf.download")
+    @patch("portfolio.services._safe_decimal")
+    def test_single_series_parsing(self, mock_safe_decimal, mock_download):
+        # When only one pair to fetch
+        mock_df = pd.DataFrame(
+            {"Close": [30.0, 31.0]},
+            index=pd.DatetimeIndex(["2023-10-01", "2023-10-02"]),
+        )
+        mock_download.return_value = mock_df
+        mock_safe_decimal.return_value = Decimal("31.0")
+
+        pairs = [("USD", "TRY"), ("TRY", "TRY")]
+        d = date(2023, 10, 2)
+        result = fetch_fx_rates_bulk(pairs, rate_date=d)
+
+        self.assertEqual(result.get(("USD", "TRY")), Decimal("31.0"))
+        self.assertEqual(result.get(("TRY", "TRY")), Decimal("1"))
+        mock_safe_decimal.assert_called_once_with(31.0)
+
+    @patch("portfolio.services.yf.download")
+    @patch("portfolio.services._safe_decimal")
+    def test_multi_index_dataframe_parsing(self, mock_safe_decimal, mock_download):
+        # When >1 pair to fetch, 'Close' may have columns for each symbol
+        data = {
+            "USDTRY=X": [30.0, 31.0],
+            "EURTRY=X": [32.0, 33.0],
+        }
+        mock_df = pd.DataFrame(
+            data, index=pd.DatetimeIndex(["2023-10-01", "2023-10-02"])
+        )
+        # Wrap it so it looks like it has a "Close" top level
+        mock_df = pd.concat([mock_df], axis=1, keys=["Close"])
+        mock_download.return_value = mock_df
+
+        # We need to handle sequential calls to safe_decimal
+        mock_safe_decimal.side_effect = [Decimal("31.0"), Decimal("33.0")]
+
+        pairs = [("USD", "TRY"), ("EUR", "TRY")]
+        d = date(2023, 10, 2)
+        result = fetch_fx_rates_bulk(pairs, rate_date=d)
+
+        self.assertEqual(result.get(("USD", "TRY")), Decimal("31.0"))
+        self.assertEqual(result.get(("EUR", "TRY")), Decimal("33.0"))
+
+
 class FetchFXRateTests(TestCase):
     def test_empty_currencies(self):
         """Test with empty base or target currency."""
