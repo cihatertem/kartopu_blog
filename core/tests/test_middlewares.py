@@ -4,7 +4,26 @@ from unittest.mock import MagicMock
 
 from django.test import RequestFactory, TestCase, override_settings
 
-from core.middlewares import TrustedProxyMiddleware
+from core.middlewares import HealthCheckMiddleware, TrustedProxyMiddleware
+
+
+class HealthCheckMiddlewareTest(TestCase):
+    def setUp(self):
+        self.factory = RequestFactory()
+        self.middleware = HealthCheckMiddleware(lambda r: "response")
+
+    def test_health_check_ping(self):
+        request = self.factory.get("/ping")
+        response = self.middleware(request)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.content, b'{"response": "pong!"}')
+
+    def test_health_check_other_path(self):
+        request = self.factory.get("/")
+        response = self.middleware(request)
+
+        self.assertEqual(response, "response")
 
 
 class TrustedProxyMiddlewareTest(TestCase):
