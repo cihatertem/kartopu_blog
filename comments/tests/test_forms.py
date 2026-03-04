@@ -44,3 +44,16 @@ class CommentFormTests(TestCase):
         form = CommentForm(data={"body": "   "})
         self.assertFalse(form.is_valid())
         self.assertIn("body", form.errors)
+
+    def test_honeypot_field(self):
+        form = CommentForm(data={"body": "Valid body", "website": "http://spam.com"})
+        self.assertTrue(form.is_valid())
+        self.assertEqual(form.cleaned_data["website"], "http://spam.com")
+
+    def test_parent_id_field(self):
+        import uuid
+
+        parent_uuid = uuid.uuid4()
+        form = CommentForm(data={"body": "Valid body", "parent_id": parent_uuid})
+        self.assertTrue(form.is_valid())
+        self.assertEqual(form.cleaned_data["parent_id"], parent_uuid)
