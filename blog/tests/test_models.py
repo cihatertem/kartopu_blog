@@ -1,14 +1,10 @@
-import time
-from datetime import date
-from decimal import Decimal
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
 from django.contrib.auth import get_user_model
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import TestCase
-from django.utils.text import slugify
 
-from blog.models import KARTOPU_MONEY_BASE_URL, BlogPost, BlogPostImage, Category, Tag
+from blog.models import BlogPost, BlogPostImage, Category, Tag
 
 User = get_user_model()
 

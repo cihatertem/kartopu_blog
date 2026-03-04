@@ -1,48 +1,13 @@
-import json
-import os
-import shutil
-from decimal import Decimal
 from unittest.mock import MagicMock, patch
 
-import django
-from allauth.socialaccount.models import SocialAccount
-from django.conf import settings
 from django.contrib.admin.sites import AdminSite
 from django.contrib.auth import get_user_model
-from django.contrib.messages import get_messages
 from django.contrib.messages.storage.fallback import FallbackStorage
-from django.contrib.syndication.views import Feed
-from django.core.files.uploadedfile import InMemoryUploadedFile, SimpleUploadedFile
-from django.template import engines
-from django.test import Client, RequestFactory, TestCase
-from django.urls import reverse
+from django.test import RequestFactory, TestCase
 from django.utils import timezone
 
 from blog.admin import BlogPostAdmin, BlogPostImageInline, CategoryAdmin, TagAdmin
-from blog.feeds import (
-    CategoryPostsFeed,
-    LatestPostsFeed,
-    _fallback_cover_name,
-    _get_cover_name,
-    _safe_cover_size,
-)
-from blog.models import BlogPost, BlogPostImage, BlogPostReaction, Category, Tag
-from blog.signals import (
-    _delete_local_dir_if_exists,
-    _delete_storage_dir_if_exists,
-    _delete_storage_file,
-    _post_cache_dir,
-    _post_cache_storage_dir,
-    _post_media_dir,
-    invalidate_nav_cache,
-)
-from blog.templatetags import blog_extras
-from blog.views import (
-    _extract_social_avatar_url,
-    _normalize_avatar_url,
-    archive_index,
-    post_reaction,
-)
+from blog.models import BlogPost, BlogPostImage, Category, Tag
 
 User = get_user_model()
 

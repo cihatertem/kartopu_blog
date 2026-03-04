@@ -1,0 +1,150 @@
+from datetime import date
+from unittest.mock import MagicMock
+
+from django.contrib.auth import get_user_model
+from django.test import RequestFactory, TestCase
+from django.utils import timezone
+
+from blog.models import BlogPost, Category
+from core.services.blog import published_posts_queryset
+from core.services.pagination import get_page_obj
+from core.services.portfolio import (
+    build_comparison_name,
+    build_snapshot_name,
+    format_comparison_label,
+    format_snapshot_label,
+    generate_unique_slug,
+)
+
+
+class BlogServicesTest(TestCase):
+    def setUp(self):
+        User = get_user_model()
+        self.user = User.objects.create_user(email="test@user.com")
+        self.category = Category.objects.create(name="Tech", slug="tech")
+
+        BlogPost.objects.create(
+            author=self.user,
+            title="Published Post",
+            slug="published",
+            status=BlogPost.Status.PUBLISHED,
+            category=self.category,
+            published_at=timezone.now(),
+        )
+        BlogPost.objects.create(
+            author=self.user,
+            title="Draft Post",
+            slug="draft",
+            status=BlogPost.Status.DRAFT,
+            category=self.category,
+        )
+
+    def test_published_posts_queryset(self):
+        qs = published_posts_queryset()
+        self.assertEqual(qs.count(), 1)
+        self.assertEqual(qs.first().title, "Published Post")
+
+    def test_published_posts_queryset_no_tags(self):
+        qs = published_posts_queryset(include_tags=False)
+        self.assertEqual(qs.count(), 1)
+
+
+class PaginationServicesTest(TestCase):
+    def setUp(self):
+        self.factory = RequestFactory()
+
+    def test_get_page_obj(self):
+        items = list(range(1, 15))  # 1 to 14
+
+        request = self.factory.get("/", {"page": "2"})
+        page_obj = get_page_obj(request, items, per_page=10)
+
+        self.assertEqual(page_obj.number, 2)
+        self.assertEqual(page_obj.object_list, [11, 12, 13, 14])
+
+    def test_get_page_obj_invalid_page(self):
+        items = list(range(1, 15))
+        request = self.factory.get("/", {"page": "abc"})
+        page_obj = get_page_obj(request, items, per_page=10)
+
+        self.assertEqual(page_obj.number, 1)
+
+
+class PortfolioServicesTest(TestCase):
+    def test_build_snapshot_name(self):
+        name = build_snapshot_name("UserA", date(2023, 1, 1))
+        self.assertEqual(name, "UserA - 2023-01-01")
+
+        name_no_date = build_snapshot_name("UserB", None)
+        self.assertEqual(name_no_date, "UserB")
+
+    def test_format_snapshot_label(self):
+        label1 = format_snapshot_label(
+            slug="custom-slug", name=None, owner_label="User", snapshot_date=None
+        )
+        self.assertEqual(label1, "custom-slug")
+
+        label2 = format_snapshot_label(
+            slug=None, name="Custom Name", owner_label="User", snapshot_date=None
+        )
+        self.assertEqual(label2, "Custom Name")
+
+        label3 = format_snapshot_label(
+            slug=None, name=None, owner_label="User", snapshot_date=date(2023, 1, 1)
+        )
+        self.assertEqual(label3, "User - 2023-01-01")
+
+    def test_build_comparison_name(self):
+        base = MagicMock(name="Base")
+        base.name = "Base Name"
+
+        compare = MagicMock(name="Compare")
+        compare.name = "Compare Name"
+
+        self.assertEqual(
+            build_comparison_name(base, compare), "Base Name → Compare Name"
+        )
+
+        base.name = None
+        base.__str__.return_value = "BaseStr"
+        compare.name = None
+        compare.__str__.return_value = "CompareStr"
+
+        self.assertEqual(build_comparison_name(base, compare), "BaseStr → CompareStr")
+
+    def test_format_comparison_label(self):
+        self.assertEqual(
+            format_comparison_label(
+                slug="comp-slug", name=None, base_snapshot="A", compare_snapshot="B"
+            ),
+            "comp-slug",
+        )
+
+        self.assertEqual(
+            format_comparison_label(
+                slug=None, name="Comp Name", base_snapshot="A", compare_snapshot="B"
+            ),
+            "Comp Name",
+        )
+
+        self.assertEqual(
+            format_comparison_label(
+                slug=None, name=None, base_snapshot="A", compare_snapshot="B"
+            ),
+            "A → B",
+        )
+
+    def test_generate_unique_slug(self):
+        # We need a Django model to test generating slugs against its `.objects.filter()`
+        from blog.models import Category
+
+        slug1 = generate_unique_slug(Category, "My Special Name")
+        self.assertTrue(slug1.startswith("my-special-name#"))
+
+        slug2 = generate_unique_slug(Category, "My Special Name")
+        self.assertNotEqual(slug1, slug2)
+
+        # Test long names
+        long_name = "a" * 300
+        slug3 = generate_unique_slug(Category, long_name)
+        self.assertLessEqual(len(slug3), 255)

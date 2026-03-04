@@ -276,7 +276,6 @@ class ViewHelperTests(TestCase):
         request = RequestFactory().get("/archive/")
 
         # Test requires template mocking or full client request since views use `render` with real templates
-        from django.template.response import TemplateResponse
 
         with patch("blog.views.render") as mock_render:
             mock_render.return_value = "mock_html"
