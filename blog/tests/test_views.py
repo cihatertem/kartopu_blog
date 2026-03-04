@@ -116,7 +116,7 @@ class BlogViewsTests(TestCase):
         # We will mock it instead or skip if it causes NotImplementedError.
         from unittest.mock import patch
 
-        with patch("blog.views.SearchVector") as mock_vector:
+        with patch("blog.views.SearchVector"):
             url = reverse("blog:search_results")
 
             # Empty search

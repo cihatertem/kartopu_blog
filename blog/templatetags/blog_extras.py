@@ -547,9 +547,6 @@ def _render_portfolio_comparison_summary_html(comparison) -> str:
 
     cost_free_value_delta = value_delta - cost_delta
 
-    value_change_pct = (
-        (value_delta / base_value) * Decimal("100") if base_value else Decimal("0")
-    )
     cost_free_return = (
         (cost_free_value_delta / base_value) * Decimal("100")
         if base_value

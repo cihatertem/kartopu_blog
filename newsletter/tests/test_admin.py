@@ -1,10 +1,9 @@
-from unittest.mock import Mock, patch
+from unittest.mock import patch
 
 from django.contrib.admin.sites import AdminSite
 from django.contrib.messages import get_messages
 from django.contrib.messages.storage.fallback import FallbackStorage
 from django.test import RequestFactory, TestCase
-from django.utils import timezone
 
 from newsletter.admin import (
     AnnouncementAdmin,
@@ -65,7 +64,7 @@ class NewsletterAdminTest(TestCase):
         announcement_draft = Announcement.objects.create(
             subject="Draft", body="Body", status=AnnouncementStatus.DRAFT
         )
-        announcement_sent = Announcement.objects.create(
+        Announcement.objects.create(
             subject="Sent", body="Body", status=AnnouncementStatus.SENT
         )
         mock_send.return_value = 5

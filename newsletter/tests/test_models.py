@@ -7,12 +7,10 @@ from accounts.models import User
 from blog.models import BlogPost, Category
 from newsletter.models import (
     Announcement,
-    AnnouncementStatus,
     BlogPostNotification,
     DirectEmail,
     DirectEmailAttachment,
     EmailQueue,
-    EmailQueueStatus,
     Subscriber,
     SubscriberStatus,
 )

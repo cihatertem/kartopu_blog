@@ -1,14 +1,12 @@
 from datetime import datetime
 from decimal import Decimal
 
-from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.core.cache import cache
 from django.test import RequestFactory, TestCase, override_settings
 from django.urls import resolve
 
 from blog.cache_keys import (
-    NAV_ARCHIVES_KEY,
     NAV_CATEGORIES_KEY,
     NAV_POPULAR_POSTS_KEY,
     NAV_PORTFOLIO_POSTS_KEY,

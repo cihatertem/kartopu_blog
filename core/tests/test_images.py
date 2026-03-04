@@ -3,7 +3,7 @@ import os
 import tempfile
 from unittest.mock import MagicMock
 
-from django.core.files.uploadedfile import InMemoryUploadedFile, SimpleUploadedFile
+from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import TestCase
 from PIL import Image
 

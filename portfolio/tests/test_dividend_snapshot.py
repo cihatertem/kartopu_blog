@@ -4,7 +4,7 @@ from unittest.mock import patch
 
 from django.test import TestCase
 
-from portfolio.models import Asset, Dividend, DividendPayment, DividendSnapshot
+from portfolio.models import Asset, DividendPayment, DividendSnapshot
 
 
 class DividendSnapshotTests(TestCase):

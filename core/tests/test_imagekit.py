@@ -1,10 +1,8 @@
 from collections import namedtuple
-from unittest.mock import MagicMock
 
 from django.test import TestCase
 
 from core.imagekit import (
-    _file_url,
     _safe_spec_dimensions,
     _safe_spec_url,
     build_responsive_rendition,

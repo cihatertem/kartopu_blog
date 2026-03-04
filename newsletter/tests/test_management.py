@@ -84,8 +84,10 @@ class ProcessEmailQueueCommandTest(TestCase):
             EmailQueue.objects.filter(status=EmailQueueStatus.PENDING).count(), 1
         )
 
+    @patch("sys.stderr.write")
+    @patch("sys.stdout.write")
     @patch("django.core.mail.EmailMultiAlternatives.send")
-    def test_failing_email_handling(self, mock_send):
+    def test_failing_email_handling(self, mock_send, mock_stdout, mock_stderr):
         mock_send.side_effect = Exception("SMTP Connection Error")
 
         email = EmailQueue.objects.create(
