@@ -18,21 +18,33 @@ document.addEventListener("DOMContentLoaded", function () {
     // -------------------------
     // Textarea character counter
     // -------------------------
-    const textarea = document.getElementById("id_body");
-    const counter = document.getElementById("char-count");
+    const charCounters = document.querySelectorAll(".char-counter");
+    charCounters.forEach((counterContainer) => {
+        // Find the preceding form field (usually .comment-form__field or .comment-reply__field)
+        const fieldContainer = counterContainer.previousElementSibling;
+        if (!fieldContainer) return;
 
-    if (textarea && counter) {
-        const max = Number(textarea.getAttribute("maxlength"));
+        const textarea = fieldContainer.querySelector("textarea");
+        // Accept either #char-count or .char-count inside the container
+        const counter =
+            counterContainer.querySelector(".char-count") ||
+            counterContainer.querySelector("#char-count") ||
+            counterContainer.querySelector("span");
 
-        function updateCounter() {
-            const len = textarea.value.length;
-            counter.textContent = len;
-            counter.style.color = len >= max ? "red" : "";
+        if (textarea && counter) {
+            // max is taken from maxlength if exists, otherwise assume 3000
+            const max = Number(textarea.getAttribute("maxlength")) || 3000;
+
+            function updateCounter() {
+                const len = textarea.value.length;
+                counter.textContent = len;
+                counter.style.color = len >= max ? "red" : "";
+            }
+
+            textarea.addEventListener("input", updateCounter);
+            updateCounter();
         }
-
-        textarea.addEventListener("input", updateCounter);
-        updateCounter();
-    }
+    });
 
     // -------------------------
     // Social login modal

@@ -166,6 +166,7 @@ def _build_comment_context(request, post):
     approved_comments = list(qs)
     author_ids = {comment.author_id for comment in approved_comments}
     social_avatar_map = {}
+    social_profile_map = {}
     if author_ids:
         social_accounts = SocialAccount.objects.filter(user_id__in=author_ids)
         for account in social_accounts:
@@ -174,6 +175,9 @@ def _build_comment_context(request, post):
                 avatar_url = _extract_social_avatar_url(account.extra_data or {})
             if avatar_url and account.user_id not in social_avatar_map:  # pyright: ignore[reportAttributeAccessIssue]
                 social_avatar_map[account.user_id] = avatar_url  # pyright: ignore[reportAttributeAccessIssue]
+            profile_url = account.get_profile_url()
+            if profile_url and account.user_id not in social_profile_map:
+                social_profile_map[account.user_id] = profile_url
 
     replies_by_parent = {}
     for comment in approved_comments:
@@ -184,6 +188,7 @@ def _build_comment_context(request, post):
             comment.social_avatar_url = ""
         else:
             comment.social_avatar_url = social_avatar_map.get(comment.author_id, "")  # type: ignore[attr-defined]
+        comment.social_profile_url = social_profile_map.get(comment.author_id, "")  # type: ignore[attr-defined]
     top_level_comments = replies_by_parent.get(None, [])
     comment_form = CommentForm()
     has_social_account = (

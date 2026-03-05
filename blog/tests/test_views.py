@@ -330,10 +330,18 @@ class ViewHelperTests(TestCase):
         request = RequestFactory().get("/")
         request.user = user
 
-        with patch(
-            "allauth.socialaccount.models.SocialAccount.get_avatar_url", return_value=""
+        with (
+            patch(
+                "allauth.socialaccount.models.SocialAccount.get_avatar_url",
+                return_value="",
+            ),
+            patch(
+                "allauth.socialaccount.models.SocialAccount.get_profile_url",
+                return_value="https://twitter.com/testuser",
+            ),
         ):
             ctx = _build_comment_context(request, post)
         self.assertEqual(ctx["comment_total"], 1)
         comments = ctx["comment_page_obj"].object_list
         self.assertEqual(comments[0].social_avatar_url, "http://g.com/1")
+        self.assertEqual(comments[0].social_profile_url, "https://twitter.com/testuser")
