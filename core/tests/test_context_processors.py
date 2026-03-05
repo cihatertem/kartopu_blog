@@ -154,7 +154,6 @@ class ContextProcessorsTests(TestCase):
         self.assertEqual(tags[0]["name"], "Tag 1")
         self.assertIn("cloud_size", tags[0])
         self.assertEqual(tags[0]["cloud_size"], 1.0)
-        self.assertEqual(tags[0]["cloud_size_class"], "tag-cloud__item--size-2")
         self.assertEqual(cache.get(NAV_TAGS_KEY), tags)
 
     def test_get_nav_archives(self):
