@@ -1,5 +1,6 @@
 document.addEventListener("DOMContentLoaded", () => {
     const form = document.getElementById("sim-form");
+    form.addEventListener("submit", (e) => e.preventDefault());
     const inputs = form.querySelectorAll("input");
     const ctx = document.getElementById("balanceChart").getContext("2d");
     let chart;

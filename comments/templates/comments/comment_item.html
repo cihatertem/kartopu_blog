@@ -31,7 +31,7 @@
       <strong>{{ comment.author.full_name }}</strong>
       <small>— {{ comment.created_at|date:"d F Y H:i" }}</small>
       {% if is_staff %}
-        <span style="font-size: 0.8em; margin-left: 10px; color: {% if comment.status == 'approved' %}green{% elif comment.status == 'pending' %}orange{% else %}red{% endif %};">
+        <span class="comment-status {% if comment.status == 'approved' %}comment-status--approved{% elif comment.status == 'pending' %}comment-status--pending{% else %}comment-status--rejected{% endif %}">
           [{{ comment.get_status_display }}]
         </span>
       {% endif %}
@@ -43,16 +43,16 @@
   <p class="comment-body">{{ comment.body|linebreaksbr }}</p>
 
   {% if is_staff %}
-    <div class="comment-moderation" style="margin-bottom: 10px;">
-      <form method="post" action="{% url 'comments:moderate_comment' comment.id %}" style="display:inline;">
+    <div class="comment-moderation">
+      <form method="post" action="{% url 'comments:moderate_comment' comment.id %}" class="comment-moderation-actions">
         {% csrf_token %}
         {% if comment.status != 'approved' %}
-          <button type="submit" name="action" value="approve" class="button button--small" style="padding: 2px 8px; font-size: 0.8em;">Onayla</button>
+          <button type="submit" name="action" value="approve" class="button button--small">Onayla</button>
         {% endif %}
         {% if comment.status != 'pending' %}
-          <button type="submit" name="action" value="pending" class="button button--small" style="padding: 2px 8px; font-size: 0.8em;">Onaya Al</button>
+          <button type="submit" name="action" value="pending" class="button button--small">Onaya Al</button>
         {% endif %}
-        <button type="submit" name="action" value="delete" class="button button--small" style="padding: 2px 8px; font-size: 0.8em; color: red; border-color: red;" onclick="return confirm('Silmek istediğinize emin misiniz?');">Sil</button>
+        <button type="submit" name="action" value="delete" class="button button--small button--danger btn-delete-comment">Sil</button>
       </form>
     </div>
   {% endif %}

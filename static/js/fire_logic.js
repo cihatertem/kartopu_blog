@@ -1,5 +1,6 @@
 document.addEventListener("DOMContentLoaded", () => {
     const form = document.getElementById("fire-form");
+    form.addEventListener("submit", (e) => e.preventDefault());
     const inputs = form.querySelectorAll("input");
 
     // Load from URL

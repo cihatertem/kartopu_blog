@@ -838,6 +838,17 @@ document.addEventListener("DOMContentLoaded", function () {
     });
 
     // -------------------------
+    // Delete comment confirmation
+    // -------------------------
+    document.querySelectorAll(".btn-delete-comment").forEach((btn) => {
+        btn.addEventListener("click", (e) => {
+            if (!confirm("Silmek istediğinize emin misiniz?")) {
+                e.preventDefault();
+            }
+        });
+    });
+
+    // -------------------------
     // Social auth callbacks
     // -------------------------
     window.addEventListener("message", (event) => {

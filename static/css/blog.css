@@ -321,6 +321,41 @@
   gap: 0.25rem;
 }
 
+.comment-status {
+  font-size: 0.8em;
+  margin-left: 10px;
+}
+
+.comment-status--approved {
+  color: green;
+}
+
+.comment-status--pending {
+  color: orange;
+}
+
+.comment-status--rejected {
+  color: red;
+}
+
+.comment-moderation {
+  margin-bottom: 10px;
+}
+
+.comment-moderation-actions {
+  display: inline;
+}
+
+.button--small {
+  padding: 2px 8px;
+  font-size: 0.8em;
+}
+
+.button--danger {
+  color: red;
+  border-color: red;
+}
+
 .comment-body {
   margin-top: 0.5rem;
   color: var(--color-text);
