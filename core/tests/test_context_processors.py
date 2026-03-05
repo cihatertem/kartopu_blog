@@ -154,6 +154,7 @@ class ContextProcessorsTests(TestCase):
         self.assertEqual(tags[0]["name"], "Tag 1")
         self.assertIn("cloud_size", tags[0])
         self.assertEqual(tags[0]["cloud_size"], 1.0)
+        self.assertEqual(tags[0]["cloud_size_class"], "tag-cloud__item--size-2")
         self.assertEqual(cache.get(NAV_TAGS_KEY), tags)
 
     def test_get_nav_archives(self):
@@ -207,6 +208,19 @@ class ContextProcessorsTests(TestCase):
         self.assertEqual(snapshot["current_value"], Decimal("50000"))
         self.assertEqual(snapshot["target_value"], Decimal("100000"))
         self.assertEqual(snapshot["remaining_pct"]["display"], 50)
+        self.assertEqual(snapshot["remaining_pct"]["fill_class"], "goal-widget__fill--50")
+
+    def test_get_goal_widget_snapshot_uses_min_fill_for_tiny_progress(self):
+        PortfolioSnapshot.objects.filter(pk=self.snapshot.pk).update(
+            total_value=Decimal("984"),
+            target_value=Decimal("24000000"),
+        )
+
+        snapshot = _get_goal_widget_snapshot()
+
+        self.assertIsNotNone(snapshot)
+        self.assertEqual(snapshot["remaining_pct"]["value"], 0)
+        self.assertEqual(snapshot["remaining_pct"]["fill_class"], "goal-widget__fill--1")
 
     def test_get_unread_contact_message_count_staff(self):
         # Arrange

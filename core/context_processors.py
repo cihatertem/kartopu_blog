@@ -86,10 +86,13 @@ def _get_nav_tags():
         max_count = max(counts) if counts else 0
         for t in nav_tags:
             if max_count == min_count:
+                normalized = 0.2
                 t["cloud_size"] = 1.0
             else:
                 normalized = (t["post_count"] - min_count) / (max_count - min_count)
                 t["cloud_size"] = round(0.85 + normalized * 0.75, 2)
+            size_level = min(6, max(1, int(round(normalized * 5)) + 1))
+            t["cloud_size_class"] = f"tag-cloud__item--size-{size_level}"
             t["color_class"] = get_tag_color_class(t["slug"])
         cache.set(NAV_TAGS_KEY, nav_tags, timeout=CACHE_TIMEOUT)
     return nav_tags
@@ -218,9 +221,14 @@ def _get_goal_widget_snapshot():
 
         formatted_target = f"{target_value:,.0f}".replace(",", ".")
         formatted_current = f"{total_value:,.0f}".replace(",", ".")
+        achieved_pct = 100 - remaining_pct_display
+        fill_pct = achieved_pct
+        if total_value > 0 and fill_pct == 0:
+            fill_pct = 1
         target_pct = {
-            "value": 100 - remaining_pct_display,
+            "value": achieved_pct,
             "display": remaining_pct_display,
+            "fill_class": f"goal-widget__fill--{fill_pct}",
         }
 
         goal_widget_snapshot = {
