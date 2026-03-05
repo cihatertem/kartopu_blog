@@ -86,10 +86,13 @@ def _get_nav_tags():
         max_count = max(counts) if counts else 0
         for t in nav_tags:
             if max_count == min_count:
+                normalized = 0.2
                 t["cloud_size"] = 1.0
             else:
                 normalized = (t["post_count"] - min_count) / (max_count - min_count)
                 t["cloud_size"] = round(0.85 + normalized * 0.75, 2)
+            size_level = min(6, max(1, int(round(normalized * 5)) + 1))
+            t["cloud_size_class"] = f"tag-cloud__item--size-{size_level}"
             t["color_class"] = get_tag_color_class(t["slug"])
         cache.set(NAV_TAGS_KEY, nav_tags, timeout=CACHE_TIMEOUT)
     return nav_tags
