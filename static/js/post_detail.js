@@ -18,32 +18,26 @@ document.addEventListener("DOMContentLoaded", function () {
     // -------------------------
     // Textarea character counter
     // -------------------------
-    const charCounters = document.querySelectorAll(".char-counter");
-    charCounters.forEach((counterContainer) => {
-        // Find the preceding form field (usually .comment-form__field or .comment-reply__field)
-        const fieldContainer = counterContainer.previousElementSibling;
-        if (!fieldContainer) return;
+    const textareas = document.querySelectorAll('textarea[name="body"]');
+    textareas.forEach((textarea) => {
+        const form = textarea.closest("form");
+        if (!form) return;
 
-        const textarea = fieldContainer.querySelector("textarea");
-        // Accept either #char-count or .char-count inside the container
         const counter =
-            counterContainer.querySelector(".char-count") ||
-            counterContainer.querySelector("#char-count") ||
-            counterContainer.querySelector("span");
+            form.querySelector(".char-count") ||
+            form.querySelector("#char-count");
+        if (!counter) return;
 
-        if (textarea && counter) {
-            // max is taken from maxlength if exists, otherwise assume 3000
-            const max = Number(textarea.getAttribute("maxlength")) || 3000;
+        const max = Number(textarea.getAttribute("maxlength")) || 3000;
 
-            function updateCounter() {
-                const len = textarea.value.length;
-                counter.textContent = len;
-                counter.style.color = len >= max ? "red" : "";
-            }
-
-            textarea.addEventListener("input", updateCounter);
-            updateCounter();
+        function updateCounter() {
+            const len = textarea.value.length;
+            counter.textContent = len;
+            counter.style.color = len >= max ? "red" : "";
         }
+
+        textarea.addEventListener("input", updateCounter);
+        updateCounter();
     });
 
     // -------------------------

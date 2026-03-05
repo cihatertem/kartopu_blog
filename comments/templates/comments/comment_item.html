@@ -1,5 +1,8 @@
 <li class="comment-item">
   <div class="comment-header">
+    {% if comment.social_profile_url %}
+    <a href="{{ comment.social_profile_url }}" target="_blank" rel="noopener noreferrer" class="comment-header__link">
+    {% endif %}
     {% with local_avatar=comment.author.avatar_rendition %}
       {% if local_avatar %}
         <img
@@ -33,6 +36,9 @@
         </span>
       {% endif %}
     </div>
+    {% if comment.social_profile_url %}
+    </a>
+    {% endif %}
   </div>
   <p class="comment-body">{{ comment.body|linebreaksbr }}</p>
 
@@ -62,9 +68,13 @@
           <textarea
             name="body"
             rows="3"
+            maxlength="3000"
             placeholder="Yanıtınızı yazın...(Maksimum 3000 karakter)"
             required
           ></textarea>
+        </div>
+        <div class="char-counter">
+            <span class="char-count">0</span> / 3000
         </div>
         <button type="submit" class="button button--primary">Yanıtı Gönder</button>
       </form>

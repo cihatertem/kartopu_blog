@@ -110,6 +110,46 @@ def _extract_social_avatar_url(extra_data):
     return ""
 
 
+def _extract_social_profile_url(account):
+    """
+    Extracts or constructs a social profile URL from a SocialAccount.
+    Some providers do not supply a full URL in their default methods.
+    """
+    provider = account.provider.lower()
+    extra_data = account.extra_data or {}
+
+    # Try to get it from default allauth method first
+    try:
+        url = account.get_profile_url()
+        if url:
+            return url
+    except Exception:
+        pass
+
+    if provider == "twitter" or provider == "x":
+        username = extra_data.get("screen_name") or extra_data.get("username")
+        if username:
+            return f"https://x.com/{username}"
+    elif provider == "github":
+        url = extra_data.get("html_url")
+        if url:
+            return url
+        login = extra_data.get("login")
+        if login:
+            return f"https://github.com/{login}"
+    elif provider == "linkedin":
+        # Extra data usually comes with vanityName
+        vanity_name = extra_data.get("vanityName")
+        if vanity_name:
+            return f"https://www.linkedin.com/in/{vanity_name}"
+    elif provider == "google":
+        # Google+ is deprecated but google auth may just not have a profile url
+        # For google, if they have a profile property, return it
+        return extra_data.get("profile") or ""
+
+    return ""
+
+
 def _build_reaction_context(request, post):
     counts = (
         BlogPostReaction.objects.filter(post=post)
@@ -175,7 +215,7 @@ def _build_comment_context(request, post):
                 avatar_url = _extract_social_avatar_url(account.extra_data or {})
             if avatar_url and account.user_id not in social_avatar_map:  # pyright: ignore[reportAttributeAccessIssue]
                 social_avatar_map[account.user_id] = avatar_url  # pyright: ignore[reportAttributeAccessIssue]
-            profile_url = account.get_profile_url()
+            profile_url = _extract_social_profile_url(account)
             if profile_url and account.user_id not in social_profile_map:
                 social_profile_map[account.user_id] = profile_url
 

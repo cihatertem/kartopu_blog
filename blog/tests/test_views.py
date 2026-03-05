@@ -336,7 +336,7 @@ class ViewHelperTests(TestCase):
                 return_value="",
             ),
             patch(
-                "allauth.socialaccount.models.SocialAccount.get_profile_url",
+                "blog.views._extract_social_profile_url",
                 return_value="https://twitter.com/testuser",
             ),
         ):
@@ -345,3 +345,46 @@ class ViewHelperTests(TestCase):
         comments = ctx["comment_page_obj"].object_list
         self.assertEqual(comments[0].social_avatar_url, "http://g.com/1")
         self.assertEqual(comments[0].social_profile_url, "https://twitter.com/testuser")
+
+    def test_build_comment_context_social_profile_url(self):
+        """Test that _build_comment_context correctly fetches and assigns social_profile_url."""
+        # Arrange
+        user = User.objects.create_user(email="profiletest@example.com", password="pwd")
+        post = BlogPost.objects.create(
+            title="Profile Post",
+            slug="profile-post",
+            author=user,
+            status=BlogPost.Status.PUBLISHED,
+        )
+        from comments.models import Comment
+
+        Comment.objects.create(
+            post=post,
+            author=user,
+            body="Profile comment",
+            status=Comment.Status.APPROVED,
+        )
+
+        # We must create a social account for the author to fetch profile url
+        SocialAccount.objects.create(
+            user=user,
+            provider="github",
+            uid="9999",
+            extra_data={"html_url": "https://github.com/profiletest"},
+        )
+
+        request = RequestFactory().get("/")
+        request.user = user
+
+        # Act
+        with patch(
+            "allauth.socialaccount.models.SocialAccount.get_avatar_url", return_value=""
+        ):
+            ctx = _build_comment_context(request, post)
+
+        # Assert
+        comments = ctx["comment_page_obj"].object_list
+        self.assertEqual(len(comments), 1)
+        self.assertEqual(
+            comments[0].social_profile_url, "https://github.com/profiletest"
+        )
