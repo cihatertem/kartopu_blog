@@ -483,6 +483,7 @@ CONTENT_SECURITY_POLICY = {
         # API / AJAX / analytics
         "connect-src": [
             SELF,
+            "https://static.kartopu.money",
             "https://www.google-analytics.com",
             "https://region1.google-analytics.com",
             "https://api.twitter.com",
