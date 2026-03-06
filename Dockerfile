@@ -91,8 +91,6 @@ COPY . .
 RUN mkdir -p /app/staticfiles /app/media \
     && chown -R app:app /app
 
-RUN python manage.py collectstatic --noinput
-
 USER app
 
 CMD ["gunicorn", "config.wsgi:application", "--bind", "0.0.0.0:9002", "--workers", "2"]

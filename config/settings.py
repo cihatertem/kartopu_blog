@@ -412,15 +412,19 @@ if not DEBUG:
         for net in _raw.split(","):
             TRUSTED_PROXY_NETS.append(ipaddress.ip_network(net.strip()))
 
+    CSRF_COOKIE_NAME = "__Host-csrftoken"
     CSRF_COOKIE_SECURE = True
     CSRF_COOKIE_HTTPONLY = True
+    CSRF_COOKIE_PATH = "/"
     CSRF_COOKIE_SAMESITE = os.getenv("DJANGO_CSRF_COOKIE_SAMESITE", "Lax")
     CSRF_TRUSTED_ORIGINS = [
         f"https://{host}" for host in ALLOWED_HOSTS
     ]  # e.g. ["https://example.com"]
 
+    SESSION_COOKIE_NAME = "__Host-sessionid"
     SESSION_COOKIE_SECURE = True
     SESSION_COOKIE_HTTPONLY = True
+    SESSION_COOKIE_PATH = "/"
     SESSION_COOKIE_SAMESITE = os.getenv("DJANGO_SESSION_COOKIE_SAMESITE", "Lax")
 
     SECURE_SSL_REDIRECT = True
@@ -443,42 +447,72 @@ if not DEBUG:
 
 
 CONTENT_SECURITY_POLICY = {
+    "EXCLUDE_URL_PREFIXES": [os.getenv("ADMIN_ADDRESS", "/admin")],
     "DIRECTIVES": {
+        # default olarak sadece kendi origin
         "default-src": ["'self'"],
+        # SCRIPT
         "script-src": [
-            "'self'",
-            "https://static.kartopu.money",
-            "https://*.twitter.com",
-            "https://*.x.com",
-            "https://www.googletagmanager.com",
             "'strict-dynamic'",
             NONCE,
-        ],
-        "worker-src": ["'self'", "blob:"],
-        "connect-src": [
             "'self'",
             "https://static.kartopu.money",
-            "https://*.twitter.com",
-            "https://*.x.com",
-            "https://twitter.com",
-            "https://x.com",
-            "https://www.google-analytics.com",
+            "https://www.googletagmanager.com",
         ],
+        # CSS
+        "style-src": [
+            "'self'",
+            "https://static.kartopu.money",
+            NONCE,
+        ],
+        # FONT
+        "font-src": [
+            "'self'",
+            "https://static.kartopu.money",
+            "data:",
+        ],
+        # IMAGE
         "img-src": [
             "'self'",
             "data:",
             "https://static.kartopu.money",
-            "https://www.googletagmanager.com",
             "https://pbs.twimg.com",
             "https://*.googleusercontent.com",
             "https://*.licdn.com",
         ],
-        "style-src": ["'self'", "https://static.kartopu.money", NONCE],
-        "font-src": ["'self'", "https://static.kartopu.money", "data:"],
-        "frame-src": ["'self'", "https://*.twitter.com", "https://*.x.com"],
+        # API / AJAX / analytics
+        "connect-src": [
+            "'self'",
+            "https://www.google-analytics.com",
+            "https://region1.google-analytics.com",
+            "https://api.twitter.com",
+            "https://api.x.com",
+        ],
+        # iframe embed
+        "frame-src": [
+            "'self'",
+            "https://platform.twitter.com",
+        ],
+        # web worker
+        "worker-src": [
+            "'self'",
+            "blob:",
+        ],
+        # OAuth form redirect güvenliği
+        "form-action": [
+            "'self'",
+            "https://accounts.google.com",
+            "https://twitter.com",
+            "https://x.com",
+            "https://www.linkedin.com",
+        ],
+        # clickjacking koruması
         "frame-ancestors": ["'self'"],
+        # plugin tamamen kapalı
         "object-src": ["'none'"],
+        # base tag hijack koruması
         "base-uri": ["'self'"],
+        # http -> https upgrade
         "upgrade-insecure-requests": True,
-    }
+    },
 }
