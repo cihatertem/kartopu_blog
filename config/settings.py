@@ -14,7 +14,7 @@ import ipaddress
 import os
 from pathlib import Path
 
-from csp.constants import NONCE
+from csp.constants import NONCE, SELF
 
 
 def get_swarm_secret_for_psg(key: str, default: str = "") -> str:
@@ -447,33 +447,33 @@ if not DEBUG:
 
 
 CONTENT_SECURITY_POLICY = {
-    "EXCLUDE_URL_PREFIXES": [os.getenv("ADMIN_ADDRESS", "/admin")],
+    "EXCLUDE_URL_PREFIXES": [f"/{os.getenv('ADMIN_ADDRESS', 'admin')}"],
     "DIRECTIVES": {
         # default olarak sadece kendi origin
-        "default-src": ["'self'"],
+        "default-src": [SELF],
         # SCRIPT
         "script-src": [
             "'strict-dynamic'",
             NONCE,
-            "'self'",
+            SELF,
             "https://static.kartopu.money",
             "https://www.googletagmanager.com",
         ],
         # CSS
         "style-src": [
-            "'self'",
+            SELF,
             "https://static.kartopu.money",
             NONCE,
         ],
         # FONT
         "font-src": [
-            "'self'",
+            SELF,
             "https://static.kartopu.money",
             "data:",
         ],
         # IMAGE
         "img-src": [
-            "'self'",
+            SELF,
             "data:",
             "https://static.kartopu.money",
             "https://pbs.twimg.com",
@@ -482,7 +482,7 @@ CONTENT_SECURITY_POLICY = {
         ],
         # API / AJAX / analytics
         "connect-src": [
-            "'self'",
+            SELF,
             "https://www.google-analytics.com",
             "https://region1.google-analytics.com",
             "https://api.twitter.com",
@@ -490,28 +490,28 @@ CONTENT_SECURITY_POLICY = {
         ],
         # iframe embed
         "frame-src": [
-            "'self'",
+            SELF,
             "https://platform.twitter.com",
         ],
         # web worker
         "worker-src": [
-            "'self'",
+            SELF,
             "blob:",
         ],
         # OAuth form redirect güvenliği
         "form-action": [
-            "'self'",
+            SELF,
             "https://accounts.google.com",
             "https://twitter.com",
             "https://x.com",
             "https://www.linkedin.com",
         ],
         # clickjacking koruması
-        "frame-ancestors": ["'self'"],
+        "frame-ancestors": [SELF],
         # plugin tamamen kapalı
         "object-src": ["'none'"],
         # base tag hijack koruması
-        "base-uri": ["'self'"],
+        "base-uri": [SELF],
         # http -> https upgrade
         "upgrade-insecure-requests": True,
     },
