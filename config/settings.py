@@ -14,6 +14,8 @@ import ipaddress
 import os
 from pathlib import Path
 
+from csp.constants import NONCE
+
 
 def get_swarm_secret_for_psg(key: str, default: str = "") -> str:
     value = os.getenv(key, default)
@@ -82,6 +84,7 @@ MIDDLEWARE = [
     "core.middlewares.TrustedProxyMiddleware",
     "core.middlewares.HealthCheckMiddleware",
     "django.middleware.security.SecurityMiddleware",
+    "csp.middleware.CSPMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.locale.LocaleMiddleware",
     "django.middleware.common.CommonMiddleware",
@@ -102,6 +105,7 @@ TEMPLATES = [
         "OPTIONS": {
             "context_processors": [
                 "django.template.context_processors.request",
+                "csp.context_processors.nonce",
                 "django.contrib.auth.context_processors.auth",
                 "django.contrib.messages.context_processors.messages",
                 "core.context_processors.categories_tags_context",  # navbar/sidebar categories context
@@ -436,3 +440,45 @@ if not DEBUG:
         os.getenv("DJANGO_SECURE_HSTS_INCLUDE_SUBDOMAINS", "1") == "1"
     )
     SECURE_HSTS_PRELOAD = os.getenv("DJANGO_SECURE_HSTS_PRELOAD", "1") == "1"
+
+
+CONTENT_SECURITY_POLICY = {
+    "DIRECTIVES": {
+        "default-src": ["'self'"],
+        "script-src": [
+            "'self'",
+            "https://static.kartopu.money",
+            "https://*.twitter.com",
+            "https://*.x.com",
+            "https://www.googletagmanager.com",
+            "'strict-dynamic'",
+            NONCE,
+        ],
+        "worker-src": ["'self'", "blob:"],
+        "connect-src": [
+            "'self'",
+            "https://static.kartopu.money",
+            "https://*.twitter.com",
+            "https://*.x.com",
+            "https://twitter.com",
+            "https://x.com",
+            "https://www.google-analytics.com",
+        ],
+        "img-src": [
+            "'self'",
+            "data:",
+            "https://static.kartopu.money",
+            "https://www.googletagmanager.com",
+            "https://pbs.twimg.com",
+            "https://*.googleusercontent.com",
+            "https://*.licdn.com",
+        ],
+        "style-src": ["'self'", "https://static.kartopu.money", NONCE],
+        "font-src": ["'self'", "https://static.kartopu.money", "data:"],
+        "frame-src": ["'self'", "https://*.twitter.com", "https://*.x.com"],
+        "frame-ancestors": ["'self'"],
+        "object-src": ["'none'"],
+        "base-uri": ["'self'"],
+        "upgrade-insecure-requests": True,
+    }
+}

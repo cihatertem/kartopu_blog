@@ -28,6 +28,7 @@ dependencies = [
     "lz4>=4.4.5",
     "redis[hiredis]>=7.2.0",
     "hiredis>=3.3.0",
+    "django-csp>=4.0",
 ]
 
 [dependency-groups]

@@ -124,6 +124,6 @@
 {% endblock %}
 
 {% block js_script %}
-<script defer src="{% static 'vendor/chart.umd.min.js' %}"></script>
-<script defer src="{% static 'js/portfolio_sim.js' %}"></script>
+<script nonce="{{ CSP_NONCE }}" defer src="{% static 'vendor/chart.umd.min.js' %}"></script>
+<script nonce="{{ CSP_NONCE }}" defer src="{% static 'js/portfolio_sim.js' %}"></script>
 {% endblock %}

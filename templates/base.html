@@ -8,22 +8,22 @@
     <title>{% block title %}{{ seo.title }}{% endblock %}</title>
     <meta name="description" content="{% block description %}{{ seo.description }}{% endblock %}" />
     {% include "includes/_meta.html" with seo=seo %}
-    <link rel="stylesheet" href="{% static 'css/head.css' %}" />
-    <script src="{% static 'js/head.js' %}"></script>
+    <script nonce="{{ CSP_NONCE }}" src="{% static 'js/head.js' %}"></script>
+    <link rel="stylesheet" href="{% static 'css/head.css' %}">
     {% preload_stylesheet 'css/site.css' %}
     {% block page_css %}{% endblock %}
-    <script src="{% static 'js/preload.js' %}"></script>
+    <script nonce="{{ CSP_NONCE }}" src="{% static 'js/preload.js' %}"></script>
     <link rel="icon" type="image/svg+xml" href="{% static 'images/home/hero-snow-ball.png' %}" />
     <!-- Google tag (gtag.js) -->
     {% if GOOGLE_ANALYTICS_ID %}
     <link rel="preconnect" href="https://www.googletagmanager.com" crossorigin />
     <link rel="dns-prefetch" href="https://www.googletagmanager.com" />
-    <script async src="https://www.googletagmanager.com/gtag/js?id={{ GOOGLE_ANALYTICS_ID }}"></script>
-    <script defer src="{% static 'js/ga.js' %}" data-ga-id="{{ GOOGLE_ANALYTICS_ID }}"></script>
+    <script nonce="{{ CSP_NONCE }}" async src="https://www.googletagmanager.com/gtag/js?id={{ GOOGLE_ANALYTICS_ID }}"></script>
+    <script nonce="{{ CSP_NONCE }}" defer src="{% static 'js/ga.js' %}" data-ga-id="{{ GOOGLE_ANALYTICS_ID }}"></script>
     {% endif %}
     {% static 'images/home/hero-snow-ball.png' as site_logo_path %}
     {% with site_logo_url=site_logo_path|absolute_url:site_base_url %}
-    <script type="application/ld+json">
+    <script nonce="{{ CSP_NONCE }}" type="application/ld+json">
       {
         "@context": "https://schema.org",
         "@graph": [
@@ -100,5 +100,5 @@
     </button>
   </body>
   {% block js_script %}{% endblock %}
-  <script defer src="{% static 'js/base.js' %}"></script>
+  <script nonce="{{ CSP_NONCE }}" defer src="{% static 'js/base.js' %}"></script>
 </html>
