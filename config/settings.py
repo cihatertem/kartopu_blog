@@ -14,7 +14,7 @@ import ipaddress
 import os
 from pathlib import Path
 
-from csp.constants import NONCE, SELF
+from django.utils.csp import CSP
 
 
 def get_swarm_secret_for_psg(key: str, default: str = "") -> str:
@@ -84,7 +84,8 @@ MIDDLEWARE = [
     "core.middlewares.TrustedProxyMiddleware",
     "core.middlewares.HealthCheckMiddleware",
     "django.middleware.security.SecurityMiddleware",
-    "csp.middleware.CSPMiddleware",
+    "core.middlewares.AdminCSPExcludeMiddleware",
+    "django.middleware.csp.ContentSecurityPolicyMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.locale.LocaleMiddleware",
     "django.middleware.common.CommonMiddleware",
@@ -105,7 +106,7 @@ TEMPLATES = [
         "OPTIONS": {
             "context_processors": [
                 "django.template.context_processors.request",
-                "csp.context_processors.nonce",
+                "django.template.context_processors.csp",
                 "django.contrib.auth.context_processors.auth",
                 "django.contrib.messages.context_processors.messages",
                 "core.context_processors.categories_tags_context",  # navbar/sidebar categories context
@@ -446,74 +447,71 @@ if not DEBUG:
     SECURE_HSTS_PRELOAD = os.getenv("DJANGO_SECURE_HSTS_PRELOAD", "1") == "1"
 
 
-CONTENT_SECURITY_POLICY = {
-    "EXCLUDE_URL_PREFIXES": [f"/{os.getenv('ADMIN_ADDRESS', 'admin')}"],
-    "DIRECTIVES": {
-        # default olarak sadece kendi origin
-        "default-src": [SELF],
-        # SCRIPT
-        "script-src": [
-            "'strict-dynamic'",
-            NONCE,
-            SELF,
-            "https://static.kartopu.money",
-            "https://www.googletagmanager.com",
-        ],
-        # CSS
-        "style-src": [
-            SELF,
-            "https://static.kartopu.money",
-            NONCE,
-        ],
-        # FONT
-        "font-src": [
-            SELF,
-            "https://static.kartopu.money",
-            "data:",
-        ],
-        # IMAGE
-        "img-src": [
-            SELF,
-            "data:",
-            "https://static.kartopu.money",
-            "https://pbs.twimg.com",
-            "https://*.googleusercontent.com",
-            "https://*.licdn.com",
-        ],
-        # API / AJAX / analytics
-        "connect-src": [
-            SELF,
-            "https://static.kartopu.money",
-            "https://www.google-analytics.com",
-            "https://region1.google-analytics.com",
-            "https://api.twitter.com",
-            "https://api.x.com",
-        ],
-        # iframe embed
-        "frame-src": [
-            SELF,
-            "https://platform.twitter.com",
-        ],
-        # web worker
-        "worker-src": [
-            SELF,
-            "blob:",
-        ],
-        # OAuth form redirect güvenliği
-        "form-action": [
-            SELF,
-            "https://accounts.google.com",
-            "https://twitter.com",
-            "https://x.com",
-            "https://www.linkedin.com",
-        ],
-        # clickjacking koruması
-        "frame-ancestors": [SELF],
-        # plugin tamamen kapalı
-        "object-src": ["'none'"],
-        # base tag hijack koruması
-        "base-uri": [SELF],
-        # http -> https upgrade
-        "upgrade-insecure-requests": True,
-    },
+SECURE_CSP = {
+    # default olarak sadece kendi origin
+    "default-src": [CSP.SELF],
+    # SCRIPT
+    "script-src": [
+        "'strict-dynamic'",
+        CSP.NONCE,
+        CSP.SELF,
+        "https://static.kartopu.money",
+        "https://www.googletagmanager.com",
+    ],
+    # CSS
+    "style-src": [
+        CSP.SELF,
+        "https://static.kartopu.money",
+        CSP.NONCE,
+    ],
+    # FONT
+    "font-src": [
+        CSP.SELF,
+        "https://static.kartopu.money",
+        "data:",
+    ],
+    # IMAGE
+    "img-src": [
+        CSP.SELF,
+        "data:",
+        "https://static.kartopu.money",
+        "https://pbs.twimg.com",
+        "https://*.googleusercontent.com",
+        "https://*.licdn.com",
+    ],
+    # API / AJAX / analytics
+    "connect-src": [
+        CSP.SELF,
+        "https://static.kartopu.money",
+        "https://www.google-analytics.com",
+        "https://region1.google-analytics.com",
+        "https://api.twitter.com",
+        "https://api.x.com",
+    ],
+    # iframe embed
+    "frame-src": [
+        CSP.SELF,
+        "https://platform.twitter.com",
+    ],
+    # web worker
+    "worker-src": [
+        CSP.SELF,
+        "blob:",
+    ],
+    # OAuth form redirect güvenliği
+    "form-action": [
+        CSP.SELF,
+        "https://accounts.google.com",
+        "https://twitter.com",
+        "https://x.com",
+        "https://www.linkedin.com",
+    ],
+    # clickjacking koruması
+    "frame-ancestors": [CSP.SELF],
+    # plugin tamamen kapalı
+    "object-src": ["'none'"],
+    # base tag hijack koruması
+    "base-uri": [CSP.SELF],
+    # http -> https upgrade
+    "upgrade-insecure-requests": True,
 }

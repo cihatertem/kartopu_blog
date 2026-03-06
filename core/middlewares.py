@@ -44,3 +44,26 @@ class TrustedProxyMiddleware:
 
         address = ipaddress.ip_address(remote)
         return any(address in net for net in trusted_nets)
+
+
+class AdminCSPExcludeMiddleware:
+    """
+    Removes Content-Security-Policy headers from admin endpoints.
+    """
+
+    def __init__(self, get_response):
+        self.get_response = get_response
+
+    def __call__(self, request):
+        response = self.get_response(request)
+        import os
+
+        admin_prefix = f"/{os.getenv('ADMIN_ADDRESS', 'admin')}"
+        if (
+            request.path.startswith(admin_prefix)
+            or request.path.startswith(f"/en{admin_prefix}")
+            or request.path.startswith(f"/tr{admin_prefix}")
+        ):
+            response.headers.pop("Content-Security-Policy", None)
+            response.headers.pop("Content-Security-Policy-Report-Only", None)
+        return response

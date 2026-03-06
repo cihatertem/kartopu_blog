@@ -2,12 +2,11 @@ import base64
 import os
 from unittest.mock import patch
 
-from csp.middleware import CSPMiddleware
 from django.test import TestCase, override_settings
 
 
 @override_settings(SECURE_SSL_REDIRECT=False)
-class CSPMiddlewareTest(TestCase):
+class ContentSecurityPolicyMiddlewareTest(TestCase):
     def setUp(self):
         # Arrange
         self.url = "/"
@@ -90,3 +89,28 @@ class CSPMiddlewareTest(TestCase):
     def test_csp_upgrade_insecure_requests(self):
         # Assert
         self.assertIn("upgrade-insecure-requests", self.csp_header)
+
+
+@override_settings(SECURE_SSL_REDIRECT=False)
+class AdminCSPExcludeMiddlewareTest(TestCase):
+    def test_admin_path_excludes_csp(self):
+        # Arrange
+        admin_prefix = f"/{os.getenv('ADMIN_ADDRESS', 'admin')}"
+        url = f"{admin_prefix}/some-path/"
+
+        # Act
+        response = self.client.get(url)
+
+        # Assert
+        self.assertNotIn("Content-Security-Policy", response.headers)
+        self.assertNotIn("Content-Security-Policy-Report-Only", response.headers)
+
+    def test_non_admin_path_includes_csp(self):
+        # Arrange
+        url = "/"
+
+        # Act
+        response = self.client.get(url)
+
+        # Assert
+        self.assertIn("Content-Security-Policy", response.headers)

@@ -12,7 +12,7 @@
   {% with site_logo_url=site_logo_path|absolute_url:site_base_url %}
   {% with post_url=post.get_absolute_url|absolute_url:site_base_url %}
   {% with cover=post.cover_rendition %}
-  <script nonce="{{ CSP_NONCE }}" type="application/ld+json">
+  <script nonce="{{ csp_nonce }}" type="application/ld+json">
     {
       "@context": "https://schema.org",
       "@type": "BlogPosting",
@@ -254,6 +254,6 @@
 {% endblock %}
 
 {% block js_script %}
-  <script nonce="{{ CSP_NONCE }}" defer src="{% static 'vendor/chart.umd.min.js' %}"></script>
-  <script nonce="{{ CSP_NONCE }}" defer src="{% static 'js/post_detail.js' %}"></script>
+  <script nonce="{{ csp_nonce }}" defer src="{% static 'vendor/chart.umd.min.js' %}"></script>
+  <script nonce="{{ csp_nonce }}" defer src="{% static 'js/post_detail.js' %}"></script>
 {% endblock %}
