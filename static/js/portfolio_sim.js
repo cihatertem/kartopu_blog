@@ -200,7 +200,21 @@ document.addEventListener("DOMContentLoaded", () => {
                 mutation.type === "attributes" &&
                 mutation.attributeName === "data-theme"
             ) {
-                runSimulation();
+                if (chart) {
+                    const isDarkMode =
+                        document.documentElement.getAttribute("data-theme") ===
+                        "dark";
+                    const gridColor = isDarkMode
+                        ? "rgba(255, 255, 255, 0.1)"
+                        : "rgba(0, 0, 0, 0.1)";
+                    const textColor = isDarkMode ? "#e6edf6" : "#1f2a37";
+
+                    chart.options.scales.x.grid.color = gridColor;
+                    chart.options.scales.x.ticks.color = textColor;
+                    chart.options.scales.y.grid.color = gridColor;
+                    chart.options.scales.y.ticks.color = textColor;
+                    chart.update();
+                }
             }
         });
     });
