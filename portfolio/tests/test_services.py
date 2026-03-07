@@ -316,6 +316,81 @@ class FetchFXRatesBulkTests(TestCase):
         self.assertEqual(result.get(("USD", "TRY")), Decimal("31.0"))
         self.assertEqual(result.get(("EUR", "TRY")), Decimal("33.0"))
 
+    @patch("portfolio.services.yf.download")
+    def test_yf_download_empty_after_date_filter(self, mock_download):
+        """Test returning empty dictionary when DataFrame is empty after date filtering."""
+        mock_df = pd.DataFrame(
+            {"Close": [30.0, 31.0]},
+            index=pd.DatetimeIndex(["2023-10-03", "2023-10-04"]),
+        )
+        mock_download.return_value = mock_df
+
+        pairs = [("USD", "TRY")]
+        d = date(2023, 10, 2)
+        self.assertEqual(fetch_fx_rates_bulk(pairs, rate_date=d), {})
+
+    @patch("portfolio.services.yf.download")
+    def test_no_close_column_in_data(self, mock_download):
+        """Test returning empty dictionary when 'Close' is not present in data."""
+        mock_df = pd.DataFrame(
+            {"Open": [30.0, 31.0]},
+            index=pd.DatetimeIndex(["2023-10-01", "2023-10-02"]),
+        )
+        mock_download.return_value = mock_df
+
+        pairs = [("USD", "TRY")]
+        self.assertEqual(fetch_fx_rates_bulk(pairs), {})
+
+    @patch("portfolio.services.yf.download")
+    def test_multi_symbol_missing_from_close_data(self, mock_download):
+        """Test when multiple pairs requested but one is missing from 'Close' data."""
+        data = {
+            "USDTRY=X": [30.0, 31.0],
+        }
+        mock_df = pd.DataFrame(
+            data, index=pd.DatetimeIndex(["2023-10-01", "2023-10-02"])
+        )
+        mock_df = pd.concat([mock_df], axis=1, keys=["Close"])
+        mock_download.return_value = mock_df
+
+        pairs = [("USD", "TRY"), ("EUR", "TRY")]
+        result = fetch_fx_rates_bulk(pairs)
+
+        self.assertIn(("USD", "TRY"), result)
+        self.assertNotIn(("EUR", "TRY"), result)
+
+    @patch("portfolio.services.yf.download")
+    def test_series_empty_after_dropna(self, mock_download):
+        """Test when series becomes empty after dropna()."""
+        mock_df = pd.DataFrame(
+            {"Close": [float("nan"), float("nan")]},
+            index=pd.DatetimeIndex(["2023-10-01", "2023-10-02"]),
+        )
+        mock_download.return_value = mock_df
+
+        pairs = [("USD", "TRY")]
+        self.assertEqual(fetch_fx_rates_bulk(pairs), {})
+
+    @patch("portfolio.services.yf.download")
+    @patch("portfolio.services._safe_decimal")
+    def test_parse_fx_rate_exception(self, mock_safe_decimal, mock_download):
+        """Test handling of exception during single symbol parsing."""
+        mock_df = pd.DataFrame(
+            {"Close": [30.0, 31.0]},
+            index=pd.DatetimeIndex(["2023-10-01", "2023-10-02"]),
+        )
+        mock_download.return_value = mock_df
+        mock_safe_decimal.side_effect = Exception("Parsing error")
+
+        pairs = [("USD", "TRY")]
+
+        # Suppress logging output to keep tests clean
+        with patch("portfolio.services.logger") as mock_logger:
+            result = fetch_fx_rates_bulk(pairs)
+
+        self.assertEqual(result, {})
+        mock_logger.exception.assert_called_once()
+
 
 class FetchFXRateTests(TestCase):
     def test_empty_currencies(self):
