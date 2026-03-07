@@ -1448,44 +1448,29 @@ class DividendSnapshot(BaseSnapshot):
         return ""
 
     @classmethod
-    def _prepare_snapshot_data(
+    def _get_fx_rates(
         cls,
-        *,
-        snapshot_date: date | None = None,
-        name: str | None = None,
-        **kwargs: object,
-    ) -> tuple[date, dict[str, object], list[object]]:
-        year = kwargs["year"]
-        currency = kwargs["currency"]
-        snapshot_date = snapshot_date or date(year, 12, 31)  # pyright: ignore[reportArgumentType]
-        payments = (
-            DividendPayment.objects.select_related("asset")
-            .prefetch_related("dividends")
-            .filter(payment_date__year=year, payment_date__lte=snapshot_date)
-            .order_by("payment_date", "created_at")
-        )
-
-        total_amount = Decimal("0")
-        asset_totals: dict[str, dict[str, Decimal | Asset]] = {}
-        payment_rows: list[dict[str, object]] = []
-
+        payments: QuerySet,  # pyright: ignore[reportMissingTypeArgument]
+        target_currency: str,
+        snapshot_date: date,
+    ) -> dict[tuple[str, str, date | None], Decimal]:
         fx_rates: dict[tuple[str, str, date | None], Decimal] = {}
 
         unique_currencies = {
             payment.asset.currency
             for payment in payments
-            if payment.asset.currency != currency
+            if payment.asset.currency != target_currency
         }
 
         uncached_pairs = []
         for entry_currency in unique_currencies:
-            currency_pair = (entry_currency, currency, snapshot_date)
-            cache_key = f"fx_rate_{entry_currency}_{currency}_{snapshot_date.isoformat() if snapshot_date else 'latest'}"
+            currency_pair = (entry_currency, target_currency, snapshot_date)
+            cache_key = f"fx_rate_{entry_currency}_{target_currency}_{snapshot_date.isoformat() if snapshot_date else 'latest'}"
             cached_rate = cache.get(cache_key)
             if cached_rate is not None:
                 fx_rates[currency_pair] = cached_rate  # pyright: ignore[reportArgumentType]
             else:
-                uncached_pairs.append((entry_currency, currency))
+                uncached_pairs.append((entry_currency, target_currency))
 
         if uncached_pairs:
             fetched_rates = fetch_fx_rates_bulk(uncached_pairs, rate_date=snapshot_date)
@@ -1499,6 +1484,59 @@ class DividendSnapshot(BaseSnapshot):
                     timeout=getattr(settings, "CACHE_TIMEOUT", CACHE_TIMEOUT),
                 )
                 fx_rates[currency_pair] = fx_rate  # pyright: ignore[reportArgumentType]
+
+        return fx_rates
+
+    @classmethod
+    def _build_items_data(
+        cls,
+        asset_totals: dict[str, dict[str, object]],
+        payment_rows: list[dict[str, object]],
+        total_amount: Decimal,
+    ) -> list[object]:
+        items_data: list[object] = []
+        for asset_entry in asset_totals.values():
+            amount = asset_entry["total_amount"]  # pyright: ignore[reportAssignmentType]
+            allocation_pct = amount / total_amount if total_amount > 0 else Decimal("0")  # pyright: ignore[reportOperatorIssue]
+            items_data.append(
+                {
+                    "type": "asset",
+                    "asset": asset_entry["asset"],
+                    "total_amount": amount,
+                    "allocation_pct": allocation_pct,
+                }
+            )
+
+        for row in payment_rows:
+            items_data.append(
+                {
+                    "type": "payment",
+                    "asset": row["asset"],
+                    "payment": row["payment"],
+                    "payment_date": row["payment_date"],
+                    "per_share_net_amount": row["per_share_net_amount"],
+                    "dividend_yield_on_payment_price": row[
+                        "dividend_yield_on_payment_price"
+                    ],
+                    "dividend_yield_on_average_cost": row[
+                        "dividend_yield_on_average_cost"
+                    ],
+                    "total_net_amount": row["total_net_amount"],
+                }
+            )
+        return items_data
+
+    @classmethod
+    def _process_payments(
+        cls,
+        payments: QuerySet,  # pyright: ignore[reportMissingTypeArgument]
+        currency: str,
+        snapshot_date: date,
+        fx_rates: dict[tuple[str, str, date | None], Decimal],
+    ) -> tuple[Decimal, dict[str, dict[str, object]], list[dict[str, object]]]:
+        total_amount = Decimal("0")
+        asset_totals: dict[str, dict[str, object]] = {}
+        payment_rows: list[dict[str, object]] = []
 
         for payment in payments:
             dividend = next(
@@ -1550,6 +1588,39 @@ class DividendSnapshot(BaseSnapshot):
                 }
             )
 
+        return total_amount, asset_totals, payment_rows
+
+    @classmethod
+    def _prepare_snapshot_data(
+        cls,
+        *,
+        snapshot_date: date | None = None,
+        name: str | None = None,
+        **kwargs: object,
+    ) -> tuple[date, dict[str, object], list[object]]:
+        year = kwargs["year"]
+        currency = kwargs["currency"]
+        snapshot_date = snapshot_date or date(year, 12, 31)  # pyright: ignore[reportArgumentType]
+        payments = (
+            DividendPayment.objects.select_related("asset")
+            .prefetch_related("dividends")
+            .filter(payment_date__year=year, payment_date__lte=snapshot_date)
+            .order_by("payment_date", "created_at")
+        )
+
+        fx_rates = cls._get_fx_rates(
+            payments,
+            str(currency),
+            snapshot_date,
+        )
+
+        total_amount, asset_totals, payment_rows = cls._process_payments(
+            payments,
+            str(currency),
+            snapshot_date,
+            fx_rates,
+        )
+
         name_override = name or f"{year} Temettü Özeti"
         snapshot_kwargs = {
             "year": year,
@@ -1558,36 +1629,7 @@ class DividendSnapshot(BaseSnapshot):
             "name": name_override,
         }
 
-        items_data = []
-        for asset_entry in asset_totals.values():
-            amount = asset_entry["total_amount"]  # pyright: ignore[reportAssignmentType]
-            allocation_pct = amount / total_amount if total_amount > 0 else Decimal("0")  # pyright: ignore[reportOperatorIssue]
-            items_data.append(
-                {
-                    "type": "asset",
-                    "asset": asset_entry["asset"],
-                    "total_amount": amount,
-                    "allocation_pct": allocation_pct,
-                }
-            )
-
-        for row in payment_rows:
-            items_data.append(
-                {
-                    "type": "payment",
-                    "asset": row["asset"],
-                    "payment": row["payment"],
-                    "payment_date": row["payment_date"],
-                    "per_share_net_amount": row["per_share_net_amount"],
-                    "dividend_yield_on_payment_price": row[
-                        "dividend_yield_on_payment_price"
-                    ],
-                    "dividend_yield_on_average_cost": row[
-                        "dividend_yield_on_average_cost"
-                    ],
-                    "total_net_amount": row["total_net_amount"],
-                }
-            )
+        items_data = cls._build_items_data(asset_totals, payment_rows, total_amount)
 
         return snapshot_date, snapshot_kwargs, items_data
 
