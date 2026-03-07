@@ -267,6 +267,43 @@ class Portfolio(UUIDModelMixin, TimeStampedModelMixin):
 
         return fx_rates[currency_pair]
 
+    def _prefetch_fx_rates(
+        self,
+        transactions: list["PortfolioTransaction"],
+        fx_rates: dict[tuple[str, str, date | None], Decimal],
+        price_date: date | None = None,
+    ) -> None:
+        uncached_pairs_by_date: dict[date | None, set[tuple[str, str]]] = {}
+        for tx in transactions:
+            conversion_date = price_date or tx.trade_date
+            if tx.asset.currency == self.currency:
+                continue
+            currency_pair = (tx.asset.currency, self.currency, conversion_date)
+            if currency_pair not in fx_rates:
+                cache_key = f"fx_rate_{tx.asset.currency}_{self.currency}_{conversion_date.isoformat() if conversion_date else 'latest'}"
+                cached_rate = cache.get(cache_key)
+                if cached_rate is not None:
+                    fx_rates[currency_pair] = cached_rate
+                else:
+                    if conversion_date not in uncached_pairs_by_date:
+                        uncached_pairs_by_date[conversion_date] = set()
+                    uncached_pairs_by_date[conversion_date].add(
+                        (tx.asset.currency, self.currency)
+                    )
+
+        for rate_date, pairs in uncached_pairs_by_date.items():
+            fetched_rates = fetch_fx_rates_bulk(list(pairs), rate_date=rate_date)
+            for pair in pairs:
+                currency_pair = (pair[0], pair[1], rate_date)
+                cache_key = f"fx_rate_{pair[0]}_{pair[1]}_{rate_date.isoformat() if rate_date else 'latest'}"
+                fx_rate = (fetched_rates or {}).get(pair, Decimal("1"))
+                cache.set(
+                    cache_key,
+                    fx_rate,
+                    timeout=getattr(settings, "CACHE_TIMEOUT", CACHE_TIMEOUT),
+                )
+                fx_rates[currency_pair] = fx_rate
+
     def _apply_transaction_to_position(
         self,
         transaction: "PortfolioTransaction",
@@ -326,7 +363,10 @@ class Portfolio(UUIDModelMixin, TimeStampedModelMixin):
     ) -> dict[str, dict[str, Decimal | Asset]]:
         positions: dict[str, dict[str, Decimal | Asset]] = {}
 
-        for transaction in transactions:
+        tx_list = list(transactions)
+        self._prefetch_fx_rates(tx_list, fx_rates, price_date)
+
+        for transaction in tx_list:
             asset = transaction.asset
             # Use price_date (snapshot date) for conversion if provided, otherwise historical
             conversion_date = price_date or transaction.trade_date
@@ -486,7 +526,10 @@ class Portfolio(UUIDModelMixin, TimeStampedModelMixin):
         fx_rates: dict[tuple[str, str, date | None], Decimal] = {}
         asset_quantities: dict[str, Decimal] = {}
 
-        for tx in transactions:
+        tx_list = list(transactions)
+        self._prefetch_fx_rates(tx_list, fx_rates)
+
+        for tx in tx_list:
             fx_rate = self._get_or_fetch_fx_rate(
                 fx_rates, tx.asset.currency, self.currency, tx.trade_date
             )
