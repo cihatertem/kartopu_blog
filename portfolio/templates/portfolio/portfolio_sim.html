@@ -2,6 +2,7 @@
 {% load static %}
 
 {% block title %}{{ title }} | Kartopu Money{% endblock %}
+{% block description %} {{ description }} {% endblock %}
 
 {% block page_css %}
 <link rel="stylesheet" href="{% static 'css/portfolio-sim.css' %}">
@@ -17,7 +18,18 @@
 
     <header class="page-header">
         <h1>{{ title }}</h1>
-        <p class="text-muted">{{ description|safe }}</p>
+        <p class="text-muted">
+            Portföyünüzün enflasyondan arındırılmış gerçek büyümesini hesaplayın.
+            Temettü verimi ve reel CAGR
+            <span class="tooltip">
+                <span class="tooltip-icon">i</span>
+                <span class="tooltip-text">
+                    Bileşik Yıllık Büyüme Oranı (Compound Annual Growth Rate).
+                    Bir yatırımın belirli bir dönem boyunca her yıl ortalama ne kadar büyüdüğünü gösteren bir ölçüttür.
+                </span>
+            </span>
+            ile satın alma gücünüzü kaç yıl koruyabileceğinizi görün.
+        </p>
     </header>
 
     <div class="sim-container">

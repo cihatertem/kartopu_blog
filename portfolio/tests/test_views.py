@@ -13,7 +13,7 @@ class FireCalculatorViewTests(TestCase):
             response.context["title"], "Finansal Özgürlük (F.I.R.E.) Hesaplayıcı"
         )
         self.assertEqual(response.context["active_nav"], "fire-calculator")
-        self.assertIn("4% kuralı", response.context["description"])
+        self.assertContains(response, "4% kuralı")
 
 
 @override_settings(SECURE_SSL_REDIRECT=False)
@@ -27,7 +27,7 @@ class SorrAnalysisViewTests(TestCase):
             response.context["title"], "Sequence of Returns Risk (SORR) Analizi"
         )
         self.assertEqual(response.context["active_nav"], "sorr-analysis")
-        self.assertIn("Kötü başlangıç", response.context["description"])
+        self.assertContains(response, "Kötü başlangıç")
 
 
 @override_settings(SECURE_SSL_REDIRECT=False)
@@ -42,7 +42,7 @@ class PortfolioSimViewTests(TestCase):
             "Reel Portföy Büyüme ve Temettü Emekliliği Simülatörü",
         )
         self.assertEqual(response.context["active_nav"], "portfolio-sim")
-        self.assertIn("Bileşik Yıllık Büyüme Oranı", response.context["description"])
+        self.assertContains(response, "Bileşik Yıllık Büyüme Oranı")
 
 
 @override_settings(SECURE_SSL_REDIRECT=False)

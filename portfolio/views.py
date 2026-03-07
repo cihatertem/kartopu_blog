@@ -9,11 +9,7 @@ class FireCalculatorView(TemplateView):
         context.update(
             {
                 "title": "Finansal Özgürlük (F.I.R.E.) Hesaplayıcı",
-                "description": (
-                    "Portföyünüzün sizi ne zaman finansal olarak özgür kılacağını hesaplayın."
-                    " 4% kuralı ve bileşik getiri ile F.I.R.E. yolculuğunuzu planlayın.</br>"
-                    "<strong>Not:</strong> <a href='https://kartopu.money/blog/finansal-ozgurluk-hesaplayicisi-yayinda/' target='_blank'>Hesaplayıcıya dair blog yazımız.</a>"
-                ),
+                "description": "Portföyünüzün sizi ne zaman finansal olarak özgür kılacağını hesaplayın. 4% kuralı ve bileşik getiri ile F.I.R.E. yolculuğunuzu planlayın.",
                 "active_nav": "fire-calculator",
             }
         )
@@ -28,11 +24,7 @@ class SorrAnalysisView(TemplateView):
         context.update(
             {
                 "title": "Sequence of Returns Risk (SORR) Analizi",
-                "description": (
-                    "Emeklilik portföyünüzün ilk yıllarındaki piyasa dalgalanmalarının "
-                    "portföy ömrüne etkisini simüle edin. 'Kötü başlangıç' senaryolarının "
-                    "uzun vadeli planlarınıza etkisini görün."
-                ),
+                "description": "Emeklilik portföyünüzün ilk yıllarındaki piyasa dalgalanmalarının portföy ömrüne etkisini simüle edin. 'Kötü başlangıç' senaryolarının uzun vadeli planlarınıza etkisini görün.",
                 "active_nav": "sorr-analysis",
             }
         )
@@ -47,16 +39,7 @@ class PortfolioSimView(TemplateView):
         context.update(
             {
                 "title": "Reel Portföy Büyüme ve Temettü Emekliliği Simülatörü",
-                "description": (
-                    "Portföyünüzün enflasyondan arındırılmış gerçek büyümesini hesaplayın. "
-                    "Temettü verimi ve reel CAGR"
-                    '<span class="tooltip">'
-                    '<span class="tooltip-icon">i</span>'
-                    '<span class="tooltip-text">'
-                    "Bileşik Yıllık Büyüme Oranı (Compound Annual Growth Rate). "
-                    "Bir yatırımın belirli bir dönem boyunca her yıl ortalama ne kadar büyüdüğünü gösteren bir ölçüttür."
-                    "</span></span> ile satın alma gücünüzü kaç yıl koruyabileceğinizi görün."
-                ),
+                "description": "Portföyünüzün enflasyondan arındırılmış gerçek büyümesini hesaplayın. Temettü verimi ve reel CAGR i ile satın alma gücünüzü kaç yıl koruyabileceğinizi görün.",
                 "active_nav": "portfolio-sim",
             }
         )
