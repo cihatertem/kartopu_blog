@@ -1,10 +1,10 @@
-from django.http import Http404, HttpResponse
+from django.shortcuts import render
 
 
 # Create your views here.
 def author_profile_view(request):
-    return HttpResponse(b"Author Profile Page")
+    return render(request, "accounts/author_profile.html")
 
 
 def disabled_account_view(request):
-    raise Http404("This account endpoint has been disabled.")
+    return render(request, "accounts/disabled_account.html", status=404)

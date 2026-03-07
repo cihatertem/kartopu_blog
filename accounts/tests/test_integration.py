@@ -21,4 +21,4 @@ class AccountsIntegrationTests(TestCase):
 
         # Assert
         self.assertEqual(response.status_code, 200)
-        self.assertEqual(response.content, b"Author Profile Page")
+        self.assertInHTML("Author Profile", response.content.decode())

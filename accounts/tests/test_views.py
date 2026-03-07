@@ -15,14 +15,15 @@ class AccountsViewsTests(TestCase):
 
         # Assert
         self.assertEqual(response.status_code, 200)
-        self.assertEqual(response.content, b"Author Profile Page")
+        self.assertContains(response, "Author Profile")
 
     def test_disabled_account_view(self):
         # Arrange
-        from django.http import Http404
+        url = reverse("account_login_disabled")
 
-        from accounts.views import disabled_account_view
+        # Act
+        response = self.client.get(url)
 
-        # Act & Assert
-        with self.assertRaises(Http404):
-            disabled_account_view(None)
+        # Assert
+        self.assertEqual(response.status_code, 404)
+        self.assertContains(response, "Account Feature Disabled", status_code=404)
