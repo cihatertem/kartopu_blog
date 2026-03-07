@@ -1,11 +1,14 @@
 from __future__ import annotations
 
+import logging
 from datetime import date, timedelta
 from decimal import Decimal, InvalidOperation
 
 import yfinance as yf
 
 from core.decorators import log_exceptions
+
+logger = logging.getLogger(__name__)
 
 
 def calculate_xirr(cash_flows: list[tuple[date, Decimal]]) -> float | None:
@@ -189,6 +192,7 @@ def fetch_fx_rates_bulk(
         # yf.download can be noisy; setting progress=False avoids stdout spam
         data = yf.download(symbols, start=start, end=end, progress=False, interval="1d")
     except Exception:
+        logger.exception("Yahoo Finance bulk download failed for symbols: %s", symbols)
         return {}
 
     if data is None or data.empty:
@@ -226,7 +230,7 @@ def fetch_fx_rates_bulk(
             if decimal_price is not None:
                 results[symbols_map[symbol]] = decimal_price
         except Exception:
-            pass
+            logger.exception("Failed to parse FX rate for %s", symbol)
 
     # Include identical pairs in the result
     for pair in currency_pairs:

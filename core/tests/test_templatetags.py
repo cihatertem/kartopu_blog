@@ -133,3 +133,27 @@ class SEOTest(TestCase):
     def test_empty_request(self):
         seo = get_seo_data({})
         self.assertEqual(seo, {})
+
+    def test_pageseo_exception_logging(self):
+        from unittest.mock import patch
+
+        request = self.factory.get("/")
+
+        with patch(
+            "core.templatetags.seo_tags.PageSEO.objects.filter",
+            side_effect=Exception("Database error"),
+        ):
+            with self.assertLogs("core.templatetags.seo_tags", level="ERROR") as cm:
+                seo = get_seo_data({"request": request})
+
+                # Check that the exception was logged
+                self.assertTrue(
+                    any(
+                        "Error generating SEO data for path: /" in msg
+                        for msg in cm.output
+                    )
+                )
+
+                # Check that the default SEO data is still returned
+                self.assertEqual(seo.get("title"), "Default Title")
+                self.assertEqual(seo.get("description"), "Default Description")

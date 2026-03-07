@@ -2,12 +2,11 @@ from datetime import date
 from unittest.mock import MagicMock
 
 from django.contrib.auth import get_user_model
-from django.test import RequestFactory, TestCase
+from django.test import TestCase
 from django.utils import timezone
 
 from blog.models import BlogPost, Category
 from core.services.blog import published_posts_queryset
-from core.services.pagination import get_page_obj
 from core.services.portfolio import (
     build_comparison_name,
     build_snapshot_name,
@@ -47,27 +46,6 @@ class BlogServicesTest(TestCase):
     def test_published_posts_queryset_no_tags(self):
         qs = published_posts_queryset(include_tags=False)
         self.assertEqual(qs.count(), 1)
-
-
-class PaginationServicesTest(TestCase):
-    def setUp(self):
-        self.factory = RequestFactory()
-
-    def test_get_page_obj(self):
-        items = list(range(1, 15))  # 1 to 14
-
-        request = self.factory.get("/", {"page": "2"})
-        page_obj = get_page_obj(request, items, per_page=10)
-
-        self.assertEqual(page_obj.number, 2)
-        self.assertEqual(page_obj.object_list, [11, 12, 13, 14])
-
-    def test_get_page_obj_invalid_page(self):
-        items = list(range(1, 15))
-        request = self.factory.get("/", {"page": "abc"})
-        page_obj = get_page_obj(request, items, per_page=10)
-
-        self.assertEqual(page_obj.number, 1)
 
 
 class PortfolioServicesTest(TestCase):

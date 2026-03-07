@@ -1,3 +1,5 @@
+import logging
+
 from django import template
 from django.conf import settings
 from django.db.models import Q
@@ -5,6 +7,7 @@ from django.utils.translation import get_language
 
 from core.models import PageSEO, SiteSettings
 
+logger = logging.getLogger(__name__)
 register = template.Library()
 
 
@@ -128,6 +131,6 @@ def get_seo_data(context):
                 seo["image"] = make_absolute(page_seo.image.url)
 
     except Exception:
-        pass
+        logger.exception("Error generating SEO data for path: %s", request.path)
 
     return seo

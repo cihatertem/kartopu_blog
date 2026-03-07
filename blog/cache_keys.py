@@ -1,3 +1,4 @@
+CACHE_KEY_SAVINGS_RATE = "savings_rate"
 NAV_CATEGORIES_KEY = "nav_categories"
 NAV_TAGS_KEY = "nav_tags"
 NAV_ARCHIVES_KEY = "nav_archives"
