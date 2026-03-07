@@ -204,12 +204,68 @@ class BlogFeedsTests(TestCase):
         self.assertEqual(len(items), 2)
         self.assertNotIn(self.draft_post, items)
 
-        # Inherited item methods
+        # Inherited item methods for post_with_cover
         self.assertEqual(feed.item_title(self.post_with_cover), "Post with Cover")
+        self.assertEqual(
+            feed.item_description(self.post_with_cover), "<p>Short excerpt.</p>"
+        )
+        self.assertEqual(
+            feed.item_link(self.post_with_cover),
+            self.post_with_cover.get_absolute_url(),
+        )
+        self.assertEqual(
+            feed.item_pubdate(self.post_with_cover), self.post_with_cover.published_at
+        )
+
+        # Inherited item methods for post_no_cover
+        desc_no_cover = feed.item_description(self.post_no_cover)
+        self.assertIn("Content for no cover", desc_no_cover)
+
+        # Enclosures for post_with_cover
         self.assertIsNotNone(feed.item_enclosure_url(self.post_with_cover))
+        self.assertTrue(
+            str(feed.item_enclosure_url(self.post_with_cover)).startswith("http")
+        )
+        self.assertGreater(feed.item_enclosure_length(self.post_with_cover), 0)
+        self.assertIn("image", feed.item_enclosure_mime_type(self.post_with_cover))
+
+        # Enclosures for post_no_cover (missing cover)
+        self.assertIsNone(feed.item_enclosure_url(self.post_no_cover))
+        self.assertIsNone(feed.item_enclosure_length(self.post_no_cover))
+        self.assertIsNone(feed.item_enclosure_mime_type(self.post_no_cover))
 
         # Test fallback description if category has no description
         empty_cat = Category.objects.create(name="Empty")
         self.assertEqual(
             feed.description(empty_cat), "Kartopu Blog'daki en yeni kategori yazıları."
         )
+
+    def test_category_item_enclosure_mime_type_missing_cover_name(self):
+        feed = CategoryPostsFeed()
+        feed.request = self.factory.get("/")
+
+        class BadMimeItem:
+            cover_image = "exists"
+            cover_rendition = None
+            cover_1200 = MagicMock()
+            cover_1200.name = None
+
+        bad_item = BadMimeItem()
+        self.assertEqual(feed.item_enclosure_mime_type(bad_item), "image/webp")
+
+    def test_category_item_enclosure_url_without_request_and_safe_url(self):
+        feed = CategoryPostsFeed()
+        if hasattr(feed, "request"):
+            delattr(feed, "request")
+
+        class MockItem:
+            cover_image = MagicMock()
+            cover_rendition = None
+
+        item = MockItem()
+
+        with patch("blog.feeds.safe_file_url", return_value="/media/safe_url_cat.jpg"):
+            self.assertEqual(feed._get_item_cover_url(item), "/media/safe_url_cat.jpg")
+
+        with patch("blog.feeds.safe_file_url", return_value=None):
+            self.assertIsNone(feed._get_item_cover_url(item))
