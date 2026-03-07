@@ -543,7 +543,7 @@ def _render_portfolio_comparison_summary_html(comparison) -> str:
     )
 
     value_delta = compare_value - base_value  # pyright: ignore[reportOperatorIssue]
-    cost_delta = compare_cost - base_cost
+    cost_delta = compare_cost - base_cost  # pyright: ignore[reportOperatorIssue]
 
     cost_free_value_delta = value_delta - cost_delta
 
