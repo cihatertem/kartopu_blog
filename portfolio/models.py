@@ -929,6 +929,80 @@ class CashFlowSnapshot(BaseSnapshot):
         return ""
 
     @classmethod
+    def _get_date_range(cls, snapshot_date: date, period: str) -> tuple[date, date]:
+        if period == cls.Period.MONTHLY:
+            start_date = snapshot_date.replace(day=1)
+            last_day = calendar.monthrange(snapshot_date.year, snapshot_date.month)[1]
+            end_date = snapshot_date.replace(day=last_day)
+        else:
+            start_date = snapshot_date.replace(month=1, day=1)
+            end_date = snapshot_date.replace(month=12, day=31)
+        if snapshot_date < end_date:
+            end_date = snapshot_date
+        return start_date, end_date
+
+    @classmethod
+    def _get_fx_rates(
+        cls,
+        entries: QuerySet,
+        base_currency: str,
+        snapshot_date: date,
+    ) -> dict[tuple[str, str, date | None], Decimal]:
+        fx_rates: dict[tuple[str, str, date | None], Decimal] = {}
+        unique_currencies = {
+            entry["currency"] for entry in entries if entry["currency"] != base_currency
+        }
+
+        uncached_pairs = []
+        for entry_currency in unique_currencies:
+            currency_pair = (entry_currency, base_currency, snapshot_date)
+            cache_key = (
+                f"fx_rate_{entry_currency}_{base_currency}_{snapshot_date.isoformat()}"
+            )
+            cached_rate = cache.get(cache_key)
+            if cached_rate is not None:
+                fx_rates[currency_pair] = cached_rate
+            else:
+                uncached_pairs.append((entry_currency, base_currency))
+
+        if uncached_pairs:
+            fetched_rates = fetch_fx_rates_bulk(uncached_pairs, rate_date=snapshot_date)
+            for pair in uncached_pairs:
+                currency_pair = (pair[0], pair[1], snapshot_date)
+                cache_key = f"fx_rate_{pair[0]}_{pair[1]}_{snapshot_date.isoformat()}"
+                fx_rate = (fetched_rates or {}).get(pair, Decimal("1"))
+                cache.set(
+                    cache_key,
+                    fx_rate,
+                    timeout=getattr(settings, "CACHE_TIMEOUT", CACHE_TIMEOUT),
+                )
+                fx_rates[currency_pair] = fx_rate  # pyright: ignore[reportArgumentType]
+
+        return fx_rates
+
+    @classmethod
+    def _calculate_category_totals(
+        cls,
+        entries: QuerySet,
+        cashflow_currency: str,
+        snapshot_date: date,
+        fx_rates: dict[tuple[str, str, date | None], Decimal],
+    ) -> dict[str, Decimal]:
+        category_totals: dict[str, Decimal] = {}
+        for entry in entries:
+            amount = entry["amount"] or Decimal("0")
+            entry_currency = entry["currency"]
+            fx_rate = Decimal("1")
+            if entry_currency != cashflow_currency:
+                currency_pair = (entry_currency, cashflow_currency, snapshot_date)
+                fx_rate = fx_rates.get(currency_pair, Decimal("1"))
+            converted_amount = amount * fx_rate
+            category_totals[entry["category"]] = (
+                category_totals.get(entry["category"], Decimal("0")) + converted_amount
+            )
+        return category_totals
+
+    @classmethod
     def _prepare_snapshot_data(
         cls,
         *,
@@ -940,15 +1014,7 @@ class CashFlowSnapshot(BaseSnapshot):
         period = kwargs["period"]
         snapshot_date = snapshot_date or timezone.now().date()  # pyright: ignore[reportAssignmentType]
 
-        if period == cls.Period.MONTHLY:
-            start_date = snapshot_date.replace(day=1)
-            last_day = calendar.monthrange(snapshot_date.year, snapshot_date.month)[1]
-            end_date = snapshot_date.replace(day=last_day)
-        else:
-            start_date = snapshot_date.replace(month=1, day=1)
-            end_date = snapshot_date.replace(month=12, day=31)
-        if snapshot_date < end_date:
-            end_date = snapshot_date
+        start_date, end_date = cls._get_date_range(snapshot_date, period)  # pyright: ignore[reportArgumentType]
 
         entries = CashFlowEntry.objects.filter(
             cashflows=cashflow,  # pyright: ignore[reportArgumentType]
@@ -956,57 +1022,24 @@ class CashFlowSnapshot(BaseSnapshot):
             entry_date__lte=end_date,
         ).values("category", "amount", "currency", "entry_date")
 
-        category_totals: dict[str, Decimal] = {}
-        fx_rates: dict[tuple[str, str, date | None], Decimal] = {}
+        fx_rates = cls._get_fx_rates(
+            entries,  # pyright: ignore[reportArgumentType]
+            cashflow.currency,  # pyright: ignore[reportAttributeAccessIssue]
+            snapshot_date,
+        )
 
-        unique_currencies = {
-            entry["currency"]
-            for entry in entries
-            if entry["currency"] != cashflow.currency  # pyright: ignore[reportAttributeAccessIssue]
-        }
+        category_totals = cls._calculate_category_totals(
+            entries,  # pyright: ignore[reportArgumentType]
+            cashflow.currency,  # pyright: ignore[reportAttributeAccessIssue]
+            snapshot_date,
+            fx_rates,
+        )
 
-        uncached_pairs = []
-        for entry_currency in unique_currencies:
-            currency_pair = (entry_currency, cashflow.currency, snapshot_date)  # pyright: ignore[reportAttributeAccessIssue]
-            cache_key = f"fx_rate_{entry_currency}_{cashflow.currency}_{snapshot_date.isoformat() if snapshot_date else 'latest'}"  # pyright: ignore[reportAttributeAccessIssue]
-            cached_rate = cache.get(cache_key)
-            if cached_rate is not None:
-                fx_rates[currency_pair] = cached_rate
-            else:
-                uncached_pairs.append((entry_currency, cashflow.currency))  # pyright: ignore[reportAttributeAccessIssue]
-
-        if uncached_pairs:
-            fetched_rates = fetch_fx_rates_bulk(uncached_pairs, rate_date=snapshot_date)
-            for pair in uncached_pairs:
-                currency_pair = (pair[0], pair[1], snapshot_date)
-                cache_key = f"fx_rate_{pair[0]}_{pair[1]}_{snapshot_date.isoformat() if snapshot_date else 'latest'}"
-                fx_rate = (fetched_rates or {}).get(pair, Decimal("1"))
-                cache.set(
-                    cache_key,
-                    fx_rate,
-                    timeout=getattr(settings, "CACHE_TIMEOUT", CACHE_TIMEOUT),
-                )
-                fx_rates[currency_pair] = fx_rate  # pyright: ignore[reportArgumentType]
-
-        for entry in entries:
-            amount = entry["amount"] or Decimal("0")
-            entry_currency = entry["currency"]
-            fx_rate = Decimal("1")
-            if entry_currency != cashflow.currency:  # pyright: ignore[reportAttributeAccessIssue]
-                # Use snapshot_date for currency conversion
-                currency_pair = (entry_currency, cashflow.currency, snapshot_date)  # pyright: ignore[reportAttributeAccessIssue]
-                fx_rate = fx_rates.get(currency_pair, Decimal("1"))  # pyright: ignore[reportAssignmentType]
-            converted_amount = amount * fx_rate  # pyright: ignore[reportOperatorIssue]
-            category_totals[entry["category"]] = (  # pyright: ignore[reportArgumentType]
-                category_totals.get(entry["category"], Decimal("0")) + converted_amount  # pyright: ignore[reportArgumentType]
-            )
-
-        total_amount = sum(  # pyright: ignore[reportCallIssue]
-            category_totals.values(),  # pyright: ignore[reportArgumentType]
+        total_amount = sum(
+            category_totals.values(),
             Decimal("0"),
         )
 
-        # Determine name fallback early if cashflow object handles it.
         name_override = name or cashflow.name  # pyright: ignore[reportAttributeAccessIssue]
 
         snapshot_kwargs = {
@@ -1469,7 +1502,8 @@ class DividendSnapshot(BaseSnapshot):
 
         for payment in payments:
             dividend = next(
-                (d for d in payment.dividends.all() if d.currency == currency), None
+                (d for d in payment.dividends.all() if d.currency == currency),
+                None,  # pyright: ignore[reportAttributeAccessIssue]
             )
 
             if dividend:
