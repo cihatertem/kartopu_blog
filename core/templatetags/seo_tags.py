@@ -11,6 +11,83 @@ logger = logging.getLogger(__name__)
 register = template.Library()
 
 
+def _get_post_seo_data(seo, context, make_absolute):
+    post = context["post"]
+    seo["title"] = post.effective_meta_title
+    seo["description"] = post.effective_meta_description
+    if post.cover_image:
+        seo["image"] = make_absolute(post.cover_image.url)
+    seo["type"] = "article"
+    # Article specific meta tags
+    seo["article_published_time"] = (
+        post.published_at.isoformat() if post.published_at else ""
+    )
+    seo["article_modified_time"] = post.updated_at.isoformat()
+    if post.author:
+        seo["article_author"] = post.author.get_full_name() or post.author.email
+    if post.category:
+        seo["article_section"] = post.category.name
+    if post.tags.exists():
+        seo["article_tags"] = [tag.name for tag in post.tags.all()]
+
+
+def _get_about_page_seo_data(seo, context, site_name, make_absolute):
+    about_page = context["about_page"]
+    seo["title"] = about_page.meta_title or f"{about_page.title} | {site_name}"
+    if about_page.meta_description:
+        seo["description"] = about_page.meta_description
+
+    # İlk görseli kullan
+    first_image = about_page.images.order_by("order").first()
+    if first_image and first_image.image:
+        seo["image"] = make_absolute(first_image.image.url)
+
+
+def _get_category_seo_data(seo, context, site_name):
+    category = context["category"]
+    seo["title"] = f"{category.name} | {site_name}"
+    if category.description:
+        seo["description"] = category.description
+
+
+def _get_tag_seo_data(seo, context, site_name):
+    tag = context["tag"]
+    seo["title"] = f"#{tag.name} | {site_name}"
+    seo["description"] = f"#{tag.name} etiketine ait blog yazıları."
+
+
+def _get_archive_seo_data(seo, context, site_name):
+    archive_month = context["archive_month"]
+    seo["title"] = f"{archive_month} Arşivi | {site_name}"
+    seo["description"] = f"{archive_month} ayına ait blog yazıları."
+
+
+def _get_search_seo_data(seo, context, site_name):
+    query = context["q"]
+    seo["title"] = f"'{query}' Arama Sonuçları | {site_name}"
+    seo["description"] = f"'{query}' için arama sonuçları."
+
+
+def _apply_page_seo_override(seo, request, make_absolute):
+    try:
+        path = request.path
+        page_seo = PageSEO.objects.filter(
+            Q(path=path) | Q(path=path.rstrip("/")) | Q(path=path.rstrip("/") + "/"),
+            is_active=True,
+        ).first()
+
+        if page_seo:
+            if page_seo.title:
+                seo["title"] = page_seo.title
+            if page_seo.description:
+                seo["description"] = page_seo.description
+            if page_seo.image:
+                seo["image"] = make_absolute(page_seo.image.url)
+
+    except Exception:
+        logger.exception("Error generating SEO data for path: %s", request.path)
+
+
 @register.simple_tag(takes_context=True)
 def get_seo_data(context):
     request = context.get("request")
@@ -60,77 +137,23 @@ def get_seo_data(context):
 
     # Blog Post
     if context.get("post"):
-        post = context["post"]
-        seo["title"] = post.effective_meta_title
-        seo["description"] = post.effective_meta_description
-        if post.cover_image:
-            seo["image"] = make_absolute(post.cover_image.url)
-        seo["type"] = "article"
-        # Article specific meta tags
-        seo["article_published_time"] = (
-            post.published_at.isoformat() if post.published_at else ""
-        )
-        seo["article_modified_time"] = post.updated_at.isoformat()
-        if post.author:
-            seo["article_author"] = post.author.get_full_name() or post.author.email
-        if post.category:
-            seo["article_section"] = post.category.name
-        if post.tags.exists():
-            seo["article_tags"] = [tag.name for tag in post.tags.all()]
-
+        _get_post_seo_data(seo, context, make_absolute)
     # Hakkımda Sayfası
     elif context.get("about_page"):
-        about_page = context["about_page"]
-        seo["title"] = about_page.meta_title or f"{about_page.title} | {site_name}"
-        if about_page.meta_description:
-            seo["description"] = about_page.meta_description
-
-        # İlk görseli kullan
-        first_image = about_page.images.order_by("order").first()
-        if first_image and first_image.image:
-            seo["image"] = make_absolute(first_image.image.url)
-
+        _get_about_page_seo_data(seo, context, site_name, make_absolute)
     # Kategori Detay Sayfası
     elif context.get("category") and context.get("active_category_slug"):
-        category = context["category"]
-        seo["title"] = f"{category.name} | {site_name}"
-        if category.description:
-            seo["description"] = category.description
-
+        _get_category_seo_data(seo, context, site_name)
     # Etiket Detay Sayfası
     elif context.get("tag") and context.get("active_tag_slug"):
-        tag = context["tag"]
-        seo["title"] = f"#{tag.name} | {site_name}"
-        seo["description"] = f"#{tag.name} etiketine ait blog yazıları."
-
+        _get_tag_seo_data(seo, context, site_name)
     # Arşiv Sayfası
     elif context.get("archive_month") and context.get("active_archive_key"):
-        archive_month = context["archive_month"]
-        seo["title"] = f"{archive_month} Arşivi | {site_name}"
-        seo["description"] = f"{archive_month} ayına ait blog yazıları."
-
+        _get_archive_seo_data(seo, context, site_name)
     # Arama Sonuçları
     elif context.get("q"):
-        query = context["q"]
-        seo["title"] = f"'{query}' Arama Sonuçları | {site_name}"
-        seo["description"] = f"'{query}' için arama sonuçları."
+        _get_search_seo_data(seo, context, site_name)
 
-    try:
-        path = request.path
-        page_seo = PageSEO.objects.filter(
-            Q(path=path) | Q(path=path.rstrip("/")) | Q(path=path.rstrip("/") + "/"),
-            is_active=True,
-        ).first()
-
-        if page_seo:
-            if page_seo.title:
-                seo["title"] = page_seo.title
-            if page_seo.description:
-                seo["description"] = page_seo.description
-            if page_seo.image:
-                seo["image"] = make_absolute(page_seo.image.url)
-
-    except Exception:
-        logger.exception("Error generating SEO data for path: %s", request.path)
+    _apply_page_seo_override(seo, request, make_absolute)
 
     return seo
