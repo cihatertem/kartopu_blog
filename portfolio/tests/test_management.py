@@ -23,7 +23,7 @@ class FillMissingIrrCommandTests(TestCase):
     @patch("sys.stderr.write")
     def test_fill_missing_irr_command(self, mock_stderr_write, mock_stdout_write):
         # Create snapshots with null irr_pct
-        snap1 = PortfolioSnapshot.objects.create(
+        PortfolioSnapshot.objects.create(
             portfolio=self.portfolio,
             period=PortfolioSnapshot.Period.MONTHLY,
             snapshot_date="2023-01-01",
@@ -33,7 +33,7 @@ class FillMissingIrrCommandTests(TestCase):
             total_return_pct=Decimal("0.0"),
             irr_pct=None,
         )
-        snap2 = PortfolioSnapshot.objects.create(
+        PortfolioSnapshot.objects.create(
             portfolio=self.portfolio,
             period=PortfolioSnapshot.Period.MONTHLY,
             snapshot_date="2023-02-01",
@@ -44,15 +44,38 @@ class FillMissingIrrCommandTests(TestCase):
             irr_pct=None,
         )
 
-        # Mock update_irr to return predictable results
+        # Mock update_irr to return predictable results and simulate saving
+        def mock_update_irr_side_effect(self_obj):
+            if self_obj.snapshot_date.isoformat() == "2023-01-01":
+                self_obj.irr_pct = Decimal("5.0")
+                self_obj.save(update_fields=["irr_pct"])
+                return Decimal("5.0")
+            else:
+                self_obj.irr_pct = None
+                self_obj.save(update_fields=["irr_pct"])
+                return None
+
         with patch.object(
-            PortfolioSnapshot, "update_irr", side_effect=[Decimal("5.0"), None]
+            PortfolioSnapshot,
+            "update_irr",
+            autospec=True,
+            side_effect=mock_update_irr_side_effect,
         ) as mock_update_irr:
             call_command("fill_missing_irr")
 
             # Ensure it was called for both missing snapshots
             self.assertEqual(mock_update_irr.call_count, 2)
 
-            # Since update_irr is mocked, the DB instances won't actually be modified in this test.
-            # However, the management command's logic of finding null ones, iterating over them,
-            # calling update_irr, and printing status messages is fully exercised.
+            # Check that only the snapshot that could calculate an IRR was updated
+            updated_snapshots = PortfolioSnapshot.objects.filter(irr_pct__isnull=False)
+            self.assertEqual(updated_snapshots.count(), 1)
+            self.assertEqual(updated_snapshots.first().irr_pct, Decimal("5.0"))
+            self.assertEqual(
+                updated_snapshots.first().snapshot_date.isoformat(), "2023-01-01"
+            )
+
+            null_snapshots = PortfolioSnapshot.objects.filter(irr_pct__isnull=True)
+            self.assertEqual(null_snapshots.count(), 1)
+            self.assertEqual(
+                null_snapshots.first().snapshot_date.isoformat(), "2023-02-01"
+            )
