@@ -12,7 +12,6 @@ from portfolio.models import (
     CashFlowComparison,
     CashFlowEntry,
     CashFlowSnapshot,
-    Dividend,
     DividendComparison,
     DividendPayment,
     DividendSnapshot,
@@ -22,7 +21,6 @@ from portfolio.models import (
     PortfolioTransaction,
     SalarySavingsEntry,
     SalarySavingsFlow,
-    SalarySavingsSnapshot,
 )
 
 User = get_user_model()

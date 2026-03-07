@@ -8,7 +8,14 @@ from django.urls import reverse
 from django.utils import timezone
 
 from blog.models import BlogPost, BlogPostReaction, Category, Tag
-from blog.views import post_reaction
+from blog.views import (
+    _build_comment_context,
+    _build_reaction_context,
+    _extract_social_avatar_url,
+    _normalize_avatar_url,
+    archive_index,
+    post_reaction,
+)
 
 User = get_user_model()
 
@@ -225,15 +232,6 @@ class BlogViewsTests(TestCase):
             post_reaction(request, slug="missing")
 
 
-from blog.views import (
-    _build_comment_context,
-    _build_reaction_context,
-    _extract_social_avatar_url,
-    _normalize_avatar_url,
-    archive_index,
-)
-
-
 class ViewHelperTests(TestCase):
     def test_normalize_avatar_url(self):
         self.assertEqual(_normalize_avatar_url(None), "")
@@ -345,6 +343,27 @@ class ViewHelperTests(TestCase):
         comments = ctx["comment_page_obj"].object_list
         self.assertEqual(comments[0].social_avatar_url, "http://g.com/1")
         self.assertEqual(comments[0].social_profile_url, "https://twitter.com/testuser")
+
+    @patch("core.decorators.logging.Logger.error")
+    def test_extract_social_profile_url_exception_handled(self, mock_logger_error):
+        """Test that _extract_social_profile_url safely handles exceptions when getting the profile url."""
+        # Arrange
+        from unittest.mock import MagicMock
+
+        from blog.views import _extract_social_profile_url
+
+        account = MagicMock()
+        account.provider = "twitter"
+        account.extra_data = {"screen_name": "testuser"}
+        account.get_profile_url.side_effect = Exception("Test Exception")
+
+        # Act
+        # Shouldn't raise any exception because of log_exceptions decorator
+        result = _extract_social_profile_url(account)
+
+        # Assert
+        self.assertEqual(result, "https://x.com/testuser")
+        mock_logger_error.assert_called_with("Error getting social profile url")
 
     def test_build_comment_context_social_profile_url(self):
         """Test that _build_comment_context correctly fetches and assigns social_profile_url."""

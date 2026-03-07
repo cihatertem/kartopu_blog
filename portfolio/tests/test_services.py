@@ -5,7 +5,12 @@ from unittest.mock import MagicMock, patch
 import pandas as pd
 from django.test import TestCase
 
-from portfolio.services import calculate_xirr, fetch_fx_rate, fetch_yahoo_finance_price
+from portfolio.services import (
+    calculate_xirr,
+    fetch_fx_rate,
+    fetch_fx_rates_bulk,
+    fetch_yahoo_finance_price,
+)
 
 
 class CalculateXIRRTests(TestCase):
@@ -243,9 +248,6 @@ class FetchYahooFinancePriceTests(TestCase):
         mock_get_history.return_value = mock_df
 
         self.assertIsNone(fetch_yahoo_finance_price("AAPL", price_date=d))
-
-
-from portfolio.services import fetch_fx_rates_bulk
 
 
 class FetchFXRatesBulkTests(TestCase):

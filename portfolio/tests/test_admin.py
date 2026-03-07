@@ -4,7 +4,6 @@ from unittest.mock import MagicMock
 from django.contrib import admin
 from django.contrib.auth import get_user_model
 from django.test import RequestFactory, TestCase
-from django.urls import reverse
 
 from portfolio.admin import (
     DividendSnapshotAdmin,
@@ -16,10 +15,6 @@ from portfolio.admin import (
 )
 from portfolio.models import (
     Asset,
-    CashFlow,
-    CashFlowComparison,
-    CashFlowSnapshot,
-    DividendComparison,
     DividendSnapshot,
     Portfolio,
     PortfolioComparison,
@@ -55,7 +50,7 @@ class MixinsTests(AdminTestCase):
         self.assertEqual(initial["owner"], staff_user.pk)
 
     def test_snapshot_creator_admin_mixin(self):
-        portfolio = Portfolio.objects.create(
+        Portfolio.objects.create(
             owner=self.user, name="Portfolio", target_value=Decimal("1000")
         )
         model_admin = PortfolioAdmin(Portfolio, admin.site)

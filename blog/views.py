@@ -15,6 +15,7 @@ from django.views.decorators.http import require_POST
 from comments.forms import CommentForm
 from comments.models import MAX_COMMENT_LENGTH, Comment
 from core import helpers
+from core.decorators import log_exceptions
 from core.models import SiteSettings
 from core.services.blog import published_posts_queryset
 from core.services.pagination import get_page_obj
@@ -110,6 +111,11 @@ def _extract_social_avatar_url(extra_data):
     return ""
 
 
+@log_exceptions(message="Error getting social profile url")
+def _safe_get_profile_url(account):
+    return account.get_profile_url()
+
+
 def _extract_social_profile_url(account):
     """
     Extracts or constructs a social profile URL from a SocialAccount.
@@ -119,12 +125,9 @@ def _extract_social_profile_url(account):
     extra_data = account.extra_data or {}
 
     # Try to get it from default allauth method first
-    try:
-        url = account.get_profile_url()
-        if url:
-            return url
-    except Exception:
-        pass
+    url = _safe_get_profile_url(account)
+    if url:
+        return url
 
     if provider == "twitter" or provider == "x":
         username = extra_data.get("screen_name") or extra_data.get("username")

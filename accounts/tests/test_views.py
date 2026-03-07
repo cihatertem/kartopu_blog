@@ -1,4 +1,4 @@
-from django.test import Client, TestCase
+from django.test import Client, TestCase, override_settings
 from django.urls import reverse
 
 
@@ -17,6 +17,7 @@ class AccountsViewsTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "Author Profile")
 
+    @override_settings(SECURE_SSL_REDIRECT=False)
     def test_disabled_account_view(self):
         # Arrange
         url = reverse("account_login_disabled")

@@ -1,6 +1,4 @@
-import base64
 import os
-from unittest.mock import patch
 
 from django.test import TestCase, override_settings
 
