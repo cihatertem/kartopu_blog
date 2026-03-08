@@ -3,6 +3,6 @@
     class="site-nav__messages"
     href="{% url 'admin:core_contactmessage_changelist' %}"
   >
-    📬: {{ unread_contact_message_count }}
+    📬: {% if has_pending_messages_or_comments %}❗{% else %}✅{% endif %}
   </a>
 {% endif %}

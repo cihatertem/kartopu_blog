@@ -242,13 +242,15 @@ def _get_goal_widget_snapshot():
     return goal_widget_snapshot
 
 
-def _get_unread_contact_message_count(request):
-    unread_contact_message_count = 0
+def _get_has_pending_messages_or_comments(request):
+    has_pending = False
     if request.user.is_authenticated and request.user.is_staff:
-        unread_contact_message_count = ContactMessage.objects.filter(
-            is_read=False,
-        ).count()
-    return unread_contact_message_count
+        has_unread_messages = ContactMessage.objects.filter(is_read=False).exists()
+        has_pending_comments = Comment.objects.filter(
+            status=Comment.Status.PENDING
+        ).exists()
+        has_pending = has_unread_messages or has_pending_comments
+    return has_pending
 
 
 def categories_tags_context(request):
@@ -260,7 +262,9 @@ def categories_tags_context(request):
         "nav_popular_posts": _get_nav_popular_posts(),
         "nav_portfolio_posts": _get_nav_portfolio_posts(),
         "goal_widget_snapshot": _get_goal_widget_snapshot(),
-        "unread_contact_message_count": _get_unread_contact_message_count(request),
+        "has_pending_messages_or_comments": _get_has_pending_messages_or_comments(
+            request
+        ),
     }
 
 

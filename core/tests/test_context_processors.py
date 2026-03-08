@@ -17,13 +17,13 @@ from blog.models import BlogPost, Category, Tag
 from comments.models import Comment
 from core.context_processors import (
     _get_goal_widget_snapshot,
+    _get_has_pending_messages_or_comments,
     _get_nav_archives,
     _get_nav_categories,
     _get_nav_popular_posts,
     _get_nav_portfolio_posts,
     _get_nav_recent_posts,
     _get_nav_tags,
-    _get_unread_contact_message_count,
     breadcrumbs_context,
     categories_tags_context,
     google_analytics_context,
@@ -208,7 +208,9 @@ class ContextProcessorsTests(TestCase):
         self.assertEqual(snapshot["current_value"], Decimal("50000"))
         self.assertEqual(snapshot["target_value"], Decimal("100000"))
         self.assertEqual(snapshot["remaining_pct"]["display"], 50)
-        self.assertEqual(snapshot["remaining_pct"]["fill_class"], "goal-widget__fill--50")
+        self.assertEqual(
+            snapshot["remaining_pct"]["fill_class"], "goal-widget__fill--50"
+        )
 
     def test_get_goal_widget_snapshot_uses_min_fill_for_tiny_progress(self):
         PortfolioSnapshot.objects.filter(pk=self.snapshot.pk).update(
@@ -220,29 +222,83 @@ class ContextProcessorsTests(TestCase):
 
         self.assertIsNotNone(snapshot)
         self.assertEqual(snapshot["remaining_pct"]["value"], 0)
-        self.assertEqual(snapshot["remaining_pct"]["fill_class"], "goal-widget__fill--1")
+        self.assertEqual(
+            snapshot["remaining_pct"]["fill_class"], "goal-widget__fill--1"
+        )
 
-    def test_get_unread_contact_message_count_staff(self):
+    def test_get_has_pending_messages_or_comments_only_unread_message(self):
+        # Arrange
+        request = self.factory.get("/")
+        request.user = self.staff_user
+        # By default self.contact_msg is unread
+
+        # Act
+        has_pending = _get_has_pending_messages_or_comments(request)
+
+        # Assert
+        self.assertTrue(has_pending)
+
+    def test_get_has_pending_messages_or_comments_only_pending_comment(self):
+        # Arrange
+        request = self.factory.get("/")
+        request.user = self.staff_user
+        self.contact_msg.is_read = True
+        self.contact_msg.save()
+
+        Comment.objects.create(
+            post=self.post1,
+            author=self.normal_user,
+            body="Pending comment",
+            status=Comment.Status.PENDING,
+        )
+
+        # Act
+        has_pending = _get_has_pending_messages_or_comments(request)
+
+        # Assert
+        self.assertTrue(has_pending)
+
+    def test_get_has_pending_messages_or_comments_both_exist(self):
         # Arrange
         request = self.factory.get("/")
         request.user = self.staff_user
 
+        Comment.objects.create(
+            post=self.post1,
+            author=self.normal_user,
+            body="Pending comment",
+            status=Comment.Status.PENDING,
+        )
+
         # Act
-        count = _get_unread_contact_message_count(request)
+        has_pending = _get_has_pending_messages_or_comments(request)
 
         # Assert
-        self.assertEqual(count, 1)
+        self.assertTrue(has_pending)
 
-    def test_get_unread_contact_message_count_normal_user(self):
+    def test_get_has_pending_messages_or_comments_none_exist(self):
+        # Arrange
+        request = self.factory.get("/")
+        request.user = self.staff_user
+        self.contact_msg.is_read = True
+        self.contact_msg.save()
+
+        # Act
+        has_pending = _get_has_pending_messages_or_comments(request)
+
+        # Assert
+        self.assertFalse(has_pending)
+
+    def test_get_has_pending_messages_or_comments_normal_user(self):
         # Arrange
         request = self.factory.get("/")
         request.user = self.normal_user
 
         # Act
-        count = _get_unread_contact_message_count(request)
+        has_pending = _get_has_pending_messages_or_comments(request)
 
         # Assert
-        self.assertEqual(count, 0)
+        self.assertFalse(has_pending)
 
     # --- categories_tags_context ---
     def test_categories_tags_context(self):
@@ -261,7 +317,7 @@ class ContextProcessorsTests(TestCase):
         self.assertIn("nav_popular_posts", context)
         self.assertIn("nav_portfolio_posts", context)
         self.assertIn("goal_widget_snapshot", context)
-        self.assertIn("unread_contact_message_count", context)
+        self.assertIn("has_pending_messages_or_comments", context)
 
     # --- Simple Context Processors ---
     @override_settings(GOOGLE_ANALYTICS_ID="UA-12345678-1")

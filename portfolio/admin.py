@@ -2,7 +2,6 @@ from django.contrib import admin, messages
 from django.contrib.auth import get_user_model
 from django.utils import timezone
 
-# Register your models here.
 from portfolio.models import (
     Asset,
     CashFlow,
@@ -141,6 +140,16 @@ class PortfolioTransactionAdmin(admin.ModelAdmin):
     search_fields = ("portfolios__name", "asset__name", "asset__symbol")
     autocomplete_fields = ("portfolios",)
     ordering = ("-trade_date",)
+    fields = (
+        "portfolios",
+        "asset",
+        "transaction_type",
+        "trade_date",
+        "quantity",
+        "price_per_unit",
+        "capital_increase_rate_pct",
+        "notes",
+    )
 
     @admin.display(description="Portföyler")
     def portfolio_list(self, obj):
@@ -212,10 +221,10 @@ class PortfolioSnapshotAdmin(admin.ModelAdmin):
         )
         obj.pk = snapshot.pk
         obj.name = snapshot.name
-        obj.total_value = snapshot.total_value
-        obj.total_cost = snapshot.total_cost
-        obj.target_value = snapshot.target_value
-        obj.total_return_pct = snapshot.total_return_pct
+        obj.total_value = snapshot.total_value  # pyright: ignore[reportAttributeAccessIssue]
+        obj.total_cost = snapshot.total_cost  # pyright: ignore[reportAttributeAccessIssue]
+        obj.target_value = snapshot.target_value  # pyright: ignore[reportAttributeAccessIssue]
+        obj.total_return_pct = snapshot.total_return_pct  # pyright: ignore[reportAttributeAccessIssue]
 
 
 @admin.register(PortfolioComparison)
@@ -299,7 +308,7 @@ class CashFlowSnapshotAdmin(admin.ModelAdmin):
         )
         obj.pk = snapshot.pk
         obj.name = snapshot.name
-        obj.total_amount = snapshot.total_amount
+        obj.total_amount = snapshot.total_amount  # pyright: ignore[reportAttributeAccessIssue]
 
 
 @admin.register(CashFlowComparison)
@@ -393,9 +402,9 @@ class SalarySavingsSnapshotAdmin(admin.ModelAdmin):
         )
         obj.pk = snapshot.pk
         obj.name = snapshot.name
-        obj.total_salary = snapshot.total_salary
-        obj.total_savings = snapshot.total_savings
-        obj.savings_rate = snapshot.savings_rate
+        obj.total_salary = snapshot.total_salary  # pyright: ignore[reportAttributeAccessIssue]
+        obj.total_savings = snapshot.total_savings  # pyright: ignore[reportAttributeAccessIssue]
+        obj.savings_rate = snapshot.savings_rate  # pyright: ignore[reportAttributeAccessIssue]
 
 
 @admin.register(DividendComparison)
@@ -473,4 +482,4 @@ class DividendSnapshotAdmin(admin.ModelAdmin):
         )
         obj.pk = snapshot.pk
         obj.name = snapshot.name
-        obj.total_amount = snapshot.total_amount
+        obj.total_amount = snapshot.total_amount  # pyright: ignore[reportAttributeAccessIssue]
