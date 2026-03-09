@@ -14,19 +14,15 @@
 {% include "includes/breadcrumbs.html" %}
   <h1>{{ archive_month }} Arşivi</h1>
   <hr />
-
   {% if page_obj %}
     {% cache 600 post_list_archive active_archive_key page_obj.number %}
     {% include "includes/post_list.html" with posts=page_obj.object_list %}
   {% endcache %}
-
     <nav class="pagination">
       {% if page_obj.has_previous %}
         <a class="pagination__link" href="?page={{ page_obj.previous_page_number }}">← Önceki</a>
       {% endif %}
-
       <span class="pagination__status"> Sayfa {{ page_obj.number }} / {{ page_obj.paginator.num_pages }} </span>
-
       {% if page_obj.has_next %}
         <a class="pagination__link" href="?page={{ page_obj.next_page_number }}">Sonraki →</a>
       {% endif %}
