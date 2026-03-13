@@ -2,7 +2,7 @@ import ipaddress
 
 from django.test import RequestFactory, TestCase, override_settings
 
-from core.helpers import client_ip_key, get_client_ip
+from core.helpers import client_ip_key, get_client_ip, normalize_search_query
 
 
 class GetClientIPTest(TestCase):
@@ -63,3 +63,47 @@ class GetClientIPTest(TestCase):
         request = self.factory.get("/")
         request.META.pop("REMOTE_ADDR", None)
         self.assertEqual(client_ip_key("test_group", request), "unknown")
+
+
+class NormalizeSearchQueryTest(TestCase):
+    def test_normal_case(self):
+        """Should lowercase and split words >= 3 chars."""
+        self.assertEqual(
+            normalize_search_query("Python Django Framework"),
+            ["python", "django", "framework"],
+        )
+
+    def test_filters_short_words(self):
+        """Should remove words with length < 3."""
+        self.assertEqual(
+            normalize_search_query("A an the in on at to JS"),
+            ["the"],
+        )
+
+    def test_all_short_words(self):
+        """Should return empty list if all words are < 3 chars."""
+        self.assertEqual(
+            normalize_search_query("I do go up to my PC"),
+            [],
+        )
+
+    def test_empty_string(self):
+        """Should handle empty string."""
+        self.assertEqual(
+            normalize_search_query(""),
+            [],
+        )
+
+    def test_whitespace_only(self):
+        """Should handle string with only whitespaces."""
+        self.assertEqual(
+            normalize_search_query("   \t\n  "),
+            [],
+        )
+
+    def test_numbers_and_punctuation(self):
+        """Should treat numbers and punctuation as parts of tokens."""
+        self.assertEqual(
+            normalize_search_query("C++ C# .NET v2.0 123"),
+            ["c++", ".net", "v2.0", "123"],
+        )

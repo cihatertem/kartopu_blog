@@ -126,3 +126,18 @@ class PortfolioServicesTest(TestCase):
         base_trunc = _build_slug_base("my-name", max_length=8)
         # max_base_length = 8 - 7 = 1 >= 1 => returns base[:1] => "m"
         self.assertEqual(base_trunc, "m")
+
+        # Test zero max_length
+        base_zero = _build_slug_base("my-name", max_length=0)
+        self.assertEqual(base_zero, "my-name")
+
+        # Test negative max_length
+        base_negative = _build_slug_base("my-name", max_length=-5)
+        self.assertEqual(base_negative, "my-name")
+
+        # Test empty name with short max_length
+        base_empty_trunc = _build_slug_base("", max_length=8)
+        self.assertEqual(base_empty_trunc, "s")
+
+        base_empty_edge = _build_slug_base("", max_length=7)
+        self.assertEqual(base_empty_edge, "snapshot")
