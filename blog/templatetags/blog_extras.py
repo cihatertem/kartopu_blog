@@ -17,42 +17,9 @@ from portfolio.models import CashFlowEntry, CashFlowSnapshot, SalarySavingsSnaps
 register = template.Library()
 
 IMAGE_PATTERN = re.compile(r"\{\{\s*image:(\d+)\s*\}\}")
-PORTFOLIO_SUMMARY_PATTERN = re.compile(
-    r"\{\{\s*portfolio_summary(?::([^\s\}]+))?\s*\}\}"
+GENERIC_PATTERN = re.compile(
+    r"\{\{\s*(?P<tag>[a-zA-Z0-9_]+)(?::(?P<arg>[^\s\}]+))?\s*\}\}"
 )
-PORTFOLIO_CHARTS_PATTERN = re.compile(r"\{\{\s*portfolio_charts(?::([^\s\}]+))?\s*\}\}")
-PORTFOLIO_IRR_CHARTS_PATTERN = re.compile(
-    r"\{\{\s*portfolio_irr_charts(?::([^\s\}]+))?\s*\}\}"
-)
-PORTFOLIO_CATEGORY_SUMMARY_PATTERN = re.compile(
-    r"\{\{\s*portfolio_category_summary(?::([^\s\}]+))?\s*\}\}"
-)
-PORTFOLIO_COMPARISON_SUMMARY_PATTERN = re.compile(
-    r"\{\{\s*portfolio_comparison_summary(?::([^\s\}]+))?\s*\}\}"
-)
-PORTFOLIO_COMPARISON_CHARTS_PATTERN = re.compile(
-    r"\{\{\s*portfolio_comparison_charts(?::([^\s\}]+))?\s*\}\}"
-)
-CASHFLOW_SUMMARY_PATTERN = re.compile(r"\{\{\s*cashflow_summary(?::([^\s\}]+))?\s*\}\}")
-CASHFLOW_CHARTS_PATTERN = re.compile(r"\{\{\s*cashflow_charts(?::([^\s\}]+))?\s*\}\}")
-CASHFLOW_COMPARISON_SUMMARY_PATTERN = re.compile(
-    r"\{\{\s*cashflow_comparison_summary(?::([^\s\}]+))?\s*\}\}"
-)
-CASHFLOW_COMPARISON_CHARTS_PATTERN = re.compile(
-    r"\{\{\s*cashflow_comparison_charts(?::([^\s\}]+))?\s*\}\}"
-)
-SAVINGS_RATE_SUMMARY_PATTERN = re.compile(
-    r"\{\{\s*savings_rate_summary(?::([^\s\}]+))?\s*\}\}"
-)
-SAVINGS_RATE_CHARTS_PATTERN = re.compile(
-    r"\{\{\s*savings_rate_charts(?::([^\s\}]+))?\s*\}\}"
-)
-DIVIDEND_SUMMARY_PATTERN = re.compile(r"\{\{\s*dividend_summary(?::([^\s\}]+))?\s*\}\}")
-DIVIDEND_CHARTS_PATTERN = re.compile(r"\{\{\s*dividend_charts(?::([^\s\}]+))?\s*\}\}")
-DIVIDEND_COMPARISON_PATTERN = re.compile(
-    r"\{\{\s*dividend_comparison(?::([^\s\}]+))?\s*\}\}"
-)
-LEGAL_DISCLAIMER_PATTERN = re.compile(r"\{\{\s*legal_disclaimer\s*\}\}")
 
 
 @register.filter
@@ -1131,84 +1098,50 @@ def dividend_comparison(context, index=None):
     return mark_safe(_render_dividend_comparison_html(comparison))
 
 
-def _replace_marker(pattern, text, items, render_func):
-    """Yardımcı fonksiyon: marker'ları item ve renderer ile genişletir."""
-
-    def replacer(match):
-        identifier = match.group(1)
-        item = _get_item_by_identifier(items, identifier)
-        return render_func(item)
-
-    return pattern.sub(replacer, text)
-
-
-MARKER_GROUPS = [
-    (
+MARKER_MAP = {
+    "portfolio_summary": (_get_portfolio_snapshots, _render_portfolio_summary_html),
+    "portfolio_charts": (_get_portfolio_snapshots, _render_portfolio_charts_html),
+    "portfolio_irr_charts": (
         _get_portfolio_snapshots,
-        [
-            (PORTFOLIO_SUMMARY_PATTERN, _render_portfolio_summary_html),
-            (PORTFOLIO_CHARTS_PATTERN, _render_portfolio_charts_html),
-            (PORTFOLIO_IRR_CHARTS_PATTERN, _render_portfolio_irr_charts_html),
-            (
-                PORTFOLIO_CATEGORY_SUMMARY_PATTERN,
-                _render_portfolio_category_summary_html,
-            ),
-        ],
+        _render_portfolio_irr_charts_html,
     ),
-    (
+    "portfolio_category_summary": (
+        _get_portfolio_snapshots,
+        _render_portfolio_category_summary_html,
+    ),
+    "portfolio_comparison_summary": (
         _get_portfolio_comparisons,
-        [
-            (
-                PORTFOLIO_COMPARISON_SUMMARY_PATTERN,
-                _render_portfolio_comparison_summary_html,
-            ),
-            (
-                PORTFOLIO_COMPARISON_CHARTS_PATTERN,
-                _render_portfolio_comparison_charts_html,
-            ),
-        ],
+        _render_portfolio_comparison_summary_html,
     ),
-    (
-        _get_cashflow_snapshots,
-        [
-            (CASHFLOW_SUMMARY_PATTERN, _render_cashflow_summary_html),
-            (CASHFLOW_CHARTS_PATTERN, _render_cashflow_charts_html),
-        ],
+    "portfolio_comparison_charts": (
+        _get_portfolio_comparisons,
+        _render_portfolio_comparison_charts_html,
     ),
-    (
+    "cashflow_summary": (_get_cashflow_snapshots, _render_cashflow_summary_html),
+    "cashflow_charts": (_get_cashflow_snapshots, _render_cashflow_charts_html),
+    "cashflow_comparison_summary": (
         _get_cashflow_comparisons,
-        [
-            (
-                CASHFLOW_COMPARISON_SUMMARY_PATTERN,
-                _render_cashflow_comparison_summary_html,
-            ),
-            (
-                CASHFLOW_COMPARISON_CHARTS_PATTERN,
-                _render_cashflow_comparison_charts_html,
-            ),
-        ],
+        _render_cashflow_comparison_summary_html,
     ),
-    (
+    "cashflow_comparison_charts": (
+        _get_cashflow_comparisons,
+        _render_cashflow_comparison_charts_html,
+    ),
+    "savings_rate_summary": (
         _get_salary_savings_snapshots,
-        [
-            (SAVINGS_RATE_SUMMARY_PATTERN, _render_savings_rate_summary_html),
-            (SAVINGS_RATE_CHARTS_PATTERN, _render_savings_rate_charts_html),
-        ],
+        _render_savings_rate_summary_html,
     ),
-    (
-        _get_dividend_snapshots,
-        [
-            (DIVIDEND_SUMMARY_PATTERN, _render_dividend_summary_html),
-            (DIVIDEND_CHARTS_PATTERN, _render_dividend_charts_html),
-        ],
+    "savings_rate_charts": (
+        _get_salary_savings_snapshots,
+        _render_savings_rate_charts_html,
     ),
-    (
+    "dividend_summary": (_get_dividend_snapshots, _render_dividend_summary_html),
+    "dividend_charts": (_get_dividend_snapshots, _render_dividend_charts_html),
+    "dividend_comparison": (
         _get_dividend_comparisons,
-        [
-            (DIVIDEND_COMPARISON_PATTERN, _render_dividend_comparison_html),
-        ],
+        _render_dividend_comparison_html,
     ),
-]
+}
 
 
 @register.simple_tag(takes_context=True)
@@ -1241,20 +1174,6 @@ def render_post_body(context, post):
     )
     content = getattr(post, "content", "") or ""
 
-    def image_replacer(match):
-        index = int(match.group(1)) - 1
-        if index < 0 or index >= len(images):
-            return ""
-        img = images[index]
-        return _render_responsive_image_figure(img)
-
-    expanded = IMAGE_PATTERN.sub(image_replacer, content)
-
-    for getter, markers in MARKER_GROUPS:
-        items = getter(post)
-        for pattern, render_func in markers:
-            expanded = _replace_marker(pattern, expanded, items, render_func)
-
     legal_disclaimer_html = """
 <aside class="legal-disclaimer-inline">
   <p class="legal-disclaimer-inline__title">YASAL UYARI</p>
@@ -1269,7 +1188,39 @@ def render_post_body(context, post):
 </aside>
 """
 
-    expanded = LEGAL_DISCLAIMER_PATTERN.sub(legal_disclaimer_html, expanded)
+    cached_items = {}
+
+    def replacer(match):
+        tag = match.group("tag")
+        arg = match.group("arg")
+
+        if tag == "image":
+            if not arg:
+                return ""
+            try:
+                index = int(arg) - 1
+            except ValueError:
+                return ""
+            if index < 0 or index >= len(images):
+                return ""
+            return _render_responsive_image_figure(images[index])
+
+        elif tag == "legal_disclaimer":
+            return legal_disclaimer_html
+
+        elif tag in MARKER_MAP:
+            getter, render_func = MARKER_MAP[tag]
+
+            if getter not in cached_items:
+                cached_items[getter] = getter(post)
+
+            items = cached_items[getter]
+            item = _get_item_by_identifier(items, arg)
+            return render_func(item)
+
+        return match.group(0)
+
+    expanded = GENERIC_PATTERN.sub(replacer, content)
 
     return mark_safe(render_markdown(expanded))
 

@@ -1,3 +1,4 @@
+import concurrent.futures
 import os
 import time
 from datetime import timedelta
@@ -117,9 +118,7 @@ class Command(BaseCommand):
                 direct_emails_to_update = {}
                 attachment_cache = {}
 
-                for email_item in pending_emails:
-                    start_time = time.time()
-
+                def send_email_task(email_item, attachment_cache_local):
                     try:
                         message = EmailMultiAlternatives(
                             subject=email_item.subject,
@@ -134,7 +133,7 @@ class Command(BaseCommand):
 
                         if email_item.direct_email:
                             de_id = email_item.direct_email.id
-                            if de_id not in attachment_cache:
+                            if de_id not in attachment_cache_local:
                                 attachments_data = []
                                 for (
                                     attachment
@@ -147,43 +146,84 @@ class Command(BaseCommand):
                                                 content,
                                             )
                                         )
-                                attachment_cache[de_id] = attachments_data
+                                attachment_cache_local[de_id] = attachments_data
 
-                            for filename, content in attachment_cache[de_id]:
+                            for filename, content in attachment_cache_local[de_id]:
                                 message.attach(filename, content)
 
                         message.send(fail_silently=False)
-
-                        now = timezone.now()
-                        email_item.status = EmailQueueStatus.SENT
-                        email_item.sent_at = now
-                        email_item.updated_at = now
-                        emails_to_update.append(email_item)
-
-                        if email_item.direct_email:
-                            email_item.direct_email.sent_at = now
-                            direct_emails_to_update[email_item.direct_email.id] = (
-                                email_item.direct_email
-                            )
-
-                        sent_count += 1
-
+                        return (email_item, True, None)
                     except Exception as e:
-                        now = timezone.now()
-                        email_item.status = EmailQueueStatus.FAILED
-                        email_item.error_message = str(e)
-                        email_item.updated_at = now
-                        emails_to_update.append(email_item)
+                        return (email_item, False, e)
 
-                        self.stderr.write(
-                            f"Failed to send to {email_item.to_email}: {e}"
+                # Pre-populate attachment_cache if needed, though we can safely share it across threads since it's just a dict of lists
+                # However, thread-safety of dict updates isn't guaranteed if multiple threads update it simultaneously.
+                # Since multiple emails might point to the same direct_email, let's pre-cache all attachments in the main thread
+                # to avoid race conditions.
+                for email_item in pending_emails:
+                    if email_item.direct_email:
+                        de_id = email_item.direct_email.id
+                        if de_id not in attachment_cache:
+                            attachments_data = []
+                            for attachment in email_item.direct_email.attachments.all():  # pyright: ignore[reportGeneralTypeIssues]
+                                with attachment.file.open("rb") as f:
+                                    attachments_data.append(
+                                        (
+                                            attachment.file.name.split("/")[-1],
+                                            f.read(),
+                                        )
+                                    )
+                            attachment_cache[de_id] = attachments_data
+
+                futures = []
+                # Max 100 workers, or fewer if count is smaller, but capped at something reasonable.
+                # However we want to ensure we don't block the rate limiter if send takes long.
+                max_workers = min(100, max(10, rate))
+
+                with concurrent.futures.ThreadPoolExecutor(
+                    max_workers=max_workers
+                ) as executor:
+                    for email_item in pending_emails:
+                        start_time = time.time()
+
+                        future = executor.submit(
+                            send_email_task, email_item, attachment_cache
                         )
-                        failed_count += 1
+                        futures.append(future)
 
-                    elapsed = time.time() - start_time
-                    wait = send_interval - elapsed
-                    if wait > 0:
-                        time.sleep(wait)
+                        elapsed = time.time() - start_time
+                        wait = send_interval - elapsed
+                        if wait > 0:
+                            time.sleep(wait)
+
+                    # Wait for all futures to complete
+                    for future in concurrent.futures.as_completed(futures):
+                        email_item, success, error_msg = future.result()
+                        now = timezone.now()
+
+                        if success:
+                            email_item.status = EmailQueueStatus.SENT
+                            email_item.sent_at = now
+                            email_item.updated_at = now
+                            emails_to_update.append(email_item)
+
+                            if email_item.direct_email:
+                                email_item.direct_email.sent_at = now
+                                direct_emails_to_update[email_item.direct_email.id] = (
+                                    email_item.direct_email
+                                )
+
+                            sent_count += 1
+                        else:
+                            email_item.status = EmailQueueStatus.FAILED
+                            email_item.error_message = str(error_msg)
+                            email_item.updated_at = now
+                            emails_to_update.append(email_item)
+
+                            self.stderr.write(
+                                f"Failed to send to {email_item.to_email}: {error_msg}"
+                            )
+                            failed_count += 1
 
                 if emails_to_update:
                     EmailQueue.objects.bulk_update(

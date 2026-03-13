@@ -11,12 +11,27 @@ logger = logging.getLogger(__name__)
 register = template.Library()
 
 
-def _get_post_seo_data(seo, context, make_absolute):
+def _make_absolute(url):
+    if not url:
+        return ""
+    if str(url).startswith("http"):
+        return str(url)
+
+    site_base_url = getattr(settings, "SITE_BASE_URL", "https://kartopu.money").rstrip(
+        "/"
+    )
+    url_str = str(url)
+    if not url_str.startswith("/"):
+        url_str = "/" + url_str
+    return f"{site_base_url}{url_str}"
+
+
+def _get_post_seo_data(seo, context):
     post = context["post"]
     seo["title"] = post.effective_meta_title
     seo["description"] = post.effective_meta_description
     if post.cover_image:
-        seo["image"] = make_absolute(post.cover_image.url)
+        seo["image"] = _make_absolute(post.cover_image.url)
     seo["type"] = "article"
     # Article specific meta tags
     seo["article_published_time"] = (
@@ -31,7 +46,7 @@ def _get_post_seo_data(seo, context, make_absolute):
         seo["article_tags"] = [tag.name for tag in post.tags.all()]
 
 
-def _get_about_page_seo_data(seo, context, site_name, make_absolute):
+def _get_about_page_seo_data(seo, context, site_name):
     about_page = context["about_page"]
     seo["title"] = about_page.meta_title or f"{about_page.title} | {site_name}"
     if about_page.meta_description:
@@ -40,7 +55,7 @@ def _get_about_page_seo_data(seo, context, site_name, make_absolute):
     # İlk görseli kullan
     first_image = about_page.images.order_by("order").first()
     if first_image and first_image.image:
-        seo["image"] = make_absolute(first_image.image.url)
+        seo["image"] = _make_absolute(first_image.image.url)
 
 
 def _get_category_seo_data(seo, context, site_name):
@@ -68,7 +83,7 @@ def _get_search_seo_data(seo, context, site_name):
     seo["description"] = f"'{query}' için arama sonuçları."
 
 
-def _apply_page_seo_override(seo, request, make_absolute):
+def _apply_page_seo_override(seo, request):
     try:
         path = request.path
         page_seo = PageSEO.objects.filter(
@@ -82,10 +97,25 @@ def _apply_page_seo_override(seo, request, make_absolute):
             if page_seo.description:
                 seo["description"] = page_seo.description
             if page_seo.image:
-                seo["image"] = make_absolute(page_seo.image.url)
+                seo["image"] = _make_absolute(page_seo.image.url)
 
     except Exception:
         logger.exception("Error generating SEO data for path: %s", request.path)
+
+
+def _update_seo_from_context(seo, context, site_name):
+    if context.get("post"):
+        _get_post_seo_data(seo, context)
+    elif context.get("about_page"):
+        _get_about_page_seo_data(seo, context, site_name)
+    elif context.get("category") and context.get("active_category_slug"):
+        _get_category_seo_data(seo, context, site_name)
+    elif context.get("tag") and context.get("active_tag_slug"):
+        _get_tag_seo_data(seo, context, site_name)
+    elif context.get("archive_month") and context.get("active_archive_key"):
+        _get_archive_seo_data(seo, context, site_name)
+    elif context.get("q"):
+        _get_search_seo_data(seo, context, site_name)
 
 
 @register.simple_tag(takes_context=True)
@@ -95,21 +125,7 @@ def get_seo_data(context):
         return {}
 
     site_settings = SiteSettings.get_settings()
-    site_base_url = getattr(settings, "SITE_BASE_URL", "https://kartopu.money").rstrip(
-        "/"
-    )
     site_name = getattr(settings, "SITE_NAME", "Kartopu Money")
-
-    def make_absolute(url):
-        if not url:
-            return ""
-        if str(url).startswith("http"):
-            return str(url)
-        # Ensure url starts with /
-        url_str = str(url)
-        if not url_str.startswith("/"):
-            url_str = "/" + url_str
-        return f"{site_base_url}{url_str}"
 
     # 1. Varsayılan Ayarlar
     default_title = site_settings.default_meta_title or site_name
@@ -118,9 +134,9 @@ def get_seo_data(context):
         or "Finansal özgürlük yolculuğunuzda size eşlik ediyoruz."
     )
     default_image = (
-        make_absolute(site_settings.default_meta_image.url)
+        _make_absolute(site_settings.default_meta_image.url)
         if site_settings.default_meta_image
-        else make_absolute("/media/seo/og_twit_card.jpeg")
+        else _make_absolute("/media/seo/og_twit_card.jpeg")
     )
 
     seo = {
@@ -135,25 +151,7 @@ def get_seo_data(context):
         "twitter_site": "@KartopuMoney",  # Sabit veya settings'den alınabilir
     }
 
-    # Blog Post
-    if context.get("post"):
-        _get_post_seo_data(seo, context, make_absolute)
-    # Hakkımda Sayfası
-    elif context.get("about_page"):
-        _get_about_page_seo_data(seo, context, site_name, make_absolute)
-    # Kategori Detay Sayfası
-    elif context.get("category") and context.get("active_category_slug"):
-        _get_category_seo_data(seo, context, site_name)
-    # Etiket Detay Sayfası
-    elif context.get("tag") and context.get("active_tag_slug"):
-        _get_tag_seo_data(seo, context, site_name)
-    # Arşiv Sayfası
-    elif context.get("archive_month") and context.get("active_archive_key"):
-        _get_archive_seo_data(seo, context, site_name)
-    # Arama Sonuçları
-    elif context.get("q"):
-        _get_search_seo_data(seo, context, site_name)
-
-    _apply_page_seo_override(seo, request, make_absolute)
+    _update_seo_from_context(seo, context, site_name)
+    _apply_page_seo_override(seo, request)
 
     return seo

@@ -534,16 +534,27 @@ class Portfolio(UUIDModelMixin, TimeStampedModelMixin):
         Calculates the Internal Rate of Return (IRR) for the portfolio as of a given date
         and current market value.
         """
-        transactions = (
-            self.transactions.select_related("asset")  # pyright: ignore[reportAttributeAccessIssue]
-            .filter(trade_date__lte=as_of_date)
-            .order_by("trade_date", "created_at")
-        )
+        if (
+            hasattr(self, "_prefetched_objects_cache")
+            and "transactions" in self._prefetched_objects_cache  # pyright: ignore[reportAttributeAccessIssue]
+        ):
+            tx_list = [
+                tx
+                for tx in self.transactions.all()  # pyright: ignore[reportAttributeAccessIssue]
+                if tx.trade_date <= as_of_date
+            ]
+            tx_list.sort(key=lambda tx: (tx.trade_date, tx.created_at))
+        else:
+            tx_list = list(
+                self.transactions.select_related("asset")  # pyright: ignore[reportAttributeAccessIssue]
+                .filter(trade_date__lte=as_of_date)
+                .order_by("trade_date", "created_at")
+            )
+
         tx_cash_flows = []
         fx_rates: dict[tuple[str, str, date | None], Decimal] = {}
         asset_quantities: dict[str, Decimal] = {}
 
-        tx_list = list(transactions)
         self._prefetch_fx_rates(tx_list, fx_rates)
 
         for tx in tx_list:
