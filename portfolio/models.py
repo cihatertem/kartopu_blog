@@ -274,6 +274,10 @@ class Portfolio(UUIDModelMixin, TimeStampedModelMixin):
         price_date: date | None = None,
     ) -> None:
         uncached_pairs_by_date: dict[date | None, set[tuple[str, str]]] = {}
+        cache_keys: dict[
+            str, tuple[tuple[str, str, date | None], date | None, str]
+        ] = {}
+
         for tx in transactions:
             conversion_date = price_date or tx.trade_date
             if tx.asset.currency == self.currency:
@@ -281,14 +285,27 @@ class Portfolio(UUIDModelMixin, TimeStampedModelMixin):
             currency_pair = (tx.asset.currency, self.currency, conversion_date)
             if currency_pair not in fx_rates:
                 cache_key = f"fx_rate_{tx.asset.currency}_{self.currency}_{conversion_date.isoformat() if conversion_date else 'latest'}"
-                cached_rate = cache.get(cache_key)
+                cache_keys[cache_key] = (
+                    currency_pair,
+                    conversion_date,
+                    tx.asset.currency,
+                )
+
+        if cache_keys:
+            cached_rates = cache.get_many(list(cache_keys.keys()))
+            for cache_key, (
+                currency_pair,
+                conversion_date,
+                asset_currency,
+            ) in cache_keys.items():
+                cached_rate = cached_rates.get(cache_key)
                 if cached_rate is not None:
-                    fx_rates[currency_pair] = cached_rate
+                    fx_rates[currency_pair] = cached_rate  # pyright: ignore[reportArgumentType]
                 else:
                     if conversion_date not in uncached_pairs_by_date:
                         uncached_pairs_by_date[conversion_date] = set()
                     uncached_pairs_by_date[conversion_date].add(
-                        (tx.asset.currency, self.currency)
+                        (asset_currency, self.currency)
                     )
 
         for rate_date, pairs in uncached_pairs_by_date.items():
@@ -296,13 +313,13 @@ class Portfolio(UUIDModelMixin, TimeStampedModelMixin):
             for pair in pairs:
                 currency_pair = (pair[0], pair[1], rate_date)
                 cache_key = f"fx_rate_{pair[0]}_{pair[1]}_{rate_date.isoformat() if rate_date else 'latest'}"
-                fx_rate = (fetched_rates or {}).get(pair, Decimal("1"))
+                fx_rate = (fetched_rates or {}).get(pair, Decimal("1"))  # pyright: ignore[reportArgumentType]
                 cache.set(
                     cache_key,
                     fx_rate,
                     timeout=getattr(settings, "CACHE_TIMEOUT", CACHE_TIMEOUT),
                 )
-                fx_rates[currency_pair] = fx_rate
+                fx_rates[currency_pair] = fx_rate  # pyright: ignore[reportArgumentType]
 
     def _apply_transaction_to_position(
         self,
@@ -997,16 +1014,23 @@ class CashFlowSnapshot(BaseSnapshot):
         }
 
         uncached_pairs = []
+        cache_keys = {}
+
         for entry_currency in unique_currencies:
             currency_pair = (entry_currency, base_currency, snapshot_date)
             cache_key = (
                 f"fx_rate_{entry_currency}_{base_currency}_{snapshot_date.isoformat()}"
             )
-            cached_rate = cache.get(cache_key)
-            if cached_rate is not None:
-                fx_rates[currency_pair] = cached_rate
-            else:
-                uncached_pairs.append((entry_currency, base_currency))
+            cache_keys[cache_key] = (entry_currency, currency_pair)
+
+        if cache_keys:
+            cached_rates = cache.get_many(list(cache_keys.keys()))
+            for cache_key, (entry_currency, currency_pair) in cache_keys.items():
+                cached_rate = cached_rates.get(cache_key)
+                if cached_rate is not None:
+                    fx_rates[currency_pair] = cached_rate  # pyright: ignore[reportArgumentType]
+                else:
+                    uncached_pairs.append((entry_currency, base_currency))
 
         if uncached_pairs:
             fetched_rates = fetch_fx_rates_bulk(uncached_pairs, rate_date=snapshot_date)
@@ -1506,14 +1530,21 @@ class DividendSnapshot(BaseSnapshot):
         }
 
         uncached_pairs = []
+        cache_keys = {}
+
         for entry_currency in unique_currencies:
             currency_pair = (entry_currency, target_currency, snapshot_date)
             cache_key = f"fx_rate_{entry_currency}_{target_currency}_{snapshot_date.isoformat() if snapshot_date else 'latest'}"
-            cached_rate = cache.get(cache_key)
-            if cached_rate is not None:
-                fx_rates[currency_pair] = cached_rate  # pyright: ignore[reportArgumentType]
-            else:
-                uncached_pairs.append((entry_currency, target_currency))
+            cache_keys[cache_key] = (entry_currency, currency_pair)
+
+        if cache_keys:
+            cached_rates = cache.get_many(list(cache_keys.keys()))
+            for cache_key, (entry_currency, currency_pair) in cache_keys.items():
+                cached_rate = cached_rates.get(cache_key)
+                if cached_rate is not None:
+                    fx_rates[currency_pair] = cached_rate  # pyright: ignore[reportArgumentType]
+                else:
+                    uncached_pairs.append((entry_currency, target_currency))
 
         if uncached_pairs:
             fetched_rates = fetch_fx_rates_bulk(uncached_pairs, rate_date=snapshot_date)
