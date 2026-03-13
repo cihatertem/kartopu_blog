@@ -91,6 +91,22 @@ class DeleteEmptyFolderTests(TestCase):
 
 class SocialAvatarDownloadTests(TestCase):
     def setUp(self):
+        # Patch threading.Thread to run synchronously
+        import threading
+
+        import accounts.signals
+
+        self.thread_patcher = patch.object(accounts.signals.threading, "Thread")
+        self.mock_thread = self.thread_patcher.start()
+
+        def mock_thread_init(target, daemon=None, *args, **kwargs):
+            # When .start() is called, just call the target directly
+            mock_obj = MagicMock()
+            mock_obj.start = lambda: target()
+            return mock_obj
+
+        self.mock_thread.side_effect = mock_thread_init
+
         self.user = User.objects.create_user(
             email="test_social@example.com", password="password"
         )
@@ -101,6 +117,10 @@ class SocialAvatarDownloadTests(TestCase):
             extra_data={"name": "Test User"},
         )
         self.sociallogin = SocialLogin(account=self.social_account)
+
+    def tearDown(self):
+        self.thread_patcher.stop()
+        super().tearDown()
 
     def _create_valid_image(self):
         file = io.BytesIO()

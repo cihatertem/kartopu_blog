@@ -1,4 +1,5 @@
 import os
+import threading
 from collections.abc import Mapping
 
 import requests
@@ -9,8 +10,7 @@ from allauth.socialaccount.signals import (
 )
 from django.core.files.storage import FileSystemStorage
 from django.core.files.uploadedfile import SimpleUploadedFile
-from django.db.models.signals import post_delete
-from django.db.models.signals import post_save
+from django.db.models.signals import post_delete, post_save
 from django.dispatch import receiver
 
 from core.decorators import log_exceptions
@@ -38,9 +38,10 @@ def delete_user_avatar(sender, instance: User, **kwargs) -> None:
     if not avatar or not avatar.name:
         return
 
-    storage = avatar.storage
+    storage = avatar.storage  # pyright: ignore[reportAttributeAccessIssue]
+
     avatar_name = avatar.name
-    avatar.delete(save=False)  # type: ignore
+    avatar.delete(save=False)  # pyright: ignore[reportAttributeAccessIssue]
 
     if isinstance(storage, FileSystemStorage):
         _delete_empty_folder(storage, avatar_name)
@@ -147,21 +148,36 @@ def _download_and_save_social_avatar(sociallogin) -> None:
     if not avatar_url:
         return
 
-    # Download the avatar
-    response = requests.get(
-        avatar_url,
-        timeout=10,
-        headers={"User-Agent": "kartopu-blog-avatar-fetcher/1.0"},
-    )
-    response.raise_for_status()
+    def download_task():
+        try:
+            # Download the avatar
+            response = requests.get(
+                avatar_url,
+                timeout=10,
+                headers={"User-Agent": "kartopu-blog-avatar-fetcher/1.0"},
+            )
+            response.raise_for_status()
 
-    content_type = response.headers.get("Content-Type", "image/jpeg")
+            content_type = response.headers.get("Content-Type", "image/jpeg")
 
-    # Save the file to the user's avatar field (this triggers resize and storage mechanisms)
-    user.avatar = SimpleUploadedFile(
-        "social_avatar.jpg", response.content, content_type=content_type
-    )
-    user.save(update_fields=["avatar", "updated_at"])
+            # Save the file to the user's avatar field (this triggers resize and storage mechanisms)
+            user.avatar = SimpleUploadedFile(  # pyright: ignore[reportAttributeAccessIssue]
+                "social_avatar.jpg", response.content, content_type=content_type
+            )
+            user.save(update_fields=["avatar", "updated_at"])
+        except Exception as e:
+            import logging
+
+            logger = logging.getLogger(__name__)
+            logger.exception("Error downloading and saving social avatar: %s", str(e))
+            raise
+        finally:
+            from django.db import connection
+
+            connection.close()
+
+    # Start the download task in a separate thread
+    threading.Thread(target=download_task, daemon=True).start()
 
 
 def _download_and_save_social_avatar_for_account(account: SocialAccount) -> None:
