@@ -2,6 +2,7 @@ from __future__ import print_function
 
 from django.contrib import messages
 from django.shortcuts import redirect, render
+from django.utils.html import escape
 from django.views.decorators.http import require_http_methods
 from django_ratelimit.decorators import ratelimit
 
@@ -99,7 +100,9 @@ def contact_view(request):
                 return redirect("core:contact")
 
             contact_message.ip_address = get_client_ip(request)
-            contact_message.user_agent = request.META.get("HTTP_USER_AGENT", "")[:500]
+            contact_message.user_agent = escape(
+                request.META.get("HTTP_USER_AGENT", "")
+            )[:500]
             contact_message.save()
             messages.success(
                 request,

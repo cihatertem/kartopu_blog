@@ -224,9 +224,9 @@ def _build_comment_context(request, post):
 
     replies_by_parent = {}
     for comment in approved_comments:
+        comment.nested_replies = replies_by_parent.setdefault(comment.id, [])  # type: ignore[attr-defined]
         replies_by_parent.setdefault(comment.parent_id, []).append(comment)
-    for comment in approved_comments:
-        comment.nested_replies = replies_by_parent.get(comment.id, [])  # type: ignore[attr-defined]
+
         if comment.author and getattr(comment.author, "avatar", None):
             comment.social_avatar_url = ""
         else:
