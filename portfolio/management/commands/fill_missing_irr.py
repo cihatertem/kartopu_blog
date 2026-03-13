@@ -7,7 +7,11 @@ class Command(BaseCommand):
     help = "Fills missing irr_pct values for PortfolioSnapshot objects."
 
     def handle(self, *args, **options):
-        snapshots = PortfolioSnapshot.objects.filter(irr_pct__isnull=True)
+        snapshots = (
+            PortfolioSnapshot.objects.filter(irr_pct__isnull=True)
+            .select_related("portfolio")
+            .prefetch_related("portfolio__transactions__asset")
+        )
         count = snapshots.count()
         self.stdout.write(f"Found {count} snapshots with missing irr_pct.")
 

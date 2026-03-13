@@ -140,24 +140,20 @@ def set_link_attributes(attrs, new=False):
     if not href:
         return attrs
 
-    is_internal = False
-    if href.startswith("/") and not href.startswith("//"):
-        is_internal = True
-    elif href.startswith("#"):
-        is_internal = True
-    else:
+    is_internal = (
+        href.startswith("/") and not href.startswith("//")
+    ) or href.startswith("#")
+
+    if not is_internal:
         parsed_href = urlparse(href)
         if not parsed_href.netloc:
             is_internal = True
-        else:
-            site_url = getattr(settings, "SITE_BASE_URL", "")
-            if site_url:
-                parsed_site = urlparse(site_url)
-                if (
-                    parsed_href.netloc == parsed_site.netloc
-                    or parsed_href.netloc.endswith("." + parsed_site.netloc)
-                ):
-                    is_internal = True
+        elif site_url := getattr(settings, "SITE_BASE_URL", ""):
+            parsed_site = urlparse(site_url)
+            is_internal = (
+                parsed_href.netloc == parsed_site.netloc
+                or parsed_href.netloc.endswith("." + parsed_site.netloc)
+            )
 
     rel = attrs.get((None, "rel"), "")
     rel_list = rel.split() if rel else []

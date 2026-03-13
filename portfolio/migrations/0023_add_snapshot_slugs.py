@@ -69,7 +69,7 @@ def populate_slugs(apps, schema_editor):
     CashFlowComparison = apps.get_model("portfolio", "CashFlowComparison")
     DividendComparison = apps.get_model("portfolio", "DividendComparison")
 
-    for snapshot in PortfolioSnapshot.objects.all():
+    for snapshot in PortfolioSnapshot.objects.all().iterator(chunk_size=1000):
         label = _portfolio_snapshot_label(snapshot)
         update_fields = []
         if not snapshot.name:
@@ -81,7 +81,7 @@ def populate_slugs(apps, schema_editor):
         if update_fields:
             snapshot.save(update_fields=update_fields)
 
-    for snapshot in CashFlowSnapshot.objects.all():
+    for snapshot in CashFlowSnapshot.objects.all().iterator(chunk_size=1000):
         label = _cashflow_snapshot_label(snapshot)
         update_fields = []
         if not snapshot.name:
@@ -93,7 +93,7 @@ def populate_slugs(apps, schema_editor):
         if update_fields:
             snapshot.save(update_fields=update_fields)
 
-    for snapshot in DividendSnapshot.objects.all():
+    for snapshot in DividendSnapshot.objects.all().iterator(chunk_size=1000):
         label = _dividend_snapshot_label(snapshot)
         update_fields = []
         if not snapshot.name:
@@ -105,7 +105,7 @@ def populate_slugs(apps, schema_editor):
         if update_fields:
             snapshot.save(update_fields=update_fields)
 
-    for comparison in PortfolioComparison.objects.all():
+    for comparison in PortfolioComparison.objects.all().iterator(chunk_size=1000):
         base_label = _portfolio_snapshot_label(comparison.base_snapshot)
         compare_label = _portfolio_snapshot_label(comparison.compare_snapshot)
         label = _comparison_label(base_label, compare_label)
@@ -119,7 +119,7 @@ def populate_slugs(apps, schema_editor):
         if update_fields:
             comparison.save(update_fields=update_fields)
 
-    for comparison in CashFlowComparison.objects.all():
+    for comparison in CashFlowComparison.objects.all().iterator(chunk_size=1000):
         base_label = _cashflow_snapshot_label(comparison.base_snapshot)
         compare_label = _cashflow_snapshot_label(comparison.compare_snapshot)
         label = _comparison_label(base_label, compare_label)
@@ -133,7 +133,7 @@ def populate_slugs(apps, schema_editor):
         if update_fields:
             comparison.save(update_fields=update_fields)
 
-    for comparison in DividendComparison.objects.all():
+    for comparison in DividendComparison.objects.all().iterator(chunk_size=1000):
         base_label = _dividend_snapshot_label(comparison.base_snapshot)
         compare_label = _dividend_snapshot_label(comparison.compare_snapshot)
         label = _comparison_label(base_label, compare_label)

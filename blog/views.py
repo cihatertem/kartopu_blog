@@ -129,23 +129,26 @@ def _extract_social_profile_url(account):
     if url:
         return url
 
-    if provider == "twitter" or provider == "x":
+    if provider in ("twitter", "x"):
         username = extra_data.get("screen_name") or extra_data.get("username")
         if username:
             return f"https://x.com/{username}"
-    elif provider == "github":
+
+    if provider == "github":
         url = extra_data.get("html_url")
         if url:
             return url
         login = extra_data.get("login")
         if login:
             return f"https://github.com/{login}"
-    elif provider == "linkedin":
+
+    if provider == "linkedin":
         # Extra data usually comes with vanityName
         vanity_name = extra_data.get("vanityName")
         if vanity_name:
             return f"https://www.linkedin.com/in/{vanity_name}"
-    elif provider == "google":
+
+    if provider == "google":
         # Google+ is deprecated but google auth may just not have a profile url
         # For google, if they have a profile property, return it
         return extra_data.get("profile") or ""
@@ -224,9 +227,9 @@ def _build_comment_context(request, post):
 
     replies_by_parent = {}
     for comment in approved_comments:
-        comment.nested_replies = replies_by_parent.setdefault(comment.id, [])  # type: ignore[attr-defined]
         replies_by_parent.setdefault(comment.parent_id, []).append(comment)
-
+    for comment in approved_comments:
+        comment.nested_replies = replies_by_parent.get(comment.id, [])  # type: ignore[attr-defined]
         if comment.author and getattr(comment.author, "avatar", None):
             comment.social_avatar_url = ""
         else:
