@@ -4,6 +4,7 @@ from django.test import RequestFactory, TestCase, override_settings
 
 from core.helpers import (
     CAPTCHA_SESSION_KEY,
+    _generate_captcha,
     captcha_is_valid,
     client_ip_key,
     get_client_ip,
@@ -166,3 +167,27 @@ class CaptchaIsValidTest(TestCase):
         request = self.factory.post("/", {"captcha": "abc"})
         request.session = {CAPTCHA_SESSION_KEY: "abc"}
         self.assertFalse(captcha_is_valid(request))
+
+
+class GenerateCaptchaTest(TestCase):
+    def setUp(self):
+        self.factory = RequestFactory()
+
+    def test_generate_captcha(self):
+        """Should return two integers between 1 and 10 and set session correctly."""
+        request = self.factory.get("/")
+        request.session = {}
+
+        num_one, num_two = _generate_captcha(request)
+
+        # Ensure both are integers between 1 and 10
+        self.assertIsInstance(num_one, int)
+        self.assertIsInstance(num_two, int)
+        self.assertGreaterEqual(num_one, 1)
+        self.assertLessEqual(num_one, 10)
+        self.assertGreaterEqual(num_two, 1)
+        self.assertLessEqual(num_two, 10)
+
+        # Ensure session is updated with their sum
+        self.assertIn(CAPTCHA_SESSION_KEY, request.session)
+        self.assertEqual(request.session[CAPTCHA_SESSION_KEY], num_one + num_two)

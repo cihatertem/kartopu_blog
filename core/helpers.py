@@ -1,6 +1,5 @@
 import ipaddress
-import math
-from random import random
+import secrets
 
 from django.conf import settings
 
@@ -62,7 +61,7 @@ def captcha_is_valid(request) -> bool:
 
 
 def _generate_captcha(request):
-    num_one = math.floor(random() * 10) + 1
-    num_two = math.floor(random() * 10) + 1
+    num_one = secrets.randbelow(10) + 1
+    num_two = secrets.randbelow(10) + 1
     request.session[CAPTCHA_SESSION_KEY] = num_one + num_two
     return num_one, num_two
