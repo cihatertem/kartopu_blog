@@ -1,6 +1,35 @@
+from django.contrib.sites.models import Site
 from django.test import TestCase, override_settings
 
-from newsletter.services import build_absolute_uri
+from newsletter.services import build_absolute_uri, get_site_base_url
+
+
+class GetSiteBaseUrlTest(TestCase):
+    @override_settings(SITE_BASE_URL="https://test.example.com")
+    def test_site_base_url_from_settings(self):
+        self.assertEqual(get_site_base_url(), "https://test.example.com")
+
+    @override_settings(SITE_BASE_URL="https://test.example.com/")
+    def test_site_base_url_strips_trailing_slash(self):
+        self.assertEqual(get_site_base_url(), "https://test.example.com")
+
+    @override_settings(SITE_BASE_URL="  https://test.example.com  ")
+    def test_site_base_url_strips_whitespace(self):
+        self.assertEqual(get_site_base_url(), "https://test.example.com")
+
+    @override_settings(SITE_BASE_URL="", DEBUG=False)
+    def test_site_base_url_fallback_https(self):
+        site = Site.objects.get_current()
+        site.domain = "fallback.example.com"
+        site.save()
+        self.assertEqual(get_site_base_url(), "https://fallback.example.com")
+
+    @override_settings(SITE_BASE_URL="", DEBUG=True)
+    def test_site_base_url_fallback_http(self):
+        site = Site.objects.get_current()
+        site.domain = "fallback.example.com"
+        site.save()
+        self.assertEqual(get_site_base_url(), "http://fallback.example.com")
 
 
 class BuildAbsoluteURITest(TestCase):
@@ -40,8 +69,6 @@ class BuildAbsoluteURITest(TestCase):
     @override_settings(SITE_BASE_URL="")
     def test_fallback_to_site_framework(self):
         """Test fallback when SITE_BASE_URL is empty."""
-        from django.contrib.sites.models import Site
-
         site = Site.objects.get_current()
         site.domain = "site.framework.com"
         site.save()

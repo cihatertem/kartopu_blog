@@ -2,7 +2,13 @@ import ipaddress
 
 from django.test import RequestFactory, TestCase, override_settings
 
-from core.helpers import client_ip_key, get_client_ip, normalize_search_query
+from core.helpers import (
+    CAPTCHA_SESSION_KEY,
+    captcha_is_valid,
+    client_ip_key,
+    get_client_ip,
+    normalize_search_query,
+)
 
 
 class GetClientIPTest(TestCase):
@@ -107,3 +113,56 @@ class NormalizeSearchQueryTest(TestCase):
             normalize_search_query("C++ C# .NET v2.0 123"),
             ["c++", ".net", "v2.0", "123"],
         )
+
+
+class CaptchaIsValidTest(TestCase):
+    def setUp(self):
+        self.factory = RequestFactory()
+
+    def test_valid_captcha(self):
+        """Should return True when POST captcha matches session captcha."""
+        request = self.factory.post("/", {"captcha": "15"})
+        request.session = {CAPTCHA_SESSION_KEY: "15"}
+        self.assertTrue(captcha_is_valid(request))
+
+    def test_invalid_captcha(self):
+        """Should return False when POST captcha does not match session captcha."""
+        request = self.factory.post("/", {"captcha": "12"})
+        request.session = {CAPTCHA_SESSION_KEY: "15"}
+        self.assertFalse(captcha_is_valid(request))
+
+    def test_missing_post_captcha(self):
+        """Should return False when POST captcha is missing."""
+        request = self.factory.post("/")
+        request.session = {CAPTCHA_SESSION_KEY: "15"}
+        self.assertFalse(captcha_is_valid(request))
+
+    def test_missing_session_captcha(self):
+        """Should return False when session captcha is missing."""
+        request = self.factory.post("/", {"captcha": "15"})
+        request.session = {}
+        self.assertFalse(captcha_is_valid(request))
+
+    def test_both_missing(self):
+        """Should return False when both POST and session captchas are missing."""
+        request = self.factory.post("/")
+        request.session = {}
+        self.assertFalse(captcha_is_valid(request))
+
+    def test_non_integer_captcha(self):
+        """Should return False when POST captcha is not an integer."""
+        request = self.factory.post("/", {"captcha": "abc"})
+        request.session = {CAPTCHA_SESSION_KEY: "15"}
+        self.assertFalse(captcha_is_valid(request))
+
+    def test_non_integer_session(self):
+        """Should return False when session captcha is not an integer."""
+        request = self.factory.post("/", {"captcha": "15"})
+        request.session = {CAPTCHA_SESSION_KEY: "abc"}
+        self.assertFalse(captcha_is_valid(request))
+
+    def test_both_non_integer(self):
+        """Should return False when both captchas are not integers."""
+        request = self.factory.post("/", {"captcha": "abc"})
+        request.session = {CAPTCHA_SESSION_KEY: "abc"}
+        self.assertFalse(captcha_is_valid(request))
