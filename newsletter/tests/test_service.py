@@ -1,11 +1,14 @@
 from unittest.mock import patch
 
+from django.core import mail
 from django.test import TestCase
 
 from newsletter.services import (
     build_subscribe_confirm_url,
     build_unsubscribe_url,
+    prepare_templated_email,
     send_subscribe_confirmation,
+    send_templated_email,
 )
 from newsletter.tokens import parse_token
 
@@ -100,3 +103,72 @@ class ServicesTest(TestCase):
         payload = parse_token(token, max_age=86400)
         self.assertEqual(payload["email"], email)
         self.assertEqual(payload["action"], "unsubscribe")
+
+    @patch("newsletter.services.render_to_string")
+    def test_prepare_templated_email(self, mock_render):
+        # Setup mock returns for render_to_string
+        def render_side_effect(template_name, context):
+            if template_name.endswith(".txt"):
+                return "Mock text body"
+            elif template_name.endswith(".html"):
+                return "Mock html body"
+            return "Unknown"
+
+        mock_render.side_effect = render_side_effect
+
+        context = {"key": "value"}
+        result = prepare_templated_email(
+            subject="Test Subject",
+            to_email="test@example.com",
+            template_prefix="test_template",
+            context=context,
+        )
+
+        self.assertEqual(result["subject"], "Test Subject")
+        self.assertEqual(result["to_email"], "test@example.com")
+        self.assertIn("Kartopu.Money Blog", result["from_email"])
+        self.assertEqual(result["text_body"], "Mock text body")
+        self.assertEqual(result["html_body"], "Mock html body")
+
+        # Verify render_to_string was called with correct paths
+        self.assertEqual(mock_render.call_count, 2)
+        mock_render.assert_any_call("newsletter/email/test_template.txt", context)
+        mock_render.assert_any_call("newsletter/email/test_template.html", context)
+
+    @patch("newsletter.services.prepare_templated_email")
+    def test_send_templated_email(self, mock_prepare):
+        # Mock the data returned by prepare_templated_email
+        mock_prepare.return_value = {
+            "subject": "Test Subject",
+            "text_body": "Text body content",
+            "html_body": "<html>Html body content</html>",
+            "from_email": '"Kartopu" <test@kartopu.money>',
+            "to_email": "recipient@example.com",
+        }
+
+        # Clear the outbox before test
+        mail.outbox = []
+
+        # Call the function
+        send_templated_email(
+            subject="Ignored by mock",
+            to_email="ignored@example.com",
+            template_prefix="ignored",
+            context={},
+        )
+
+        # Check that one message was sent
+        self.assertEqual(len(mail.outbox), 1)
+
+        # Inspect the sent message
+        sent_email = mail.outbox[0]
+        self.assertEqual(sent_email.subject, "Test Subject")
+        self.assertEqual(sent_email.body, "Text body content")
+        self.assertEqual(sent_email.from_email, '"Kartopu" <test@kartopu.money>')
+        self.assertEqual(sent_email.to, ["recipient@example.com"])
+
+        # Check alternatives (HTML body)
+        self.assertEqual(len(sent_email.alternatives), 1)
+        self.assertEqual(
+            sent_email.alternatives[0], ("<html>Html body content</html>", "text/html")
+        )
