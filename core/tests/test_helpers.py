@@ -74,45 +74,31 @@ class GetClientIPTest(TestCase):
 
 class NormalizeSearchQueryTest(TestCase):
     def test_normal_case(self):
-        """Should lowercase and split words >= 3 chars."""
+        """Should return stripped string."""
         self.assertEqual(
-            normalize_search_query("Python Django Framework"),
-            ["python", "django", "framework"],
+            normalize_search_query(" Python Django Framework "),
+            "Python Django Framework",
         )
 
-    def test_filters_short_words(self):
-        """Should remove words with length < 3."""
+    def test_preserves_quotes_and_negations(self):
+        """Should preserve quotes and minuses."""
         self.assertEqual(
-            normalize_search_query("A an the in on at to JS"),
-            ["the"],
-        )
-
-    def test_all_short_words(self):
-        """Should return empty list if all words are < 3 chars."""
-        self.assertEqual(
-            normalize_search_query("I do go up to my PC"),
-            [],
+            normalize_search_query('"finansal özgürlük" -vergi'),
+            '"finansal özgürlük" -vergi',
         )
 
     def test_empty_string(self):
         """Should handle empty string."""
         self.assertEqual(
             normalize_search_query(""),
-            [],
+            "",
         )
 
     def test_whitespace_only(self):
         """Should handle string with only whitespaces."""
         self.assertEqual(
             normalize_search_query("   \t\n  "),
-            [],
-        )
-
-    def test_numbers_and_punctuation(self):
-        """Should treat numbers and punctuation as parts of tokens."""
-        self.assertEqual(
-            normalize_search_query("C++ C# .NET v2.0 123"),
-            ["c++", ".net", "v2.0", "123"],
+            "",
         )
 
 

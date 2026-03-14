@@ -130,9 +130,56 @@ class BlogViewsTests(TestCase):
                 response = self.client.get(url, {"q": "Published"}, follow=True)
                 self.assertEqual(response.status_code, 200)
 
+    def test_search_results_websearch_and_cache(self):
+        from unittest.mock import MagicMock, patch
+
+        from django.core.cache import cache
+
+        cache.clear()
+
+        # FTS queries we want to test
+        queries = [
+            "temettü yatırım",  # Standard AND
+            '"finansal özgürlük"',  # Exact Phrase
+            "hisse -vergi",  # Negation
+            "bist100 OR sp500",  # OR logic
+        ]
+
+        url = reverse("blog:search_results")
+
+        for q in queries:
+            with patch("blog.views.SearchQuery") as MockSearchQuery:
+                with patch("blog.views.get_page_obj") as mock_get_page_obj:
+                    # Mocking page_obj to return a dummy paginated list of our published post
+                    mock_page = MagicMock()
+                    mock_page.object_list = [self.published_post]
+                    mock_page.paginator.count = 1
+                    mock_get_page_obj.return_value = mock_page
+
+                    response = self.client.get(url, {"q": q}, follow=True)
+                    self.assertEqual(response.status_code, 200)
+
+                    # Ensure SearchQuery was called with the exact input string and websearch type
+                    MockSearchQuery.assert_called_with(
+                        q, search_type="websearch", config="turkish"
+                    )
+
+            # Now test cache hits and assertNumQueries
+            with patch("blog.views.SearchQuery") as MockSearchQuery:
+                # Mock published_posts_queryset to prevent executing any further query logic
+                # 1 query for base_qs.in_bulk(post_ids)
+                # plus other queries required for template rendering (e.g., seo data, global site context)
+                # But it shouldn't execute FTS SearchRank queries.
+                # Let's mock the render to only count view queries if we strictly want 1,
+                # or just assert NumQueries doesn't include the FTS search query by asserting MockSearchQuery is not called
+                response = self.client.get(url, {"q": q}, follow=True)
+                self.assertEqual(response.status_code, 200)
+                # It shouldn't evaluate FTS logic again
+                MockSearchQuery.assert_not_called()
+
     def test_search_results_view_malicious_payloads(self):
 
-        from unittest.mock import patch
+        from unittest.mock import MagicMock, patch
 
         payloads = [
             "a|echo | dveq38oqyl||echo",
@@ -144,7 +191,10 @@ class BlogViewsTests(TestCase):
         url = reverse("blog:search_results")
 
         with patch("blog.views.get_page_obj") as mock_get_page_obj:
-            mock_get_page_obj.return_value = []
+            mock_page = MagicMock()
+            mock_page.object_list = []
+            mock_page.paginator.count = 0
+            mock_get_page_obj.return_value = mock_page
             for payload in payloads:
                 response = self.client.get(url, {"q": payload}, follow=True)
                 self.assertEqual(response.status_code, 200)

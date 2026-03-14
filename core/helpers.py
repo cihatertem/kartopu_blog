@@ -8,13 +8,12 @@ from core.decorators import log_exceptions
 CAPTCHA_SESSION_KEY = "contact_captcha_answer"
 
 
-def normalize_search_query(q: str) -> list[str]:
+def normalize_search_query(q: str) -> str:
     """
     Arama terimini tokenize eder.
-    Sadece anlamlı kelimeleri bırakır.
+    Websearch mantığına uygun olacak şekilde döndürür.
     """
-    tokens = [token for token in q.lower().split() if len(token) >= 3]
-    return tokens
+    return q.strip()
 
 
 def get_client_ip(request) -> str | None:

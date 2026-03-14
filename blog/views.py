@@ -1,10 +1,13 @@
+import hashlib
 from datetime import date
 
 from allauth.socialaccount.models import SocialAccount
 from django.contrib.auth.decorators import login_required
 from django.contrib.postgres.aggregates import StringAgg
 from django.contrib.postgres.search import SearchQuery, SearchRank, SearchVector
+from django.core.cache import cache
 from django.core.exceptions import PermissionDenied
+from django.core.paginator import Paginator
 from django.db.models import Count, F, Prefetch
 from django.http import JsonResponse
 from django.shortcuts import get_object_or_404, render
@@ -423,41 +426,64 @@ def archive_index(request):
 
 def search_results(request):
     q = (request.GET.get("q") or "").strip()
-    tokens = helpers.normalize_search_query(q)
+    normalized_q = helpers.normalize_search_query(q)
+    page_num = request.GET.get("page", "1")
 
     base_qs = published_posts_queryset(include_tags=False)
 
-    if not q or not tokens:
+    if not q or not normalized_q:
         qs = base_qs.none()
+        page_obj = get_page_obj(request, qs, per_page=POST_PAGE_SIZE)
     else:
-        base_qs = base_qs.annotate(
-            tag_names=StringAgg(
-                "tags__name",
-                delimiter=" ",
-                distinct=True,
+        # Generate cache key
+        cache_key_str = f"search:{normalized_q}:{page_num}"
+        cache_key = "search_" + hashlib.md5(cache_key_str.encode("utf-8")).hexdigest()
+
+        cached_data = cache.get(cache_key)
+
+        if cached_data:
+            total_count, post_ids = cached_data
+            posts_dict = base_qs.in_bulk(post_ids)
+            # Reconstruct list maintaining order
+            page_posts = [posts_dict[pid] for pid in post_ids if pid in posts_dict]
+
+            # Create a dummy paginator
+            paginator = Paginator(range(total_count), POST_PAGE_SIZE)
+            page_obj = paginator.get_page(page_num)
+            page_obj.object_list = page_posts  # pyright: ignore[reportAttributeAccessIssue]
+        else:
+            base_qs = base_qs.annotate(
+                tag_names=StringAgg(
+                    "tags__name",
+                    delimiter=" ",
+                    distinct=True,
+                )
             )
-        )
 
-        vector = (
-            SearchVector("tag_names", weight="A", config="turkish")
-            + SearchVector("title", weight="B", config="turkish")
-            + SearchVector("excerpt", weight="C", config="turkish")
-            + SearchVector("content", weight="D", config="turkish")
-        )
+            vector = (
+                SearchVector("tag_names", weight="A", config="turkish")
+                + SearchVector("title", weight="B", config="turkish")
+                + SearchVector("excerpt", weight="C", config="turkish")
+                + SearchVector("content", weight="D", config="turkish")
+            )
 
-        query = SearchQuery(
-            " ".join(tokens),
-            search_type="websearch",
-            config="turkish",
-        )
+            query = SearchQuery(
+                normalized_q,
+                search_type="websearch",
+                config="turkish",
+            )
 
-        qs = (
-            base_qs.annotate(rank=SearchRank(vector, query))
-            .filter(rank__isnull=False, rank__gt=0)
-            .order_by("-rank", "-published_at")
-        )
+            qs = (
+                base_qs.annotate(rank=SearchRank(vector, query))
+                .filter(rank__isnull=False, rank__gt=0)
+                .order_by("-rank", "-published_at")
+            )
 
-    page_obj = get_page_obj(request, qs, per_page=POST_PAGE_SIZE)
+            page_obj = get_page_obj(request, qs, per_page=POST_PAGE_SIZE)
+
+            total_count = page_obj.paginator.count
+            post_ids = [post.id for post in page_obj.object_list]
+            cache.set(cache_key, (total_count, post_ids), timeout=3600)
 
     breadcrumbs = [
         {"label": "Blog", "url": reverse("blog:post_list")},
