@@ -69,8 +69,6 @@ class BlogSignalsTests(TestCase):
     def test_delete_storage_dir_if_exists(self, mock_storage):
         mock_storage.listdir.return_value = (["subdir"], ["file.jpg", "file2.jpg"])
 
-        # We need to limit the recursion since listdir will be called for subdir too
-        # Let's side_effect it so the first call returns data, the second returns empty
         mock_storage.listdir.side_effect = [
             (["subdir"], ["file.jpg"]),
             ([], ["subfile.jpg"]),
@@ -78,12 +76,10 @@ class BlogSignalsTests(TestCase):
 
         _delete_storage_dir_if_exists("my_dir")
 
-        # Check files deleted
         mock_storage.delete.assert_any_call("my_dir/file.jpg")
         mock_storage.delete.assert_any_call("my_dir/subdir/subfile.jpg")
 
     def test_delete_storage_dir_if_exists_empty(self):
-        # Should early exit with no error
         self.assertIsNone(_delete_storage_dir_if_exists(""))
         self.assertIsNone(_delete_storage_dir_if_exists(None))
 
@@ -96,7 +92,6 @@ class BlogSignalsTests(TestCase):
             self.assertEqual(_post_cache_dir(self.post), "")
 
     def test_delete_storage_file_none(self):
-        # Should early exit
         self.assertIsNone(_delete_storage_file(None))
 
     def test_delete_storage_file(self):
@@ -105,7 +100,6 @@ class BlogSignalsTests(TestCase):
         _delete_storage_file(mock_field)
         mock_field.storage.delete.assert_called_once_with("test.jpg")
 
-        # Test empty
         mock_field_empty = MagicMock()
         mock_field_empty.name = ""
         _delete_storage_file(mock_field_empty)
@@ -121,20 +115,14 @@ class BlogSignalsTests(TestCase):
         image = Image.new("RGB", (100, 100), "white")
         image.save(file, "JPEG")
         file.seek(0)
-        # Create a valid image file to prevent ImageKit exceptions on save
         image_file = SimpleUploadedFile(
             "pic.jpg", file.read(), content_type="image/jpeg"
         )
 
-        # Create blog post image
         img = BlogPostImage.objects.create(post=self.post, image=image_file)
 
-        # Delete image
         img.delete()
 
-        # Verify signal was called (it might be called with the mock we just setup)
-        # Because signals are connected globally, it's called during `img.delete()`.
-        # Ensure our mock was called.
         mock_delete_file.assert_called_once()
         self.assertEqual(mock_delete_file.call_args[0][0].name, img.image.name)
 
@@ -143,18 +131,15 @@ class BlogSignalsTests(TestCase):
     def test_blogpost_delete_signal_local(self, mock_storage_del, mock_local_del):
         with self.settings(USE_S3=False):
             self.post.delete()
-            # Expect local dirs to be deleted
             self.assertEqual(mock_local_del.call_count, 2)  # cache and media
             mock_storage_del.assert_not_called()
 
     @patch("blog.signals._delete_local_dir_if_exists")
     @patch("blog.signals._delete_storage_dir_if_exists")
     def test_blogpost_delete_signal_s3(self, mock_storage_del, mock_local_del):
-        # We need to recreate since it was deleted
         post = BlogPost.objects.create(title="T2", author=self.user)
         with self.settings(USE_S3=True):
             post.delete()
-            # Expect storage dir to be deleted for cache, local for media
             mock_storage_del.assert_called_once()
             mock_local_del.assert_called_once()
 
@@ -175,7 +160,6 @@ class BlogSignalsTests(TestCase):
 
     @patch("blog.signals.invalidate_nav_cache")
     def test_post_changed_signal(self, mock_invalidate):
-        # Modifying a post
         self.post.title = "Updated Title"
         self.post.save()
         mock_invalidate.assert_called()
@@ -185,16 +169,13 @@ class BlogSignalsTests(TestCase):
         tag = Tag.objects.create(name="T1")
         mock_invalidate.reset_mock()
 
-        # Add tag
         self.post.tags.add(tag)
         mock_invalidate.assert_called()
 
-        # Remove tag
         mock_invalidate.reset_mock()
         self.post.tags.remove(tag)
         mock_invalidate.assert_called()
 
-        # Clear tags
         self.post.tags.add(tag)
         mock_invalidate.reset_mock()
         self.post.tags.clear()

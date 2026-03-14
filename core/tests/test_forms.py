@@ -6,7 +6,6 @@ from core.models import ContactMessage
 
 class ContactFormTests(TestCase):
     def test_clean_name_strips_whitespace(self):
-        # Arrange
         data = {
             "name": "  John Doe  ",
             "subject": "Test Subject",
@@ -15,14 +14,11 @@ class ContactFormTests(TestCase):
         }
         form = ContactForm(data=data)
 
-        # Act
         self.assertTrue(form.is_valid())
 
-        # Assert
         self.assertEqual(form.cleaned_data["name"], "John Doe")
 
     def test_clean_subject_strips_whitespace(self):
-        # Arrange
         data = {
             "name": "John",
             "subject": "  Important   ",
@@ -31,14 +27,11 @@ class ContactFormTests(TestCase):
         }
         form = ContactForm(data=data)
 
-        # Act
         self.assertTrue(form.is_valid())
 
-        # Assert
         self.assertEqual(form.cleaned_data["subject"], "Important")
 
     def test_clean_website_strips_whitespace(self):
-        # Arrange
         data = {
             "name": "John",
             "subject": "Test",
@@ -48,10 +41,7 @@ class ContactFormTests(TestCase):
         }
         form = ContactForm(data=data)
 
-        # Act
         self.assertTrue(form.is_valid())
-
-        # Assert
         self.assertEqual(form.cleaned_data["website"], "https://test.com")
 
     def test_clean_message_valid(self):
@@ -64,10 +54,7 @@ class ContactFormTests(TestCase):
         }
         form = ContactForm(data=data)
 
-        # Act
         self.assertTrue(form.is_valid())
-
-        # Assert
         self.assertEqual(form.cleaned_data["message"], "Hello world")
 
     def test_clean_message_too_long(self):
@@ -81,10 +68,7 @@ class ContactFormTests(TestCase):
         }
         form = ContactForm(data=data)
 
-        # Act
         self.assertFalse(form.is_valid())
-
-        # Assert
         self.assertIn("message", form.errors)
         self.assertTrue(
             any(
@@ -94,8 +78,6 @@ class ContactFormTests(TestCase):
         )
 
     def test_none_values_handled_gracefully(self):
-        # Try to break the clean methods manually if they are called directly
-        # with None since forms.CharField might convert to empty string.
         form = ContactForm()
         form.cleaned_data = {
             "name": None,

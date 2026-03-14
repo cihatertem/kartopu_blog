@@ -42,7 +42,6 @@ class MixinsTests(AdminTestCase):
         staff_user = User.objects.create_user(
             email="staff@example.com", password="password", is_staff=True
         )
-        # Test get_changeform_initial_data
         model_admin = PortfolioAdmin(Portfolio, admin.site)
         request = self.factory.get("/")
         request.user = staff_user
@@ -60,7 +59,6 @@ class MixinsTests(AdminTestCase):
         request = self.factory.get("/")
         request.user = self.user
 
-        # Test create_monthly_snapshot (mocking message_user to avoid errors)
         model_admin.message_user = MagicMock()
         model_admin.create_monthly_snapshot(request, Portfolio.objects.all())
         self.assertEqual(PortfolioSnapshot.objects.count(), 1)
@@ -190,7 +188,6 @@ class SnapshotSaveModelTests(AdminTestCase):
         request = self.factory.get("/")
         request.user = self.user
 
-        # Test creation logic in save_model
         import datetime
 
         snapshot = SalarySavingsSnapshot(
@@ -201,12 +198,6 @@ class SnapshotSaveModelTests(AdminTestCase):
         self.assertIsNotNone(snapshot.pk)
         self.assertEqual(snapshot.total_salary, Decimal("1000"))
 
-        # Test update branch
-        # In Django Admin, change=True means it was loaded from DB and has an ID already
-        # However, the instance we're working on is effectively "in memory" simulating what Form gives
-        # When `change=True`, `save_model` calls `super().save_model` which calls `obj.save()`.
-        # Because we didn't fetch it fresh from the DB to simulate this, it might trigger an insert if we aren't careful,
-        # or we just fetch it and save it.
         persisted_snapshot = SalarySavingsSnapshot.objects.get(pk=snapshot.pk)
         persisted_snapshot.name = "Updated"
         model_admin.save_model(request, persisted_snapshot, None, True)

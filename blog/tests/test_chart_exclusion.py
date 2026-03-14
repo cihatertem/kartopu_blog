@@ -89,7 +89,6 @@ class ChartExclusionTests(TestCase):
         template = Template("{% load blog_extras %}{% render_post_body post %}")
         rendered = template.render(Context({"post": post}))
 
-        # Check that NVDA is in the chart data, but AMD is not
         self.assertIn("NVDA", rendered)
         self.assertNotIn("AMD", rendered)
 
@@ -129,9 +128,7 @@ class ChartExclusionTests(TestCase):
         template = Template("{% load blog_extras %}{% render_post_body post %}")
         rendered = template.render(Context({"post": post}))
 
-        # "Temettü" might be escaped in JSON as Temett\u00fc
         self.assertIn("Temett", rendered)
-        # "Faiz/Nema" should not be there
         self.assertNotIn("Faiz", rendered)
 
     def test_dividend_charts_exclude_zero_amount_items(self) -> None:

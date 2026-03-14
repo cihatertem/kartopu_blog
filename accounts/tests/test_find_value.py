@@ -30,8 +30,6 @@ class FindValueByPathTests(SimpleTestCase):
 
     def test_dot_path_returns_none_if_not_str(self):
         data = {"a": {"b": {"c": 123}}}
-        # Since it's not a string, it will fallback to recursive search
-        # If recursive search also doesn't find it (as a string), it returns None
         self.assertIsNone(_find_value_by_path(data, "a.b.c"))
 
     def test_dot_path_complex(self):
@@ -47,7 +45,6 @@ class FindValueByPathTests(SimpleTestCase):
 
     def test_recursive_first_match(self):
         data = {"a": {"target": "first"}, "b": {"target": "second"}}
-        # It should return the first one it finds in the dictionary iteration order
         self.assertEqual(_find_value_by_path(data, "target"), "first")
 
 
@@ -69,7 +66,6 @@ class FindKeyInMappingTests(SimpleTestCase):
             "first_dict": {"target_key": "first_match"},
             "second_dict": {"target_key": "second_match"},
         }
-        # Dictionaries maintain insertion order in Python 3.7+
         self.assertEqual(_find_key_in_mapping(data, "target_key"), "first_match")
 
     def test_no_match(self):
@@ -77,7 +73,6 @@ class FindKeyInMappingTests(SimpleTestCase):
         self.assertIsNone(_find_key_in_mapping(data, "target_key"))
 
     def test_non_string_value_ignored(self):
-        # Even if the target_key matches, if the value is not a string, it keeps searching.
         data = {
             "first_nested": {"target_key": 123},
             "second_nested": {"target_key": ["not", "a", "string"]},

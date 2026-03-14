@@ -57,7 +57,6 @@ class BuildAbsoluteURITest(TestCase):
     @override_settings(SITE_BASE_URL="https://test.example.com/")
     def test_relative_path(self):
         """Test that relative paths are correctly appended to the base URL."""
-        # Function strips trailing slash from base url and leading slash from path
         path = "/about-us/"
         self.assertEqual(build_absolute_uri(path), "https://test.example.com/about-us/")
 
@@ -74,12 +73,10 @@ class BuildAbsoluteURITest(TestCase):
         site.save()
 
         path = "/api/v1/resource"
-        # When DEBUG is false (default in tests unless overriden), protocol is https
         self.assertEqual(
             build_absolute_uri(path), "https://site.framework.com/api/v1/resource"
         )
 
-        # Test protocol-relative with Site fallback
         self.assertEqual(
             build_absolute_uri("//external.com/script.js"),
             "https://external.com/script.js",

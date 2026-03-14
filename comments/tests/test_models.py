@@ -34,20 +34,16 @@ class CommentModelTests(TestCase):
         self.assertEqual(str(self.comment), expected_str)
 
     def test_is_public_property(self):
-        # Initial status is PENDING
         self.assertFalse(self.comment.is_public)
 
-        # Change to APPROVED
         self.comment.status = Comment.Status.APPROVED
         self.comment.save()
         self.assertTrue(self.comment.is_public)
 
-        # Change to REJECTED
         self.comment.status = Comment.Status.REJECTED
         self.comment.save()
         self.assertFalse(self.comment.is_public)
 
-        # Change to SPAM
         self.comment.status = Comment.Status.SPAM
         self.comment.save()
         self.assertFalse(self.comment.is_public)

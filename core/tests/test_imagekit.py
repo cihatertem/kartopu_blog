@@ -32,7 +32,6 @@ class MockSpec:
 
 
 class ImagekitTests(TestCase):
-    # --- safe_file_url ---
     def test_safe_file_url_with_none(self):
         self.assertIsNone(safe_file_url(None))
 
@@ -41,20 +40,16 @@ class ImagekitTests(TestCase):
         self.assertEqual(safe_file_url(field), "http://test.com/img.jpg")
 
     def test_safe_file_url_exception_handling(self):
-        # Arrange
         class BrokenField:
             @property
             def url(self):
                 raise ValueError("Boom")
 
-        # Act
         with self.assertLogs("core.imagekit", level="ERROR"):
             result = safe_file_url(BrokenField())
 
-        # Assert
         self.assertIsNone(result)
 
-    # --- _safe_spec_url ---
     def test_safe_spec_url_valid(self):
         spec = MockSpec(url="/rendition.jpg", width=100, height=100)
         self.assertEqual(_safe_spec_url(spec, "fallback.jpg"), "/rendition.jpg")
@@ -70,7 +65,6 @@ class ImagekitTests(TestCase):
                 _safe_spec_url(BrokenSpec(), "fallback.jpg"), "fallback.jpg"
             )
 
-    # --- _safe_spec_dimensions ---
     def test_safe_spec_dimensions_valid(self):
         spec = MockSpec(url="", width=800, height=600)
         self.assertEqual(_safe_spec_dimensions(spec, (100, 100)), (800, 600))
@@ -101,7 +95,6 @@ class ImagekitTests(TestCase):
                 _safe_spec_dimensions(BrokenSpec(), (100, 100)), (100, 100)
             )
 
-    # --- build_responsive_rendition ---
     def test_build_responsive_rendition_no_original(self):
         result = build_responsive_rendition(
             original_field=None, spec_map={}, largest_size=100
@@ -109,19 +102,16 @@ class ImagekitTests(TestCase):
         self.assertIsNone(result)
 
     def test_build_responsive_rendition_success(self):
-        # Arrange
         original = MockFile(url="/original.jpg")
         spec_map = {
             100: MockSpec(url="/100.jpg", width=100, height=100),
             200: MockSpec(url="/200.jpg", width=200, height=200),
         }
 
-        # Act
         result = build_responsive_rendition(
             original_field=original, spec_map=spec_map, largest_size=200
         )
 
-        # Assert
         self.assertIsNotNone(result)
         self.assertEqual(result["src"], "/200.jpg")
         self.assertEqual(result["width"], 200)
@@ -131,7 +121,6 @@ class ImagekitTests(TestCase):
         self.assertEqual(result["urls"][100], "/100.jpg")
 
     def test_build_responsive_rendition_with_exceptions(self):
-        # Arrange
         original = MockFile(url="/original.jpg")
 
         class BrokenSpec:
@@ -155,17 +144,13 @@ class ImagekitTests(TestCase):
             200: BrokenSpec(),
         }
 
-        # Act
         with self.assertLogs("core.imagekit", level="ERROR"):
             result = build_responsive_rendition(
                 original_field=original, spec_map=spec_map, largest_size=200
             )
 
-        # Assert
         self.assertIsNotNone(result)
-        # Should fallback to original URL
         self.assertEqual(result["src"], "/original.jpg")
-        # Should use fallback dimensions (largest_size, largest_size if not in DEFAULT_RENDITION_DIMENSIONS)
         self.assertEqual(result["width"], 200)
         self.assertEqual(result["height"], 200)
         self.assertEqual(result["urls"][100], "/original.jpg")

@@ -7,16 +7,13 @@ from core.tag_colors import TAG_COLOR_CLASSES, build_tag_items, get_tag_color_cl
 
 class TagColorsTest(TestCase):
     def test_get_tag_color_class(self):
-        # Empty input should return the first class
         self.assertEqual(get_tag_color_class(""), TAG_COLOR_CLASSES[0])
         self.assertEqual(get_tag_color_class(None), TAG_COLOR_CLASSES[0])
 
-        # Test deterministic output
         color1 = get_tag_color_class("python")
         color2 = get_tag_color_class("python")
         self.assertEqual(color1, color2)
 
-        # Output should be one of the predefined classes
         self.assertIn(color1, TAG_COLOR_CLASSES)
 
     def test_build_tag_items(self):

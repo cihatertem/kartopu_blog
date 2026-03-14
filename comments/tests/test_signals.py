@@ -26,7 +26,6 @@ class CommentSignalsTests(TestCase):
 
     @patch("comments.signals.cache.delete_many")
     def test_cache_cleared_on_comment_save(self, mock_delete_many):
-        # Create a comment (calls post_save)
         comment = Comment.objects.create(
             post=self.post,
             author=self.user,
@@ -35,7 +34,6 @@ class CommentSignalsTests(TestCase):
         )
         mock_delete_many.assert_called_with(NAV_KEYS)
 
-        # Update the comment (calls post_save)
         mock_delete_many.reset_mock()
         comment.status = Comment.Status.APPROVED
         comment.save()
@@ -51,6 +49,5 @@ class CommentSignalsTests(TestCase):
         )
         mock_delete_many.reset_mock()
 
-        # Delete the comment (calls post_delete)
         comment.delete()
         mock_delete_many.assert_called_with(NAV_KEYS)

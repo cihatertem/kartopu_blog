@@ -127,7 +127,6 @@ class TestRenderHTMLFunctions(TestCase):
         self.assertEqual(_render_portfolio_charts_html(None), "")
         s = DummySnapshot()
 
-        # Test the timeseries QS mock
         class DummyQS:
             def filter(self, *args, **kwargs):
                 return self
@@ -340,7 +339,6 @@ class RenderPostBodyTests(TestCase):
             images = MagicMock()
             images.all.return_value = []
 
-            # Since _get_prefetched_list fallback checks relationships, we mock them
             portfolio_snapshots = MagicMock()
             portfolio_comparisons = MagicMock()
             cashflow_snapshots = MagicMock()
@@ -350,11 +348,9 @@ class RenderPostBodyTests(TestCase):
             dividend_comparisons = MagicMock()
 
         post = MockPost()
-        # All returns empty lists so no content rendered, just stripping the markers safely
         html = blog_extras.render_post_body({}, post)
         self.assertEqual(html, "")
 
-        # Test tags using decorators directly (smoke test)
         ctx = {"post": post}
         self.assertEqual(blog_extras.portfolio_irr_charts(ctx), "")
         self.assertEqual(blog_extras.portfolio_summary(ctx), "")

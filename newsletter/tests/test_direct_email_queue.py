@@ -20,11 +20,9 @@ class DirectEmailQueueTest(TestCase):
             body="Direct **Markdown** Body",
         )
 
-        # Calling send_direct_email should now queue it
         result = send_direct_email(direct_email)
         self.assertTrue(result)
 
-        # Verify it's in the queue
         self.assertEqual(EmailQueue.objects.count(), 1)
         queue_item = EmailQueue.objects.first()
         self.assertEqual(queue_item.subject, "Direct Subject")
@@ -32,10 +30,8 @@ class DirectEmailQueueTest(TestCase):
         self.assertEqual(queue_item.direct_email, direct_email)
         self.assertEqual(queue_item.status, EmailQueueStatus.PENDING)
 
-        # Verify no emails sent yet
         self.assertEqual(len(mail.outbox), 0)
 
-        # Verify direct_email sent_at is NOT set yet (only set after processing)
         direct_email.refresh_from_db()
         self.assertIsNone(direct_email.sent_at)
 
@@ -46,7 +42,6 @@ class DirectEmailQueueTest(TestCase):
             body="Body",
         )
 
-        # Add attachments
         attachment1 = DirectEmailAttachment.objects.create(
             direct_email=direct_email,
         )
@@ -57,26 +52,20 @@ class DirectEmailQueueTest(TestCase):
         )
         attachment2.file.save("test2.txt", ContentFile(b"Content 2"))
 
-        # Queue it
         send_direct_email(direct_email)
 
-        # Run worker
         call_command("process_email_queue", rate=100)
 
-        # Verify email sent with attachments
         self.assertEqual(len(mail.outbox), 1)
         sent_email = mail.outbox[0]
         self.assertEqual(sent_email.subject, "With Attachments")
         self.assertEqual(len(sent_email.attachments), 2)
 
-        # Check attachment names
         attachment_names = [a[0] for a in sent_email.attachments]
         self.assertTrue(any(name.startswith("test1") for name in attachment_names))
         self.assertTrue(any(name.startswith("test2") for name in attachment_names))
 
-        # Check attachment contents
         attachment_contents = [a[1] for a in sent_email.attachments]
-        # Some backends might return strings instead of bytes for simple text content
         self.assertTrue(
             any(c == b"Content 1" or c == "Content 1" for c in attachment_contents)
         )
@@ -95,9 +84,6 @@ class DirectEmailQueueTest(TestCase):
         )
         attachment.file.save("ucretler.pdf", ContentFile(b"PDF Content"))
 
-        # Verify path: mail/ucretler-ve-planlar/ucretler.pdf
-        # Django's default slugify for Turkish 'Ü' is 'u' if not configured otherwise,
-        # but let's see what happens.
         expected_prefix = "mail/ucretler-ve-planlar/"
         self.assertTrue(attachment.file.name.startswith(expected_prefix))
 
@@ -110,11 +96,9 @@ class DirectEmailTest(TestCase):
             body="Direct **Markdown** Body",
         )
         send_direct_email(direct_email)
-        # Should be queued, not sent immediately
         self.assertEqual(EmailQueue.objects.count(), 1)
         self.assertEqual(len(mail.outbox), 0)
 
-        # Process the queue
         call_command("process_email_queue", rate=100)
         self.assertEqual(len(mail.outbox), 1)
         sent_email = mail.outbox[0]

@@ -40,13 +40,11 @@ class PostCommentTests(TestCase):
             HTTP_HOST="localhost",
             secure=True,
         )
-        # Should redirect to login since @login_required is used
         self.assertEqual(response.status_code, 302)
         self.assertTrue(response.url.startswith(reverse("account_login")))
 
     @patch("comments.views.SiteSettings.get_settings")
     def test_comments_disabled(self, mock_get_settings):
-        # Mock site settings to disable comments
         mock_settings = SiteSettings()
         mock_settings.is_comments_enabled = False
         mock_get_settings.return_value = mock_settings
@@ -73,7 +71,6 @@ class PostCommentTests(TestCase):
         )
         self.assertEqual(response.status_code, 302)
         self.assertEqual(response.url, self.post.get_absolute_url())
-        # Comment should not be created
         self.assertEqual(Comment.objects.count(), 0)
 
     @patch("accounts.signals._download_and_save_social_avatar")
@@ -91,7 +88,6 @@ class PostCommentTests(TestCase):
         self.assertEqual(response.status_code, 302)
         self.assertEqual(response.url, self.post.get_absolute_url())
 
-        # Comment should be created as PENDING
         self.assertEqual(Comment.objects.count(), 1)
         comment = Comment.objects.first()
         self.assertEqual(comment.status, Comment.Status.PENDING)
@@ -111,7 +107,6 @@ class PostCommentTests(TestCase):
         self.assertEqual(response.status_code, 302)
         self.assertEqual(response.url, self.post.get_absolute_url())
 
-        # Comment should be created as APPROVED
         self.assertEqual(Comment.objects.count(), 1)
         comment = Comment.objects.first()
         self.assertEqual(comment.status, Comment.Status.APPROVED)
@@ -119,7 +114,6 @@ class PostCommentTests(TestCase):
 
     @patch("accounts.signals._download_and_save_social_avatar")
     def test_honeypot_spam(self, mock_download_avatar):
-        # Use regular user with social account to avoid staff auto-approve override
         SocialAccount.objects.create(user=self.regular_user, provider="google")
         self.client.login(email="user2@example.com", password="password")
         response = self.client.post(
@@ -132,7 +126,6 @@ class PostCommentTests(TestCase):
         self.assertEqual(response.status_code, 302)
         self.assertEqual(response.url, self.post.get_absolute_url())
 
-        # Comment should be created as SPAM
         self.assertEqual(Comment.objects.count(), 1)
         comment = Comment.objects.first()
         self.assertEqual(comment.status, Comment.Status.SPAM)
@@ -141,11 +134,10 @@ class PostCommentTests(TestCase):
         self.client.login(email="staff2@example.com", password="password")
         response = self.client.post(
             self.url, {"body": ""}, follow=False, HTTP_HOST="localhost", secure=True
-        )  # Empty body is invalid
+        )
         self.assertEqual(response.status_code, 302)
         self.assertEqual(response.url, self.post.get_absolute_url())
 
-        # Comment should not be created
         self.assertEqual(Comment.objects.count(), 0)
 
     def test_parent_comment(self):
@@ -167,13 +159,11 @@ class PostCommentTests(TestCase):
         self.assertEqual(response.status_code, 302)
         self.assertEqual(response.url, self.post.get_absolute_url())
 
-        # Comment should be created with parent set
         self.assertEqual(Comment.objects.count(), 2)
         reply = Comment.objects.exclude(id=parent_comment.id).first()
         self.assertEqual(reply.parent, parent_comment)
 
     def test_invalid_parent_comment(self):
-        # Parent comment pending, so it can't be replied to
         parent_comment = Comment.objects.create(
             post=self.post,
             author=self.staff_user,
@@ -192,14 +182,10 @@ class PostCommentTests(TestCase):
         self.assertEqual(response.status_code, 302)
         self.assertEqual(response.url, self.post.get_absolute_url())
 
-        # Reply should not be created
         self.assertEqual(Comment.objects.count(), 1)
 
     @patch("comments.views.ratelimit")
     def test_rate_limit(self, mock_ratelimit):
-        # Since the actual ratelimit decorator executes before our view logic,
-        # we test the view logic that checks request.limited.
-        # We simulate the ratelimit middleware setting limited=True.
         from django.contrib.messages.storage.fallback import FallbackStorage
         from django.http import HttpRequest
 
@@ -211,7 +197,6 @@ class PostCommentTests(TestCase):
         request.user = self.staff_user
         request.POST = {"body": "Rate limited comment"}
 
-        # Setup messages framework on request
         setattr(request, "session", "session")
         messages = FallbackStorage(request)
         setattr(request, "_messages", messages)

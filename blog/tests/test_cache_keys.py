@@ -30,7 +30,6 @@ class CacheKeysTests(SimpleTestCase):
             NAV_PORTFOLIO_POSTS_KEY,
         ]
 
-        # Verify the list elements match exactly
         self.assertEqual(NAV_KEYS, expected_keys)
 
     def test_nav_keys_are_unique(self):

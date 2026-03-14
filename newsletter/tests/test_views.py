@@ -58,7 +58,6 @@ class NewsletterSubscribeViewTest(TestCase):
             str(messages[0]),
             "Aboneliğiniz alınmıştır. Lütfen gelen kutunuzu kontrol edin.",
         )
-        # Verify no subscriber was created
         self.assertEqual(Subscriber.objects.count(), 0)
 
     @patch("newsletter.views.send_subscribe_confirmation")
@@ -157,7 +156,6 @@ class NewsletterConfirmSubscriptionViewTest(TestCase):
         self.client = Client()
 
     def test_expired_token(self):
-        # We simulate signature expired by raising it from parse_token
         with patch(
             "newsletter.views.parse_token", side_effect=signing.SignatureExpired
         ):

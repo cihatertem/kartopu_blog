@@ -12,13 +12,10 @@ class AccountsIntegrationTests(TestCase):
         )
 
     def test_author_profile_access(self):
-        # Arrange
         self.client.force_login(self.user)
         url = reverse("accounts:author_profile")
 
-        # Act
         response = self.client.get(url, follow=True)
 
-        # Assert
         self.assertEqual(response.status_code, 200)
         self.assertInHTML("Author Profile", response.content.decode())

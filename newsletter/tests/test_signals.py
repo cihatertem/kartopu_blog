@@ -17,7 +17,6 @@ class NewsletterSignalsTest(TransactionTestCase):
 
     @patch("newsletter.signals.send_post_published_email")
     def test_notify_subscribers_on_publish(self, mock_send_email):
-        # Initial creation in DRAFT status should not trigger notification
         post = BlogPost.objects.create(
             author=self.user,
             category=self.category,
@@ -29,7 +28,6 @@ class NewsletterSignalsTest(TransactionTestCase):
         mock_send_email.assert_not_called()
         self.assertEqual(BlogPostNotification.objects.count(), 0)
 
-        # Changing to PUBLISHED should trigger the signal and thus send_post_published_email
         post.status = BlogPost.Status.PUBLISHED
         post.published_at = timezone.now()
         post.save()
@@ -55,7 +53,6 @@ class NewsletterSignalsTest(TransactionTestCase):
 
         mock_send_email.reset_mock()
 
-        # Save again with PUBLISHED status shouldn't trigger duplicate notification
         post.title = "Updated Title"
         post.save()
 

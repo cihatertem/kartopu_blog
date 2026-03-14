@@ -73,8 +73,7 @@ class NewsletterAdminTest(TestCase):
         request = self.get_mock_request()
         queryset = Announcement.objects.all()
 
-        # Queryset returns in an order we should control or just sort it explicitly
-        queryset = Announcement.objects.all().order_by("subject")  # Draft then Sent
+        queryset = Announcement.objects.all().order_by("subject")
         send_selected_announcements(admin, request, queryset)
 
         mock_send.assert_called_once_with(announcement_draft)
@@ -82,7 +81,6 @@ class NewsletterAdminTest(TestCase):
         messages = list(get_messages(request))
         self.assertEqual(len(messages), 2)
 
-        # Check messages correctly
         message_strings = [str(m) for m in messages]
         self.assertIn("Sent zaten gönderildi.", message_strings)
         self.assertIn("Draft duyurusu 5 aboneye gönderildi.", message_strings)
@@ -153,7 +151,6 @@ class NewsletterAdminTest(TestCase):
         self.assertIn("<strong>Bold</strong>", preview)
         self.assertIn("text", preview)
 
-        # Empty body
         empty_email = DirectEmail(body="")
         preview_empty = admin.rendered_body_preview(empty_email)
         self.assertEqual(preview_empty, "")

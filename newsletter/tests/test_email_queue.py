@@ -44,7 +44,6 @@ class EmailQueueTest(TestCase):
         self.assertEqual(
             EmailQueue.objects.filter(status=EmailQueueStatus.PENDING).count(), 2
         )
-        # Verify no emails sent yet
         self.assertEqual(len(mail.outbox), 0)
 
     def test_send_announcement_queues_emails(self):
@@ -70,8 +69,7 @@ class EmailQueueTest(TestCase):
             EmailQueue.objects.filter(status=EmailQueueStatus.PENDING).count(), 1
         )
 
-        call_command("process_email_queue", rate=100)  # Use high rate for tests
-
+        call_command("process_email_queue", rate=100)
         self.assertEqual(len(mail.outbox), 1)
         self.assertEqual(
             EmailQueue.objects.filter(status=EmailQueueStatus.SENT).count(), 1

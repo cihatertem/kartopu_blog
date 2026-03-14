@@ -44,8 +44,6 @@ class SEOTest(TestCase):
         self.post.tags.add(self.tag)
 
     def test_default_seo(self):
-        # Our home view normally triggers get_seo_data with empty context or specific ones
-        # But we can test the tag directly
         request = self.factory.get("/")
         seo = get_seo_data({"request": request})
         self.assertEqual(seo.get("title"), "Default Title")
@@ -55,7 +53,6 @@ class SEOTest(TestCase):
     def test_post_seo(self):
         request = self.factory.get(self.post.get_absolute_url())
 
-        # Ensure category is correctly assigned to post and fetched
         self.post.category = self.category
         self.post.save()
         post_with_cat = (
@@ -146,7 +143,6 @@ class SEOTest(TestCase):
             with self.assertLogs("core.templatetags.seo_tags", level="ERROR") as cm:
                 seo = get_seo_data({"request": request})
 
-                # Check that the exception was logged
                 self.assertTrue(
                     any(
                         "Error generating SEO data for path: /" in msg
@@ -154,6 +150,5 @@ class SEOTest(TestCase):
                     )
                 )
 
-                # Check that the default SEO data is still returned
                 self.assertEqual(seo.get("title"), "Default Title")
                 self.assertEqual(seo.get("description"), "Default Description")

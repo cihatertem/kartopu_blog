@@ -43,7 +43,6 @@ class ContextProcessorsTests(TestCase):
         self.factory = RequestFactory()
         cache.clear()
 
-        # Users
         self.staff_user = User.objects.create_user(
             email="staff@test.com", password="password", is_staff=True
         )
@@ -51,7 +50,6 @@ class ContextProcessorsTests(TestCase):
             email="normal@test.com", password="password"
         )
 
-        # Models
         self.cat1 = Category.objects.create(name="Cat 1", slug="cat-1")
         self.cat_portfolio = Category.objects.create(name="Portföy", slug="portfoy")
         self.tag1 = Tag.objects.create(name="Tag 1", slug="tag-1")
@@ -112,45 +110,33 @@ class ContextProcessorsTests(TestCase):
             order=1,
         )
 
-    # --- breadcrumbs_context ---
     def test_breadcrumbs_context_blog(self):
-        # Arrange
         request = self.factory.get("/blog/")
         request.resolver_match = resolve("/blog/")
 
-        # Act
         context = breadcrumbs_context(request)
 
-        # Assert
         self.assertEqual(len(context["breadcrumbs"]), 1)
         self.assertEqual(context["breadcrumbs"][0]["label"], "Blog")
 
     def test_breadcrumbs_context_non_blog(self):
-        # Arrange
         request = self.factory.get("/")
         request.resolver_match = resolve("/")
 
-        # Act
         context = breadcrumbs_context(request)
 
-        # Assert
         self.assertEqual(len(context["breadcrumbs"]), 0)
 
-    # --- _get_nav_* private helpers ---
     def test_get_nav_categories(self):
-        # Act
         cats = _get_nav_categories()
 
-        # Assert
         self.assertTrue(len(cats) > 0)
         self.assertEqual(cats[0].name, "Cat 1")
         self.assertEqual(cache.get(NAV_CATEGORIES_KEY), cats)
 
     def test_get_nav_tags(self):
-        # Act
         tags = _get_nav_tags()
 
-        # Assert
         self.assertEqual(len(tags), 1)
         self.assertEqual(tags[0]["name"], "Tag 1")
         self.assertIn("cloud_size", tags[0])
@@ -159,10 +145,8 @@ class ContextProcessorsTests(TestCase):
         self.assertEqual(cache.get(NAV_TAGS_KEY), tags)
 
     def test_get_nav_archives(self):
-        # Act
         archives = _get_nav_archives()
 
-        # Assert
         self.assertEqual(len(archives), 2)  # Two months: Jan 2023 and Feb 2023
         self.assertTrue(
             any(
@@ -172,39 +156,29 @@ class ContextProcessorsTests(TestCase):
         )
 
     def test_get_nav_recent_posts(self):
-        # Act
         posts = _get_nav_recent_posts()
 
-        # Assert
         self.assertEqual(len(posts), 2)
-        # Ordered by published_at DESC, so portfolio-post (Feb) comes first
         self.assertEqual(posts[0].slug, "portfolio-post")
         self.assertEqual(cache.get(NAV_RECENT_POSTS_KEY), posts)
 
     def test_get_nav_popular_posts(self):
-        # Act
         posts = _get_nav_popular_posts()
 
-        # Assert
         self.assertEqual(len(posts), 2)
-        # post-1 has 1 comment (5 points) and 100 views, portfolio-post has 0. post-1 comes first.
         self.assertEqual(posts[0].slug, "post-1")
         self.assertEqual(cache.get(NAV_POPULAR_POSTS_KEY), posts)
 
     def test_get_nav_portfolio_posts(self):
-        # Act
         posts = _get_nav_portfolio_posts()
 
-        # Assert
         self.assertEqual(len(posts), 1)
         self.assertEqual(posts[0].slug, "portfolio-post")
         self.assertEqual(cache.get(NAV_PORTFOLIO_POSTS_KEY), posts)
 
     def test_get_goal_widget_snapshot(self):
-        # Act
         snapshot = _get_goal_widget_snapshot()
 
-        # Assert
         self.assertIsNotNone(snapshot)
         self.assertEqual(snapshot["current_value"], Decimal("50000"))
         self.assertEqual(snapshot["target_value"], Decimal("100000"))
@@ -228,19 +202,14 @@ class ContextProcessorsTests(TestCase):
         )
 
     def test_get_has_pending_messages_or_comments_only_unread_message(self):
-        # Arrange
         request = self.factory.get("/")
         request.user = self.staff_user
-        # By default self.contact_msg is unread
 
-        # Act
         has_pending = _get_has_pending_messages_or_comments(request)
 
-        # Assert
         self.assertTrue(has_pending)
 
     def test_get_has_pending_messages_or_comments_only_pending_comment(self):
-        # Arrange
         request = self.factory.get("/")
         request.user = self.staff_user
         self.contact_msg.is_read = True
@@ -253,14 +222,11 @@ class ContextProcessorsTests(TestCase):
             status=Comment.Status.PENDING,
         )
 
-        # Act
         has_pending = _get_has_pending_messages_or_comments(request)
 
-        # Assert
         self.assertTrue(has_pending)
 
     def test_get_has_pending_messages_or_comments_both_exist(self):
-        # Arrange
         request = self.factory.get("/")
         request.user = self.staff_user
 
@@ -271,46 +237,34 @@ class ContextProcessorsTests(TestCase):
             status=Comment.Status.PENDING,
         )
 
-        # Act
         has_pending = _get_has_pending_messages_or_comments(request)
 
-        # Assert
         self.assertTrue(has_pending)
 
     def test_get_has_pending_messages_or_comments_none_exist(self):
-        # Arrange
         request = self.factory.get("/")
         request.user = self.staff_user
         self.contact_msg.is_read = True
         self.contact_msg.save()
 
-        # Act
         has_pending = _get_has_pending_messages_or_comments(request)
 
-        # Assert
         self.assertFalse(has_pending)
 
     def test_get_has_pending_messages_or_comments_normal_user(self):
-        # Arrange
         request = self.factory.get("/")
         request.user = self.normal_user
 
-        # Act
         has_pending = _get_has_pending_messages_or_comments(request)
 
-        # Assert
         self.assertFalse(has_pending)
 
-    # --- categories_tags_context ---
     def test_categories_tags_context(self):
-        # Arrange
         request = self.factory.get("/")
         request.user = self.normal_user
 
-        # Act
         context = categories_tags_context(request)
 
-        # Assert
         self.assertIn("nav_categories", context)
         self.assertIn("nav_tags", context)
         self.assertIn("nav_archives", context)
@@ -320,7 +274,6 @@ class ContextProcessorsTests(TestCase):
         self.assertIn("goal_widget_snapshot", context)
         self.assertIn("has_pending_messages_or_comments", context)
 
-    # --- Simple Context Processors ---
     @override_settings(GOOGLE_ANALYTICS_ID="UA-12345678-1")
     def test_google_analytics_context(self):
         request = self.factory.get("/")

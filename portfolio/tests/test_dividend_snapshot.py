@@ -29,11 +29,9 @@ class DividendSnapshotTests(TestCase):
     def test_dividend_snapshot_uses_saved_dividends(
         self, mock_fetch_fx_rates_bulk, mock_fetch_fx_rate
     ):
-        # Mock FX rate to 30.0 for the payment date
         mock_fetch_fx_rate.return_value = Decimal("30.00")
         mock_fetch_fx_rates_bulk.return_value = {("USD", "TRY"): Decimal("30.00")}
 
-        # Create payment in USD
         payment_usd = DividendPayment.objects.create(
             asset=self.asset_usd,
             payment_date=datetime.date(2023, 1, 15),
@@ -43,31 +41,25 @@ class DividendSnapshotTests(TestCase):
             last_close_price=Decimal("140.00"),
         )
 
-        # Ensure dividends are created
         self.assertEqual(payment_usd.dividends.count(), 3)
         div_try = payment_usd.dividends.get(currency=Asset.Currency.TRY)
-        self.assertEqual(div_try.total_net_amount, Decimal("300.00"))  # 10 * 30
+        self.assertEqual(div_try.total_net_amount, Decimal("300.00"))
 
-        # Change the mock for snapshot time to show it doesn't use it
         mock_fetch_fx_rate.return_value = Decimal("40.00")
         mock_fetch_fx_rates_bulk.return_value = {("USD", "TRY"): Decimal("40.00")}
 
-        # Snapshot for 2023 in TRY
         snapshot = DividendSnapshot.create_snapshot(
             year=2023,
             currency=Asset.Currency.TRY,
             snapshot_date=datetime.date(2023, 12, 31),
         )
 
-        # Should be 300 TRY based on the recorded dividend, not calculated on the fly
         self.assertEqual(snapshot.total_amount, Decimal("300.00"))
 
-        # Verify payment item
         item = snapshot.payment_items.first()
         self.assertIsNotNone(item)
         self.assertEqual(item.total_net_amount, Decimal("300.00"))
 
-        # Verify yields are correct and not multiplied by FX
         self.assertEqual(
             item.dividend_yield_on_payment_price,
             round(Decimal("1.00") / Decimal("140.00"), 4),
@@ -82,38 +74,31 @@ class DividendSnapshotTests(TestCase):
     def test_dividend_snapshot_fallback_when_dividend_missing(
         self, mock_fetch_fx_rates_bulk, mock_fetch_fx_rate
     ):
-        # Mock FX rate to 30.0 for the payment date
         mock_fetch_fx_rate.return_value = Decimal("30.00")
         mock_fetch_fx_rates_bulk.return_value = {("USD", "TRY"): Decimal("30.00")}
 
-        # Create payment in USD
         payment_usd = DividendPayment.objects.create(
             asset=self.asset_usd,
             payment_date=datetime.date(2023, 1, 15),
             share_count=Decimal("10"),
-            net_dividend_per_share=Decimal("1.00"),  # Total: $10
+            net_dividend_per_share=Decimal("1.00"),
             average_cost=Decimal("100.00"),
             last_close_price=Decimal("140.00"),
         )
 
-        # Ensure dividends are created
         self.assertEqual(payment_usd.dividends.count(), 3)
         div_try = payment_usd.dividends.get(currency=Asset.Currency.TRY)
-        self.assertEqual(div_try.total_net_amount, Decimal("300.00"))  # 10 * 30
+        self.assertEqual(div_try.total_net_amount, Decimal("300.00"))
 
-        # FORCE DELETE DIVIDEND for test
         payment_usd.dividends.all().delete()
 
-        # Change the mock for snapshot time to show it DOES use it now
         mock_fetch_fx_rate.return_value = Decimal("40.00")
         mock_fetch_fx_rates_bulk.return_value = {("USD", "TRY"): Decimal("40.00")}
 
-        # Snapshot for 2023 in TRY
         snapshot = DividendSnapshot.create_snapshot(
             year=2023,
             currency=Asset.Currency.TRY,
             snapshot_date=datetime.date(2023, 12, 31),
         )
 
-        # Should be 400 TRY based on the fallback
         self.assertEqual(snapshot.total_amount, Decimal("400.00"))

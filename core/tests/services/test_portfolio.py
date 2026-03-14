@@ -90,7 +90,6 @@ class PortfolioServicesTest(TestCase):
         )
 
     def test_generate_unique_slug(self):
-        # We need a Django model to test generating slugs against its `.objects.filter()`
         from blog.models import Category
 
         slug1 = generate_unique_slug(Category, "My Special Name")
@@ -99,13 +98,11 @@ class PortfolioServicesTest(TestCase):
         slug2 = generate_unique_slug(Category, "My Special Name")
         self.assertNotEqual(slug1, slug2)
 
-        # Test long names
         long_name = "a" * 300
         slug3 = generate_unique_slug(Category, long_name)
         self.assertLessEqual(len(slug3), 255)
 
     def test__build_slug_base_empty_name(self):
-        # When `slugify(name)` returns an empty string, the base defaults to "snapshot"
         base = _build_slug_base("", max_length=255)
         self.assertEqual(base, "snapshot")
 
@@ -113,29 +110,21 @@ class PortfolioServicesTest(TestCase):
         self.assertEqual(base_unslugifiable, "snapshot")
 
     def test__build_slug_base_short_max_length(self):
-        # When max_base_length < 1 (e.g., max_length <= SLUG_HASH_LENGTH)
-        # It should just return the base without truncation
-        # SLUG_HASH_LENGTH is 6, so max_length of 6 gives max_base_length = 6 - (6 + 1) = -1
         base = _build_slug_base("my-name", max_length=6)
         self.assertEqual(base, "my-name")
 
         base_edge = _build_slug_base("my-name", max_length=7)
-        # max_base_length = 7 - 7 = 0 < 1 => returns base
         self.assertEqual(base_edge, "my-name")
 
         base_trunc = _build_slug_base("my-name", max_length=8)
-        # max_base_length = 8 - 7 = 1 >= 1 => returns base[:1] => "m"
         self.assertEqual(base_trunc, "m")
 
-        # Test zero max_length
         base_zero = _build_slug_base("my-name", max_length=0)
         self.assertEqual(base_zero, "my-name")
 
-        # Test negative max_length
         base_negative = _build_slug_base("my-name", max_length=-5)
         self.assertEqual(base_negative, "my-name")
 
-        # Test empty name with short max_length
         base_empty_trunc = _build_slug_base("", max_length=8)
         self.assertEqual(base_empty_trunc, "s")
 

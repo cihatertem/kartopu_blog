@@ -88,7 +88,6 @@ class AboutPageImageTest(TestCase):
     def test_str_representation(self):
         page = AboutPage.objects.create(title="About Me", content="Content")
 
-        # Create a valid test image to avoid UnidentifiedImageError
         import io
 
         img_buffer = io.BytesIO()

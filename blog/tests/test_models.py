@@ -32,7 +32,6 @@ class BlogModelsTests(TestCase):
         self.assertEqual(str(tag), "Python Models")
         self.assertEqual(tag.get_absolute_url(), "/blog/tag/python-models/")
 
-        # Test slug autogen
         tag2 = Tag(name="Go Models")
         tag2.save()
         self.assertEqual(tag2.slug, "go-models")
@@ -50,7 +49,6 @@ class BlogModelsTests(TestCase):
             post.canonical_url, "https://kartopu.money/blog/canonical-post/"
         )
 
-        # Test overwrite
         post2 = BlogPost(
             title="T2", slug="t2", canonical_url="http://x.com", author=self.user
         )
@@ -83,7 +81,6 @@ class BlogModelsTests(TestCase):
 
     @patch("blog.models.optimize_uploaded_image_field")
     def test_blogpost_cover_optimize(self, mock_opt):
-        # Create a simple file
         import io
 
         from PIL import Image
@@ -101,7 +98,6 @@ class BlogModelsTests(TestCase):
         mock_opt.assert_called_once()
         self.assertEqual(mock_opt.call_args[0][0].name, post.cover_image.name)
 
-        # Update should not trigger again
         mock_opt.reset_mock()
         post.title = "Img Post Updated"
         post.save()
@@ -117,7 +113,6 @@ class BlogModelsTests(TestCase):
 
         post.cover_image = "dummy.jpg"
 
-        # Clear cached_property if any
         if "cover_rendition" in post.__dict__:
             del post.__dict__["cover_rendition"]
         if "cover_thumb_rendition" in post.__dict__:

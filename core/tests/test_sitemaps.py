@@ -50,7 +50,6 @@ class SitemapsTest(TestCase):
         self.assertIn(post1, items)
         self.assertNotIn(post2, items)
 
-        # Test lastmod logic
         self.assertEqual(sitemap.lastmod(post1), post1.updated_at or post1.published_at)
 
     def test_blog_category_sitemap(self):

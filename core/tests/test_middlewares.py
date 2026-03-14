@@ -59,10 +59,8 @@ class TrustedProxyMiddlewareTest(TestCase):
         request = self.factory.get("/")
         request.META["REMOTE_ADDR"] = "invalid-ip"
 
-        # Suppress the formatting error by blocking emit in standard logger
         logger = logging.getLogger("core.middlewares")
 
-        # We can capture what args are passed using a custom handler
         class CaptureHandler(logging.Handler):
             def __init__(self):
                 super().__init__()
@@ -74,7 +72,6 @@ class TrustedProxyMiddlewareTest(TestCase):
         handler = CaptureHandler()
         logger.addHandler(handler)
 
-        # Disable propagation temporarily to avoid stderr formatting error outputs
         old_propagate = logger.propagate
         logger.propagate = False
 

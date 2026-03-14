@@ -23,16 +23,13 @@ class ProcessEmailQueueCommandTest(TestCase):
             os.remove(self.lock_file)
 
     def test_command_creates_lock_file_and_prevents_multiple_instances(self):
-        # Create an artificial lock file
         with open(self.lock_file, "w") as f:
             f.write("1234")
 
-        # Command should exit immediately due to the lock file
         with patch("sys.stdout.write") as mock_stdout:
             call_command("process_email_queue", rate=100)
 
         self.assertTrue(os.path.exists(self.lock_file))
-        # The warning should be printed
         self.assertTrue(
             any(
                 "Processor already running or lock file exists." in call.args[0]
@@ -44,8 +41,6 @@ class ProcessEmailQueueCommandTest(TestCase):
     def test_stale_processing_rows_reverted_to_pending(self, mock_stdout):
         stale_time = timezone.now() - timedelta(minutes=20)
 
-        # We need to set the updated_at field, which is auto-updated on save by TimeStampedModelMixin
-        # So we update it using queryset update to bypass auto_now=True
         email = EmailQueue.objects.create(
             subject="Test Stale",
             from_email="from@example.com",
@@ -55,10 +50,8 @@ class ProcessEmailQueueCommandTest(TestCase):
         )
         EmailQueue.objects.filter(id=email.id).update(updated_at=stale_time)
 
-        # Run command
         call_command("process_email_queue", rate=100)
 
-        # It should have been reverted to PENDING and then processed to SENT
         email.refresh_from_db()
         self.assertEqual(email.status, EmailQueueStatus.SENT)
         self.assertEqual(len(mail.outbox), 1)
@@ -77,7 +70,6 @@ class ProcessEmailQueueCommandTest(TestCase):
 
         call_command("process_email_queue", rate=100, limit=2)
 
-        # Only 2 should be processed due to the limit
         self.assertEqual(len(mail.outbox), 2)
         self.assertEqual(
             EmailQueue.objects.filter(status=EmailQueueStatus.SENT).count(), 2
@@ -142,7 +134,6 @@ class ProcessEmailQueueCommandTest(TestCase):
             else "file_content_1",
         )
 
-        # Test attachment cache hit
         EmailQueue.objects.create(
             subject="Test email with attachment 2",
             from_email="from@example.com",
@@ -182,8 +173,6 @@ class ProcessEmailQueueCommandTest(TestCase):
         def fake_time():
             if not hasattr(fake_time, "count"):
                 fake_time.count = 0
-            # handle has multiple calls. Let's trace calls: start_time = time() -> 1.0. elapsed = time() - start_time -> 1.05. Wait wait!
-            # there is wait = send_interval - elapsed. send_interval is 1.0 / 10 = 0.1
             res = 1.0 if fake_time.count == 0 else 1.05
             fake_time.count += 1
             return res

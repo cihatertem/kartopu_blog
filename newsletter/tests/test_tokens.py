@@ -13,7 +13,6 @@ class TokenTests(TestCase):
         self.assertIsInstance(token, str)
         self.assertTrue(len(token) > 0)
 
-        # Verify it can be decoded back to original payload
         payload = parse_token(token, max_age=3600)
         self.assertEqual(payload, {"email": email, "action": action})
 
@@ -30,7 +29,6 @@ class TokenTests(TestCase):
         action = "subscribe"
         token = make_token(email, action)
 
-        # -1 max_age means it's always expired
         with self.assertRaises(signing.SignatureExpired):
             parse_token(token, max_age=-1)
 
@@ -39,7 +37,6 @@ class TokenTests(TestCase):
         action = "subscribe"
         token = make_token(email, action)
 
-        # Tamper with the token string
         invalid_token = token[:-1] + ("a" if token[-1] != "a" else "b")
 
         with self.assertRaises(signing.BadSignature):

@@ -68,31 +68,25 @@ class BlogFeedsTests(TestCase):
         )
 
     def test_safe_cover_size(self):
-        # With valid field
         size = _safe_cover_size(self.post_with_cover.cover_image)
         self.assertIsNotNone(size)
         self.assertGreater(size, 0)
 
     def test_fallback_cover_name(self):
-        # With cover
         name = _fallback_cover_name(self.post_with_cover)
         self.assertIsNotNone(name)
 
-        # Without cover
         name = _fallback_cover_name(self.post_no_cover)
         self.assertIsNone(name)
 
-        # No cover_image attribute
         class MissingAttr:
             pass
 
         self.assertIsNone(_fallback_cover_name(MissingAttr()))
 
     def test_get_cover_name(self):
-        # With valid image processing
         self.assertIsNotNone(_get_cover_name(self.post_with_cover))
 
-        # Test exception path handled by log_exceptions default_factory
         class BadItem:
             @property
             def cover_1200(self):
@@ -101,14 +95,11 @@ class BlogFeedsTests(TestCase):
             cover_image = MagicMock(name="fallback.jpg")
 
         bad_item = BadItem()
-        # Fallback will return the mock's string repr or name depending on the mock configuration
-        # but _fallback_cover_name grabs getattr(cover_image, 'name') which for a mock is its configured name or we can explicitly set it
         bad_item.cover_image.name = "fallback.jpg"
 
         with self.assertLogs("blog.feeds", level="ERROR"):
             self.assertEqual(_get_cover_name(bad_item), "fallback.jpg")
 
-        # With invalid field (should return None safely due to log_exceptions)
         class BadImageField:
             @property
             def size(self):
@@ -127,7 +118,6 @@ class BlogFeedsTests(TestCase):
         self.assertEqual(len(items), 2)
         self.assertNotIn(self.draft_post, items)
 
-        # Test item metadata for post_with_cover
         self.assertEqual(feed.item_title(self.post_with_cover), "Post with Cover")
         self.assertEqual(
             feed.item_description(self.post_with_cover), "<p>Short excerpt.</p>"
@@ -140,7 +130,6 @@ class BlogFeedsTests(TestCase):
             feed.item_pubdate(self.post_with_cover), self.post_with_cover.published_at
         )
 
-        # Test item metadata for post_no_cover (fallback to truncated content)
         desc_no_cover = feed.item_description(self.post_no_cover)
         self.assertIn("Content for no cover", desc_no_cover)
 
@@ -165,14 +154,13 @@ class BlogFeedsTests(TestCase):
             cover_image = "exists"
             cover_rendition = None
             cover_1200 = MagicMock()
-            cover_1200.name = None  # this makes _get_cover_name return None
+            cover_1200.name = None
 
         bad_item = BadMimeItem()
         self.assertEqual(feed.item_enclosure_mime_type(bad_item), "image/webp")
 
     def test_item_enclosure_url_without_request_and_safe_url(self):
         feed = LatestPostsFeed()
-        # Ensure no request is set
         if hasattr(feed, "request"):
             delattr(feed, "request")
 
@@ -192,21 +180,17 @@ class BlogFeedsTests(TestCase):
         feed = CategoryPostsFeed()
         feed.request = self.factory.get("/")
 
-        # Test get_object
         obj = feed.get_object(feed.request, self.category.slug)
         self.assertEqual(obj, self.category)
 
-        # Test basic info
         self.assertEqual(feed.title(obj), "Kartopu Blog - Feed Category Yazıları")
         self.assertEqual(feed.link(obj), obj.get_absolute_url())
         self.assertEqual(feed.description(obj), "A test category")
 
-        # Items
         items = feed.items(obj)
         self.assertEqual(len(items), 2)
         self.assertNotIn(self.draft_post, items)
 
-        # Inherited item methods for post_with_cover
         self.assertEqual(feed.item_title(self.post_with_cover), "Post with Cover")
         self.assertEqual(
             feed.item_description(self.post_with_cover), "<p>Short excerpt.</p>"
@@ -219,11 +203,9 @@ class BlogFeedsTests(TestCase):
             feed.item_pubdate(self.post_with_cover), self.post_with_cover.published_at
         )
 
-        # Inherited item methods for post_no_cover
         desc_no_cover = feed.item_description(self.post_no_cover)
         self.assertIn("Content for no cover", desc_no_cover)
 
-        # Enclosures for post_with_cover
         self.assertIsNotNone(feed.item_enclosure_url(self.post_with_cover))
         self.assertTrue(
             str(feed.item_enclosure_url(self.post_with_cover)).startswith("http")
@@ -231,12 +213,10 @@ class BlogFeedsTests(TestCase):
         self.assertGreater(feed.item_enclosure_length(self.post_with_cover), 0)
         self.assertIn("image", feed.item_enclosure_mime_type(self.post_with_cover))
 
-        # Enclosures for post_no_cover (missing cover)
         self.assertIsNone(feed.item_enclosure_url(self.post_no_cover))
         self.assertIsNone(feed.item_enclosure_length(self.post_no_cover))
         self.assertIsNone(feed.item_enclosure_mime_type(self.post_no_cover))
 
-        # Test fallback description if category has no description
         empty_cat = Category.objects.create(name="Empty")
         self.assertEqual(
             feed.description(empty_cat), "Kartopu Blog'daki en yeni kategori yazıları."

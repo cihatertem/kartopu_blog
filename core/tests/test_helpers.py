@@ -183,7 +183,6 @@ class GenerateCaptchaTest(TestCase):
 
         num_one, num_two = _generate_captcha(request)
 
-        # Ensure both are integers between 1 and 10
         self.assertIsInstance(num_one, int)
         self.assertIsInstance(num_two, int)
         self.assertGreaterEqual(num_one, 1)
@@ -191,6 +190,5 @@ class GenerateCaptchaTest(TestCase):
         self.assertGreaterEqual(num_two, 1)
         self.assertLessEqual(num_two, 10)
 
-        # Ensure session is updated with their sum
         self.assertIn(CAPTCHA_SESSION_KEY, request.session)
         self.assertEqual(request.session[CAPTCHA_SESSION_KEY], num_one + num_two)

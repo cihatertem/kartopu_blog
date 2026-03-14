@@ -18,7 +18,6 @@ class UserAdminActionTests(TestCase):
         self.admin = UserAdmin(User, self.site)
         self.factory = RequestFactory()
 
-        # Create some test users
         self.user1 = User.objects.create_user(email="user1@example.com", password="pwd")
         self.user2 = User.objects.create_user(email="user2@example.com", password="pwd")
         self.user3 = User.objects.create_user(email="user3@example.com", password="pwd")
@@ -26,7 +25,6 @@ class UserAdminActionTests(TestCase):
     def get_request(self):
         request = self.factory.get("/")
         request.user = MockSuperUser()
-        # Mock messages framework
         setattr(request, "session", "session")
         messages = FallbackStorage(request)
         setattr(request, "_messages", messages)
@@ -147,7 +145,6 @@ class CustomSocialAppAdminTests(TestCase):
         self.assertIn("avatar_url_field", instance.settings)
         self.assertEqual(instance.settings["avatar_url_field"], "custom_picture_key")
 
-        # Test initial value loading
         form_edit = CustomSocialAppForm(instance=instance)
         self.assertEqual(
             form_edit.fields["avatar_url_field"].initial, "custom_picture_key"
@@ -155,7 +152,6 @@ class CustomSocialAppAdminTests(TestCase):
 
     def test_custom_social_app_form_removes_settings_if_empty(self):
         """Test that avatar_url_field is removed from settings JSON if submitted empty"""
-        # Create an instance that has it set first
         app = SocialApp.objects.create(
             provider="google",
             name="Google",

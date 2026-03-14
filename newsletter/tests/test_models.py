@@ -91,7 +91,6 @@ class BlogPostNotificationModelTest(TestCase):
         )
 
     def test_blog_post_notification_str(self):
-        # Prevent the signal from automatically creating this to allow us to test the model in isolation
         with patch("newsletter.signals.send_post_published_email"):
             notification = BlogPostNotification.objects.create(
                 post=self.post, sent_at=timezone.now()

@@ -230,7 +230,6 @@ class LogicTests(ModelsTestCase):
         asset.refresh_price()
         self.assertEqual(asset.current_price, Decimal("150.0"))
 
-        # Test save method triggers refresh_price when adding and price is missing
         mock_fetch_price.return_value = Decimal("200.0")
         asset2 = Asset(name="Tesla", symbol="TSLA", asset_type=Asset.AssetType.STOCK)
         asset2.save()
@@ -279,7 +278,6 @@ class LogicTests(ModelsTestCase):
             asset_type=Asset.AssetType.STOCK,
             current_price=10,
         )
-        # Using save to trigger sync_dividend_currencies
         payment = DividendPayment.objects.create(
             asset=asset,
             payment_date="2023-01-01",
@@ -289,7 +287,6 @@ class LogicTests(ModelsTestCase):
             last_close_price=150,
         )
 
-        # Apple dividend total = 10 * 1 = 10 USD.
         usd_dividend = payment.dividends.get(currency=Asset.Currency.USD)
         self.assertEqual(usd_dividend.total_net_amount, Decimal("10.0"))
 

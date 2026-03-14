@@ -91,7 +91,6 @@ class DeleteEmptyFolderTests(TestCase):
 
 class SocialAvatarDownloadTests(TestCase):
     def setUp(self):
-        # Patch threading.Thread to run synchronously
 
         import accounts.signals
 
@@ -99,7 +98,6 @@ class SocialAvatarDownloadTests(TestCase):
         self.mock_thread = self.thread_patcher.start()
 
         def mock_thread_init(target, daemon=None, *args, **kwargs):
-            # When .start() is called, just call the target directly
             mock_obj = MagicMock()
             mock_obj.start = lambda: target()
             return mock_obj

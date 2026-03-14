@@ -37,7 +37,6 @@ class DummyComparison:
 
 class TestPortfolioComparisonSummaryHtml(TestCase):
     def test_render_portfolio_comparison_summary_html(self):
-        # We simulate the values from the user issue
         base = DummySnapshot(
             snapshot_date="2026-01-31",
             total_value="3492833.62",
@@ -56,20 +55,15 @@ class TestPortfolioComparisonSummaryHtml(TestCase):
 
         html = _render_portfolio_comparison_summary_html(comparison)
 
-        # Check target points logic (base target is 87.32%, compare is 88.58% -> +1.26%)
-        # Just check that 'puan' is present
         self.assertIn("puan", html)
         self.assertIn("Getiri -500 puan", html)
 
-        # Value delta check
         self.assertIn("50.262,47", html)
         self.assertIn("~%-1,77", html)
 
-        # Check for specific structure
         self.assertIn("<strong>Değişim:</strong>", html)
 
     def test_render_portfolio_comparison_summary_html_positive_return(self):
-        # Test positive return to ensure + sign works
         base = DummySnapshot(
             snapshot_date="2026-01-31",
             total_value="1000.00",
@@ -91,8 +85,4 @@ class TestPortfolioComparisonSummaryHtml(TestCase):
         self.assertIn("Getiri +2500 puan", html)
         self.assertIn("Hedef Gerçekleşme +2500 puan", html)
 
-        # value change = 500 / 1000 = 50%
-        # cost delta = 200
-        # cost free value delta = 500 - 200 = 300
-        # cost free return = 300 / 1000 = 30%
         self.assertIn("~%30,00", html)

@@ -46,21 +46,15 @@ class ServicesTest(TestCase):
         email = "test@example.com"
         url = build_subscribe_confirm_url(email)
 
-        # Check that it returns an absolute URL
         self.assertTrue(url.startswith("http://") or url.startswith("https://"))
 
-        # Extract the path and token
         from urllib.parse import urlparse
 
         parsed_url = urlparse(url)
         path = parsed_url.path
 
-        # The path should match the reverse of confirm url with some token
         self.assertTrue(path.startswith("/newsletter/confirm/"))
 
-        # Extract token from the path
-        # Path is like: /newsletter/confirm/<token>/
-        # Split by '/' -> ['', 'newsletter', 'confirm', '<token>', '']
         parts = path.strip("/").split("/")
         self.assertEqual(len(parts), 3)
         self.assertEqual(parts[0], "newsletter")
@@ -68,7 +62,6 @@ class ServicesTest(TestCase):
 
         token = parts[2]
 
-        # Verify the token payload
         payload = parse_token(token, max_age=86400)
         self.assertEqual(payload["email"], email)
         self.assertEqual(payload["action"], "subscribe")
@@ -77,21 +70,15 @@ class ServicesTest(TestCase):
         email = "test@example.com"
         url = build_unsubscribe_url(email)
 
-        # Check that it returns an absolute URL
         self.assertTrue(url.startswith("http://") or url.startswith("https://"))
 
-        # Extract the path and token
         from urllib.parse import urlparse
 
         parsed_url = urlparse(url)
         path = parsed_url.path
 
-        # The path should match the reverse of confirm url with some token
         self.assertTrue(path.startswith("/newsletter/confirm/"))
 
-        # Extract token from the path
-        # Path is like: /newsletter/confirm/<token>/
-        # Split by '/' -> ['', 'newsletter', 'confirm', '<token>', '']
         parts = path.strip("/").split("/")
         self.assertEqual(len(parts), 3)
         self.assertEqual(parts[0], "newsletter")
@@ -99,14 +86,12 @@ class ServicesTest(TestCase):
 
         token = parts[2]
 
-        # Verify the token payload
         payload = parse_token(token, max_age=86400)
         self.assertEqual(payload["email"], email)
         self.assertEqual(payload["action"], "unsubscribe")
 
     @patch("newsletter.services.render_to_string")
     def test_prepare_templated_email(self, mock_render):
-        # Setup mock returns for render_to_string
         def render_side_effect(template_name, context):
             if template_name.endswith(".txt"):
                 return "Mock text body"
@@ -130,14 +115,12 @@ class ServicesTest(TestCase):
         self.assertEqual(result["text_body"], "Mock text body")
         self.assertEqual(result["html_body"], "Mock html body")
 
-        # Verify render_to_string was called with correct paths
         self.assertEqual(mock_render.call_count, 2)
         mock_render.assert_any_call("newsletter/email/test_template.txt", context)
         mock_render.assert_any_call("newsletter/email/test_template.html", context)
 
     @patch("newsletter.services.prepare_templated_email")
     def test_send_templated_email(self, mock_prepare):
-        # Mock the data returned by prepare_templated_email
         mock_prepare.return_value = {
             "subject": "Test Subject",
             "text_body": "Text body content",
@@ -146,10 +129,8 @@ class ServicesTest(TestCase):
             "to_email": "recipient@example.com",
         }
 
-        # Clear the outbox before test
         mail.outbox = []
 
-        # Call the function
         send_templated_email(
             subject="Ignored by mock",
             to_email="ignored@example.com",
@@ -157,17 +138,14 @@ class ServicesTest(TestCase):
             context={},
         )
 
-        # Check that one message was sent
         self.assertEqual(len(mail.outbox), 1)
 
-        # Inspect the sent message
         sent_email = mail.outbox[0]
         self.assertEqual(sent_email.subject, "Test Subject")
         self.assertEqual(sent_email.body, "Text body content")
         self.assertEqual(sent_email.from_email, '"Kartopu" <test@kartopu.money>')
         self.assertEqual(sent_email.to, ["recipient@example.com"])
 
-        # Check alternatives (HTML body)
         self.assertEqual(len(sent_email.alternatives), 1)
         self.assertEqual(
             sent_email.alternatives[0], ("<html>Html body content</html>", "text/html")

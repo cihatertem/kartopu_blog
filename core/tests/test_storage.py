@@ -26,8 +26,6 @@ class StorageTest(TestCase):
     @patch("storages.backends.s3.S3Storage.__init__", return_value=None)
     @patch("storages.backends.s3.S3Storage.bucket")
     def test_post_process(self, mock_bucket, mock_s3_init, mock_load_manifest):
-        # We need to test the generator behavior of post_process.
-        # It's a bit complex because it involves S3 interactions. We can mock its methods.
         storage = S3CompressedManifestStaticStorage_Old()
         storage.open = MagicMock()
 
@@ -37,8 +35,6 @@ class StorageTest(TestCase):
 
         storage._save_compressed = MagicMock()
 
-        # ManifestFilesMixin.post_process normally returns an iterator of (name, processed, processed_content).
-        # Since we just want to test our custom override, we patch `super().post_process`
         with patch(
             "django.contrib.staticfiles.storage.ManifestFilesMixin.post_process"
         ) as mock_super:
@@ -50,7 +46,6 @@ class StorageTest(TestCase):
             self.assertEqual(len(results), 1)
             self.assertEqual(results[0][0], "styles.css")
 
-            # Should have called _save_compressed for gzip (and brotli if installed)
             self.assertTrue(storage._save_compressed.called)
 
     @patch(

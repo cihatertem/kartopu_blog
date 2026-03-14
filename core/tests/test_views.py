@@ -28,7 +28,6 @@ class ViewsTest(TestCase):
             is_featured=True,
         )
 
-        # Init settings
         SiteSettings.objects.all().delete()
         self.settings = SiteSettings.get_settings()
 
@@ -74,7 +73,6 @@ class ViewsTest(TestCase):
 
     def test_contact_view_post_invalid_captcha(self):
         url = reverse("core:contact")
-        # Ensure session exists to modify it
         session = self.client.session
         session[CAPTCHA_SESSION_KEY] = 5
         session.save()
@@ -151,17 +149,10 @@ class ViewsTest(TestCase):
 
         data = {
             "captcha": "5",
-            # missing required fields
         }
 
         response = self.client.post(url, data)
-        self.assertEqual(
-            response.status_code, 200
-        )  # rendered form with errors, views.py doesn't redirect for invalid forms, wait... let's check views.py logic
-        # Actually views.py:
-        # if form.is_valid(): ...
-        # messages.error(request, "Lütfen form alanlarını kontrol edin.")
-        # and then returns render(...)
+        self.assertEqual(response.status_code, 200)
 
         messages = list(response.context["messages"])
         self.assertEqual(str(messages[0]), "Lütfen form alanlarını kontrol edin.")

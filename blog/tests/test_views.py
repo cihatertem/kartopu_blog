@@ -64,7 +64,6 @@ class BlogViewsTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "A Published Post")
 
-        # Test view count increases
         self.published_post.refresh_from_db()
         self.assertEqual(self.published_post.view_count, 1)
 
@@ -76,7 +75,6 @@ class BlogViewsTests(TestCase):
     def test_post_preview_unauthenticated(self):
         url = reverse("blog:post_preview", kwargs={"slug": self.draft_post.slug})
         response = self.client.get(url, follow=True)
-        # Login view is disabled in test or returns 404, we just check the redirect chain
         redirect_chain = getattr(response, "redirect_chain", [])
         has_login_redirect = any(
             r[0].startswith("/accounts/login/") for r in redirect_chain
@@ -119,29 +117,21 @@ class BlogViewsTests(TestCase):
         self.assertContains(response, "#Python")
 
     def test_search_results_view(self):
-        # Full text search in SQLite might fail if not enabled/installed.
-        # We will mock it instead or skip if it causes NotImplementedError.
         from unittest.mock import patch
 
         with patch("blog.views.SearchVector"):
             url = reverse("blog:search_results")
 
-            # Empty search
             response = self.client.get(url, follow=True)
             self.assertEqual(response.status_code, 200)
 
-            # Valid search mocked
             with patch("blog.views.published_posts_queryset") as mock_qs:
-                # Return empty list or fake qs to avoid execution
                 mock_qs.return_value.none.return_value = BlogPost.objects.none()
                 response = self.client.get(url, {"q": "Published"}, follow=True)
                 self.assertEqual(response.status_code, 200)
 
     def test_search_results_view_malicious_payloads(self):
-        # We test that malicious payloads don't crash the database query parser.
-        # SQLite doesn't support SearchVector and SearchQuery natively in Django tests without extensions.
-        # So we patch the queryset evaluation to prevent NotImplementedError in tests,
-        # but we let the SearchQuery object get initialized to ensure it doesn't crash Python side.
+
         from unittest.mock import patch
 
         payloads = [
@@ -153,8 +143,6 @@ class BlogViewsTests(TestCase):
 
         url = reverse("blog:search_results")
 
-        # Mock the get_page function directly to bypass the database evaluation
-        # (which triggers the NotImplementedError for SearchVector on SQLite)
         with patch("blog.views.get_page_obj") as mock_get_page_obj:
             mock_get_page_obj.return_value = []
             for payload in payloads:
@@ -189,7 +177,6 @@ class BlogViewsTests(TestCase):
         SocialAccount.objects.create(user=self.reader, provider="google", uid="123")
         url = reverse("blog:post_reaction", kwargs={"slug": self.published_post.slug})
 
-        # Add reaction
         request = self.factory.post(
             url, {"reaction": BlogPostReaction.Reaction.KALP.value}
         )
@@ -200,7 +187,6 @@ class BlogViewsTests(TestCase):
         self.assertEqual(data["selected"], BlogPostReaction.Reaction.KALP.value)
         self.assertEqual(data["counts"].get(BlogPostReaction.Reaction.KALP.value), 1)
 
-        # Remove reaction by sending empty
         request = self.factory.post(url, {"reaction": ""})
         request.user = self.reader
         response = post_reaction(request, slug=self.published_post.slug)
@@ -209,7 +195,6 @@ class BlogViewsTests(TestCase):
         self.assertEqual(data["selected"], "")
         self.assertEqual(data["counts"].get(BlogPostReaction.Reaction.KALP.value), None)
 
-        # Toggle reaction (send same one)
         request = self.factory.post(
             url, {"reaction": BlogPostReaction.Reaction.KALP.value}
         )
@@ -226,7 +211,6 @@ class BlogViewsTests(TestCase):
         data = json.loads(response.content)
         self.assertEqual(data["selected"], "")
 
-        # Change reaction
         request = self.factory.post(
             url, {"reaction": BlogPostReaction.Reaction.KALP.value}
         )
@@ -300,8 +284,6 @@ class ViewHelperTests(TestCase):
 
         request = RequestFactory().get("/archive/")
 
-        # Test requires template mocking or full client request since views use `render` with real templates
-
         with patch("blog.views.render") as mock_render:
             mock_render.return_value = "mock_html"
             resp = archive_index(request)
@@ -374,7 +356,6 @@ class ViewHelperTests(TestCase):
 
     def test_extract_social_profile_url_exception_handled(self):
         """Test that _extract_social_profile_url safely handles exceptions when getting the profile url."""
-        # Arrange
         from unittest.mock import MagicMock
 
         from blog.views import _extract_social_profile_url
@@ -384,18 +365,14 @@ class ViewHelperTests(TestCase):
         account.extra_data = {"screen_name": "testuser"}
         account.get_profile_url.side_effect = Exception("Test Exception")
 
-        # Act
-        # Shouldn't raise any exception because of log_exceptions decorator
         with self.assertLogs("blog.views", level="ERROR"):
             result = _extract_social_profile_url(account)
 
-        # Assert
         self.assertEqual(result, "https://x.com/testuser")
 
     @patch("accounts.signals._download_and_save_social_avatar")
     def test_build_comment_context_social_profile_url(self, mock_download_avatar):
         """Test that _build_comment_context correctly fetches and assigns social_profile_url."""
-        # Arrange
         user = User.objects.create_user(email="profiletest@example.com", password="pwd")
         post = BlogPost.objects.create(
             title="Profile Post",
@@ -412,7 +389,6 @@ class ViewHelperTests(TestCase):
             status=Comment.Status.APPROVED,
         )
 
-        # We must create a social account for the author to fetch profile url
         SocialAccount.objects.create(
             user=user,
             provider="github",
@@ -423,16 +399,12 @@ class ViewHelperTests(TestCase):
         request = RequestFactory().get("/")
         request.user = user
 
-        # Act
         with patch(
             "allauth.socialaccount.models.SocialAccount.get_avatar_url", return_value=""
         ):
-            # It will log "Error getting social profile url" if get_profile_url fails
-            # But wait, it's not failing here? Wait! GitHub doesn't have a profile URL by default?
             with self.assertLogs("blog.views", level="ERROR"):
                 ctx = _build_comment_context(request, post)
 
-        # Assert
         comments = ctx["comment_page_obj"].object_list
         self.assertEqual(len(comments), 1)
         self.assertEqual(

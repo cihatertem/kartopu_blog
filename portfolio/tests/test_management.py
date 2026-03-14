@@ -22,7 +22,6 @@ class FillMissingIrrCommandTests(TestCase):
     @patch("sys.stdout.write")
     @patch("sys.stderr.write")
     def test_fill_missing_irr_command(self, mock_stderr_write, mock_stdout_write):
-        # Create snapshots with null irr_pct
         PortfolioSnapshot.objects.create(
             portfolio=self.portfolio,
             period=PortfolioSnapshot.Period.MONTHLY,
@@ -44,7 +43,6 @@ class FillMissingIrrCommandTests(TestCase):
             irr_pct=None,
         )
 
-        # Mock update_irr to return predictable results and simulate saving
         def mock_update_irr_side_effect(self_obj):
             if self_obj.snapshot_date.isoformat() == "2023-01-01":
                 self_obj.irr_pct = Decimal("5.0")
@@ -63,10 +61,8 @@ class FillMissingIrrCommandTests(TestCase):
         ) as mock_update_irr:
             call_command("fill_missing_irr")
 
-            # Ensure it was called for both missing snapshots
             self.assertEqual(mock_update_irr.call_count, 2)
 
-            # Check that only the snapshot that could calculate an IRR was updated
             updated_snapshots = PortfolioSnapshot.objects.filter(irr_pct__isnull=False)
             self.assertEqual(updated_snapshots.count(), 1)
             self.assertEqual(updated_snapshots.first().irr_pct, Decimal("5.0"))
