@@ -262,8 +262,9 @@ class FetchFXRatesBulkTests(TestCase):
             result, {("USD", "USD"): Decimal("1"), ("TRY", "TRY"): Decimal("1")}
         )
 
+    @patch("portfolio.services.logger.exception")
     @patch("portfolio.services.yf.download")
-    def test_yf_download_exception(self, mock_download):
+    def test_yf_download_exception(self, mock_download, mock_logger_exception):
         mock_download.side_effect = Exception("Download failed")
         pairs = [("USD", "TRY")]
         self.assertEqual(fetch_fx_rates_bulk(pairs), {})
@@ -343,8 +344,11 @@ class FetchFXRatesBulkTests(TestCase):
         pairs = [("USD", "TRY")]
         self.assertEqual(fetch_fx_rates_bulk(pairs), {})
 
+    @patch("portfolio.services.logger.exception")
     @patch("portfolio.services.yf.download")
-    def test_multi_symbol_missing_from_close_data(self, mock_download):
+    def test_multi_symbol_missing_from_close_data(
+        self, mock_download, mock_logger_exception
+    ):
         """Test when multiple pairs requested but one is missing from 'Close' data."""
         data = {
             "USDTRY=X": [30.0, 31.0],

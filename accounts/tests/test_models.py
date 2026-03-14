@@ -91,7 +91,8 @@ class UserAvatarResizeTests(TestCase):
         with Image.open(user.avatar) as img:
             self.assertEqual(img.size, (800, 640))  # 1000x800 scales down to 800x640
 
-    def test_resize_avatar_error_handling(self):
+    @patch("accounts.models.Image.open")
+    def test_resize_avatar_error_handling(self, mock_image_open):
         # We bypass user.save() which has signal hooks from ImageKit that crash on bad images
         # Instead, we directly test that `_resize_avatar_in_memory` safely catches and logs exceptions
         user = User(email="error@example.com", password="password", first_name="Error")
@@ -99,19 +100,24 @@ class UserAvatarResizeTests(TestCase):
 
         from django.core.files.base import ContentFile
 
-        user.avatar.save(
-            "bad.jpg", ContentFile(b"this is not a valid image"), save=False
-        )
+        # Bypassing the normal ImageField save, but using a valid empty mock bytes object
+        # which ImageKit won't try to process via post_save because we use save=False
+        user.avatar.save("dummy.png", ContentFile(b"not an image"), save=False)
+
+        from PIL import UnidentifiedImageError
+
+        mock_image_open.side_effect = UnidentifiedImageError("Mocked error")
 
         # Test that calling the function wrapped by @log_exceptions does not throw
-        try:
-            # We call the method, expecting the UnidentifiedImageError to be swallowed
-            # by the @log_exceptions decorator
-            user._resize_avatar_in_memory()
-        except Exception as e:
-            self.fail(
-                f"_resize_avatar_in_memory raised {type(e).__name__} unexpectedly!"
-            )
+        with self.assertLogs("accounts.models", level="ERROR"):
+            try:
+                # We call the method, expecting the UnidentifiedImageError to be swallowed
+                # by the @log_exceptions decorator
+                user._resize_avatar_in_memory()
+            except Exception as e:
+                self.fail(
+                    f"_resize_avatar_in_memory raised {type(e).__name__} unexpectedly!"
+                )
 
 
 class UserManagerTests(TestCase):

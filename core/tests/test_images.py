@@ -40,7 +40,8 @@ class ImageOptimizationTests(TestCase):
         invalid_path = "/path/to/nonexistent/image.jpg"
 
         # Act - should catch exception and not raise
-        result = optimize_uploaded_image(invalid_path)
+        with self.assertLogs("core.images", level="ERROR"):
+            result = optimize_uploaded_image(invalid_path)
 
         # Assert
         self.assertIsNone(result)

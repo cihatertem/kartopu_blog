@@ -105,7 +105,8 @@ class BlogFeedsTests(TestCase):
         # but _fallback_cover_name grabs getattr(cover_image, 'name') which for a mock is its configured name or we can explicitly set it
         bad_item.cover_image.name = "fallback.jpg"
 
-        self.assertEqual(_get_cover_name(bad_item), "fallback.jpg")
+        with self.assertLogs("blog.feeds", level="ERROR"):
+            self.assertEqual(_get_cover_name(bad_item), "fallback.jpg")
 
         # With invalid field (should return None safely due to log_exceptions)
         class BadImageField:
@@ -114,8 +115,9 @@ class BlogFeedsTests(TestCase):
                 raise Exception("Storage error")
 
         bad_field = BadImageField()
-        size_err = _safe_cover_size(bad_field)
-        self.assertIsNone(size_err)
+        with self.assertLogs("blog.feeds", level="ERROR"):
+            size_err = _safe_cover_size(bad_field)
+            self.assertIsNone(size_err)
 
     def test_latest_posts_feed(self):
         feed = LatestPostsFeed()

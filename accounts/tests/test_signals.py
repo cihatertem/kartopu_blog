@@ -92,7 +92,6 @@ class DeleteEmptyFolderTests(TestCase):
 class SocialAvatarDownloadTests(TestCase):
     def setUp(self):
         # Patch threading.Thread to run synchronously
-        import threading
 
         import accounts.signals
 

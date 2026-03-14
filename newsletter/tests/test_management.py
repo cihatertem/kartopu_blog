@@ -40,7 +40,8 @@ class ProcessEmailQueueCommandTest(TestCase):
             )
         )
 
-    def test_stale_processing_rows_reverted_to_pending(self):
+    @patch("sys.stdout.write")
+    def test_stale_processing_rows_reverted_to_pending(self, mock_stdout):
         stale_time = timezone.now() - timedelta(minutes=20)
 
         # We need to set the updated_at field, which is auto-updated on save by TimeStampedModelMixin
@@ -62,7 +63,8 @@ class ProcessEmailQueueCommandTest(TestCase):
         self.assertEqual(email.status, EmailQueueStatus.SENT)
         self.assertEqual(len(mail.outbox), 1)
 
-    def test_batch_processing_multiple_emails(self):
+    @patch("sys.stdout.write")
+    def test_batch_processing_multiple_emails(self, mock_stdout):
         EmailQueue.objects.create(
             subject="Test 1", from_email="f@e.com", to_email="t1@e.com", text_body="1"
         )
@@ -105,7 +107,8 @@ class ProcessEmailQueueCommandTest(TestCase):
         self.assertEqual(email.error_message, "SMTP Connection Error")
         self.assertEqual(len(mail.outbox), 0)
 
-    def test_direct_email_attachments(self):
+    @patch("sys.stdout.write")
+    def test_direct_email_attachments(self, mock_stdout):
         from django.core.files.uploadedfile import SimpleUploadedFile
 
         from newsletter.models import DirectEmail, DirectEmailAttachment
@@ -172,9 +175,10 @@ class ProcessEmailQueueCommandTest(TestCase):
                 )
             )
 
+    @patch("sys.stdout.write")
     @patch("newsletter.management.commands.process_email_queue.time.sleep")
     @patch("newsletter.management.commands.process_email_queue.time.time")
-    def test_rate_limiting_sleep(self, mock_time, mock_sleep):
+    def test_rate_limiting_sleep(self, mock_time, mock_sleep, mock_stdout):
         def fake_time():
             if not hasattr(fake_time, "count"):
                 fake_time.count = 0

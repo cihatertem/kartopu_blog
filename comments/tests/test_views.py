@@ -76,7 +76,8 @@ class PostCommentTests(TestCase):
         # Comment should not be created
         self.assertEqual(Comment.objects.count(), 0)
 
-    def test_regular_user_with_social_account(self):
+    @patch("accounts.signals._download_and_save_social_avatar")
+    def test_regular_user_with_social_account(self, mock_download_avatar):
         SocialAccount.objects.create(user=self.regular_user, provider="google")
         self.client.login(email="user2@example.com", password="password")
 
@@ -116,7 +117,8 @@ class PostCommentTests(TestCase):
         self.assertEqual(comment.status, Comment.Status.APPROVED)
         self.assertEqual(comment.author, self.staff_user)
 
-    def test_honeypot_spam(self):
+    @patch("accounts.signals._download_and_save_social_avatar")
+    def test_honeypot_spam(self, mock_download_avatar):
         # Use regular user with social account to avoid staff auto-approve override
         SocialAccount.objects.create(user=self.regular_user, provider="google")
         self.client.login(email="user2@example.com", password="password")

@@ -273,7 +273,8 @@ class BlogExtrasFiltersTests(TestCase):
     def test_safe_float(self):
         self.assertEqual(blog_extras.safe_float("1.23"), 1.23)
         self.assertEqual(blog_extras.safe_float(None), 0.0)
-        self.assertEqual(blog_extras.safe_float("invalid"), 0.0)
+        with self.assertLogs("blog.templatetags.blog_extras", level="ERROR"):
+            self.assertEqual(blog_extras.safe_float("invalid"), 0.0)
 
     def test_format_currency(self):
         self.assertEqual(

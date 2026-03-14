@@ -56,7 +56,10 @@ class EmailQueueTest(TestCase):
         )
         self.assertEqual(len(mail.outbox), 0)
 
-    def test_process_email_queue_command(self):
+    from unittest.mock import patch
+
+    @patch("sys.stdout.write")
+    def test_process_email_queue_command(self, mock_stdout):
         EmailQueue.objects.create(
             subject="Test",
             from_email="from@example.com",

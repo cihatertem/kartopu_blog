@@ -48,7 +48,8 @@ class ImagekitTests(TestCase):
                 raise ValueError("Boom")
 
         # Act
-        result = safe_file_url(BrokenField())
+        with self.assertLogs("core.imagekit", level="ERROR"):
+            result = safe_file_url(BrokenField())
 
         # Assert
         self.assertIsNone(result)
@@ -64,7 +65,10 @@ class ImagekitTests(TestCase):
             def url(self):
                 raise ValueError("Boom")
 
-        self.assertEqual(_safe_spec_url(BrokenSpec(), "fallback.jpg"), "fallback.jpg")
+        with self.assertLogs("core.imagekit", level="ERROR"):
+            self.assertEqual(
+                _safe_spec_url(BrokenSpec(), "fallback.jpg"), "fallback.jpg"
+            )
 
     # --- _safe_spec_dimensions ---
     def test_safe_spec_dimensions_valid(self):
@@ -92,7 +96,10 @@ class ImagekitTests(TestCase):
             def storage(self):
                 return MockStorage()
 
-        self.assertEqual(_safe_spec_dimensions(BrokenSpec(), (100, 100)), (100, 100))
+        with self.assertLogs("core.imagekit", level="ERROR"):
+            self.assertEqual(
+                _safe_spec_dimensions(BrokenSpec(), (100, 100)), (100, 100)
+            )
 
     # --- build_responsive_rendition ---
     def test_build_responsive_rendition_no_original(self):
@@ -149,9 +156,10 @@ class ImagekitTests(TestCase):
         }
 
         # Act
-        result = build_responsive_rendition(
-            original_field=original, spec_map=spec_map, largest_size=200
-        )
+        with self.assertLogs("core.imagekit", level="ERROR"):
+            result = build_responsive_rendition(
+                original_field=original, spec_map=spec_map, largest_size=200
+            )
 
         # Assert
         self.assertIsNotNone(result)

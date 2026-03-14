@@ -154,19 +154,22 @@ class CaptchaIsValidTest(TestCase):
         """Should return False when POST captcha is not an integer."""
         request = self.factory.post("/", {"captcha": "abc"})
         request.session = {CAPTCHA_SESSION_KEY: "15"}
-        self.assertFalse(captcha_is_valid(request))
+        with self.assertLogs("core.helpers", level="ERROR"):
+            self.assertFalse(captcha_is_valid(request))
 
     def test_non_integer_session(self):
         """Should return False when session captcha is not an integer."""
         request = self.factory.post("/", {"captcha": "15"})
         request.session = {CAPTCHA_SESSION_KEY: "abc"}
-        self.assertFalse(captcha_is_valid(request))
+        with self.assertLogs("core.helpers", level="ERROR"):
+            self.assertFalse(captcha_is_valid(request))
 
     def test_both_non_integer(self):
         """Should return False when both captchas are not integers."""
         request = self.factory.post("/", {"captcha": "abc"})
         request.session = {CAPTCHA_SESSION_KEY: "abc"}
-        self.assertFalse(captcha_is_valid(request))
+        with self.assertLogs("core.helpers", level="ERROR"):
+            self.assertFalse(captcha_is_valid(request))
 
 
 class GenerateCaptchaTest(TestCase):

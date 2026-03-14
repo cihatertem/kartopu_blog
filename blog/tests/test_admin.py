@@ -90,8 +90,9 @@ class BlogAdminTests(TestCase):
                 raise Exception("Cannot resolve url")
 
         bad_image = BadImage()
-        url = inline._get_rendition_url(bad_image)
-        self.assertIsNone(url)
+        with self.assertLogs("blog.admin", level="ERROR"):
+            url = inline._get_rendition_url(bad_image)
+            self.assertIsNone(url)
 
     def test_blogpost_admin_actions(self):
         model_admin = BlogPostAdmin(BlogPost, self.site)

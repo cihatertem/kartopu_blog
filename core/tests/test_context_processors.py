@@ -5,6 +5,7 @@ from django.contrib.auth import get_user_model
 from django.core.cache import cache
 from django.test import RequestFactory, TestCase, override_settings
 from django.urls import resolve
+from django.utils import timezone
 
 from blog.cache_keys import (
     NAV_CATEGORIES_KEY,
@@ -61,7 +62,7 @@ class ContextProcessorsTests(TestCase):
             author=self.staff_user,
             category=self.cat1,
             status=BlogPost.Status.PUBLISHED,
-            published_at=datetime(2023, 1, 15, tzinfo=None),
+            published_at=timezone.make_aware(datetime(2023, 1, 15)),
             view_count=100,
         )
         self.post1.tags.add(self.tag1)
@@ -72,7 +73,7 @@ class ContextProcessorsTests(TestCase):
             author=self.staff_user,
             category=self.cat_portfolio,
             status=BlogPost.Status.PUBLISHED,
-            published_at=datetime(2023, 2, 20, tzinfo=None),
+            published_at=timezone.make_aware(datetime(2023, 2, 20)),
         )
 
         Comment.objects.create(
