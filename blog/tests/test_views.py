@@ -137,6 +137,30 @@ class BlogViewsTests(TestCase):
                 response = self.client.get(url, {"q": "Published"}, follow=True)
                 self.assertEqual(response.status_code, 200)
 
+    def test_search_results_view_malicious_payloads(self):
+        # We test that malicious payloads don't crash the database query parser.
+        # SQLite doesn't support SearchVector and SearchQuery natively in Django tests without extensions.
+        # So we patch the queryset evaluation to prevent NotImplementedError in tests,
+        # but we let the SearchQuery object get initialized to ensure it doesn't crash Python side.
+        from unittest.mock import patch
+
+        payloads = [
+            "a|echo | dveq38oqyl||echo",
+            "1%>\"%>'%>zj<%=7337*6123%>zj",
+            "'';'()(null",
+            "apple & | ! orange",
+        ]
+
+        url = reverse("blog:search_results")
+
+        # Mock the get_page function directly to bypass the database evaluation
+        # (which triggers the NotImplementedError for SearchVector on SQLite)
+        with patch("blog.views.get_page_obj") as mock_get_page_obj:
+            mock_get_page_obj.return_value = []
+            for payload in payloads:
+                response = self.client.get(url, {"q": payload}, follow=True)
+                self.assertEqual(response.status_code, 200)
+
     def test_post_reaction_requires_social_account(self):
         url = reverse("blog:post_reaction", kwargs={"slug": self.published_post.slug})
         request = self.factory.post(

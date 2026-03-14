@@ -446,8 +446,8 @@ def search_results(request):
         )
 
         query = SearchQuery(
-            " | ".join(tokens),
-            search_type="raw",
+            " ".join(tokens),
+            search_type="websearch",
             config="turkish",
         )
 
