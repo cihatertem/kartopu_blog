@@ -1,5 +1,5 @@
 from datetime import date
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
 
 from django.test import TestCase
 
@@ -147,6 +147,23 @@ class PortfolioServicesTest(TestCase):
         long_name = "a" * 300
         slug3 = generate_unique_slug(Category, long_name)
         self.assertLessEqual(len(slug3), 255)
+
+    @patch("core.services.portfolio.secrets.choice")
+    def test_generate_unique_slug_collision(self, mock_choice):
+        from blog.models import Category
+
+        # Make the mock_choice return 'a' 6 times, then 'b' 6 times.
+        mock_choice.side_effect = ["a"] * 6 + ["b"] * 6
+
+        mock_qs = MagicMock()
+        mock_qs.exists.side_effect = [True, False]
+        mock_filter = MagicMock(return_value=mock_qs)
+
+        with patch.object(Category.objects, "filter", mock_filter):
+            slug = generate_unique_slug(Category, "Test Collision")
+
+        self.assertEqual(slug, "test-collision#bbbbbb")
+        self.assertEqual(mock_qs.exists.call_count, 2)
 
     def test__build_slug_base_empty_name(self):
         base = _build_slug_base("", max_length=255)
