@@ -67,6 +67,20 @@ class PortfolioServicesTest(TestCase):
 
         self.assertEqual(build_comparison_name(base, compare), "Base Name")
 
+        # Missing branch tests
+        self.assertEqual(build_comparison_name(None, None), "None → None")
+
+        class SnapshotWithoutNameAttr:
+            def __str__(self):
+                return "SnapshotStr"
+
+        base_no_attr = SnapshotWithoutNameAttr()
+        compare_no_attr = SnapshotWithoutNameAttr()
+        self.assertEqual(
+            build_comparison_name(base_no_attr, compare_no_attr),
+            "SnapshotStr → SnapshotStr",
+        )
+
     def test_format_comparison_label(self):
         self.assertEqual(
             format_comparison_label(
