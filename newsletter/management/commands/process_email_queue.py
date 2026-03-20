@@ -1,6 +1,6 @@
-import concurrent.futures
 import os
 import time
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import timedelta
 
 from django.core.mail import EmailMultiAlternatives
@@ -53,10 +53,8 @@ class Command(BaseCommand):
         processing_timeout = options["processing_timeout"]
         send_interval = 1.0 / rate
 
-        # Simple lock to prevent multiple instances
         lock_file = "/tmp/process_email_queue.lock"
         if os.path.exists(lock_file):
-            # Check if process is actually running (optional but safer)
             self.stdout.write(
                 self.style.WARNING("Processor already running or lock file exists.")
             )
@@ -156,10 +154,6 @@ class Command(BaseCommand):
                     except Exception as e:
                         return (email_item, False, e)
 
-                # Pre-populate attachment_cache if needed, though we can safely share it across threads since it's just a dict of lists
-                # However, thread-safety of dict updates isn't guaranteed if multiple threads update it simultaneously.
-                # Since multiple emails might point to the same direct_email, let's pre-cache all attachments in the main thread
-                # to avoid race conditions.
                 for email_item in pending_emails:
                     if email_item.direct_email:
                         de_id = email_item.direct_email.id
@@ -176,13 +170,9 @@ class Command(BaseCommand):
                             attachment_cache[de_id] = attachments_data
 
                 futures = []
-                # Max 100 workers, or fewer if count is smaller, but capped at something reasonable.
-                # However we want to ensure we don't block the rate limiter if send takes long.
                 max_workers = min(100, max(10, rate))
 
-                with concurrent.futures.ThreadPoolExecutor(
-                    max_workers=max_workers
-                ) as executor:
+                with ThreadPoolExecutor(max_workers=max_workers) as executor:
                     for email_item in pending_emails:
                         start_time = time.time()
 
@@ -196,8 +186,7 @@ class Command(BaseCommand):
                         if wait > 0:
                             time.sleep(wait)
 
-                    # Wait for all futures to complete
-                    for future in concurrent.futures.as_completed(futures):
+                    for future in as_completed(futures):
                         email_item, success, error_msg = future.result()
                         now = timezone.now()
 

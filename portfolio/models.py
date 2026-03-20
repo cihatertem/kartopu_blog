@@ -25,7 +25,7 @@ from portfolio.services import (
     fetch_yahoo_finance_price,
 )
 
-MAX_DICITS = 200
+MAX_DIGITS = 200
 MAX_DECIMAL_PLACES = 4
 MAX_DECIMAL_PLACES_FOR_QUANTITY = 5
 MAX_DECIMAL_PLACES_FOR_RATE = 4
@@ -120,7 +120,7 @@ class Asset(UUIDModelMixin, TimeStampedModelMixin):
         max_length=10, default=Currency.TRY, choices=Currency.choices
     )
     current_price = models.DecimalField(
-        max_digits=MAX_DICITS,
+        max_digits=MAX_DIGITS,
         decimal_places=MAX_DECIMAL_PLACES,
         null=True,
         blank=True,
@@ -216,7 +216,7 @@ class Portfolio(UUIDModelMixin, TimeStampedModelMixin):
         default=Currency.TRY,
     )
     target_value = models.DecimalField(
-        max_digits=MAX_DICITS, decimal_places=MAX_DECIMAL_PLACES
+        max_digits=MAX_DIGITS, decimal_places=MAX_DECIMAL_PLACES
     )
 
     class Meta:  # pyright: ignore[reportIncompatibleVariableOverride]
@@ -650,10 +650,10 @@ class PortfolioTransaction(UUIDModelMixin, TimeStampedModelMixin):
     )
     trade_date = models.DateField()
     quantity = models.DecimalField(
-        max_digits=MAX_DICITS, decimal_places=MAX_DECIMAL_PLACES_FOR_QUANTITY
+        max_digits=MAX_DIGITS, decimal_places=MAX_DECIMAL_PLACES_FOR_QUANTITY
     )
     capital_increase_rate_pct = models.DecimalField(
-        max_digits=MAX_DICITS,
+        max_digits=MAX_DIGITS,
         decimal_places=MAX_DECIMAL_PLACES_FOR_RATE,
         null=True,
         blank=True,
@@ -681,7 +681,7 @@ class PortfolioTransaction(UUIDModelMixin, TimeStampedModelMixin):
         ),
     )
     price_per_unit = models.DecimalField(
-        max_digits=MAX_DICITS, decimal_places=MAX_DECIMAL_PLACES
+        max_digits=MAX_DIGITS, decimal_places=MAX_DECIMAL_PLACES
     )
 
     notes = models.TextField(blank=True)
@@ -741,19 +741,19 @@ class PortfolioSnapshot(BaseSnapshot):
     )
     period = models.CharField(max_length=10, choices=Period.choices)
     total_value = models.DecimalField(
-        max_digits=MAX_DICITS, decimal_places=MAX_DECIMAL_PLACES
+        max_digits=MAX_DIGITS, decimal_places=MAX_DECIMAL_PLACES
     )
     total_cost = models.DecimalField(
-        max_digits=MAX_DICITS, decimal_places=MAX_DECIMAL_PLACES
+        max_digits=MAX_DIGITS, decimal_places=MAX_DECIMAL_PLACES
     )
     target_value = models.DecimalField(
-        max_digits=MAX_DICITS, decimal_places=MAX_DECIMAL_PLACES
+        max_digits=MAX_DIGITS, decimal_places=MAX_DECIMAL_PLACES
     )
     total_return_pct = models.DecimalField(
         max_digits=10, decimal_places=MAX_DECIMAL_PLACES
     )
     irr_pct = models.DecimalField(
-        max_digits=MAX_DICITS, decimal_places=MAX_DECIMAL_PLACES, null=True, blank=True
+        max_digits=MAX_DIGITS, decimal_places=MAX_DECIMAL_PLACES, null=True, blank=True
     )
     is_featured = models.BooleanField(default=False)
 
@@ -870,23 +870,23 @@ class PortfolioSnapshotItem(UUIDModelMixin, TimeStampedModelMixin):
     )
     asset = models.ForeignKey(Asset, on_delete=models.PROTECT)
     quantity = models.DecimalField(
-        max_digits=MAX_DICITS, decimal_places=MAX_DECIMAL_PLACES_FOR_QUANTITY
+        max_digits=MAX_DIGITS, decimal_places=MAX_DECIMAL_PLACES_FOR_QUANTITY
     )
     average_cost = models.DecimalField(
-        max_digits=MAX_DICITS, decimal_places=MAX_DECIMAL_PLACES
+        max_digits=MAX_DIGITS, decimal_places=MAX_DECIMAL_PLACES
     )
     cost_basis = models.DecimalField(
-        max_digits=MAX_DICITS, decimal_places=MAX_DECIMAL_PLACES
+        max_digits=MAX_DIGITS, decimal_places=MAX_DECIMAL_PLACES
     )
     current_price = models.DecimalField(
-        max_digits=MAX_DICITS, decimal_places=MAX_DECIMAL_PLACES
+        max_digits=MAX_DIGITS, decimal_places=MAX_DECIMAL_PLACES
     )
     market_value = models.DecimalField(
-        max_digits=MAX_DICITS, decimal_places=MAX_DECIMAL_PLACES
+        max_digits=MAX_DIGITS, decimal_places=MAX_DECIMAL_PLACES
     )
     allocation_pct = models.DecimalField(max_digits=10, decimal_places=4)
     gain_loss = models.DecimalField(
-        max_digits=MAX_DICITS, decimal_places=MAX_DECIMAL_PLACES
+        max_digits=MAX_DIGITS, decimal_places=MAX_DECIMAL_PLACES
     )
     gain_loss_pct = models.DecimalField(max_digits=10, decimal_places=4)
 
@@ -940,7 +940,7 @@ class CashFlowEntry(UUIDModelMixin, TimeStampedModelMixin):
     entry_date = models.DateField()
     category = models.CharField(max_length=30, choices=Category.choices)
     amount = models.DecimalField(
-        max_digits=MAX_DICITS, decimal_places=MAX_DECIMAL_PLACES
+        max_digits=MAX_DIGITS, decimal_places=MAX_DECIMAL_PLACES
     )
     currency = models.CharField(
         max_length=10,
@@ -978,7 +978,7 @@ class CashFlowSnapshot(BaseSnapshot):
         help_text="İsimlendirme yapılmazsa CashFlow adı kullanılır.",
     )
     total_amount = models.DecimalField(
-        max_digits=MAX_DICITS, decimal_places=MAX_DECIMAL_PLACES
+        max_digits=MAX_DIGITS, decimal_places=MAX_DECIMAL_PLACES
     )
 
     class Meta:  # pyright: ignore[reportIncompatibleVariableOverride]
@@ -1161,7 +1161,7 @@ class CashFlowSnapshotItem(UUIDModelMixin, TimeStampedModelMixin):
     )
     category = models.CharField(max_length=30, choices=CashFlowEntry.Category.choices)
     amount = models.DecimalField(
-        max_digits=MAX_DICITS, decimal_places=MAX_DECIMAL_PLACES
+        max_digits=MAX_DIGITS, decimal_places=MAX_DECIMAL_PLACES
     )
     allocation_pct = models.DecimalField(max_digits=10, decimal_places=4)
 
@@ -1250,11 +1250,11 @@ class SalarySavingsEntry(UUIDModelMixin, TimeStampedModelMixin):
     )
     entry_date = models.DateField()
     salary_amount = models.DecimalField(
-        max_digits=MAX_DICITS,
+        max_digits=MAX_DIGITS,
         decimal_places=MAX_DECIMAL_PLACES,
     )
     savings_amount = models.DecimalField(
-        max_digits=MAX_DICITS,
+        max_digits=MAX_DIGITS,
         decimal_places=MAX_DECIMAL_PLACES,
     )
     notes = models.TextField(blank=True)
@@ -1280,11 +1280,11 @@ class SalarySavingsSnapshot(BaseSnapshot):
         help_text="İsimlendirme yapılmazsa akış adı ve tarih kullanılır.",
     )
     total_salary = models.DecimalField(
-        max_digits=MAX_DICITS,
+        max_digits=MAX_DIGITS,
         decimal_places=MAX_DECIMAL_PLACES,
     )
     total_savings = models.DecimalField(
-        max_digits=MAX_DICITS,
+        max_digits=MAX_DIGITS,
         decimal_places=MAX_DECIMAL_PLACES,
     )
     savings_rate = models.DecimalField(max_digits=10, decimal_places=4)
@@ -1402,16 +1402,16 @@ class DividendPayment(UUIDModelMixin, TimeStampedModelMixin):
     )
     payment_date = models.DateField()
     share_count = models.DecimalField(
-        max_digits=MAX_DICITS, decimal_places=MAX_DECIMAL_PLACES_FOR_QUANTITY
+        max_digits=MAX_DIGITS, decimal_places=MAX_DECIMAL_PLACES_FOR_QUANTITY
     )
     net_dividend_per_share = models.DecimalField(
-        max_digits=MAX_DICITS, decimal_places=MAX_DECIMAL_PLACES
+        max_digits=MAX_DIGITS, decimal_places=MAX_DECIMAL_PLACES
     )
     average_cost = models.DecimalField(
-        max_digits=MAX_DICITS, decimal_places=MAX_DECIMAL_PLACES
+        max_digits=MAX_DIGITS, decimal_places=MAX_DECIMAL_PLACES
     )
     last_close_price = models.DecimalField(
-        max_digits=MAX_DICITS, decimal_places=MAX_DECIMAL_PLACES
+        max_digits=MAX_DIGITS, decimal_places=MAX_DECIMAL_PLACES
     )
     notes = models.TextField(blank=True)
 
@@ -1479,10 +1479,10 @@ class Dividend(UUIDModelMixin, TimeStampedModelMixin):
         default=Asset.Currency.TRY,
     )
     per_share_net_amount = models.DecimalField(
-        max_digits=MAX_DICITS, decimal_places=MAX_DECIMAL_PLACES
+        max_digits=MAX_DIGITS, decimal_places=MAX_DECIMAL_PLACES
     )
     total_net_amount = models.DecimalField(
-        max_digits=MAX_DICITS, decimal_places=MAX_DECIMAL_PLACES
+        max_digits=MAX_DIGITS, decimal_places=MAX_DECIMAL_PLACES
     )
 
     class Meta:  # pyright: ignore[reportIncompatibleVariableOverride]
@@ -1507,7 +1507,7 @@ class DividendSnapshot(BaseSnapshot):
         default=Asset.Currency.TRY,
     )
     total_amount = models.DecimalField(
-        max_digits=MAX_DICITS, decimal_places=MAX_DECIMAL_PLACES
+        max_digits=MAX_DIGITS, decimal_places=MAX_DECIMAL_PLACES
     )
 
     class Meta:  # pyright: ignore[reportIncompatibleVariableOverride]
@@ -1756,7 +1756,7 @@ class DividendSnapshotAssetItem(UUIDModelMixin, TimeStampedModelMixin):
     )
     asset = models.ForeignKey(Asset, on_delete=models.PROTECT)
     total_amount = models.DecimalField(
-        max_digits=MAX_DICITS, decimal_places=MAX_DECIMAL_PLACES
+        max_digits=MAX_DIGITS, decimal_places=MAX_DECIMAL_PLACES
     )
     allocation_pct = models.DecimalField(max_digits=10, decimal_places=4)
 
@@ -1778,16 +1778,16 @@ class DividendSnapshotPaymentItem(UUIDModelMixin, TimeStampedModelMixin):
     payment = models.ForeignKey(DividendPayment, on_delete=models.CASCADE)
     payment_date = models.DateField()
     per_share_net_amount = models.DecimalField(
-        max_digits=MAX_DICITS, decimal_places=MAX_DECIMAL_PLACES
+        max_digits=MAX_DIGITS, decimal_places=MAX_DECIMAL_PLACES
     )
     dividend_yield_on_payment_price = models.DecimalField(
-        max_digits=MAX_DICITS, decimal_places=MAX_DECIMAL_PLACES
+        max_digits=MAX_DIGITS, decimal_places=MAX_DECIMAL_PLACES
     )
     dividend_yield_on_average_cost = models.DecimalField(
-        max_digits=MAX_DICITS, decimal_places=MAX_DECIMAL_PLACES
+        max_digits=MAX_DIGITS, decimal_places=MAX_DECIMAL_PLACES
     )
     total_net_amount = models.DecimalField(
-        max_digits=MAX_DICITS, decimal_places=MAX_DECIMAL_PLACES
+        max_digits=MAX_DIGITS, decimal_places=MAX_DECIMAL_PLACES
     )
 
     class Meta:  # pyright: ignore[reportIncompatibleVariableOverride]
