@@ -123,6 +123,24 @@ class TestRenderHTMLFunctions(TestCase):
         html = _render_portfolio_irr_charts_html(s)
         self.assertIn("portfolio-irr-charts", html)
 
+    @patch("blog.templatetags.blog_extras._render_portfolio_irr_charts_html")
+    @patch("blog.templatetags.blog_extras._get_item_by_identifier")
+    @patch("blog.templatetags.blog_extras._get_portfolio_snapshots")
+    def test_portfolio_irr_charts(
+        self, mock_get_snapshots, mock_get_item, mock_render_charts
+    ):
+        mock_get_snapshots.return_value = ["snap1"]
+        mock_get_item.return_value = "snap1"
+        mock_render_charts.return_value = "<html>irr charts</html>"
+
+        context = {"post": "dummy_post"}
+        html = blog_extras.portfolio_irr_charts(context, index=1)
+
+        mock_get_snapshots.assert_called_once_with("dummy_post")
+        mock_get_item.assert_called_once_with(["snap1"], 1)
+        mock_render_charts.assert_called_once_with("snap1")
+        self.assertEqual(html, "<html>irr charts</html>")
+
     @patch("blog.templatetags.blog_extras._render_portfolio_summary_html")
     @patch("blog.templatetags.blog_extras._get_item_by_identifier")
     @patch("blog.templatetags.blog_extras._get_portfolio_snapshots")

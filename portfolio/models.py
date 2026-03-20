@@ -1142,13 +1142,17 @@ class CashFlowSnapshot(BaseSnapshot):
     def _create_snapshot_items(
         cls, snapshot: BaseSnapshot, items_data: list[object]
     ) -> None:
-        for item in items_data:
-            CashFlowSnapshotItem.objects.create(
+        objects_to_create = [
+            CashFlowSnapshotItem(
                 snapshot=snapshot,
                 category=item["category"],  # pyright: ignore[reportIndexIssue]
                 amount=item["amount"],  # pyright: ignore[reportIndexIssue]
                 allocation_pct=item["allocation_pct"],  # pyright: ignore[reportIndexIssue]
             )
+            for item in items_data
+        ]
+        if objects_to_create:
+            CashFlowSnapshotItem.objects.bulk_create(objects_to_create)
 
 
 class CashFlowSnapshotItem(UUIDModelMixin, TimeStampedModelMixin):
