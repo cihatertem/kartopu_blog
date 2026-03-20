@@ -177,6 +177,24 @@ class TestRenderHTMLFunctions(TestCase):
         mock_render_summary.assert_called_once_with("snap1")
         self.assertEqual(html, "<html>category summary</html>")
 
+    @patch("blog.templatetags.blog_extras._render_portfolio_comparison_summary_html")
+    @patch("blog.templatetags.blog_extras._get_item_by_identifier")
+    @patch("blog.templatetags.blog_extras._get_portfolio_comparisons")
+    def test_portfolio_comparison_summary(
+        self, mock_get_comparisons, mock_get_item, mock_render_summary
+    ):
+        mock_get_comparisons.return_value = ["comp1"]
+        mock_get_item.return_value = "comp1"
+        mock_render_summary.return_value = "<html>comparison_summary</html>"
+
+        context = {"post": "dummy_post"}
+        html = blog_extras.portfolio_comparison_summary(context, index=1)
+
+        mock_get_comparisons.assert_called_once_with("dummy_post")
+        mock_get_item.assert_called_once_with(["comp1"], 1)
+        mock_render_summary.assert_called_once_with("comp1")
+        self.assertEqual(html, "<html>comparison_summary</html>")
+
     @patch("blog.templatetags.blog_extras._render_portfolio_comparison_charts_html")
     @patch("blog.templatetags.blog_extras._get_item_by_identifier")
     @patch("blog.templatetags.blog_extras._get_portfolio_comparisons")

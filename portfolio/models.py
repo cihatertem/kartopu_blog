@@ -385,7 +385,6 @@ class Portfolio(UUIDModelMixin, TimeStampedModelMixin):
 
         for transaction in tx_list:
             asset = transaction.asset
-            # Use price_date (snapshot date) for conversion if provided, otherwise historical
             conversion_date = price_date or transaction.trade_date
             fx_rate = self._get_or_fetch_fx_rate(
                 fx_rates, asset.currency, self.currency, conversion_date
@@ -581,7 +580,6 @@ class Portfolio(UUIDModelMixin, TimeStampedModelMixin):
             elif tx.transaction_type == PortfolioTransaction.TransactionType.SELL:
                 tx_cash_flows.append((tx.trade_date, amount))
 
-            # Update rolling balance
             if tx.transaction_type == PortfolioTransaction.TransactionType.BUY:
                 current_quantity += tx.quantity
             elif tx.transaction_type == PortfolioTransaction.TransactionType.SELL:
@@ -1623,11 +1621,38 @@ class DividendSnapshot(BaseSnapshot):
         asset_totals: dict[str, dict[str, object]] = {}
         payment_rows: list[dict[str, object]] = []
 
-        for payment in payments:
-            dividend = next(
-                (d for d in payment.dividends.all() if d.currency == currency),
-                None,  # pyright: ignore[reportAttributeAccessIssue]
+        payments_list = list(payments)
+        unprefetched_ids = [
+            p.id
+            for p in payments_list
+            if not (
+                hasattr(p, "_prefetched_objects_cache")
+                and "dividends" in p._prefetched_objects_cache
             )
+        ]
+
+        dividends_map = {}
+        if unprefetched_ids:
+            from portfolio.models import Dividend
+
+            dividends_map = {
+                d.payment_id: d  # pyright: ignore[reportAttributeAccessIssue]
+                for d in Dividend.objects.filter(
+                    payment_id__in=unprefetched_ids, currency=currency
+                )
+            }
+
+        for payment in payments_list:
+            if (
+                hasattr(payment, "_prefetched_objects_cache")
+                and "dividends" in payment._prefetched_objects_cache
+            ):
+                dividend = next(
+                    (d for d in payment.dividends.all() if d.currency == currency),
+                    None,  # pyright: ignore[reportAttributeAccessIssue]
+                )
+            else:
+                dividend = dividends_map.get(payment.id)
 
             if dividend:
                 per_share = dividend.per_share_net_amount
@@ -1635,7 +1660,6 @@ class DividendSnapshot(BaseSnapshot):
             else:
                 fx_rate = Decimal("1")
                 if payment.asset.currency != currency:
-                    # Use snapshot_date for currency conversion
                     currency_pair = (payment.asset.currency, currency, snapshot_date)
                     fx_rate = fx_rates.get(currency_pair, Decimal("1"))  # pyright: ignore[reportCallIssue, reportArgumentType]
                 per_share = payment.net_dividend_per_share * fx_rate  # pyright: ignore[reportOperatorIssue]
