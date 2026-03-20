@@ -845,8 +845,8 @@ class PortfolioSnapshot(BaseSnapshot):
     def _create_snapshot_items(
         cls, snapshot: BaseSnapshot, items_data: list[object]
     ) -> None:
-        for position in items_data:
-            PortfolioSnapshotItem.objects.create(
+        items = [
+            PortfolioSnapshotItem(
                 snapshot=snapshot,
                 asset=position["asset"],  # pyright: ignore[reportIndexIssue]
                 quantity=position["quantity"],  # pyright: ignore[reportIndexIssue]
@@ -858,6 +858,10 @@ class PortfolioSnapshot(BaseSnapshot):
                 gain_loss=position["gain_loss"],  # pyright: ignore[reportIndexIssue]
                 gain_loss_pct=position["gain_loss_pct"],  # pyright: ignore[reportIndexIssue]
             )
+            for position in items_data
+        ]
+        if items:
+            PortfolioSnapshotItem.objects.bulk_create(items)
 
 
 class PortfolioSnapshotItem(UUIDModelMixin, TimeStampedModelMixin):
@@ -1750,30 +1754,41 @@ class DividendSnapshot(BaseSnapshot):
     def _create_snapshot_items(
         cls, snapshot: BaseSnapshot, items_data: list[object]
     ) -> None:
+        asset_items = []
+        payment_items = []
         for item in items_data:
             item_type = item["type"]  # pyright: ignore[reportIndexIssue]
             if item_type == "asset":
-                DividendSnapshotAssetItem.objects.create(
-                    snapshot=snapshot,
-                    asset=item["asset"],  # pyright: ignore[reportIndexIssue]
-                    total_amount=item["total_amount"],  # pyright: ignore[reportIndexIssue]
-                    allocation_pct=item["allocation_pct"],  # pyright: ignore[reportIndexIssue]
+                asset_items.append(
+                    DividendSnapshotAssetItem(
+                        snapshot=snapshot,
+                        asset=item["asset"],  # pyright: ignore[reportIndexIssue]
+                        total_amount=item["total_amount"],  # pyright: ignore[reportIndexIssue]
+                        allocation_pct=item["allocation_pct"],  # pyright: ignore[reportIndexIssue]
+                    )
                 )
             elif item_type == "payment":
-                DividendSnapshotPaymentItem.objects.create(
-                    snapshot=snapshot,
-                    asset=item["asset"],  # pyright: ignore[reportIndexIssue]
-                    payment=item["payment"],  # pyright: ignore[reportIndexIssue]
-                    payment_date=item["payment_date"],  # pyright: ignore[reportIndexIssue]
-                    per_share_net_amount=item["per_share_net_amount"],  # pyright: ignore[reportIndexIssue]
-                    dividend_yield_on_payment_price=item[  # pyright: ignore[reportIndexIssue]
-                        "dividend_yield_on_payment_price"
-                    ],  # pyright: ignore[reportIndexIssue]
-                    dividend_yield_on_average_cost=item[  # pyright: ignore[reportIndexIssue]
-                        "dividend_yield_on_average_cost"
-                    ],  # pyright: ignore[reportIndexIssue]
-                    total_net_amount=item["total_net_amount"],  # pyright: ignore[reportIndexIssue]
+                payment_items.append(
+                    DividendSnapshotPaymentItem(
+                        snapshot=snapshot,
+                        asset=item["asset"],  # pyright: ignore[reportIndexIssue]
+                        payment=item["payment"],  # pyright: ignore[reportIndexIssue]
+                        payment_date=item["payment_date"],  # pyright: ignore[reportIndexIssue]
+                        per_share_net_amount=item["per_share_net_amount"],  # pyright: ignore[reportIndexIssue]
+                        dividend_yield_on_payment_price=item[  # pyright: ignore[reportIndexIssue]
+                            "dividend_yield_on_payment_price"
+                        ],  # pyright: ignore[reportIndexIssue]
+                        dividend_yield_on_average_cost=item[  # pyright: ignore[reportIndexIssue]
+                            "dividend_yield_on_average_cost"
+                        ],  # pyright: ignore[reportIndexIssue]
+                        total_net_amount=item["total_net_amount"],  # pyright: ignore[reportIndexIssue]
+                    )
                 )
+
+        if asset_items:
+            DividendSnapshotAssetItem.objects.bulk_create(asset_items)
+        if payment_items:
+            DividendSnapshotPaymentItem.objects.bulk_create(payment_items)
 
 
 class DividendSnapshotAssetItem(UUIDModelMixin, TimeStampedModelMixin):
