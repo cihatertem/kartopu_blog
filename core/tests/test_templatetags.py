@@ -1,12 +1,13 @@
 from django.core.cache import cache
+from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import RequestFactory, TestCase, override_settings
 from django.urls import reverse
 from django.utils import timezone
 
 from accounts.models import User
 from blog.models import BlogPost, Category, Tag
-from core.models import AboutPage, PageSEO, SiteSettings
-from core.templatetags.seo_tags import get_seo_data
+from core.models import AboutPage, AboutPageImage, PageSEO, SiteSettings
+from core.templatetags.seo_tags import _make_absolute, get_seo_data
 
 
 @override_settings(SITE_BASE_URL="https://kartopu.money", SECURE_SSL_REDIRECT=False)
@@ -43,6 +44,24 @@ class SEOTest(TestCase):
         )
         self.post.tags.add(self.tag)
 
+    def test_make_absolute_url(self):
+        self.assertEqual(_make_absolute(None), "")
+        self.assertEqual(_make_absolute(""), "")
+        self.assertEqual(
+            _make_absolute("http://example.com/image.png"),
+            "http://example.com/image.png",
+        )
+        self.assertEqual(
+            _make_absolute("https://example.com/image.png"),
+            "https://example.com/image.png",
+        )
+        self.assertEqual(
+            _make_absolute("/media/image.png"), "https://kartopu.money/media/image.png"
+        )
+        self.assertEqual(
+            _make_absolute("media/image.png"), "https://kartopu.money/media/image.png"
+        )
+
     def test_default_seo(self):
         request = self.factory.get("/")
         seo = get_seo_data({"request": request})
@@ -54,6 +73,12 @@ class SEOTest(TestCase):
         request = self.factory.get(self.post.get_absolute_url())
 
         self.post.category = self.category
+        dummy_image = SimpleUploadedFile(
+            name="test_cover.png",
+            content=b"\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR\x00\x00\x00\x01\x00\x00\x00\x01\x08\x06\x00\x00\x00\x1f\x15\xc4\x89\x00\x00\x00\nIDATx\x9cc\x00\x01\x00\x00\x05\x00\x01\r\n-\xb4\x00\x00\x00\x00IEND\xaeB`\x82",
+            content_type="image/png",
+        )
+        self.post.cover_image = dummy_image
         self.post.save()
         post_with_cat = (
             BlogPost.objects.select_related("category", "author")
@@ -67,6 +92,10 @@ class SEOTest(TestCase):
         self.assertEqual(seo.get("type"), "article")
         self.assertEqual(seo.get("article_section"), "Test Category")
         self.assertIn("Test Tag", seo.get("article_tags", []))
+        self.assertTrue(
+            seo.get("image").startswith("https://kartopu.money/media/blog/")
+        )
+        self.assertIn("cover_", seo.get("image"))
 
     def test_category_seo(self):
         request = self.factory.get(self.category.get_absolute_url())
@@ -93,23 +122,47 @@ class SEOTest(TestCase):
 
     def test_pageseo_override(self):
         path = reverse("core:contact")
+        dummy_image = SimpleUploadedFile(
+            name="pageseo_test.png",
+            content=b"\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR\x00\x00\x00\x01\x00\x00\x00\x01\x08\x06\x00\x00\x00\x1f\x15\xc4\x89\x00\x00\x00\nIDATx\x9cc\x00\x01\x00\x00\x05\x00\x01\r\n-\xb4\x00\x00\x00\x00IEND\xaeB`\x82",
+            content_type="image/png",
+        )
         PageSEO.objects.create(
-            path=path, title="Contact SEO Title", description="Contact SEO Desc"
+            path=path,
+            title="Contact SEO Title",
+            description="Contact SEO Desc",
+            image=dummy_image,
         )
         request = self.factory.get(path)
         seo = get_seo_data({"request": request})
 
         self.assertEqual(seo.get("title"), "Contact SEO Title")
         self.assertEqual(seo.get("description"), "Contact SEO Desc")
+        self.assertTrue(seo.get("image").startswith("https://kartopu.money/media/seo/"))
 
     def test_about_page_seo(self):
         about = AboutPage.objects.create(
             title="About Us", meta_title="Meta About", meta_description="About Desc"
         )
+        dummy_image = SimpleUploadedFile(
+            name="about_test.png",
+            content=b"\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR\x00\x00\x00\x01\x00\x00\x00\x01\x08\x06\x00\x00\x00\x1f\x15\xc4\x89\x00\x00\x00\nIDATx\x9cc\x00\x01\x00\x00\x05\x00\x01\r\n-\xb4\x00\x00\x00\x00IEND\xaeB`\x82",
+            content_type="image/png",
+        )
+        AboutPageImage.objects.create(
+            page=about,
+            image=dummy_image,
+            order=0,
+        )
         request = self.factory.get("/about/")
         seo = get_seo_data({"request": request, "about_page": about})
         self.assertEqual(seo.get("title"), "Meta About")
         self.assertEqual(seo.get("description"), "About Desc")
+        self.assertTrue(
+            seo.get("image").startswith(
+                "https://kartopu.money/media/core/about/images/"
+            )
+        )
 
     def test_archive_seo(self):
         request = self.factory.get("/archive/2023/1/")

@@ -113,8 +113,8 @@ class TestRenderHTMLFunctions(TestCase):
         self.assertIn("1.000 ₺", html)
         self.assertIn("800 ₺", html)
         self.assertIn("2.000 ₺", html)
-        self.assertIn("50.00", html)  # target ratio
-        self.assertIn("25.00", html)  # return
+        self.assertIn("50.00", html)
+        self.assertIn("25.00", html)
 
     def test_render_portfolio_irr_charts_html(self):
         self.assertEqual(_render_portfolio_irr_charts_html(None), "")
@@ -263,7 +263,21 @@ class BlogExtrasFiltersTests(TestCase):
             "http://example.com/path/",
         )
         self.assertEqual(blog_extras.absolute_url("", "http://example.com/"), "")
+        self.assertEqual(blog_extras.absolute_url(None, "http://example.com/"), "")
         self.assertEqual(blog_extras.absolute_url("/path/", ""), "/path/")
+        self.assertEqual(blog_extras.absolute_url("/path/", None), "/path/")
+        self.assertEqual(
+            blog_extras.absolute_url("path/", "http://example.com"),
+            "http://example.com/path/",
+        )
+        self.assertEqual(
+            blog_extras.absolute_url("http://other.com/path/", "http://example.com/"),
+            "http://other.com/path/",
+        )
+        self.assertEqual(
+            blog_extras.absolute_url(123, "http://example.com/"),
+            "http://example.com/123",
+        )
 
     def test_mul100(self):
         self.assertEqual(blog_extras.mul100(0.12), 12.0)

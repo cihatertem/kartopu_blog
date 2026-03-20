@@ -21,6 +21,15 @@ class PortfolioServicesTest(TestCase):
         name_no_date = build_snapshot_name("UserB", None)
         self.assertEqual(name_no_date, "UserB")
 
+        name_empty_owner = build_snapshot_name("", date(2023, 1, 1))
+        self.assertEqual(name_empty_owner, " - 2023-01-01")
+
+        name_empty_no_date = build_snapshot_name("", None)
+        self.assertEqual(name_empty_no_date, "")
+
+        name_special = build_snapshot_name("User C & Co.", date(2023, 1, 1))
+        self.assertEqual(name_special, "User C & Co. - 2023-01-01")
+
     def test_format_snapshot_label(self):
         label1 = format_snapshot_label(
             slug="custom-slug", name=None, owner_label="User", snapshot_date=None
@@ -67,7 +76,6 @@ class PortfolioServicesTest(TestCase):
 
         self.assertEqual(build_comparison_name(base, compare), "Base Name")
 
-        # Missing branch tests
         self.assertEqual(build_comparison_name(None, None), "None → None")
 
         class SnapshotWithoutNameAttr:
