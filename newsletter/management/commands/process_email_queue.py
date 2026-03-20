@@ -94,7 +94,6 @@ class Command(BaseCommand):
                 pending_emails = (
                     EmailQueue.objects.filter(id__in=pending_ids)
                     .select_related("direct_email")
-                    .prefetch_related("direct_email__attachments")
                     .order_by("created_at")
                 )
                 count = len(pending_emails)
@@ -115,6 +114,16 @@ class Command(BaseCommand):
                 emails_to_update = []
                 direct_emails_to_update = {}
                 attachment_cache = {}
+
+                direct_emails = [
+                    email_item.direct_email
+                    for email_item in pending_emails
+                    if email_item.direct_email
+                ]
+                if direct_emails:
+                    from django.db.models import prefetch_related_objects
+
+                    prefetch_related_objects(direct_emails, "attachments")
 
                 def send_email_task(email_item, attachment_cache_local):
                     try:
@@ -154,20 +163,17 @@ class Command(BaseCommand):
                     except Exception as e:
                         return (email_item, False, e)
 
-                for email_item in pending_emails:
-                    if email_item.direct_email:
-                        de_id = email_item.direct_email.id
-                        if de_id not in attachment_cache:
-                            attachments_data = []
-                            for attachment in email_item.direct_email.attachments.all():  # pyright: ignore[reportGeneralTypeIssues]
-                                with attachment.file.open("rb") as f:
-                                    attachments_data.append(
-                                        (
-                                            attachment.file.name.split("/")[-1],
-                                            f.read(),
-                                        )
-                                    )
-                            attachment_cache[de_id] = attachments_data
+                for de in set(direct_emails):
+                    attachments_data = []
+                    for attachment in de.attachments.all():  # pyright: ignore[reportGeneralTypeIssues]
+                        with attachment.file.open("rb") as f:
+                            attachments_data.append(
+                                (
+                                    attachment.file.name.split("/")[-1],
+                                    f.read(),
+                                )
+                            )
+                    attachment_cache[de.id] = attachments_data
 
                 futures = []
                 max_workers = min(100, max(10, rate))
