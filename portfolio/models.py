@@ -543,6 +543,10 @@ class Portfolio(UUIDModelMixin, TimeStampedModelMixin):
                 if tx.trade_date <= as_of_date
             ]
             tx_list.sort(key=lambda tx: (tx.trade_date, tx.created_at))
+
+            from django.db.models import prefetch_related_objects
+
+            prefetch_related_objects(tx_list, "asset")
         else:
             tx_list = list(
                 self.transactions.select_related("asset")  # pyright: ignore[reportAttributeAccessIssue]
