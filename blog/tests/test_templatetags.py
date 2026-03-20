@@ -141,6 +141,24 @@ class TestRenderHTMLFunctions(TestCase):
         mock_render_charts.assert_called_once_with("snap1")
         self.assertEqual(html, "<html>charts</html>")
 
+    @patch("blog.templatetags.blog_extras._render_portfolio_category_summary_html")
+    @patch("blog.templatetags.blog_extras._get_item_by_identifier")
+    @patch("blog.templatetags.blog_extras._get_portfolio_snapshots")
+    def test_portfolio_category_summary(
+        self, mock_get_snapshots, mock_get_item, mock_render_summary
+    ):
+        mock_get_snapshots.return_value = ["snap1"]
+        mock_get_item.return_value = "snap1"
+        mock_render_summary.return_value = "<html>category summary</html>"
+
+        context = {"post": "dummy_post"}
+        html = blog_extras.portfolio_category_summary(context, index=1)
+
+        mock_get_snapshots.assert_called_once_with("dummy_post")
+        mock_get_item.assert_called_once_with(["snap1"], 1)
+        mock_render_summary.assert_called_once_with("snap1")
+        self.assertEqual(html, "<html>category summary</html>")
+
     @patch("blog.templatetags.blog_extras._render_portfolio_comparison_charts_html")
     @patch("blog.templatetags.blog_extras._get_item_by_identifier")
     @patch("blog.templatetags.blog_extras._get_portfolio_comparisons")
@@ -331,10 +349,38 @@ class BlogExtrasFiltersTests(TestCase):
         )
         self.assertEqual(blog_extras.format_currency(1000, "USD"), "1.000 $")
 
-    def test_preload_stylesheet(self):
+    def test_preload_stylesheet_template_tag(self):
+        from django.template import Context, Template
+
+        template = Template(
+            "{% load blog_extras %}{% preload_stylesheet 'css/test.css' %}"
+        )
+        rendered = template.render(Context({}))
+
+        self.assertIn(
+            '<link rel="preload" href="/static/css/test.css" as="style"', rendered
+        )
+        self.assertIn(
+            '<noscript><link rel="stylesheet" href="/static/css/test.css"></noscript>',
+            rendered,
+        )
+        self.assertIn('data-preload-stylesheet="true"', rendered)
+
+    @patch("blog.templatetags.blog_extras.static_url")
+    def test_preload_stylesheet(self, mock_static_url):
+        from django.utils.safestring import SafeString
+
+        mock_static_url.return_value = "/static/css/test.css"
         html = blog_extras.preload_stylesheet("css/test.css")
-        self.assertIn('link rel="preload"', html)
-        self.assertIn("css/test.css", html)
+
+        mock_static_url.assert_called_once_with("css/test.css")
+        self.assertIsInstance(html, SafeString)
+        expected_html = (
+            '<link rel="preload" href="/static/css/test.css" as="style" '
+            'data-preload-stylesheet="true">'
+            '<noscript><link rel="stylesheet" href="/static/css/test.css"></noscript>'
+        )
+        self.assertEqual(html, expected_html)
 
     def test_render_excerpt(self):
         self.assertIn("<strong>bold</strong>", blog_extras.render_excerpt("**bold**"))
@@ -370,6 +416,45 @@ class BlogExtrasFiltersTests(TestCase):
         self.assertIn('src="/src.jpg"', html)
         self.assertIn("Cap", html)
         self.assertIn("Line2", html)
+
+    def test_render_post_content_missing_or_out_of_bounds_images(self):
+        class MockImage:
+            rendition = {
+                "src": "/src.jpg",
+                "srcset": "/src.jpg 1x",
+                "width": 100,
+                "height": 100,
+            }
+            alt_text = "Alt"
+            caption = "Cap"
+
+        # Out of bounds index
+        content = "Line1\n{{ image:2 }}\nLine2"
+        images = [MockImage()]
+        html = blog_extras.render_post_content(content, images)
+        self.assertIn("Line1", html)
+        self.assertNotIn("<figure>", html)
+        self.assertIn("Line2", html)
+
+        # Zero or negative index (0 becomes -1 in python, but handled as out of bounds if not len)
+        # Actually in code: int(match.group(1)) - 1
+        # So "0" becomes -1
+        content = "Line1\n{{ image:0 }}\nLine2"
+        html = blog_extras.render_post_content(content, images)
+        self.assertIn("Line1", html)
+        self.assertNotIn("<figure>", html)
+        self.assertIn("Line2", html)
+
+        # Empty images list
+        content = "Line1\n{{ image:1 }}\nLine2"
+        html = blog_extras.render_post_content(content, [])
+        self.assertIn("Line1", html)
+        self.assertNotIn("<figure>", html)
+        self.assertIn("Line2", html)
+
+    def test_render_post_content_none_content(self):
+        html = blog_extras.render_post_content(None, [])
+        self.assertEqual(html, "")
 
 
 class RenderPostBodyTests(TestCase):
