@@ -141,6 +141,24 @@ class TestRenderHTMLFunctions(TestCase):
         mock_render_charts.assert_called_once_with("snap1")
         self.assertEqual(html, "<html>charts</html>")
 
+    @patch("blog.templatetags.blog_extras._render_portfolio_comparison_charts_html")
+    @patch("blog.templatetags.blog_extras._get_item_by_identifier")
+    @patch("blog.templatetags.blog_extras._get_portfolio_comparisons")
+    def test_portfolio_comparison_charts(
+        self, mock_get_comparisons, mock_get_item, mock_render_charts
+    ):
+        mock_get_comparisons.return_value = ["comp1"]
+        mock_get_item.return_value = "comp1"
+        mock_render_charts.return_value = "<html>comparison_charts</html>"
+
+        context = {"post": "dummy_post"}
+        html = blog_extras.portfolio_comparison_charts(context, index=1)
+
+        mock_get_comparisons.assert_called_once_with("dummy_post")
+        mock_get_item.assert_called_once_with(["comp1"], 1)
+        mock_render_charts.assert_called_once_with("comp1")
+        self.assertEqual(html, "<html>comparison_charts</html>")
+
     def test_render_portfolio_charts_html(self):
         self.assertEqual(_render_portfolio_charts_html(None), "")
         s = DummySnapshot()

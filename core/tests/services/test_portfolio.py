@@ -46,6 +46,16 @@ class PortfolioServicesTest(TestCase):
         )
         self.assertEqual(label3, "User - 2023-01-01")
 
+        label4 = format_snapshot_label(
+            slug="", name="", owner_label="User", snapshot_date=date(2023, 1, 1)
+        )
+        self.assertEqual(label4, "User - 2023-01-01")
+
+        label5 = format_snapshot_label(
+            slug=None, name=None, owner_label="User", snapshot_date=None
+        )
+        self.assertEqual(label5, "User")
+
     def test_build_comparison_name(self):
         base = MagicMock(name="Base")
         base.name = "Base Name"
@@ -152,7 +162,6 @@ class PortfolioServicesTest(TestCase):
     def test_generate_unique_slug_collision(self, mock_choice):
         from blog.models import Category
 
-        # Make the mock_choice return 'a' 6 times, then 'b' 6 times.
         mock_choice.side_effect = ["a"] * 6 + ["b"] * 6
 
         mock_qs = MagicMock()
