@@ -90,25 +90,49 @@ class PortfolioServicesTest(TestCase):
         )
 
     def test_format_comparison_label(self):
+        base = MagicMock()
+        base.__str__.return_value = "BaseStr"
+        compare = MagicMock()
+        compare.__str__.return_value = "CompareStr"
         self.assertEqual(
             format_comparison_label(
-                slug="comp-slug", name=None, base_snapshot="A", compare_snapshot="B"
+                slug="comp-slug",
+                name="Comp Name",
+                base_snapshot=base,
+                compare_snapshot=compare,
             ),
             "comp-slug",
         )
 
         self.assertEqual(
             format_comparison_label(
-                slug=None, name="Comp Name", base_snapshot="A", compare_snapshot="B"
+                slug="", name="Comp Name", base_snapshot=base, compare_snapshot=compare
             ),
             "Comp Name",
         )
 
         self.assertEqual(
             format_comparison_label(
-                slug=None, name=None, base_snapshot="A", compare_snapshot="B"
+                slug=None,
+                name="Comp Name",
+                base_snapshot=base,
+                compare_snapshot=compare,
             ),
-            "A → B",
+            "Comp Name",
+        )
+
+        self.assertEqual(
+            format_comparison_label(
+                slug="", name="", base_snapshot=base, compare_snapshot=compare
+            ),
+            "BaseStr → CompareStr",
+        )
+
+        self.assertEqual(
+            format_comparison_label(
+                slug=None, name=None, base_snapshot=base, compare_snapshot=compare
+            ),
+            "BaseStr → CompareStr",
         )
 
     def test_generate_unique_slug(self):

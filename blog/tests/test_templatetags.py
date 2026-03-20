@@ -301,9 +301,18 @@ class BlogExtrasFiltersTests(TestCase):
         self.assertIn("css/test.css", html)
 
     def test_render_excerpt(self):
-        text = "**bold**"
-        html = blog_extras.render_excerpt(text)
-        self.assertIn("<strong>bold</strong>", html)
+        self.assertIn("<strong>bold</strong>", blog_extras.render_excerpt("**bold**"))
+
+        self.assertEqual("", blog_extras.render_excerpt(None))
+
+        self.assertEqual("", blog_extras.render_excerpt(""))
+
+        html = blog_extras.render_excerpt("[link](javascript:alert(1))")
+        self.assertNotIn("javascript:", html)
+        self.assertIn("<a>link</a>", html)
+
+        html = blog_extras.render_excerpt("<script>alert(1)</script>")
+        self.assertNotIn("<script>", html)
 
     def test_render_post_content(self):
         class MockImage:
