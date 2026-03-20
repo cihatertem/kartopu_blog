@@ -407,7 +407,12 @@ def _get_cashflow_comparisons(post):
             "compare_snapshot",
             "base_snapshot__cashflow",
             "compare_snapshot__cashflow",
-        ).order_by("created_at"),
+        )
+        .prefetch_related(
+            "base_snapshot__items",
+            "compare_snapshot__items",
+        )
+        .order_by("created_at"),
     )
 
 
