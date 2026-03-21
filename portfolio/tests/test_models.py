@@ -293,6 +293,20 @@ class LogicTests(ModelsTestCase):
         try_dividend = payment.dividends.get(currency=Asset.Currency.TRY)
         self.assertEqual(try_dividend.total_net_amount, Decimal("20.0"))
 
+        initial_dividend_count = payment.dividends.count()
+
+        mock_fetch_fx.return_value = Decimal("3.0")
+        payment.net_dividend_per_share = 2
+        payment.save()
+
+        self.assertEqual(payment.dividends.count(), initial_dividend_count)
+
+        usd_dividend.refresh_from_db()
+        self.assertEqual(usd_dividend.total_net_amount, Decimal("20.0"))
+
+        try_dividend.refresh_from_db()
+        self.assertEqual(try_dividend.total_net_amount, Decimal("60.0"))
+
     @patch("portfolio.models.fetch_fx_rate")
     def test_dividend_payment_properties(self, mock_fetch):
         mock_fetch.return_value = Decimal("2.0")
