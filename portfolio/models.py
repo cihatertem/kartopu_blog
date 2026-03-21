@@ -1452,6 +1452,7 @@ class DividendPayment(UUIDModelMixin, TimeStampedModelMixin):
     def sync_dividend_currencies(self) -> None:
         base_currency = self.asset.currency
         total_amount = self.total_net_amount
+        dividends_to_create_or_update = []
         for currency, _ in Asset.Currency.choices:
             fx_rate = Decimal("1")
             if base_currency != currency:
@@ -1463,13 +1464,21 @@ class DividendPayment(UUIDModelMixin, TimeStampedModelMixin):
                 fx_rate = fetched_rate if fetched_rate is not None else Decimal("1")
             per_share = self.net_dividend_per_share * fx_rate
             total_converted = total_amount * fx_rate
-            Dividend.objects.update_or_create(
-                payment=self,
-                currency=currency,
-                defaults={
-                    "per_share_net_amount": per_share,
-                    "total_net_amount": total_converted,
-                },
+            dividends_to_create_or_update.append(
+                Dividend(
+                    payment=self,
+                    currency=currency,
+                    per_share_net_amount=per_share,
+                    total_net_amount=total_converted,
+                )
+            )
+
+        if dividends_to_create_or_update:
+            Dividend.objects.bulk_create(
+                dividends_to_create_or_update,
+                update_conflicts=True,
+                unique_fields=["payment", "currency"],
+                update_fields=["per_share_net_amount", "total_net_amount"],
             )
 
     def save(self, *args: object, **kwargs: object) -> None:
