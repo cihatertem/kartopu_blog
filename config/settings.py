@@ -62,6 +62,7 @@ INSTALLED_APPS = [
     "django.contrib.postgres",  # postgres full text search
     "django.contrib.sitemaps",
     "django.contrib.sites",
+    "django.contrib.redirects",
     # third party apps
     "django_cleanup.apps.CleanupConfig",
     "imagekit",
@@ -94,6 +95,7 @@ MIDDLEWARE = [
     "allauth.account.middleware.AccountMiddleware",  # allauth middleware
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
+    "django.contrib.redirects.middleware.RedirectFallbackMiddleware",
 ]
 
 ROOT_URLCONF = "config.urls"
