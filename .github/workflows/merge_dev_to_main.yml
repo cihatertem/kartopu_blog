@@ -10,7 +10,7 @@ permissions:
 
 jobs:
     merge-dev:
-        if: startsWith(github.event.head_commit.message, '[[action:merge_dev]]')
+        if: contains(toJson(github.event.commits.*.message), '[[action:merge_dev]]')
         runs-on: ubuntu-24.04
         steps:
             - name: Checkout repository
@@ -23,11 +23,16 @@ jobs:
                   git config user.name "github-actions[bot]"
                   git config user.email "github-actions[bot]@users.noreply.github.com"
 
-            - name: Merge dev into main
+            - name: Safely Merge dev into main
               run: |
                   git fetch origin main:main
                   git checkout main
-                  git merge --no-ff origin/dev -m "Merge dev into main"
+
+                  if ! git merge --no-ff origin/dev -m "Auto-merge dev into main"; then
+                    echo "Merge conflict detected! Aborting merge."
+                    git merge --abort
+                    exit 1
+                  fi
 
             - name: Push main
               run: git push origin main
