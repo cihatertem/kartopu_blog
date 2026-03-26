@@ -62,11 +62,11 @@ class DividendSnapshotTests(TestCase):
 
         self.assertEqual(
             item.dividend_yield_on_payment_price,
-            round(Decimal("1.00") / Decimal("140.00"), 4),
+            round(Decimal("1.00") / Decimal("140.00"), 8),
         )
         self.assertEqual(
             item.dividend_yield_on_average_cost,
-            round(Decimal("1.00") / Decimal("100.00"), 4),
+            round(Decimal("1.00") / Decimal("100.00"), 8),
         )
 
     @patch("portfolio.models.fetch_fx_rate")
