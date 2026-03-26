@@ -28,6 +28,7 @@ dependencies = [
     "lz4>=4.4.5",
     "redis[hiredis]>=7.2.0",
     "hiredis>=3.3.0",
+    "tblib>=3.2.2",
 ]
 
 [dependency-groups]

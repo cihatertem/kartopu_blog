@@ -26,9 +26,9 @@ from portfolio.services import (
 )
 
 MAX_DIGITS = 200
-MAX_DECIMAL_PLACES = 4
+MAX_DECIMAL_PLACES = 8
 MAX_DECIMAL_PLACES_FOR_QUANTITY = 5
-MAX_DECIMAL_PLACES_FOR_RATE = 4
+MAX_DECIMAL_PLACES_FOR_RATE = 8
 CACHE_TIMEOUT = 600  # 10 minutes
 
 
@@ -752,7 +752,7 @@ class PortfolioSnapshot(BaseSnapshot):
         max_digits=MAX_DIGITS, decimal_places=MAX_DECIMAL_PLACES
     )
     total_return_pct = models.DecimalField(
-        max_digits=10, decimal_places=MAX_DECIMAL_PLACES
+        max_digits=MAX_DIGITS, decimal_places=MAX_DECIMAL_PLACES
     )
     irr_pct = models.DecimalField(
         max_digits=MAX_DIGITS, decimal_places=MAX_DECIMAL_PLACES, null=True, blank=True
@@ -890,11 +890,15 @@ class PortfolioSnapshotItem(UUIDModelMixin, TimeStampedModelMixin):
     market_value = models.DecimalField(
         max_digits=MAX_DIGITS, decimal_places=MAX_DECIMAL_PLACES
     )
-    allocation_pct = models.DecimalField(max_digits=10, decimal_places=4)
+    allocation_pct = models.DecimalField(
+        max_digits=MAX_DIGITS, decimal_places=MAX_DECIMAL_PLACES_FOR_RATE
+    )
     gain_loss = models.DecimalField(
         max_digits=MAX_DIGITS, decimal_places=MAX_DECIMAL_PLACES
     )
-    gain_loss_pct = models.DecimalField(max_digits=10, decimal_places=4)
+    gain_loss_pct = models.DecimalField(
+        max_digits=MAX_DIGITS, decimal_places=MAX_DECIMAL_PLACES_FOR_RATE
+    )
 
     class Meta:  # pyright: ignore[reportIncompatibleVariableOverride]
         verbose_name = "Snapshot Kalemi"
@@ -1173,7 +1177,9 @@ class CashFlowSnapshotItem(UUIDModelMixin, TimeStampedModelMixin):
     amount = models.DecimalField(
         max_digits=MAX_DIGITS, decimal_places=MAX_DECIMAL_PLACES
     )
-    allocation_pct = models.DecimalField(max_digits=10, decimal_places=4)
+    allocation_pct = models.DecimalField(
+        max_digits=MAX_DIGITS, decimal_places=MAX_DECIMAL_PLACES_FOR_RATE
+    )
 
     class Meta:  # pyright: ignore[reportIncompatibleVariableOverride]
         verbose_name = "Nakit Akışı Snapshot Kalemi"
@@ -1297,7 +1303,9 @@ class SalarySavingsSnapshot(BaseSnapshot):
         max_digits=MAX_DIGITS,
         decimal_places=MAX_DECIMAL_PLACES,
     )
-    savings_rate = models.DecimalField(max_digits=10, decimal_places=4)
+    savings_rate = models.DecimalField(
+        max_digits=MAX_DIGITS, decimal_places=MAX_DECIMAL_PLACES_FOR_RATE
+    )
 
     class Meta:  # pyright: ignore[reportIncompatibleVariableOverride]
         verbose_name = "Maaş/Tasarruf Snapshot"
@@ -1814,7 +1822,9 @@ class DividendSnapshotAssetItem(UUIDModelMixin, TimeStampedModelMixin):
     total_amount = models.DecimalField(
         max_digits=MAX_DIGITS, decimal_places=MAX_DECIMAL_PLACES
     )
-    allocation_pct = models.DecimalField(max_digits=10, decimal_places=4)
+    allocation_pct = models.DecimalField(
+        max_digits=MAX_DIGITS, decimal_places=MAX_DECIMAL_PLACES_FOR_RATE
+    )
 
     class Meta:  # pyright: ignore[reportIncompatibleVariableOverride]
         verbose_name = "Temettü Snapshot Varlığı"
