@@ -1,6 +1,9 @@
+from django.contrib.auth import get_user_model
 from django.test import RequestFactory, SimpleTestCase
 
 from core.services.pagination import get_page_obj
+
+User = get_user_model()
 
 
 class PaginationServicesTest(SimpleTestCase):
@@ -15,6 +18,24 @@ class PaginationServicesTest(SimpleTestCase):
         self.assertEqual(page_obj.number, 1)
         self.assertEqual(list(page_obj.object_list), list(range(1, 11)))
         self.assertTrue(page_obj.has_next())
+        self.assertFalse(page_obj.has_previous())
+
+    def test_get_page_obj_empty_list(self):
+        request = self.factory.get("/")
+        page_obj = get_page_obj(request, [], per_page=10)
+
+        self.assertEqual(page_obj.number, 1)
+        self.assertEqual(list(page_obj.object_list), [])
+        self.assertFalse(page_obj.has_next())
+        self.assertFalse(page_obj.has_previous())
+
+    def test_get_page_obj_empty_queryset(self):
+        request = self.factory.get("/")
+        page_obj = get_page_obj(request, User.objects.none(), per_page=10)
+
+        self.assertEqual(page_obj.number, 1)
+        self.assertEqual(list(page_obj.object_list), [])
+        self.assertFalse(page_obj.has_next())
         self.assertFalse(page_obj.has_previous())
 
     def test_get_page_obj_valid_page(self):
@@ -51,6 +72,13 @@ class PaginationServicesTest(SimpleTestCase):
 
     def test_get_page_obj_negative_page(self):
         request = self.factory.get("/?page=-1")
+        page_obj = get_page_obj(request, self.items, per_page=10)
+
+        self.assertEqual(page_obj.number, 3)
+        self.assertEqual(list(page_obj.object_list), list(range(21, 26)))
+
+    def test_get_page_obj_zero_page(self):
+        request = self.factory.get("/?page=0")
         page_obj = get_page_obj(request, self.items, per_page=10)
 
         self.assertEqual(page_obj.number, 3)

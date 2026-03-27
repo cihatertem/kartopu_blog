@@ -119,9 +119,27 @@ class TestRenderHTMLFunctions(TestCase):
     def test_render_portfolio_irr_charts_html(self):
         self.assertEqual(_render_portfolio_irr_charts_html(None), "")
         s = DummySnapshot()
-        s.portfolio.get_irr_history.return_value = [{"date": "2025", "irr": 10}]
+        s.snapshot_date = datetime.date(2025, 1, 1)
+        s.portfolio.get_irr_history.return_value = [
+            {"date": "2024-12-01", "irr": Decimal("5.5")},
+            {"date": "2025-01-01", "irr": Decimal("10.2")},
+        ]
         html = _render_portfolio_irr_charts_html(s)
         self.assertIn("portfolio-irr-charts", html)
+        s.portfolio.get_irr_history.assert_called_once_with(until_date=s.snapshot_date)
+        self.assertIn(
+            "&quot;labels&quot;: [&quot;2024-12-01&quot;, &quot;2025-01-01&quot;]", html
+        )
+        self.assertIn("&quot;values&quot;: [&quot;5.5&quot;, &quot;10.2&quot;]", html)
+
+    def test_render_portfolio_irr_charts_html_empty(self):
+        s = DummySnapshot()
+        s.snapshot_date = datetime.date(2025, 1, 1)
+        s.portfolio.get_irr_history.return_value = []
+        html = _render_portfolio_irr_charts_html(s)
+        self.assertIn("portfolio-irr-charts", html)
+        self.assertIn("&quot;labels&quot;: []", html)
+        self.assertIn("&quot;values&quot;: []", html)
 
     @patch("blog.templatetags.blog_extras._render_portfolio_irr_charts_html")
     @patch("blog.templatetags.blog_extras._get_item_by_identifier")
@@ -405,6 +423,25 @@ class BlogExtrasFiltersTests(TestCase):
             "http://example.com/123",
         )
 
+    def test_absolute_url_template_filter(self):
+        from django.template import Context, Template
+
+        template = Template(
+            "{% load blog_extras %}{{ '/path/'|absolute_url:'http://example.com/' }}"
+        )
+        rendered = template.render(Context({}))
+        self.assertEqual(rendered, "http://example.com/path/")
+
+        template2 = Template("{% load blog_extras %}{{ '/path/'|absolute_url:'' }}")
+        rendered2 = template2.render(Context({}))
+        self.assertEqual(rendered2, "/path/")
+
+        template3 = Template(
+            "{% load blog_extras %}{{ ''|absolute_url:'http://example.com/' }}"
+        )
+        rendered3 = template3.render(Context({}))
+        self.assertEqual(rendered3, "")
+
     def test_mul100(self):
         self.assertEqual(blog_extras.mul100(0.12), 12.0)
         self.assertEqual(blog_extras.mul100(None), 0)
@@ -454,6 +491,38 @@ class BlogExtrasFiltersTests(TestCase):
         )
         self.assertEqual(html, expected_html)
 
+    @patch("blog.templatetags.blog_extras.static_url")
+    def test_preload_stylesheet_empty_path(self, mock_static_url):
+        from django.utils.safestring import SafeString
+
+        mock_static_url.return_value = "/static/"
+        html = blog_extras.preload_stylesheet("")
+
+        mock_static_url.assert_called_once_with("")
+        self.assertIsInstance(html, SafeString)
+        expected_html = (
+            '<link rel="preload" href="/static/" as="style" '
+            'data-preload-stylesheet="true">'
+            '<noscript><link rel="stylesheet" href="/static/"></noscript>'
+        )
+        self.assertEqual(html, expected_html)
+
+    @patch("blog.templatetags.blog_extras.static_url")
+    def test_preload_stylesheet_none_path(self, mock_static_url):
+        from django.utils.safestring import SafeString
+
+        mock_static_url.return_value = "/static/"
+        html = blog_extras.preload_stylesheet(None)
+
+        mock_static_url.assert_called_once_with(None)
+        self.assertIsInstance(html, SafeString)
+        expected_html = (
+            '<link rel="preload" href="/static/" as="style" '
+            'data-preload-stylesheet="true">'
+            '<noscript><link rel="stylesheet" href="/static/"></noscript>'
+        )
+        self.assertEqual(html, expected_html)
+
     def test_render_excerpt(self):
         self.assertIn("<strong>bold</strong>", blog_extras.render_excerpt("**bold**"))
 
@@ -467,6 +536,24 @@ class BlogExtrasFiltersTests(TestCase):
 
         html = blog_extras.render_excerpt("<script>alert(1)</script>")
         self.assertNotIn("<script>", html)
+
+        self.assertEqual(
+            "<p>Hello</p>\n<p>World</p>", blog_extras.render_excerpt("Hello\n\nWorld")
+        )
+
+        self.assertEqual(
+            "<blockquote>\n<p>Blockquote</p>\n</blockquote>",
+            blog_extras.render_excerpt("> Blockquote"),
+        )
+
+        self.assertEqual(
+            "", blog_extras.render_excerpt('<iframe src="http://malicious"></iframe>')
+        )
+
+        self.assertEqual(
+            '<p><img alt="image" src="http://example.com/img.jpg"></p>',
+            blog_extras.render_excerpt("![image](http://example.com/img.jpg)"),
+        )
 
     def test_render_post_content(self):
         class MockImage:
@@ -524,9 +611,42 @@ class BlogExtrasFiltersTests(TestCase):
         self.assertNotIn("<figure>", html)
         self.assertIn("Line2", html)
 
+    def test_render_post_content_no_caption(self):
+        class MockImageNoCaption:
+            rendition = {
+                "src": "/src.jpg",
+                "srcset": "/src.jpg 1x",
+                "width": 100,
+                "height": 100,
+            }
+            alt_text = "Alt"
+            caption = None
+
+        content = "{{ image:1 }}"
+        images = [MockImageNoCaption()]
+
+        html = blog_extras.render_post_content(content, images)
+        self.assertIn("<figure>", html)
+        self.assertIn('src="/src.jpg"', html)
+        self.assertNotIn("<figcaption>", html)
+
     def test_render_post_content_none_content(self):
         html = blog_extras.render_post_content(None, [])
         self.assertEqual(html, "")
+
+    def test_render_post_content_no_rendition(self):
+        class MockImageNoRendition:
+            rendition = None
+            alt_text = "Alt"
+            caption = "Cap"
+
+        content = "Line1\n{{ image:1 }}\nLine2"
+        images = [MockImageNoRendition()]
+
+        html = blog_extras.render_post_content(content, images)
+        self.assertIn("Line1", html)
+        self.assertNotIn("<figure>", html)
+        self.assertIn("Line2", html)
 
 
 class RenderPostBodyTests(TestCase):

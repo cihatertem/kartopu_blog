@@ -13,6 +13,7 @@ from blog.signals import (
     _post_cache_dir,
     _post_cache_storage_dir,
     _post_media_dir,
+    blogpost_delete_files,
     invalidate_nav_cache,
 )
 
@@ -106,6 +107,17 @@ class BlogSignalsTests(TestCase):
         mock_field_empty.storage.delete.assert_not_called()
 
     @patch("blog.signals._delete_storage_file")
+    def test_blogpostimage_delete_files_direct(self, mock_delete_file):
+        from blog.signals import blogpostimage_delete_files
+
+        mock_instance = MagicMock()
+        mock_instance.image = "mocked_image_file"
+
+        blogpostimage_delete_files(sender=BlogPostImage, instance=mock_instance)
+
+        mock_delete_file.assert_called_once_with("mocked_image_file")
+
+    @patch("blog.signals._delete_storage_file")
     def test_blogpostimage_delete_signal(self, mock_delete_file):
         import io
 
@@ -125,6 +137,48 @@ class BlogSignalsTests(TestCase):
 
         mock_delete_file.assert_called_once()
         self.assertEqual(mock_delete_file.call_args[0][0].name, img.image.name)
+
+    @patch("blog.signals._delete_local_dir_if_exists")
+    @patch("blog.signals._delete_storage_dir_if_exists")
+    @patch("blog.signals._post_cache_storage_dir")
+    @patch("blog.signals._post_media_dir")
+    def test_blogpost_delete_files_s3(
+        self,
+        mock_post_media_dir,
+        mock_post_cache_storage_dir,
+        mock_storage_del,
+        mock_local_del,
+    ):
+        mock_post_cache_storage_dir.return_value = "s3_cache_dir"
+        mock_post_media_dir.return_value = "local_media_dir"
+
+        with self.settings(USE_S3=True):
+            blogpost_delete_files(sender=BlogPost, instance=self.post)
+
+        mock_post_cache_storage_dir.assert_called_once_with(self.post)
+        mock_post_media_dir.assert_called_once_with(self.post)
+        mock_storage_del.assert_called_once_with("s3_cache_dir")
+        mock_local_del.assert_called_once_with("local_media_dir")
+
+    @patch("blog.signals._delete_local_dir_if_exists")
+    @patch("blog.signals._delete_storage_dir_if_exists")
+    @patch("blog.signals._post_cache_dir")
+    @patch("blog.signals._post_media_dir")
+    def test_blogpost_delete_files_local(
+        self, mock_post_media_dir, mock_post_cache_dir, mock_storage_del, mock_local_del
+    ):
+        mock_post_cache_dir.return_value = "local_cache_dir"
+        mock_post_media_dir.return_value = "local_media_dir"
+
+        with self.settings(USE_S3=False):
+            blogpost_delete_files(sender=BlogPost, instance=self.post)
+
+        mock_post_cache_dir.assert_called_once_with(self.post)
+        mock_post_media_dir.assert_called_once_with(self.post)
+        mock_storage_del.assert_not_called()
+        mock_local_del.assert_any_call("local_cache_dir")
+        mock_local_del.assert_any_call("local_media_dir")
+        self.assertEqual(mock_local_del.call_count, 2)
 
     @patch("blog.signals._delete_local_dir_if_exists")
     @patch("blog.signals._delete_storage_dir_if_exists")
