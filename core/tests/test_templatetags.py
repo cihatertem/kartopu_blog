@@ -1,6 +1,9 @@
+from unittest.mock import MagicMock, patch
+
 from django.core.cache import cache
 from django.core.files.uploadedfile import SimpleUploadedFile
-from django.test import RequestFactory, TestCase, override_settings
+from django.template import Context, Template
+from django.test import RequestFactory, SimpleTestCase, TestCase, override_settings
 from django.urls import reverse
 from django.utils import timezone
 
@@ -180,10 +183,6 @@ class SEOTest(TestCase):
         seo = get_seo_data({"request": request, "q": "finance"})
         self.assertIn("'finance' Arama Sonuçları", seo.get("title"))
 
-    def test_empty_request(self):
-        seo = get_seo_data({})
-        self.assertEqual(seo, {})
-
     def test_pageseo_exception_logging(self):
         from unittest.mock import patch
 
@@ -205,3 +204,71 @@ class SEOTest(TestCase):
 
                 self.assertEqual(seo.get("title"), "Default Title")
                 self.assertEqual(seo.get("description"), "Default Description")
+
+
+class GetSeoDataIsolatedTest(SimpleTestCase):
+    def setUp(self):
+        self.factory = RequestFactory()
+
+    def test_get_seo_data_no_request(self):
+        context = {}
+        result = get_seo_data(context)
+        self.assertEqual(result, {})
+
+    @patch("core.templatetags.seo_tags.SiteSettings.get_settings")
+    @patch("core.templatetags.seo_tags._update_seo_from_context")
+    @patch("core.templatetags.seo_tags._apply_page_seo_override")
+    @patch("core.templatetags.seo_tags.get_language")
+    @patch("core.templatetags.seo_tags._make_absolute")
+    def test_get_seo_data_with_mocked_helpers(
+        self,
+        mock_make_absolute,
+        mock_get_language,
+        mock_apply_override,
+        mock_update_context,
+        mock_get_settings,
+    ):
+        request = self.factory.get("/test-path/")
+        context = {"request": request, "q": "search"}
+
+        mock_settings = MagicMock()
+        mock_settings.default_meta_title = "Mock Title"
+        mock_settings.default_meta_description = "Mock Description"
+        mock_settings.default_meta_image = None
+        mock_get_settings.return_value = mock_settings
+
+        mock_make_absolute.return_value = "https://example.com/mock-image.jpg"
+        mock_get_language.return_value = "en_US"
+
+        result = get_seo_data(context)
+
+        self.assertEqual(result["title"], "Mock Title")
+        self.assertEqual(result["description"], "Mock Description")
+        self.assertEqual(result["image"], "https://example.com/mock-image.jpg")
+        self.assertEqual(result["locale"], "en_US")
+        self.assertEqual(result["canonical_url"], "http://testserver/test-path/")
+        self.assertEqual(result["type"], "website")
+        self.assertEqual(result["twitter_card"], "summary_large_image")
+
+        mock_update_context.assert_called_once_with(result, context, "Kartopu Money")
+        mock_apply_override.assert_called_once_with(result, request)
+
+    @patch("core.templatetags.seo_tags.SiteSettings.get_settings")
+    @patch("core.templatetags.seo_tags._apply_page_seo_override")
+    def test_get_seo_data_template_integration(
+        self, mock_apply_override, mock_get_settings
+    ):
+        mock_settings = MagicMock()
+        mock_settings.default_meta_title = "Template Title"
+        mock_settings.default_meta_description = "Template Desc"
+        mock_settings.default_meta_image = None
+        mock_get_settings.return_value = mock_settings
+
+        request = self.factory.get("/")
+        context = Context({"request": request})
+        template = Template(
+            "{% load seo_tags %}{% get_seo_data as seo_data %}{{ seo_data.title }}"
+        )
+
+        rendered = template.render(context)
+        self.assertEqual(rendered, "Template Title")

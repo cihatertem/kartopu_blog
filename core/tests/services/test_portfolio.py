@@ -72,6 +72,32 @@ class PortfolioServicesTest(TestCase):
         )
         self.assertEqual(label5, "User")
 
+        label6 = format_snapshot_label(
+            slug="slug-only", name=None, owner_label="User", snapshot_date=None
+        )
+        self.assertEqual(label6, "slug-only")
+
+        label7 = format_snapshot_label(
+            slug=None, name="name-only", owner_label="User", snapshot_date=None
+        )
+        self.assertEqual(label7, "name-only")
+
+        label8 = format_snapshot_label(
+            slug="slug-has-priority",
+            name="name-ignored",
+            owner_label="User",
+            snapshot_date=None,
+        )
+        self.assertEqual(label8, "slug-has-priority")
+
+        label9 = format_snapshot_label(
+            slug="",
+            name="name-only-with-empty-slug",
+            owner_label="User",
+            snapshot_date=None,
+        )
+        self.assertEqual(label9, "name-only-with-empty-slug")
+
     def test_build_comparison_name(self):
         base = MagicMock(name="Base")
         base.name = "Base Name"

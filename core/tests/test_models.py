@@ -1,7 +1,11 @@
+from datetime import datetime
+from unittest.mock import patch
+from zoneinfo import ZoneInfo
+
 from django.core.cache import cache
 from django.core.exceptions import ValidationError
 from django.core.files.uploadedfile import SimpleUploadedFile
-from django.test import TestCase
+from django.test import SimpleTestCase, TestCase
 from PIL import Image
 
 from core.models import (
@@ -11,7 +15,38 @@ from core.models import (
     PageSEO,
     SidebarWidget,
     SiteSettings,
+    about_image_upload_path,
+    site_settings_og_image_upload_path,
 )
+
+
+class SiteSettingsOgImageUploadPathTest(SimpleTestCase):
+    @patch("django.utils.timezone.now")
+    def test_valid_filename(self, mock_now):
+        mock_now.return_value = datetime(
+            2023, 10, 25, 12, 30, 45, tzinfo=ZoneInfo("UTC")
+        )
+        instance = None
+        result = site_settings_og_image_upload_path(instance, "image.png")
+        self.assertEqual(result, "seo/og_image_20231025123045.png")
+
+    @patch("django.utils.timezone.now")
+    def test_uppercase_extension(self, mock_now):
+        mock_now.return_value = datetime(
+            2023, 10, 25, 12, 30, 45, tzinfo=ZoneInfo("UTC")
+        )
+        instance = None
+        result = site_settings_og_image_upload_path(instance, "IMAGE.JPG")
+        self.assertEqual(result, "seo/og_image_20231025123045.jpg")
+
+    @patch("django.utils.timezone.now")
+    def test_filename_with_multiple_dots(self, mock_now):
+        mock_now.return_value = datetime(
+            2023, 10, 25, 12, 30, 45, tzinfo=ZoneInfo("UTC")
+        )
+        instance = None
+        result = site_settings_og_image_upload_path(instance, "my.cool.image.webp")
+        self.assertEqual(result, "seo/og_image_20231025123045.webp")
 
 
 class SiteSettingsTest(TestCase):
@@ -82,6 +117,30 @@ class AboutPageTest(TestCase):
     def test_str_representation(self):
         page = AboutPage.objects.create(title="About Me", content="Content")
         self.assertEqual(str(page), "About Me")
+
+
+class AboutImageUploadPathTest(SimpleTestCase):
+    @patch("django.utils.timezone.now")
+    def test_standard_filename(self, mock_now):
+        from datetime import timezone as dt_timezone
+
+        mock_now.return_value = datetime(2023, 1, 1, 12, 0, 0, tzinfo=dt_timezone.utc)
+
+        result = about_image_upload_path(None, "test.jpg")
+
+        self.assertEqual(result, "core/about/images/test_20230101120000.jpg")
+
+    @patch("django.utils.timezone.now")
+    def test_special_characters_filename(self, mock_now):
+        from datetime import timezone as dt_timezone
+
+        mock_now.return_value = datetime(2023, 1, 1, 12, 0, 0, tzinfo=dt_timezone.utc)
+
+        result = about_image_upload_path(None, "My Awesome Photo!.PNG")
+
+        self.assertEqual(
+            result, "core/about/images/my-awesome-photo_20230101120000.png"
+        )
 
 
 class AboutPageImageTest(TestCase):

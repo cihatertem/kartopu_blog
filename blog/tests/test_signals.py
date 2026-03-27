@@ -106,6 +106,17 @@ class BlogSignalsTests(TestCase):
         mock_field_empty.storage.delete.assert_not_called()
 
     @patch("blog.signals._delete_storage_file")
+    def test_blogpostimage_delete_files_direct(self, mock_delete_file):
+        from blog.signals import blogpostimage_delete_files
+
+        mock_instance = MagicMock()
+        mock_instance.image = "mocked_image_file"
+
+        blogpostimage_delete_files(sender=BlogPostImage, instance=mock_instance)
+
+        mock_delete_file.assert_called_once_with("mocked_image_file")
+
+    @patch("blog.signals._delete_storage_file")
     def test_blogpostimage_delete_signal(self, mock_delete_file):
         import io
 
