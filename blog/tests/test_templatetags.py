@@ -519,6 +519,24 @@ class BlogExtrasFiltersTests(TestCase):
         html = blog_extras.render_excerpt("<script>alert(1)</script>")
         self.assertNotIn("<script>", html)
 
+        self.assertEqual(
+            "<p>Hello</p>\n<p>World</p>", blog_extras.render_excerpt("Hello\n\nWorld")
+        )
+
+        self.assertEqual(
+            "<blockquote>\n<p>Blockquote</p>\n</blockquote>",
+            blog_extras.render_excerpt("> Blockquote"),
+        )
+
+        self.assertEqual(
+            "", blog_extras.render_excerpt('<iframe src="http://malicious"></iframe>')
+        )
+
+        self.assertEqual(
+            '<p><img alt="image" src="http://example.com/img.jpg"></p>',
+            blog_extras.render_excerpt("![image](http://example.com/img.jpg)"),
+        )
+
     def test_render_post_content(self):
         class MockImage:
             rendition = {
