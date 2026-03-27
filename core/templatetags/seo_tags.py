@@ -2,6 +2,7 @@ import logging
 
 from django import template
 from django.conf import settings
+from django.core.cache import cache
 from django.db.models import Q
 from django.utils.translation import get_language
 
@@ -86,18 +87,41 @@ def _get_search_seo_data(seo, context, site_name):
 def _apply_page_seo_override(seo, request):
     try:
         path = request.path
-        page_seo = PageSEO.objects.filter(
-            Q(path=path) | Q(path=path.rstrip("/")) | Q(path=path.rstrip("/") + "/"),
-            is_active=True,
-        ).first()
+        normalized_path = path.rstrip("/") or "/"
+        cache_key = f"page_seo_{normalized_path}"
 
-        if page_seo:
-            if page_seo.title:
-                seo["title"] = page_seo.title
-            if page_seo.description:
-                seo["description"] = page_seo.description
-            if page_seo.image:
-                seo["image"] = _make_absolute(page_seo.image.url)
+        page_seo_data = cache.get(cache_key)
+
+        if page_seo_data is None:
+            page_seo = (
+                PageSEO.objects.filter(
+                    Q(path=path)
+                    | Q(path=path.rstrip("/"))
+                    | Q(path=path.rstrip("/") + "/"),
+                    is_active=True,
+                )
+                .only("title", "description", "image")
+                .first()
+            )
+
+            if page_seo:
+                page_seo_data = {
+                    "title": page_seo.title,
+                    "description": page_seo.description,
+                    "image_url": page_seo.image.url if page_seo.image else None,
+                }
+            else:
+                page_seo_data = {}
+
+            cache.set(cache_key, page_seo_data, timeout=3600)
+
+        if page_seo_data:
+            if page_seo_data.get("title"):
+                seo["title"] = page_seo_data["title"]
+            if page_seo_data.get("description"):
+                seo["description"] = page_seo_data["description"]
+            if page_seo_data.get("image_url"):
+                seo["image"] = _make_absolute(page_seo_data["image_url"])
 
     except Exception:
         logger.exception("Error generating SEO data for path: %s", request.path)

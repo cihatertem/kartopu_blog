@@ -36,9 +36,7 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 DEBUG = os.getenv("DJANGO_DEBUG", "0") == "1"
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = get_swarm_secret_for_psg(
-    "DJANGO_SECRET", "django-insecure-please-change-me"
-)
+SECRET_KEY = get_swarm_secret_for_psg("DJANGO_SECRET")
 
 _allowed_hosts = os.getenv("DJANGO_ALLOWED_HOSTS", "")
 if _allowed_hosts:

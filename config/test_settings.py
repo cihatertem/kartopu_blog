@@ -5,6 +5,8 @@ from django.db.models.expressions import Expression
 
 from config.settings import *
 
+SECRET_KEY = "django-insecure-test-key"
+
 DATABASES = {
     "default": {
         "ENGINE": "django.db.backends.sqlite3",

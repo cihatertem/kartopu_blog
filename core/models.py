@@ -142,15 +142,24 @@ class PageSEO(
         return self.path
 
     def save(self, *args, **kwargs):
-        # Path temizliği
         if self.path:
             self.path = self.path.strip()
             if not self.path.startswith("/"):
                 self.path = "/" + self.path
-            # Sonda slash olmalı mı? Django genellikle append_slash=True kullanır.
-            # Kesinlik için opsiyonel bırakabiliriz ama standart olarak eklemek iyi olabilir.
-            # Ancak regex path'ler için sorun olabilir. Şimdilik basit path varsayalım.
         super().save(*args, **kwargs)
+        self.invalidate_cache()
+
+    def delete(self, *args, **kwargs):
+        self.invalidate_cache()
+        super().delete(*args, **kwargs)
+
+    def invalidate_cache(self) -> None:
+        if self.path:
+            from django.core.cache import cache
+
+            normalized_path = self.path.rstrip("/") or "/"
+            cache_key = f"page_seo_{normalized_path}"
+            cache.delete(cache_key)
 
 
 class ContactMessage(
