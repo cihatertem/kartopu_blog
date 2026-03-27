@@ -45,6 +45,177 @@ class Command(BaseCommand):
             help="Minutes after which stuck processing rows are moved back to pending (default: 15).",
         )
 
+    def _acquire_lock(self, lock_file: str) -> bool:
+        """Attempts to acquire a lock file. Returns True if successful."""
+        if os.path.exists(lock_file):
+            self.stdout.write(
+                self.style.WARNING("Processor already running or lock file exists.")
+            )
+            return False
+
+        with open(lock_file, "w") as f:
+            f.write(str(os.getpid()))
+        return True
+
+    def _release_lock(self, lock_file: str) -> None:
+        """Releases the lock file if it exists."""
+        if os.path.exists(lock_file):
+            os.remove(lock_file)
+
+    def _get_pending_emails(self, processing_timeout: int, limit: int):
+        """Reverts stuck processing rows to pending and fetches a new batch."""
+        stale_before = timezone.now() - timedelta(minutes=processing_timeout)
+        EmailQueue.objects.filter(
+            status=EmailQueueStatus.PROCESSING,  # pyright: ignore[reportAttributeAccessIssue]
+            updated_at__lt=stale_before,
+        ).update(status=EmailQueueStatus.PENDING)
+
+        with transaction.atomic():
+            pending_ids = list(
+                EmailQueue.objects.select_for_update(skip_locked=True)
+                .filter(status=EmailQueueStatus.PENDING)
+                .order_by("created_at")
+                .values_list("id", flat=True)[:limit]
+            )
+
+            if pending_ids:
+                EmailQueue.objects.filter(
+                    id__in=pending_ids,
+                    status=EmailQueueStatus.PENDING,
+                ).update(status=EmailQueueStatus.PROCESSING)  # pyright: ignore[reportAttributeAccessIssue]
+
+        return (
+            EmailQueue.objects.filter(id__in=pending_ids)
+            .select_related("direct_email")
+            .order_by("created_at")
+        )
+
+    def _send_email_task(self, email_item, attachment_cache_local):
+        """Builds and sends an individual email with attachments."""
+        try:
+            message = EmailMultiAlternatives(
+                subject=email_item.subject,
+                body=email_item.text_body,
+                from_email=email_item.from_email,
+                to=[email_item.to_email],
+            )
+            if email_item.html_body:
+                message.attach_alternative(email_item.html_body, "text/html")
+
+            if email_item.direct_email:
+                de_id = email_item.direct_email.id
+                if de_id not in attachment_cache_local:
+                    attachments_data = []
+                    for attachment in email_item.direct_email.attachments.all():  # pyright: ignore[reportGeneralTypeIssues]
+                        with attachment.file.open("rb") as f:
+                            content = f.read()
+                            attachments_data.append(
+                                (
+                                    attachment.file.name.split("/")[-1],
+                                    content,
+                                )
+                            )
+                    attachment_cache_local[de_id] = attachments_data
+
+                for filename, content in attachment_cache_local[de_id]:
+                    message.attach(filename, content)
+
+            message.send(fail_silently=False)
+            return (email_item, True, None)
+        except Exception as e:
+            return (email_item, False, e)
+
+    def _process_batch(self, pending_emails, rate: int, send_interval: float):
+        """Processes a batch of emails using a thread pool."""
+        sent_count = 0
+        failed_count = 0
+        emails_to_update = []
+        direct_emails_to_update = {}
+        attachment_cache = {}
+
+        direct_emails = [
+            email_item.direct_email
+            for email_item in pending_emails
+            if email_item.direct_email
+        ]
+        if direct_emails:
+            from django.db.models import prefetch_related_objects
+
+            prefetch_related_objects(direct_emails, "attachments")
+
+        for de in set(direct_emails):
+            attachments_data = []
+            for attachment in de.attachments.all():  # pyright: ignore[reportGeneralTypeIssues]
+                with attachment.file.open("rb") as f:
+                    attachments_data.append(
+                        (
+                            attachment.file.name.split("/")[-1],
+                            f.read(),
+                        )
+                    )
+            attachment_cache[de.id] = attachments_data
+
+        futures = []
+        max_workers = min(100, max(10, rate))
+
+        with ThreadPoolExecutor(max_workers=max_workers) as executor:
+            for email_item in pending_emails:
+                start_time = time.time()
+
+                future = executor.submit(
+                    self._send_email_task, email_item, attachment_cache
+                )
+                futures.append(future)
+
+                elapsed = time.time() - start_time
+                wait = send_interval - elapsed
+                if wait > 0:
+                    time.sleep(wait)
+
+            for future in as_completed(futures):
+                email_item, success, error_msg = future.result()
+                now = timezone.now()
+
+                if success:
+                    email_item.status = EmailQueueStatus.SENT
+                    email_item.sent_at = now
+                    email_item.updated_at = now
+                    emails_to_update.append(email_item)
+
+                    if email_item.direct_email:
+                        email_item.direct_email.sent_at = now
+                        direct_emails_to_update[email_item.direct_email.id] = (
+                            email_item.direct_email
+                        )
+
+                    sent_count += 1
+                else:
+                    email_item.status = EmailQueueStatus.FAILED
+                    email_item.error_message = str(error_msg)
+                    email_item.updated_at = now
+                    emails_to_update.append(email_item)
+
+                    self.stderr.write(
+                        f"Failed to send to {email_item.to_email}: {error_msg}"
+                    )
+                    failed_count += 1
+
+        return sent_count, failed_count, emails_to_update, direct_emails_to_update
+
+    def _update_results(self, emails_to_update, direct_emails_to_update):
+        """Bulk updates the statuses of processed emails."""
+        if emails_to_update:
+            EmailQueue.objects.bulk_update(
+                emails_to_update,
+                ["status", "sent_at", "updated_at", "error_message"],
+            )
+        if direct_emails_to_update:
+            from newsletter.models import DirectEmail
+
+            DirectEmail.objects.bulk_update(
+                list(direct_emails_to_update.values()), ["sent_at"]
+            )
+
     def handle(self, *args, **options):
         rate = options["rate"]
         limit = options["limit"]
@@ -54,14 +225,8 @@ class Command(BaseCommand):
         send_interval = 1.0 / rate
 
         lock_file = "/tmp/process_email_queue.lock"
-        if os.path.exists(lock_file):
-            self.stdout.write(
-                self.style.WARNING("Processor already running or lock file exists.")
-            )
+        if not self._acquire_lock(lock_file):
             return
-
-        with open(lock_file, "w") as f:
-            f.write(str(os.getpid()))
 
         if daemon:
             self.stdout.write(
@@ -69,33 +234,10 @@ class Command(BaseCommand):
                     f"Email processor started in daemon mode (Rate: {rate}/sec)."
                 )
             )
+
         try:
             while True:
-                stale_before = timezone.now() - timedelta(minutes=processing_timeout)
-                EmailQueue.objects.filter(
-                    status=EmailQueueStatus.PROCESSING,  # pyright: ignore[reportAttributeAccessIssue]
-                    updated_at__lt=stale_before,
-                ).update(status=EmailQueueStatus.PENDING)
-
-                with transaction.atomic():
-                    pending_ids = list(
-                        EmailQueue.objects.select_for_update(skip_locked=True)
-                        .filter(status=EmailQueueStatus.PENDING)
-                        .order_by("created_at")
-                        .values_list("id", flat=True)[:limit]
-                    )
-
-                    if pending_ids:
-                        EmailQueue.objects.filter(
-                            id__in=pending_ids,
-                            status=EmailQueueStatus.PENDING,
-                        ).update(status=EmailQueueStatus.PROCESSING)  # pyright: ignore[reportAttributeAccessIssue]
-
-                pending_emails = (
-                    EmailQueue.objects.filter(id__in=pending_ids)
-                    .select_related("direct_email")
-                    .order_by("created_at")
-                )
+                pending_emails = self._get_pending_emails(processing_timeout, limit)
                 count = len(pending_emails)
 
                 if count == 0:
@@ -109,128 +251,11 @@ class Command(BaseCommand):
                     f"Processing batch of {count} emails at {rate} emails/sec..."
                 )
 
-                sent_count = 0
-                failed_count = 0
-                emails_to_update = []
-                direct_emails_to_update = {}
-                attachment_cache = {}
+                sent_count, failed_count, emails_to_update, direct_emails_to_update = (
+                    self._process_batch(pending_emails, rate, send_interval)
+                )
 
-                direct_emails = [
-                    email_item.direct_email
-                    for email_item in pending_emails
-                    if email_item.direct_email
-                ]
-                if direct_emails:
-                    from django.db.models import prefetch_related_objects
-
-                    prefetch_related_objects(direct_emails, "attachments")
-
-                def send_email_task(email_item, attachment_cache_local):
-                    try:
-                        message = EmailMultiAlternatives(
-                            subject=email_item.subject,
-                            body=email_item.text_body,
-                            from_email=email_item.from_email,
-                            to=[email_item.to_email],
-                        )
-                        if email_item.html_body:
-                            message.attach_alternative(
-                                email_item.html_body, "text/html"
-                            )
-
-                        if email_item.direct_email:
-                            de_id = email_item.direct_email.id
-                            if de_id not in attachment_cache_local:
-                                attachments_data = []
-                                for (
-                                    attachment
-                                ) in email_item.direct_email.attachments.all():  # pyright: ignore[reportGeneralTypeIssues]
-                                    with attachment.file.open("rb") as f:
-                                        content = f.read()
-                                        attachments_data.append(
-                                            (
-                                                attachment.file.name.split("/")[-1],
-                                                content,
-                                            )
-                                        )
-                                attachment_cache_local[de_id] = attachments_data
-
-                            for filename, content in attachment_cache_local[de_id]:
-                                message.attach(filename, content)
-
-                        message.send(fail_silently=False)
-                        return (email_item, True, None)
-                    except Exception as e:
-                        return (email_item, False, e)
-
-                for de in set(direct_emails):
-                    attachments_data = []
-                    for attachment in de.attachments.all():  # pyright: ignore[reportGeneralTypeIssues]
-                        with attachment.file.open("rb") as f:
-                            attachments_data.append(
-                                (
-                                    attachment.file.name.split("/")[-1],
-                                    f.read(),
-                                )
-                            )
-                    attachment_cache[de.id] = attachments_data
-
-                futures = []
-                max_workers = min(100, max(10, rate))
-
-                with ThreadPoolExecutor(max_workers=max_workers) as executor:
-                    for email_item in pending_emails:
-                        start_time = time.time()
-
-                        future = executor.submit(
-                            send_email_task, email_item, attachment_cache
-                        )
-                        futures.append(future)
-
-                        elapsed = time.time() - start_time
-                        wait = send_interval - elapsed
-                        if wait > 0:
-                            time.sleep(wait)
-
-                    for future in as_completed(futures):
-                        email_item, success, error_msg = future.result()
-                        now = timezone.now()
-
-                        if success:
-                            email_item.status = EmailQueueStatus.SENT
-                            email_item.sent_at = now
-                            email_item.updated_at = now
-                            emails_to_update.append(email_item)
-
-                            if email_item.direct_email:
-                                email_item.direct_email.sent_at = now
-                                direct_emails_to_update[email_item.direct_email.id] = (
-                                    email_item.direct_email
-                                )
-
-                            sent_count += 1
-                        else:
-                            email_item.status = EmailQueueStatus.FAILED
-                            email_item.error_message = str(error_msg)
-                            email_item.updated_at = now
-                            emails_to_update.append(email_item)
-
-                            self.stderr.write(
-                                f"Failed to send to {email_item.to_email}: {error_msg}"
-                            )
-                            failed_count += 1
-
-                if emails_to_update:
-                    EmailQueue.objects.bulk_update(
-                        emails_to_update,
-                        ["status", "sent_at", "updated_at", "error_message"],
-                    )
-                if direct_emails_to_update:
-                    from newsletter.models import DirectEmail
-
-                    DirectEmail.objects.bulk_update(
-                        list(direct_emails_to_update.values()), ["sent_at"]
-                    )
+                self._update_results(emails_to_update, direct_emails_to_update)
 
                 self.stdout.write(
                     self.style.SUCCESS(
@@ -243,5 +268,4 @@ class Command(BaseCommand):
         except KeyboardInterrupt:
             self.stdout.write(self.style.WARNING("Email processor stopped."))
         finally:
-            if os.path.exists(lock_file):
-                os.remove(lock_file)
+            self._release_lock(lock_file)

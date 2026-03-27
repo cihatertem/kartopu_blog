@@ -473,6 +473,38 @@ class BlogExtrasFiltersTests(TestCase):
         )
         self.assertEqual(html, expected_html)
 
+    @patch("blog.templatetags.blog_extras.static_url")
+    def test_preload_stylesheet_empty_path(self, mock_static_url):
+        from django.utils.safestring import SafeString
+
+        mock_static_url.return_value = "/static/"
+        html = blog_extras.preload_stylesheet("")
+
+        mock_static_url.assert_called_once_with("")
+        self.assertIsInstance(html, SafeString)
+        expected_html = (
+            '<link rel="preload" href="/static/" as="style" '
+            'data-preload-stylesheet="true">'
+            '<noscript><link rel="stylesheet" href="/static/"></noscript>'
+        )
+        self.assertEqual(html, expected_html)
+
+    @patch("blog.templatetags.blog_extras.static_url")
+    def test_preload_stylesheet_none_path(self, mock_static_url):
+        from django.utils.safestring import SafeString
+
+        mock_static_url.return_value = "/static/"
+        html = blog_extras.preload_stylesheet(None)
+
+        mock_static_url.assert_called_once_with(None)
+        self.assertIsInstance(html, SafeString)
+        expected_html = (
+            '<link rel="preload" href="/static/" as="style" '
+            'data-preload-stylesheet="true">'
+            '<noscript><link rel="stylesheet" href="/static/"></noscript>'
+        )
+        self.assertEqual(html, expected_html)
+
     def test_render_excerpt(self):
         self.assertIn("<strong>bold</strong>", blog_extras.render_excerpt("**bold**"))
 

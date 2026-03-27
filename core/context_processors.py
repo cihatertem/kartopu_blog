@@ -81,19 +81,29 @@ def _get_nav_tags():
             .values("id", "name", "slug", "post_count")
         )
         nav_tags = list(qs)
-        counts = [t["post_count"] for t in nav_tags]
-        min_count = min(counts) if counts else 0
-        max_count = max(counts) if counts else 0
-        for t in nav_tags:
+        if nav_tags:
+            min_count = nav_tags[0]["post_count"]
+            max_count = min_count
+            for t in nav_tags:
+                c = t["post_count"]
+                if c < min_count:
+                    min_count = c
+                elif c > max_count:
+                    max_count = c
+
             if max_count == min_count:
-                normalized = 0.2
-                t["cloud_size"] = 1.0
+                for t in nav_tags:
+                    t["cloud_size"] = 1.0
+                    t["cloud_size_class"] = "tag-cloud__item--size-2"
+                    t["color_class"] = get_tag_color_class(t["slug"])
             else:
-                normalized = (t["post_count"] - min_count) / (max_count - min_count)
-                t["cloud_size"] = round(0.85 + normalized * 0.75, 2)
-            size_level = min(6, max(1, int(round(normalized * 5)) + 1))
-            t["cloud_size_class"] = f"tag-cloud__item--size-{size_level}"
-            t["color_class"] = get_tag_color_class(t["slug"])
+                diff_inv = 1.0 / (max_count - min_count)
+                for t in nav_tags:
+                    normalized = (t["post_count"] - min_count) * diff_inv
+                    t["cloud_size"] = round(0.85 + normalized * 0.75, 2)
+                    size_level = min(6, max(1, int(round(normalized * 5.0)) + 1))
+                    t["cloud_size_class"] = f"tag-cloud__item--size-{size_level}"
+                    t["color_class"] = get_tag_color_class(t["slug"])
         cache.set(NAV_TAGS_KEY, nav_tags, timeout=CACHE_TIMEOUT)
     return nav_tags
 
