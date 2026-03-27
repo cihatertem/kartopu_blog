@@ -6,6 +6,7 @@ import bleach
 import markdown as md
 from bleach.css_sanitizer import CSSSanitizer
 from django.conf import settings
+from django.utils.safestring import mark_safe
 
 css_sanitizer = CSSSanitizer(
     allowed_css_properties=[
@@ -199,4 +200,4 @@ def render_markdown(text: str) -> str:
     )
 
     cleaned = bleach.linkify(cleaned, callbacks=[set_link_attributes])
-    return cleaned
+    return mark_safe(cleaned)

@@ -405,6 +405,25 @@ class BlogExtrasFiltersTests(TestCase):
             "http://example.com/123",
         )
 
+    def test_absolute_url_template_filter(self):
+        from django.template import Context, Template
+
+        template = Template(
+            "{% load blog_extras %}{{ '/path/'|absolute_url:'http://example.com/' }}"
+        )
+        rendered = template.render(Context({}))
+        self.assertEqual(rendered, "http://example.com/path/")
+
+        template2 = Template("{% load blog_extras %}{{ '/path/'|absolute_url:'' }}")
+        rendered2 = template2.render(Context({}))
+        self.assertEqual(rendered2, "/path/")
+
+        template3 = Template(
+            "{% load blog_extras %}{{ ''|absolute_url:'http://example.com/' }}"
+        )
+        rendered3 = template3.render(Context({}))
+        self.assertEqual(rendered3, "")
+
     def test_mul100(self):
         self.assertEqual(blog_extras.mul100(0.12), 12.0)
         self.assertEqual(blog_extras.mul100(None), 0)

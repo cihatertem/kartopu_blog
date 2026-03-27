@@ -1,5 +1,3 @@
-from __future__ import print_function
-
 from django.contrib import messages
 from django.shortcuts import redirect, render
 from django.utils.html import escape

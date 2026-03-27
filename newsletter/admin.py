@@ -1,6 +1,5 @@
 from django.contrib import admin, messages
 from django.utils import timezone
-from django.utils.safestring import mark_safe
 
 from core.markdown import render_markdown
 
@@ -93,7 +92,7 @@ class DirectEmailAdmin(admin.ModelAdmin):
     @admin.display(description="Markdown Önizleme")
     def rendered_body_preview(self, obj: DirectEmail) -> str:
         if obj.body:
-            return mark_safe(render_markdown(obj.body))
+            return render_markdown(obj.body)
         return ""
 
     @admin.action(description="Seçili e-postaları gönder")

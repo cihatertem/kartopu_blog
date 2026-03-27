@@ -223,6 +223,27 @@ class ValidationTests(ModelsTestCase):
 
 
 class LogicTests(ModelsTestCase):
+    def test_portfolio_total_market_value_and_cost_basis_empty(self):
+        portfolio = Portfolio.objects.create(
+            owner=self.user, name="Empty Portfolio", target_value=100
+        )
+        self.assertEqual(portfolio.total_market_value(), Decimal("0"))
+        self.assertEqual(portfolio.total_cost_basis(), Decimal("0"))
+
+    @patch("portfolio.models.Portfolio.get_positions")
+    def test_portfolio_total_market_value_and_cost_basis_with_positions(
+        self, mock_get_positions
+    ):
+        portfolio = Portfolio.objects.create(
+            owner=self.user, name="My Portfolio", target_value=100
+        )
+        mock_get_positions.return_value = [
+            {"market_value": Decimal("150.0"), "cost_basis": Decimal("100.0")},
+            {"market_value": Decimal("200.0"), "cost_basis": Decimal("150.0")},
+        ]
+        self.assertEqual(portfolio.total_market_value(), Decimal("350.0"))
+        self.assertEqual(portfolio.total_cost_basis(), Decimal("250.0"))
+
     @patch("portfolio.models.fetch_yahoo_finance_price")
     def test_asset_refresh_price(self, mock_fetch_price):
         mock_fetch_price.return_value = Decimal("150.0")
