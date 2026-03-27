@@ -575,9 +575,42 @@ class BlogExtrasFiltersTests(TestCase):
         self.assertNotIn("<figure>", html)
         self.assertIn("Line2", html)
 
+    def test_render_post_content_no_caption(self):
+        class MockImageNoCaption:
+            rendition = {
+                "src": "/src.jpg",
+                "srcset": "/src.jpg 1x",
+                "width": 100,
+                "height": 100,
+            }
+            alt_text = "Alt"
+            caption = None
+
+        content = "{{ image:1 }}"
+        images = [MockImageNoCaption()]
+
+        html = blog_extras.render_post_content(content, images)
+        self.assertIn("<figure>", html)
+        self.assertIn('src="/src.jpg"', html)
+        self.assertNotIn("<figcaption>", html)
+
     def test_render_post_content_none_content(self):
         html = blog_extras.render_post_content(None, [])
         self.assertEqual(html, "")
+
+    def test_render_post_content_no_rendition(self):
+        class MockImageNoRendition:
+            rendition = None
+            alt_text = "Alt"
+            caption = "Cap"
+
+        content = "Line1\n{{ image:1 }}\nLine2"
+        images = [MockImageNoRendition()]
+
+        html = blog_extras.render_post_content(content, images)
+        self.assertIn("Line1", html)
+        self.assertNotIn("<figure>", html)
+        self.assertIn("Line2", html)
 
 
 class RenderPostBodyTests(TestCase):
