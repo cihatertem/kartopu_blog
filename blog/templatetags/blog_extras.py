@@ -479,6 +479,36 @@ def _get_dividend_comparisons(post):
     )
 
 
+def _get_portfolio_target_ratio_html(target_ratio) -> str:
+    if target_ratio is None:
+        return ""
+    return f"<li><strong>Hedef Gerçekleşme (%):</strong> {escape(f'{float(target_ratio):.2f}')}</li>"
+
+
+def _render_portfolio_comparison_column(
+    label: str,
+    period: str,
+    value,
+    cost,
+    return_pct,
+    target_ratio_html: str,
+    currency,
+) -> str:
+    return f"""
+      <div>
+        <p class="summary-meta"><strong>Tarih:</strong> {label}
+          <span class="text-muted">({period})</span>
+        </p>
+        <ul class="summary-list">
+          <li><strong>Toplam Değer:</strong> {_format_currency(value, currency)}</li>
+          <li><strong>Toplam Maliyet:</strong> {_format_currency(cost, currency)}</li>
+          {target_ratio_html}
+          <li><strong>Toplam Getiri (%):</strong> {escape(f"{float(return_pct):.2f}")}</li>
+        </ul>
+      </div>
+""".strip()
+
+
 def _render_portfolio_comparison_summary_html(comparison) -> str:
     if not comparison:
         return ""
@@ -530,16 +560,8 @@ def _render_portfolio_comparison_summary_html(comparison) -> str:
     if base_target_ratio is not None and compare_target_ratio is not None:
         target_ratio_delta = compare_target_ratio - base_target_ratio
 
-    base_target_ratio_html = (
-        f"<li><strong>Hedef Gerçekleşme (%):</strong> {escape(f'{float(base_target_ratio):.2f}')}</li>"
-        if base_target_ratio is not None
-        else ""
-    )
-    compare_target_ratio_html = (
-        f"<li><strong>Hedef Gerçekleşme (%):</strong> {escape(f'{float(compare_target_ratio):.2f}')}</li>"
-        if compare_target_ratio is not None
-        else ""
-    )
+    base_target_ratio_html = _get_portfolio_target_ratio_html(base_target_ratio)
+    compare_target_ratio_html = _get_portfolio_target_ratio_html(compare_target_ratio)
 
     target_ratio_delta_html = ""
     if target_ratio_delta is not None:
@@ -553,33 +575,32 @@ def _render_portfolio_comparison_summary_html(comparison) -> str:
 
     cost_free_return_str = escape(f"~%{float(cost_free_return):.2f}").replace(".", ",")
 
+    base_col_html = _render_portfolio_comparison_column(
+        base_label,
+        base_period,
+        base_value,
+        base_cost,
+        base_return,
+        base_target_ratio_html,
+        portfolio_currency,
+    )
+    compare_col_html = _render_portfolio_comparison_column(
+        compare_label,
+        compare_period,
+        compare_value,
+        compare_cost,
+        compare_return,
+        compare_target_ratio_html,
+        portfolio_currency,
+    )
+
     html = f"""
 <section class="portfolio-comparison">
   <h4>Portföy Karşılaştırması</h4>
   <div class="summary-card">
     <div class="comparison-grid">
-      <div>
-        <p class="summary-meta"><strong>Tarih:</strong> {base_label}
-          <span class="text-muted">({base_period})</span>
-        </p>
-        <ul class="summary-list">
-          <li><strong>Toplam Değer:</strong> {_format_currency(base_value, portfolio_currency)}</li>
-          <li><strong>Toplam Maliyet:</strong> {_format_currency(base_cost, portfolio_currency)}</li>
-          {base_target_ratio_html}
-          <li><strong>Toplam Getiri (%):</strong> {escape(f"{float(base_return):.2f}")}</li>
-        </ul>
-      </div>
-      <div>
-        <p class="summary-meta"><strong>Tarih:</strong> {compare_label}
-          <span class="text-muted">({compare_period})</span>
-        </p>
-        <ul class="summary-list">
-          <li><strong>Toplam Değer:</strong> {_format_currency(compare_value, portfolio_currency)}</li>
-          <li><strong>Toplam Maliyet:</strong> {_format_currency(compare_cost, portfolio_currency)}</li>
-          {compare_target_ratio_html}
-          <li><strong>Toplam Getiri (%):</strong> {escape(f"{float(compare_return):.2f}")}</li>
-        </ul>
-      </div>
+      {base_col_html}
+      {compare_col_html}
     </div>
     <div class="comparison-footer">
       <p class="summary-meta summary-meta--tight"><strong>Değişim:</strong> Toplam Değer {_format_currency(value_delta, portfolio_currency)} ({cost_free_return_str}),

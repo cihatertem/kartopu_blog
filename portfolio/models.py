@@ -374,7 +374,7 @@ class Portfolio(UUIDModelMixin, TimeStampedModelMixin):
 
     def _build_initial_positions(
         self,
-        transactions: QuerySet["PortfolioTransaction"],
+        transactions: list["PortfolioTransaction"] | QuerySet["PortfolioTransaction"],
         fx_rates: dict[tuple[str, str, date | None], Decimal],
         price_date: date | None,
     ) -> dict[str, dict[str, Decimal | Asset]]:
@@ -490,7 +490,25 @@ class Portfolio(UUIDModelMixin, TimeStampedModelMixin):
 
     def _get_filtered_transactions(
         self, price_date: date | None
-    ) -> QuerySet["PortfolioTransaction"]:
+    ) -> list["PortfolioTransaction"] | QuerySet["PortfolioTransaction"]:
+        if (
+            hasattr(self, "_prefetched_objects_cache")
+            and "transactions" in self._prefetched_objects_cache  # pyright: ignore[reportAttributeAccessIssue]
+        ):
+            tx_list = [
+                tx
+                for tx in self.transactions.all()  # pyright: ignore[reportAttributeAccessIssue]
+                if not price_date or tx.trade_date <= price_date
+            ]
+            tx_list.sort(key=lambda tx: (tx.trade_date, tx.created_at))
+
+            if tx_list and "asset" not in tx_list[0]._state.fields_cache:
+                from django.db.models import prefetch_related_objects
+
+                prefetch_related_objects(tx_list, "asset")
+
+            return tx_list
+
         transactions = (
             self.transactions.select_related(  # pyright: ignore[reportAttributeAccessIssue]
                 "asset"
