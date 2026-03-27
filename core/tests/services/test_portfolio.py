@@ -30,6 +30,22 @@ class PortfolioServicesTest(TestCase):
         name_special = build_snapshot_name("User C & Co.", date(2023, 1, 1))
         self.assertEqual(name_special, "User C & Co. - 2023-01-01")
 
+        long_name = "A" * 500
+        name_long = build_snapshot_name(long_name, date(2023, 1, 1))
+        self.assertEqual(name_long, f"{long_name} - 2023-01-01")
+
+        name_unicode = build_snapshot_name("Täst Üser 🚀", date(2023, 1, 1))
+        self.assertEqual(name_unicode, "Täst Üser 🚀 - 2023-01-01")
+
+        name_numeric = build_snapshot_name("12345", date(2023, 1, 1))
+        self.assertEqual(name_numeric, "12345 - 2023-01-01")
+
+        from datetime import datetime
+
+        dt = datetime(2023, 1, 1, 15, 30)
+        name_datetime = build_snapshot_name("UserD", dt)
+        self.assertEqual(name_datetime, "UserD - 2023-01-01 15:30:00")
+
     def test_format_snapshot_label(self):
         label1 = format_snapshot_label(
             slug="custom-slug", name=None, owner_label="User", snapshot_date=None
@@ -98,6 +114,57 @@ class PortfolioServicesTest(TestCase):
             build_comparison_name(base_no_attr, compare_no_attr),
             "SnapshotStr → SnapshotStr",
         )
+        base.name = ""
+        base.__str__.return_value = "BaseStrFallback"
+        compare.name = ""
+        compare.__str__.return_value = "CompareStrFallback"
+        self.assertEqual(
+            build_comparison_name(base, compare), "BaseStrFallback → CompareStrFallback"
+        )
+
+        base.name = "  "
+        base.__str__.return_value = "BaseStrFallback"
+        compare.name = "  "
+        compare.__str__.return_value = "CompareStrFallback"
+        self.assertEqual(build_comparison_name(base, compare), "   →   ")
+
+        class MockSnapshot:
+            name = None
+
+            def __str__(self):
+                return "None"
+
+        self.assertEqual(
+            build_comparison_name(MockSnapshot(), MockSnapshot()), "None → None"
+        )
+
+        class EmptySnapshot:
+            def __str__(self):
+                return ""
+
+        empty_base = EmptySnapshot()
+        empty_compare = EmptySnapshot()
+        self.assertEqual(build_comparison_name(empty_base, empty_compare), "")
+
+        class FalsySnapshotWithEmptyName(EmptySnapshot):
+            name = ""
+
+        falsy_base_name = FalsySnapshotWithEmptyName()
+        falsy_compare_name = FalsySnapshotWithEmptyName()
+        self.assertEqual(build_comparison_name(falsy_base_name, falsy_compare_name), "")
+
+        class FalsySnapshot:
+            def __bool__(self):
+                return False
+
+            def __str__(self):
+                return "FalsyStr"
+
+        falsy_base = FalsySnapshot()
+        falsy_compare = FalsySnapshot()
+        self.assertEqual(
+            build_comparison_name(falsy_base, falsy_compare), "FalsyStr → FalsyStr"
+        )
 
     def test_format_comparison_label(self):
         base = MagicMock()
@@ -138,6 +205,35 @@ class PortfolioServicesTest(TestCase):
             "BaseStr → CompareStr",
         )
 
+        class SnapshotWithStr:
+            def __init__(self, val):
+                self.val = val
+
+            def __str__(self):
+                return self.val
+
+        base_val = SnapshotWithStr("BaseVal")
+        compare_val = SnapshotWithStr("CompareVal")
+        self.assertEqual(
+            format_comparison_label(
+                slug=None,
+                name=None,
+                base_snapshot=base_val,
+                compare_snapshot=compare_val,
+            ),
+            "BaseVal → CompareVal",
+        )
+
+        self.assertEqual(
+            format_comparison_label(
+                slug=None,
+                name=None,
+                base_snapshot=None,
+                compare_snapshot=None,
+            ),
+            "None → None",
+        )
+
         self.assertEqual(
             format_comparison_label(
                 slug=None, name=None, base_snapshot=base, compare_snapshot=compare
@@ -173,6 +269,24 @@ class PortfolioServicesTest(TestCase):
 
         self.assertEqual(slug, "test-collision#bbbbbb")
         self.assertEqual(mock_qs.exists.call_count, 2)
+
+    @patch("core.services.portfolio.secrets.choice")
+    def test_generate_unique_slug_no_mocks(self, mock_choice):
+        from blog.models import Category
+
+        Category.objects.all().delete()
+
+        mock_choice.side_effect = ["a"] * 6 + ["a"] * 6 + ["b"] * 6
+
+        name = "Actual DB Test"
+        slug1 = generate_unique_slug(Category, name)
+        Category.objects.create(name=name, slug=slug1)
+
+        slug2 = generate_unique_slug(Category, name)
+
+        self.assertEqual(slug1, "actual-db-test#aaaaaa")
+        self.assertEqual(slug2, "actual-db-test#bbbbbb")
+        self.assertNotEqual(slug1, slug2)
 
     def test__build_slug_base_empty_name(self):
         base = _build_slug_base("", max_length=255)
