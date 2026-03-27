@@ -509,6 +509,28 @@ def _render_portfolio_comparison_column(
 """.strip()
 
 
+def _get_portfolio_snapshot_metrics(snapshot):
+    value = _safe_decimal(snapshot.total_value)
+    cost = _safe_decimal(snapshot.total_cost)
+    return_pct = _safe_decimal(snapshot.total_return_pct) * Decimal("100")  # pyright: ignore[reportOptionalOperand]
+    target_value = _safe_decimal(snapshot.target_value)
+    target_ratio = (
+        (value / target_value) * Decimal("100") if target_value else None  # pyright: ignore[reportOptionalOperand]
+    )
+    return value, cost, return_pct, target_ratio
+
+
+def _format_points_delta_html(
+    label: str, delta: Decimal, prefix_comma: bool = False
+) -> str:
+    points = delta * Decimal("100")
+    sign = "+" if points > 0 else ""
+    html = f"{label} {sign}{escape(f'{float(points):.0f}')} puan"
+    if prefix_comma:
+        return f", {html}"
+    return html
+
+
 def _render_portfolio_comparison_summary_html(comparison) -> str:
     if not comparison:
         return ""
@@ -525,24 +547,13 @@ def _render_portfolio_comparison_summary_html(comparison) -> str:
         compare.get_period_display() if hasattr(compare, "get_period_display") else ""
     )
 
-    base_value = _safe_decimal(base.total_value)
-    compare_value = _safe_decimal(compare.total_value)
-    base_cost = _safe_decimal(base.total_cost)
-    compare_cost = _safe_decimal(compare.total_cost)
-    base_return = _safe_decimal(base.total_return_pct) * Decimal("100")  # pyright: ignore[reportOptionalOperand]
-    compare_return = _safe_decimal(compare.total_return_pct) * Decimal("100")  # pyright: ignore[reportOptionalOperand]
+    base_value, base_cost, base_return, base_target_ratio = (
+        _get_portfolio_snapshot_metrics(base)
+    )
+    compare_value, compare_cost, compare_return, compare_target_ratio = (
+        _get_portfolio_snapshot_metrics(compare)
+    )
     portfolio_currency = getattr(base.portfolio, "currency", None)
-
-    base_target_value = _safe_decimal(base.target_value)
-    compare_target_value = _safe_decimal(compare.target_value)
-    base_target_ratio = (
-        (base_value / base_target_value) * Decimal("100") if base_target_value else None  # pyright: ignore[reportOptionalOperand]
-    )
-    compare_target_ratio = (
-        (compare_value / compare_target_value) * Decimal("100")  # pyright: ignore[reportOptionalOperand]
-        if compare_target_value
-        else None
-    )
 
     value_delta = compare_value - base_value  # pyright: ignore[reportOperatorIssue]
     cost_delta = compare_cost - base_cost  # pyright: ignore[reportOperatorIssue]
@@ -565,13 +576,11 @@ def _render_portfolio_comparison_summary_html(comparison) -> str:
 
     target_ratio_delta_html = ""
     if target_ratio_delta is not None:
-        target_points = target_ratio_delta * Decimal("100")
-        target_sign = "+" if target_points > 0 else ""
-        target_ratio_delta_html = f", Hedef Gerçekleşme {target_sign}{escape(f'{float(target_points):.0f}')} puan"
+        target_ratio_delta_html = _format_points_delta_html(
+            "Hedef Gerçekleşme", target_ratio_delta, prefix_comma=True
+        )
 
-    return_points = return_delta * Decimal("100")
-    return_sign = "+" if return_points > 0 else ""
-    return_html = f"Getiri {return_sign}{escape(f'{float(return_points):.0f}')} puan"
+    return_html = _format_points_delta_html("Getiri", return_delta)
 
     cost_free_return_str = escape(f"~%{float(cost_free_return):.2f}").replace(".", ",")
 
