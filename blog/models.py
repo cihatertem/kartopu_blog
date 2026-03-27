@@ -13,7 +13,7 @@ from imagekit.processors import ResizeToFill, ResizeToFit, Transpose
 
 from core.imagekit import build_responsive_rendition
 from core.images import optimize_uploaded_image_field
-from core.mixins import TimeStampedModelMixin, UUIDModelMixin
+from core.mixins import ImageRenditionMixin, TimeStampedModelMixin, UUIDModelMixin
 
 META_TITLE_SUFFIX = " | Kartopu Money"
 SEO_TITLE_MAX_LENGTH = 50
@@ -351,6 +351,7 @@ class BlogPost(
 
 
 class BlogPostImage(
+    ImageRenditionMixin,
     UUIDModelMixin,
     TimeStampedModelMixin,
 ):
@@ -381,28 +382,6 @@ class BlogPostImage(
         help_text="Görsel sırası",
     )
 
-    # imagekit
-    image_600 = ImageSpecField(
-        source="image",
-        processors=[Transpose(), ResizeToFit(600, 600)],
-        format="WEBP",
-        options={"quality": 85},
-    )
-
-    image_900 = ImageSpecField(
-        source="image",
-        processors=[Transpose(), ResizeToFit(900, 900)],
-        format="WEBP",
-        options={"quality": 85},
-    )
-
-    image_1200 = ImageSpecField(
-        source="image",
-        processors=[Transpose(), ResizeToFit(1200, 1200)],
-        format="WEBP",
-        options={"quality": 85},
-    )
-
     class Meta:  # pyright: ignore[reportIncompatibleVariableOverride]
         ordering = ["order"]
         verbose_name = "Blog Görseli"
@@ -418,20 +397,6 @@ class BlogPostImage(
 
     def __str__(self) -> str:
         return f"{self.post.title} - Görsel"  # pyright: ignore[reportAttributeAccessIssue]
-
-    @cached_property
-    def rendition(self) -> dict | None:
-        if not self.image:
-            return None
-        return build_responsive_rendition(
-            original_field=self.image,
-            spec_map={
-                600: self.image_600,
-                900: self.image_900,
-                1200: self.image_1200,
-            },
-            largest_size=1200,
-        )
 
 
 class Tag(

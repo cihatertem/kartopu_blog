@@ -144,7 +144,7 @@ class BlogModelsTests(TestCase):
         bpi.save()
         mock_opt.assert_not_called()
 
-    @patch("blog.models.build_responsive_rendition")
+    @patch("core.mixins.build_responsive_rendition")
     def test_blogpostimage_rendition(self, mock_build):
         mock_build.return_value = {"src": "y"}
         post = BlogPost.objects.create(title="Host", author=self.user)

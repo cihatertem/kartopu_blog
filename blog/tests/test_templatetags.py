@@ -119,9 +119,27 @@ class TestRenderHTMLFunctions(TestCase):
     def test_render_portfolio_irr_charts_html(self):
         self.assertEqual(_render_portfolio_irr_charts_html(None), "")
         s = DummySnapshot()
-        s.portfolio.get_irr_history.return_value = [{"date": "2025", "irr": 10}]
+        s.snapshot_date = datetime.date(2025, 1, 1)
+        s.portfolio.get_irr_history.return_value = [
+            {"date": "2024-12-01", "irr": Decimal("5.5")},
+            {"date": "2025-01-01", "irr": Decimal("10.2")},
+        ]
         html = _render_portfolio_irr_charts_html(s)
         self.assertIn("portfolio-irr-charts", html)
+        s.portfolio.get_irr_history.assert_called_once_with(until_date=s.snapshot_date)
+        self.assertIn(
+            "&quot;labels&quot;: [&quot;2024-12-01&quot;, &quot;2025-01-01&quot;]", html
+        )
+        self.assertIn("&quot;values&quot;: [&quot;5.5&quot;, &quot;10.2&quot;]", html)
+
+    def test_render_portfolio_irr_charts_html_empty(self):
+        s = DummySnapshot()
+        s.snapshot_date = datetime.date(2025, 1, 1)
+        s.portfolio.get_irr_history.return_value = []
+        html = _render_portfolio_irr_charts_html(s)
+        self.assertIn("portfolio-irr-charts", html)
+        self.assertIn("&quot;labels&quot;: []", html)
+        self.assertIn("&quot;values&quot;: []", html)
 
     @patch("blog.templatetags.blog_extras._render_portfolio_irr_charts_html")
     @patch("blog.templatetags.blog_extras._get_item_by_identifier")
