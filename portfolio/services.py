@@ -214,11 +214,14 @@ def fetch_fx_rates_bulk(
 
     for symbol in symbols:
         try:
-            # Handle MultiIndex DataFrame vs single Series
-            if len(symbols) > 1:
-                if symbol not in close_data:
+            # yfinance can return different shapes for single/multiple symbols.
+            if hasattr(close_data, "columns"):
+                if symbol in close_data:
+                    series = close_data[symbol].dropna()  # pyright: ignore[reportAttributeAccessIssue]
+                elif len(symbols) == 1:
+                    series = close_data.iloc[:, 0].dropna()  # pyright: ignore[reportAttributeAccessIssue]
+                else:
                     continue
-                series = close_data[symbol].dropna()  # pyright: ignore[reportAttributeAccessIssue]
             else:
                 series = close_data.dropna()  # pyright: ignore[reportAttributeAccessIssue]
 

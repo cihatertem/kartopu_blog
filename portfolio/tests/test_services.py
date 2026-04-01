@@ -276,6 +276,24 @@ class FetchFXRatesBulkTests(TestCase):
 
     @patch("portfolio.services.yf.download")
     @patch("portfolio.services._safe_decimal")
+    def test_single_symbol_multiindex_close_parsing(
+        self, mock_safe_decimal, mock_download
+    ):
+        mock_df = pd.DataFrame(
+            {"USDTRY=X": [30.0, 31.0]},
+            index=pd.DatetimeIndex(["2023-10-01", "2023-10-02"]),
+        )
+        mock_df = pd.concat([mock_df], axis=1, keys=["Close"])
+        mock_download.return_value = mock_df
+        mock_safe_decimal.return_value = Decimal("31.0")
+
+        result = fetch_fx_rates_bulk([("USD", "TRY")], rate_date=date(2023, 10, 2))
+
+        self.assertEqual(result.get(("USD", "TRY")), Decimal("31.0"))
+        mock_safe_decimal.assert_called_once_with(31.0)
+
+    @patch("portfolio.services.yf.download")
+    @patch("portfolio.services._safe_decimal")
     def test_multi_index_dataframe_parsing(self, mock_safe_decimal, mock_download):
         data = {
             "USDTRY=X": [30.0, 31.0],
