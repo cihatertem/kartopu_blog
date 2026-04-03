@@ -268,13 +268,12 @@ class Portfolio(UUIDModelMixin, TimeStampedModelMixin):
 
         return fx_rates[currency_pair]
 
-    def _prefetch_fx_rates(
+    def _get_cache_keys_for_transactions(
         self,
         transactions: list["PortfolioTransaction"],
         fx_rates: dict[tuple[str, str, date | None], Decimal],
-        price_date: date | None = None,
-    ) -> None:
-        uncached_pairs_by_date: dict[date | None, set[tuple[str, str]]] = {}
+        price_date: date | None,
+    ) -> dict[str, tuple[tuple[str, str, date | None], date | None, str]]:
         cache_keys: dict[
             str, tuple[tuple[str, str, date | None], date | None, str]
         ] = {}
@@ -291,37 +290,66 @@ class Portfolio(UUIDModelMixin, TimeStampedModelMixin):
                     conversion_date,
                     tx.asset.currency,
                 )
+        return cache_keys
 
-        if cache_keys:
-            cached_rates = cache.get_many(list(cache_keys.keys()))
-            for cache_key, (
-                currency_pair,
-                conversion_date,
-                asset_currency,
-            ) in cache_keys.items():
-                cached_rate = cached_rates.get(cache_key)
-                if cached_rate is not None:
-                    fx_rates[currency_pair] = cached_rate  # pyright: ignore[reportArgumentType]
-                else:
-                    if conversion_date not in uncached_pairs_by_date:
-                        uncached_pairs_by_date[conversion_date] = set()
-                    uncached_pairs_by_date[conversion_date].add(
-                        (asset_currency, self.currency)
-                    )
+    def _process_cached_rates(
+        self,
+        cache_keys: dict[str, tuple[tuple[str, str, date | None], date | None, str]],
+        fx_rates: dict[tuple[str, str, date | None], Decimal],
+    ) -> dict[date | None, set[tuple[str, str]]]:
+        uncached_pairs_by_date: dict[date | None, set[tuple[str, str]]] = {}
+        if not cache_keys:
+            return uncached_pairs_by_date
 
-        if uncached_pairs_by_date:
-            fetched_rates = fetch_multiple_fx_rates_bulk(uncached_pairs_by_date)
-            for rate_date, pairs in uncached_pairs_by_date.items():
-                for pair in pairs:
-                    currency_pair = (pair[0], pair[1], rate_date)
-                    cache_key = f"fx_rate_{pair[0]}_{pair[1]}_{rate_date.isoformat() if rate_date else 'latest'}"
-                    fx_rate = fetched_rates.get(currency_pair, Decimal("1"))  # pyright: ignore
-                    cache.set(
-                        cache_key,
-                        fx_rate,
-                        timeout=getattr(settings, "CACHE_TIMEOUT", CACHE_TIMEOUT),
-                    )
-                    fx_rates[currency_pair] = fx_rate  # pyright: ignore[reportArgumentType]
+        cached_rates = cache.get_many(list(cache_keys.keys()))
+        for cache_key, (
+            currency_pair,
+            conversion_date,
+            asset_currency,
+        ) in cache_keys.items():
+            cached_rate = cached_rates.get(cache_key)
+            if cached_rate is not None:
+                fx_rates[currency_pair] = cached_rate  # pyright: ignore[reportArgumentType]
+            else:
+                if conversion_date not in uncached_pairs_by_date:
+                    uncached_pairs_by_date[conversion_date] = set()
+                uncached_pairs_by_date[conversion_date].add(
+                    (asset_currency, self.currency)
+                )
+        return uncached_pairs_by_date
+
+    def _fetch_and_cache_missing_rates(
+        self,
+        uncached_pairs_by_date: dict[date | None, set[tuple[str, str]]],
+        fx_rates: dict[tuple[str, str, date | None], Decimal],
+    ) -> None:
+        if not uncached_pairs_by_date:
+            return
+
+        fetched_rates = fetch_multiple_fx_rates_bulk(uncached_pairs_by_date)
+        for rate_date, pairs in uncached_pairs_by_date.items():
+            for pair in pairs:
+                currency_pair = (pair[0], pair[1], rate_date)
+                cache_key = f"fx_rate_{pair[0]}_{pair[1]}_{rate_date.isoformat() if rate_date else 'latest'}"
+                fx_rate = fetched_rates.get(currency_pair, Decimal("1"))  # pyright: ignore
+                cache.set(
+                    cache_key,
+                    fx_rate,
+                    timeout=getattr(settings, "CACHE_TIMEOUT", CACHE_TIMEOUT),
+                )
+                fx_rates[currency_pair] = fx_rate  # pyright: ignore[reportArgumentType]
+
+    def _prefetch_fx_rates(
+        self,
+        transactions: list["PortfolioTransaction"],
+        fx_rates: dict[tuple[str, str, date | None], Decimal],
+        price_date: date | None = None,
+    ) -> None:
+        cache_keys = self._get_cache_keys_for_transactions(
+            transactions, fx_rates, price_date
+        )
+        uncached_pairs_by_date = self._process_cached_rates(cache_keys, fx_rates)
+        self._fetch_and_cache_missing_rates(uncached_pairs_by_date, fx_rates)
 
     @staticmethod
     def _apply_buy(
