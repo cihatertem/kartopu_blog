@@ -531,10 +531,7 @@ def _format_points_delta_html(
     return html
 
 
-def _render_portfolio_comparison_summary_html(comparison) -> str:
-    if not comparison:
-        return ""
-
+def _calculate_portfolio_comparison_metrics(comparison) -> dict:
     base = comparison.base_snapshot
     compare = comparison.compare_snapshot
 
@@ -603,17 +600,34 @@ def _render_portfolio_comparison_summary_html(comparison) -> str:
         portfolio_currency,
     )
 
+    return {
+        "base_col_html": base_col_html,
+        "compare_col_html": compare_col_html,
+        "portfolio_currency": portfolio_currency,
+        "value_delta": value_delta,
+        "cost_free_return_str": cost_free_return_str,
+        "return_html": return_html,
+        "target_ratio_delta_html": target_ratio_delta_html,
+    }
+
+
+def _render_portfolio_comparison_summary_html(comparison) -> str:
+    if not comparison:
+        return ""
+
+    metrics = _calculate_portfolio_comparison_metrics(comparison)
+
     html = f"""
 <section class="portfolio-comparison">
   <h4>Portföy Karşılaştırması</h4>
   <div class="summary-card">
     <div class="comparison-grid">
-      {base_col_html}
-      {compare_col_html}
+      {metrics["base_col_html"]}
+      {metrics["compare_col_html"]}
     </div>
     <div class="comparison-footer">
-      <p class="summary-meta summary-meta--tight"><strong>Değişim:</strong> Toplam Değer {_format_currency(value_delta, portfolio_currency)} ({cost_free_return_str}),
-        {return_html}{target_ratio_delta_html}</p>
+      <p class="summary-meta summary-meta--tight"><strong>Değişim:</strong> Toplam Değer {_format_currency(metrics["value_delta"], metrics["portfolio_currency"])} ({metrics["cost_free_return_str"]}),
+        {metrics["return_html"]}{metrics["target_ratio_delta_html"]}</p>
     </div>
   </div>
 </section>

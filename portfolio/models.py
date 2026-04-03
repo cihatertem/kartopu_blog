@@ -323,6 +323,67 @@ class Portfolio(UUIDModelMixin, TimeStampedModelMixin):
                     )
                     fx_rates[currency_pair] = fx_rate  # pyright: ignore[reportArgumentType]
 
+    @staticmethod
+    def _apply_buy(
+        transaction: "PortfolioTransaction",
+        quantity: Decimal,
+        cost_basis: Decimal,
+        value_adjustment: Decimal,
+        fx_rate: Decimal,
+    ) -> tuple[Decimal, Decimal, Decimal]:
+        transaction_cost = transaction.total_cost * fx_rate
+        return (
+            quantity + transaction.quantity,
+            cost_basis + transaction_cost,
+            value_adjustment,
+        )
+
+    @staticmethod
+    def _apply_bonus_capital_increase(
+        increase_quantity: Decimal,
+        quantity: Decimal,
+        cost_basis: Decimal,
+        value_adjustment: Decimal,
+    ) -> tuple[Decimal, Decimal, Decimal]:
+        return quantity + increase_quantity, cost_basis, value_adjustment
+
+    @staticmethod
+    def _apply_rights_exercised(
+        transaction: "PortfolioTransaction",
+        increase_quantity: Decimal,
+        quantity: Decimal,
+        cost_basis: Decimal,
+        value_adjustment: Decimal,
+        fx_rate: Decimal,
+    ) -> tuple[Decimal, Decimal, Decimal]:
+        rights_cost = increase_quantity * transaction.price_per_unit * fx_rate
+        return quantity + increase_quantity, cost_basis + rights_cost, value_adjustment
+
+    @staticmethod
+    def _apply_rights_not_exercised(
+        transaction: "PortfolioTransaction",
+        increase_quantity: Decimal,
+        quantity: Decimal,
+        cost_basis: Decimal,
+        value_adjustment: Decimal,
+        fx_rate: Decimal,
+    ) -> tuple[Decimal, Decimal, Decimal]:
+        rights_loss = increase_quantity * transaction.price_per_unit * fx_rate
+        return quantity, cost_basis, value_adjustment - rights_loss
+
+    @staticmethod
+    def _apply_sell(
+        transaction: "PortfolioTransaction",
+        quantity: Decimal,
+        cost_basis: Decimal,
+        value_adjustment: Decimal,
+    ) -> tuple[Decimal, Decimal, Decimal]:
+        if quantity > 0:
+            average_cost = cost_basis / quantity
+            cost_basis -= average_cost * transaction.quantity
+        quantity -= transaction.quantity
+        return quantity, cost_basis, value_adjustment
+
     def _apply_transaction_to_position(
         self,
         transaction: "PortfolioTransaction",
@@ -332,40 +393,57 @@ class Portfolio(UUIDModelMixin, TimeStampedModelMixin):
         quantity = data["quantity"]
         cost_basis = data["cost_basis"]
         value_adjustment = data["value_adjustment"]
+
+        assert isinstance(quantity, Decimal)
+        assert isinstance(cost_basis, Decimal)
+        assert isinstance(value_adjustment, Decimal)
+
         increase_quantity = self._calculate_capital_increase_quantity(
-            current_quantity=quantity,  # pyright: ignore[reportArgumentType]
+            current_quantity=quantity,
             increase_rate_pct=transaction.capital_increase_rate_pct,
         )
 
         if transaction.transaction_type == PortfolioTransaction.TransactionType.BUY:
-            transaction_cost = transaction.total_cost * fx_rate
-            quantity += transaction.quantity  # pyright: ignore [reportOperatorIssue]
-            cost_basis += transaction_cost  # pyright: ignore [reportOperatorIssue]
+            quantity, cost_basis, value_adjustment = self._apply_buy(
+                transaction, quantity, cost_basis, value_adjustment, fx_rate
+            )
         elif (
             transaction.transaction_type
             == PortfolioTransaction.TransactionType.BONUS_CAPITAL_INCREASE
         ):
-            quantity += increase_quantity  # pyright: ignore[reportOperatorIssue]
+            quantity, cost_basis, value_adjustment = self._apply_bonus_capital_increase(
+                increase_quantity, quantity, cost_basis, value_adjustment
+            )
         elif (
             transaction.transaction_type
             == PortfolioTransaction.TransactionType.RIGHTS_EXERCISED
         ):
-            rights_cost = increase_quantity * transaction.price_per_unit * fx_rate
-            quantity += increase_quantity  # pyright: ignore[reportOperatorIssue]
-            cost_basis += rights_cost  # pyright: ignore [reportOperatorIssue]
+            quantity, cost_basis, value_adjustment = self._apply_rights_exercised(
+                transaction,
+                increase_quantity,
+                quantity,
+                cost_basis,
+                value_adjustment,
+                fx_rate,
+            )
         elif (
             transaction.transaction_type
             == PortfolioTransaction.TransactionType.RIGHTS_NOT_EXERCISED
         ):
-            rights_loss = increase_quantity * transaction.price_per_unit * fx_rate
-            value_adjustment -= rights_loss  # pyright: ignore [reportOperatorIssue]
+            quantity, cost_basis, value_adjustment = self._apply_rights_not_exercised(
+                transaction,
+                increase_quantity,
+                quantity,
+                cost_basis,
+                value_adjustment,
+                fx_rate,
+            )
         elif transaction.transaction_type == PortfolioTransaction.TransactionType.SELL:
-            if quantity > 0:  # pyright: ignore[reportOperatorIssue]
-                average_cost = cost_basis / quantity  # pyright: ignore[reportOperatorIssue]
-                cost_basis -= average_cost * transaction.quantity  # pyright: ignore [reportOperatorIssue]
-            quantity -= transaction.quantity  # pyright: ignore [reportOperatorIssue]
+            quantity, cost_basis, value_adjustment = self._apply_sell(
+                transaction, quantity, cost_basis, value_adjustment
+            )
 
-        if quantity <= 0:  # pyright: ignore [reportOperatorIssue]
+        if quantity <= 0:
             quantity = Decimal("0")
             cost_basis = Decimal("0")
             value_adjustment = Decimal("0")
