@@ -43,6 +43,12 @@ class ContextProcessorsTests(TestCase):
         self.factory = RequestFactory()
         cache.clear()
 
+        self._create_users()
+        self._create_blog_data()
+        self._create_portfolio_data()
+        self._create_site_data()
+
+    def _create_users(self):
         self.staff_user = User.objects.create_user(
             email="staff@test.com", password="password", is_staff=True
         )
@@ -50,6 +56,7 @@ class ContextProcessorsTests(TestCase):
             email="normal@test.com", password="password"
         )
 
+    def _create_blog_data(self):
         self.cat1 = Category.objects.create(name="Cat 1", slug="cat-1")
         self.cat_portfolio = Category.objects.create(name="Portföy", slug="portfoy")
         self.tag1 = Tag.objects.create(name="Tag 1", slug="tag-1")
@@ -81,6 +88,7 @@ class ContextProcessorsTests(TestCase):
             status=Comment.Status.APPROVED,
         )
 
+    def _create_portfolio_data(self):
         self.portfolio = Portfolio.objects.create(
             owner=self.staff_user, name="My Portfolio", target_value=Decimal("100000")
         )
@@ -94,6 +102,7 @@ class ContextProcessorsTests(TestCase):
             total_return_pct=Decimal("150"),
         )
 
+    def _create_site_data(self):
         self.contact_msg = ContactMessage.objects.create(
             name="Bob",
             subject="Hello",

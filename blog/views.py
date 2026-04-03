@@ -284,13 +284,8 @@ def _build_comment_context(request, post):
     }
 
 
-def _post_detail_queryset():
-    return BlogPost.objects.select_related(
-        "category",
-        "author",
-    ).prefetch_related(
-        "tags",
-        "images",
+def _get_portfolio_prefetches():
+    return [
         Prefetch(
             "portfolio_snapshots",
             queryset=PortfolioSnapshot.objects.select_related("portfolio").order_by(
@@ -306,6 +301,11 @@ def _post_detail_queryset():
                 "compare_snapshot__portfolio",
             ).order_by("created_at"),
         ),
+    ]
+
+
+def _get_cashflow_prefetches():
+    return [
         Prefetch(
             "cashflow_snapshots",
             queryset=CashFlowSnapshot.objects.select_related("cashflow").order_by(
@@ -321,12 +321,22 @@ def _post_detail_queryset():
                 "compare_snapshot__cashflow",
             ).order_by("created_at"),
         ),
+    ]
+
+
+def _get_salary_savings_prefetches():
+    return [
         Prefetch(
             "salary_savings_snapshots",
             queryset=SalarySavingsSnapshot.objects.select_related("flow").order_by(
                 "snapshot_date"
             ),
         ),
+    ]
+
+
+def _get_dividend_prefetches():
+    return [
         Prefetch(
             "dividend_snapshots",
             queryset=DividendSnapshot.objects.order_by("-year", "-created_at"),
@@ -338,6 +348,20 @@ def _post_detail_queryset():
                 "compare_snapshot",
             ).order_by("created_at"),
         ),
+    ]
+
+
+def _post_detail_queryset():
+    return BlogPost.objects.select_related(
+        "category",
+        "author",
+    ).prefetch_related(
+        "tags",
+        "images",
+        *_get_portfolio_prefetches(),
+        *_get_cashflow_prefetches(),
+        *_get_salary_savings_prefetches(),
+        *_get_dividend_prefetches(),
     )
 
 
