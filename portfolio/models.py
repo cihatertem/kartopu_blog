@@ -1759,18 +1759,9 @@ class DividendSnapshot(BaseSnapshot):
         return items_data
 
     @classmethod
-    def _process_payments(
-        cls,
-        payments: QuerySet,  # pyright: ignore[reportMissingTypeArgument]
-        currency: str,
-        snapshot_date: date,
-        fx_rates: dict[tuple[str, str, date | None], Decimal],
-    ) -> tuple[Decimal, dict[str, dict[str, object]], list[dict[str, object]]]:
-        total_amount = Decimal("0")
-        asset_totals: dict[str, dict[str, object]] = {}
-        payment_rows: list[dict[str, object]] = []
-
-        payments_list = list(payments)
+    def _get_dividends_map(
+        cls, payments_list: list[DividendPayment], currency: str
+    ) -> dict[str, Dividend]:
         unprefetched_ids = [
             p.id
             for p in payments_list
@@ -1790,6 +1781,43 @@ class DividendSnapshot(BaseSnapshot):
                     payment_id__in=unprefetched_ids, currency=currency
                 ).iterator()
             }
+        return dividends_map
+
+    @classmethod
+    def _calculate_payment_amounts(
+        cls,
+        payment: DividendPayment,
+        dividend: Dividend | None,
+        currency: str,
+        snapshot_date: date,
+        fx_rates: dict[tuple[str, str, date | None], Decimal],
+    ) -> tuple[Decimal, Decimal]:
+        if dividend:
+            per_share = dividend.per_share_net_amount
+            total_payment = dividend.total_net_amount
+        else:
+            fx_rate = Decimal("1")
+            if payment.asset.currency != currency:
+                currency_pair = (payment.asset.currency, currency, snapshot_date)
+                fx_rate = fx_rates.get(currency_pair, Decimal("1"))  # pyright: ignore[reportCallIssue, reportArgumentType]
+            per_share = payment.net_dividend_per_share * fx_rate  # pyright: ignore[reportOperatorIssue]
+            total_payment = payment.total_net_amount * fx_rate
+        return per_share, total_payment
+
+    @classmethod
+    def _process_payments(
+        cls,
+        payments: QuerySet,  # pyright: ignore[reportMissingTypeArgument]
+        currency: str,
+        snapshot_date: date,
+        fx_rates: dict[tuple[str, str, date | None], Decimal],
+    ) -> tuple[Decimal, dict[str, dict[str, object]], list[dict[str, object]]]:
+        total_amount = Decimal("0")
+        asset_totals: dict[str, dict[str, object]] = {}
+        payment_rows: list[dict[str, object]] = []
+
+        payments_list = list(payments)
+        dividends_map = cls._get_dividends_map(payments_list, currency)
 
         for payment in payments_list:
             if (
@@ -1803,16 +1831,9 @@ class DividendSnapshot(BaseSnapshot):
             else:
                 dividend = dividends_map.get(payment.id)
 
-            if dividend:
-                per_share = dividend.per_share_net_amount
-                total_payment = dividend.total_net_amount
-            else:
-                fx_rate = Decimal("1")
-                if payment.asset.currency != currency:
-                    currency_pair = (payment.asset.currency, currency, snapshot_date)
-                    fx_rate = fx_rates.get(currency_pair, Decimal("1"))  # pyright: ignore[reportCallIssue, reportArgumentType]
-                per_share = payment.net_dividend_per_share * fx_rate  # pyright: ignore[reportOperatorIssue]
-                total_payment = payment.total_net_amount * fx_rate
+            per_share, total_payment = cls._calculate_payment_amounts(
+                payment, dividend, currency, snapshot_date, fx_rates
+            )
 
             avg_cost = payment.average_cost
             last_close = payment.last_close_price
