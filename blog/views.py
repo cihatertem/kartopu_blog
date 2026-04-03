@@ -127,11 +127,6 @@ def _extract_social_profile_url(account):
     provider = account.provider.lower()
     extra_data = account.extra_data or {}
 
-    # Try to get it from default allauth method first
-    url = _safe_get_profile_url(account)
-    if url:
-        return url
-
     if provider in ("twitter", "x"):
         username = extra_data.get("screen_name") or extra_data.get("username")
         if username:
@@ -155,6 +150,11 @@ def _extract_social_profile_url(account):
         # Google+ is deprecated but google auth may just not have a profile url
         # For google, if they have a profile property, return it
         return extra_data.get("profile") or ""
+
+    # Try to get it from default allauth method last
+    url = _safe_get_profile_url(account)
+    if url:
+        return url
 
     return ""
 
@@ -221,9 +221,9 @@ def _build_comment_context(request, post):
             user_id__in=author_ids
         )
         for account in social_accounts:
-            avatar_url = _normalize_avatar_url(account.get_avatar_url())
+            avatar_url = _extract_social_avatar_url(account.extra_data or {})
             if not avatar_url:
-                avatar_url = _extract_social_avatar_url(account.extra_data or {})
+                avatar_url = _normalize_avatar_url(account.get_avatar_url())
             if avatar_url and account.user_id not in social_avatar_map:  # pyright: ignore[reportAttributeAccessIssue]
                 social_avatar_map[account.user_id] = avatar_url  # pyright: ignore[reportAttributeAccessIssue]
             profile_url = _extract_social_profile_url(account)

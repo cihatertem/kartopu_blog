@@ -411,14 +411,14 @@ class ViewHelperTests(TestCase):
         from blog.views import _extract_social_profile_url
 
         account = MagicMock()
-        account.provider = "twitter"
-        account.extra_data = {"screen_name": "testuser"}
+        account.provider = "unknown_provider"
+        account.extra_data = {}
         account.get_profile_url.side_effect = Exception("Test Exception")
 
         with self.assertLogs("blog.views", level="ERROR"):
             result = _extract_social_profile_url(account)
 
-        self.assertEqual(result, "https://x.com/testuser")
+        self.assertEqual(result, "")
 
     @patch("accounts.signals._download_and_save_social_avatar")
     def test_build_comment_context_social_profile_url(self, mock_download_avatar):
@@ -452,8 +452,7 @@ class ViewHelperTests(TestCase):
         with patch(
             "allauth.socialaccount.models.SocialAccount.get_avatar_url", return_value=""
         ):
-            with self.assertLogs("blog.views", level="ERROR"):
-                ctx = _build_comment_context(request, post)
+            ctx = _build_comment_context(request, post)
 
         comments = ctx["comment_page_obj"].object_list
         self.assertEqual(len(comments), 1)

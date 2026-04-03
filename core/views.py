@@ -56,6 +56,49 @@ def about_view(request):
     return render(request, "core/about.html", context)
 
 
+def _handle_contact_post(request, site_settings, form):
+    if not site_settings.is_contact_enabled:
+        messages.error(request, "İletişim formu şu anda kapalıdır.")
+        return redirect("core:contact")
+
+    if getattr(request, "limited", False):
+        messages.error(
+            request,
+            "Çok fazla istek gönderdiniz. Lütfen biraz sonra tekrar deneyin.",
+        )
+        return redirect("core:contact")
+
+    if not captcha_is_valid(request):
+        messages.error(request, "Toplam alanı boş ya da hatalı. Lütfen tekrar deneyin.")
+        return redirect("core:contact")
+
+    request.session.pop(CAPTCHA_SESSION_KEY, None)
+
+    if form.is_valid():
+        contact_message = form.save(commit=False)
+
+        if bool(form.cleaned_data.get("website")):
+            messages.success(
+                request,
+                "Mesajınız alınmıştır. En kısa sürede sizinle iletişime geçeceğiz.",
+            )
+            return redirect("core:contact")
+
+        contact_message.ip_address = get_client_ip(request)
+        contact_message.user_agent = escape(request.META.get("HTTP_USER_AGENT", ""))[
+            :500
+        ]
+        contact_message.save()
+        messages.success(
+            request,
+            "Mesajınız alınmıştır. En kısa sürede sizinle iletişime geçeceğiz.",
+        )
+        return redirect("core:contact")
+
+    messages.error(request, "Lütfen form alanlarını kontrol edin.")
+    return None
+
+
 @ratelimit(
     key=client_ip_key,
     rate=CONTACT_RATE_LIMIT,
@@ -68,47 +111,9 @@ def contact_view(request):
     form = ContactForm(request.POST or None)
 
     if request.method == "POST":
-        if not site_settings.is_contact_enabled:
-            messages.error(request, "İletişim formu şu anda kapalıdır.")
-            return redirect("core:contact")
-
-        if getattr(request, "limited", False):
-            messages.error(
-                request,
-                "Çok fazla istek gönderdiniz. Lütfen biraz sonra tekrar deneyin.",
-            )
-            return redirect("core:contact")
-
-        if not captcha_is_valid(request):
-            messages.error(
-                request, "Toplam alanı boş ya da hatalı. Lütfen tekrar deneyin."
-            )
-            return redirect("core:contact")
-
-        request.session.pop(CAPTCHA_SESSION_KEY, None)
-
-        if form.is_valid():
-            contact_message = form.save(commit=False)
-
-            if bool(form.cleaned_data.get("website")):
-                messages.success(
-                    request,
-                    "Mesajınız alınmıştır. En kısa sürede sizinle iletişime geçeceğiz.",
-                )
-                return redirect("core:contact")
-
-            contact_message.ip_address = get_client_ip(request)
-            contact_message.user_agent = escape(
-                request.META.get("HTTP_USER_AGENT", "")
-            )[:500]
-            contact_message.save()
-            messages.success(
-                request,
-                "Mesajınız alınmıştır. En kısa sürede sizinle iletişime geçeceğiz.",
-            )
-            return redirect("core:contact")
-
-        messages.error(request, "Lütfen form alanlarını kontrol edin.")
+        response = _handle_contact_post(request, site_settings, form)
+        if response:
+            return response
 
     num_one, num_two = _generate_captcha(request)
 

@@ -77,45 +77,19 @@ def unsubscribe_request(request):
     return redirect(request.META.get("HTTP_REFERER", "/"))
 
 
-def confirm_subscription(request, token: str):
-    max_age = getattr(settings, "NEWSLETTER_TOKEN_MAX_AGE", 60 * 60 * 24 * 7)
-    try:
-        payload = parse_token(token, max_age=max_age)
-    except signing.SignatureExpired:
-        return render(
-            request,
-            "newsletter/confirm_result.html",
-            {
-                "title": "Link Süresi Doldu",
-                "message": "Onay linkinin süresi dolmuş. Lütfen yeniden deneyin.",
-            },
-            status=400,
-        )
-    except signing.BadSignature:
-        return render(
-            request,
-            "newsletter/confirm_result.html",
-            {
-                "title": "Geçersiz Link",
-                "message": "Onay linki geçersiz. Lütfen yeniden deneyin.",
-            },
-            status=400,
-        )
+def _render_error(request, title: str, message: str):
+    return render(
+        request,
+        "newsletter/confirm_result.html",
+        {
+            "title": title,
+            "message": message,
+        },
+        status=400,
+    )
 
-    email = payload.get("email")
-    action = payload.get("action")
 
-    if not email or action not in {"subscribe", "unsubscribe"}:
-        return render(
-            request,
-            "newsletter/confirm_result.html",
-            {
-                "title": "Geçersiz Talep",
-                "message": "Talep bilgileri eksik veya hatalı.",
-            },
-            status=400,
-        )
-
+def _handle_subscription_action(email: str, action: str) -> tuple[str, str]:
     subscriber, _ = Subscriber.objects.get_or_create(email=email)
 
     if action == "subscribe":
@@ -126,6 +100,34 @@ def confirm_subscription(request, token: str):
         subscriber.unsubscribe()
         title = "Abonelik İptal Edildi"
         message = "Newsletter aboneliğiniz iptal edildi."
+
+    return title, message
+
+
+def confirm_subscription(request, token: str):
+    max_age = getattr(settings, "NEWSLETTER_TOKEN_MAX_AGE", 60 * 60 * 24 * 7)
+    try:
+        payload = parse_token(token, max_age=max_age)
+    except signing.SignatureExpired:
+        return _render_error(
+            request,
+            "Link Süresi Doldu",
+            "Onay linkinin süresi dolmuş. Lütfen yeniden deneyin.",
+        )
+    except signing.BadSignature:
+        return _render_error(
+            request, "Geçersiz Link", "Onay linki geçersiz. Lütfen yeniden deneyin."
+        )
+
+    email = payload.get("email")
+    action = payload.get("action")
+
+    if not email or action not in {"subscribe", "unsubscribe"}:
+        return _render_error(
+            request, "Geçersiz Talep", "Talep bilgileri eksik veya hatalı."
+        )
+
+    title, message = _handle_subscription_action(email, action)
 
     return render(
         request,
