@@ -662,14 +662,14 @@ class Portfolio(UUIDModelMixin, TimeStampedModelMixin):
         fx_rates: dict[tuple[str, str, date | None], Decimal] = {}
         asset_quantities: dict[str, Decimal] = {}
 
-        self._prefetch_fx_rates(transactions, fx_rates)
+        self._prefetch_fx_rates(transactions, fx_rates)  # pyright: ignore[reportArgumentType]
 
         for tx in transactions:
             fx_rate = self._get_or_fetch_fx_rate(
                 fx_rates, tx.asset.currency, self.currency, tx.trade_date
             )
 
-            asset_id_str = str(tx.asset_id)
+            asset_id_str = str(tx.asset_id)  # pyright: ignore[reportAttributeAccessIssue]
             current_quantity = asset_quantities.get(asset_id_str, Decimal("0"))
 
             rights_quantity = self._calculate_capital_increase_quantity(
@@ -1268,7 +1268,7 @@ class CashFlowSnapshot(BaseSnapshot):
         }
         items_data = cls._build_items_data(category_totals, total_amount)
 
-        return snapshot_date, snapshot_kwargs, items_data
+        return snapshot_date, snapshot_kwargs, items_data  # pyright: ignore[reportReturnType]
 
     @classmethod
     def _create_snapshot_items(
@@ -1767,7 +1767,7 @@ class DividendSnapshot(BaseSnapshot):
             for p in payments_list
             if not (
                 hasattr(p, "_prefetched_objects_cache")
-                and "dividends" in p._prefetched_objects_cache
+                and "dividends" in p._prefetched_objects_cache  # pyright: ignore[reportAttributeAccessIssue]
             )
         ]
 
