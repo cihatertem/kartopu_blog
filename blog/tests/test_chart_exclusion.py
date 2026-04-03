@@ -30,6 +30,31 @@ class ChartExclusionTests(TestCase):
             first_name="Charts",
         )
 
+    def _create_portfolio_item(self, snapshot, asset, value):
+        return PortfolioSnapshotItem.objects.create(
+            snapshot=snapshot,
+            asset=asset,
+            quantity=Decimal("10") if value > 0 else Decimal("0"),
+            average_cost=Decimal("100") if value > 0 else Decimal("0"),
+            cost_basis=value,
+            current_price=Decimal("100") if value > 0 else Decimal("0"),
+            market_value=value,
+            allocation_pct=Decimal("1") if value > 0 else Decimal("0"),
+            gain_loss=Decimal("0"),
+            gain_loss_pct=Decimal("0"),
+        )
+
+    def _render_post(self, title, content, snapshot_relation_attr, snapshot):
+        post = BlogPost.objects.create(
+            author=self.user,
+            title=title,
+            slug=title.lower().replace(" ", "-"),
+            content=content,
+        )
+        getattr(post, snapshot_relation_attr).add(snapshot)
+        template = Template("{% load blog_extras %}{% render_post_body post %}")
+        return template.render(Context({"post": post}))
+
     def test_portfolio_charts_exclude_zero_value_items(self) -> None:
         portfolio = Portfolio.objects.create(
             owner=self.user,
@@ -53,41 +78,15 @@ class ChartExclusionTests(TestCase):
             name="Amd", symbol="AMD", asset_type=Asset.AssetType.STOCK
         )
 
-        PortfolioSnapshotItem.objects.create(
-            snapshot=snapshot,
-            asset=asset_nonzero,
-            quantity=Decimal("10"),
-            average_cost=Decimal("100"),
-            cost_basis=Decimal("1000"),
-            current_price=Decimal("100"),
-            market_value=Decimal("1000"),
-            allocation_pct=Decimal("1"),
-            gain_loss=Decimal("0"),
-            gain_loss_pct=Decimal("0"),
-        )
-        PortfolioSnapshotItem.objects.create(
-            snapshot=snapshot,
-            asset=asset_zero,
-            quantity=Decimal("0"),
-            average_cost=Decimal("0"),
-            cost_basis=Decimal("0"),
-            current_price=Decimal("0"),
-            market_value=Decimal("0"),
-            allocation_pct=Decimal("0"),
-            gain_loss=Decimal("0"),
-            gain_loss_pct=Decimal("0"),
-        )
+        self._create_portfolio_item(snapshot, asset_nonzero, Decimal("1000"))
+        self._create_portfolio_item(snapshot, asset_zero, Decimal("0"))
 
-        post = BlogPost.objects.create(
-            author=self.user,
-            title="Portfolio Charts",
-            slug="portfolio-charts",
-            content="{{ portfolio_charts }}",
+        rendered = self._render_post(
+            "Portfolio Charts",
+            "{{ portfolio_charts }}",
+            "portfolio_snapshots",
+            snapshot,
         )
-        post.portfolio_snapshots.add(snapshot)
-
-        template = Template("{% load blog_extras %}{% render_post_body post %}")
-        rendered = template.render(Context({"post": post}))
 
         self.assertIn("NVDA", rendered)
         self.assertNotIn("AMD", rendered)
@@ -117,16 +116,9 @@ class ChartExclusionTests(TestCase):
             allocation_pct=Decimal("0"),
         )
 
-        post = BlogPost.objects.create(
-            author=self.user,
-            title="CashFlow Charts",
-            slug="cashflow-charts",
-            content="{{ cashflow_charts }}",
+        rendered = self._render_post(
+            "CashFlow Charts", "{{ cashflow_charts }}", "cashflow_snapshots", snapshot
         )
-        post.cashflow_snapshots.add(snapshot)
-
-        template = Template("{% load blog_extras %}{% render_post_body post %}")
-        rendered = template.render(Context({"post": post}))
 
         self.assertIn("Temett", rendered)
         self.assertNotIn("Faiz", rendered)
@@ -158,16 +150,9 @@ class ChartExclusionTests(TestCase):
             allocation_pct=Decimal("0"),
         )
 
-        post = BlogPost.objects.create(
-            author=self.user,
-            title="Dividend Charts",
-            slug="dividend-charts",
-            content="{{ dividend_charts }}",
+        rendered = self._render_post(
+            "Dividend Charts", "{{ dividend_charts }}", "dividend_snapshots", snapshot
         )
-        post.dividend_snapshots.add(snapshot)
-
-        template = Template("{% load blog_extras %}{% render_post_body post %}")
-        rendered = template.render(Context({"post": post}))
 
         self.assertIn("APPL", rendered)
         self.assertNotIn("META", rendered)

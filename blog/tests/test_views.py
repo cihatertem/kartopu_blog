@@ -223,7 +223,7 @@ class BlogViewsTests(TestCase):
         self.assertEqual(response.status_code, 400)
 
     @patch("accounts.signals._download_and_save_social_avatar")
-    def test_post_reaction_success(self, mock_download_avatar):
+    def test_post_reaction_add(self, mock_download_avatar):
         SocialAccount.objects.create(user=self.reader, provider="google", uid="123")
         url = reverse("blog:post_reaction", kwargs={"slug": self.published_post.slug})
 
@@ -232,51 +232,82 @@ class BlogViewsTests(TestCase):
         )
         request.user = self.reader
         response = post_reaction(request, slug=self.published_post.slug)
+
         self.assertEqual(response.status_code, 200)
         data = json.loads(response.content)
         self.assertEqual(data["selected"], BlogPostReaction.Reaction.KALP.value)
         self.assertEqual(data["counts"].get(BlogPostReaction.Reaction.KALP.value), 1)
 
+    @patch("accounts.signals._download_and_save_social_avatar")
+    def test_post_reaction_remove_empty(self, mock_download_avatar):
+        SocialAccount.objects.create(user=self.reader, provider="google", uid="123")
+        url = reverse("blog:post_reaction", kwargs={"slug": self.published_post.slug})
+
+        # Add initially
+        request = self.factory.post(
+            url, {"reaction": BlogPostReaction.Reaction.KALP.value}
+        )
+        request.user = self.reader
+        post_reaction(request, slug=self.published_post.slug)
+
+        # Remove with empty
         request = self.factory.post(url, {"reaction": ""})
         request.user = self.reader
         response = post_reaction(request, slug=self.published_post.slug)
+
         self.assertEqual(response.status_code, 200)
         data = json.loads(response.content)
         self.assertEqual(data["selected"], "")
         self.assertEqual(data["counts"].get(BlogPostReaction.Reaction.KALP.value), None)
 
-        request = self.factory.post(
-            url, {"reaction": BlogPostReaction.Reaction.KALP.value}
-        )
-        request.user = self.reader
-        post_reaction(request, slug=self.published_post.slug)  # Add
+    @patch("accounts.signals._download_and_save_social_avatar")
+    def test_post_reaction_remove_toggle(self, mock_download_avatar):
+        SocialAccount.objects.create(user=self.reader, provider="google", uid="123")
+        url = reverse("blog:post_reaction", kwargs={"slug": self.published_post.slug})
 
+        # Add initially
         request = self.factory.post(
             url, {"reaction": BlogPostReaction.Reaction.KALP.value}
         )
         request.user = self.reader
-        response = post_reaction(request, slug=self.published_post.slug)  # Remove
+        post_reaction(request, slug=self.published_post.slug)
+
+        # Remove by toggling (sending same again)
+        request = self.factory.post(
+            url, {"reaction": BlogPostReaction.Reaction.KALP.value}
+        )
+        request.user = self.reader
+        response = post_reaction(request, slug=self.published_post.slug)
 
         self.assertEqual(response.status_code, 200)
         data = json.loads(response.content)
         self.assertEqual(data["selected"], "")
+        self.assertEqual(data["counts"].get(BlogPostReaction.Reaction.KALP.value), None)
 
+    @patch("accounts.signals._download_and_save_social_avatar")
+    def test_post_reaction_change(self, mock_download_avatar):
+        SocialAccount.objects.create(user=self.reader, provider="google", uid="123")
+        url = reverse("blog:post_reaction", kwargs={"slug": self.published_post.slug})
+
+        # Add initially
         request = self.factory.post(
             url, {"reaction": BlogPostReaction.Reaction.KALP.value}
         )
         request.user = self.reader
-        post_reaction(request, slug=self.published_post.slug)  # Add
+        post_reaction(request, slug=self.published_post.slug)
 
+        # Change
         request = self.factory.post(
             url, {"reaction": BlogPostReaction.Reaction.ROKET.value}
         )
         request.user = self.reader
-        response = post_reaction(request, slug=self.published_post.slug)  # Change
+        response = post_reaction(request, slug=self.published_post.slug)
 
         self.assertEqual(response.status_code, 200)
         data = json.loads(response.content)
         self.assertEqual(data["selected"], BlogPostReaction.Reaction.ROKET.value)
         self.assertEqual(data["counts"].get(BlogPostReaction.Reaction.ROKET.value), 1)
+        self.assertEqual(data["counts"].get(BlogPostReaction.Reaction.KALP.value), None)
 
     @patch("accounts.signals._download_and_save_social_avatar")
     def test_post_reaction_bad_slug(self, mock_download_avatar):

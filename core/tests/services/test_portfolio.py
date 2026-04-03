@@ -47,56 +47,81 @@ class PortfolioServicesTest(TestCase):
         self.assertEqual(name_datetime, "UserD - 2023-01-01 15:30:00")
 
     def test_format_snapshot_label(self):
-        label1 = format_snapshot_label(
-            slug="custom-slug", name=None, owner_label="User", snapshot_date=None
-        )
-        self.assertEqual(label1, "custom-slug")
+        test_cases = [
+            {
+                "slug": "custom-slug",
+                "name": None,
+                "owner_label": "User",
+                "snapshot_date": None,
+                "expected": "custom-slug",
+            },
+            {
+                "slug": None,
+                "name": "Custom Name",
+                "owner_label": "User",
+                "snapshot_date": None,
+                "expected": "Custom Name",
+            },
+            {
+                "slug": None,
+                "name": None,
+                "owner_label": "User",
+                "snapshot_date": date(2023, 1, 1),
+                "expected": "User - 2023-01-01",
+            },
+            {
+                "slug": "",
+                "name": "",
+                "owner_label": "User",
+                "snapshot_date": date(2023, 1, 1),
+                "expected": "User - 2023-01-01",
+            },
+            {
+                "slug": None,
+                "name": None,
+                "owner_label": "User",
+                "snapshot_date": None,
+                "expected": "User",
+            },
+            {
+                "slug": "slug-only",
+                "name": None,
+                "owner_label": "User",
+                "snapshot_date": None,
+                "expected": "slug-only",
+            },
+            {
+                "slug": None,
+                "name": "name-only",
+                "owner_label": "User",
+                "snapshot_date": None,
+                "expected": "name-only",
+            },
+            {
+                "slug": "slug-has-priority",
+                "name": "name-ignored",
+                "owner_label": "User",
+                "snapshot_date": None,
+                "expected": "slug-has-priority",
+            },
+            {
+                "slug": "",
+                "name": "name-only-with-empty-slug",
+                "owner_label": "User",
+                "snapshot_date": None,
+                "expected": "name-only-with-empty-slug",
+            },
+        ]
 
-        label2 = format_snapshot_label(
-            slug=None, name="Custom Name", owner_label="User", snapshot_date=None
-        )
-        self.assertEqual(label2, "Custom Name")
-
-        label3 = format_snapshot_label(
-            slug=None, name=None, owner_label="User", snapshot_date=date(2023, 1, 1)
-        )
-        self.assertEqual(label3, "User - 2023-01-01")
-
-        label4 = format_snapshot_label(
-            slug="", name="", owner_label="User", snapshot_date=date(2023, 1, 1)
-        )
-        self.assertEqual(label4, "User - 2023-01-01")
-
-        label5 = format_snapshot_label(
-            slug=None, name=None, owner_label="User", snapshot_date=None
-        )
-        self.assertEqual(label5, "User")
-
-        label6 = format_snapshot_label(
-            slug="slug-only", name=None, owner_label="User", snapshot_date=None
-        )
-        self.assertEqual(label6, "slug-only")
-
-        label7 = format_snapshot_label(
-            slug=None, name="name-only", owner_label="User", snapshot_date=None
-        )
-        self.assertEqual(label7, "name-only")
-
-        label8 = format_snapshot_label(
-            slug="slug-has-priority",
-            name="name-ignored",
-            owner_label="User",
-            snapshot_date=None,
-        )
-        self.assertEqual(label8, "slug-has-priority")
-
-        label9 = format_snapshot_label(
-            slug="",
-            name="name-only-with-empty-slug",
-            owner_label="User",
-            snapshot_date=None,
-        )
-        self.assertEqual(label9, "name-only-with-empty-slug")
+        for case in test_cases:
+            with self.subTest(case=case):
+                label = format_snapshot_label(
+                    slug=case["slug"],
+                    name=case["name"],
+                    owner_label=case["owner_label"],
+                    snapshot_date=case["snapshot_date"],
+                )
+                self.assertEqual(label, case["expected"])
 
     def test_build_comparison_name(self):
         base = MagicMock(name="Base")

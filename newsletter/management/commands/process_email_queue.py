@@ -112,19 +112,8 @@ class Command(BaseCommand):
         except Exception as e:
             return (email_item, False, e)
 
-    def _process_batch(self, pending_emails, rate: int, send_interval: float):
-        """Processes a batch of emails using a thread pool."""
-        sent_count = 0
-        failed_count = 0
-        emails_to_update = []
-        direct_emails_to_update = {}
+    def _cache_attachments(self, direct_emails):
         attachment_cache = {}
-
-        direct_emails = [
-            email_item.direct_email
-            for email_item in pending_emails
-            if email_item.direct_email
-        ]
         if direct_emails:
             from django.db.models import prefetch_related_objects
 
@@ -141,6 +130,56 @@ class Command(BaseCommand):
                         )
                     )
             attachment_cache[de.id] = attachments_data
+        return attachment_cache
+
+    def _handle_future_result(
+        self,
+        future,
+        emails_to_update,
+        direct_emails_to_update,
+        sent_count,
+        failed_count,
+    ):
+        email_item, success, error_msg = future.result()
+        now = timezone.now()
+
+        if success:
+            email_item.status = EmailQueueStatus.SENT
+            email_item.sent_at = now
+            email_item.updated_at = now
+            emails_to_update.append(email_item)
+
+            if email_item.direct_email:
+                email_item.direct_email.sent_at = now
+                direct_emails_to_update[email_item.direct_email.id] = (
+                    email_item.direct_email
+                )
+
+            sent_count += 1
+        else:
+            email_item.status = EmailQueueStatus.FAILED
+            email_item.error_message = str(error_msg)
+            email_item.updated_at = now
+            emails_to_update.append(email_item)
+
+            self.stderr.write(f"Failed to send to {email_item.to_email}: {error_msg}")
+            failed_count += 1
+
+        return sent_count, failed_count
+
+    def _process_batch(self, pending_emails, rate: int, send_interval: float):
+        """Processes a batch of emails using a thread pool."""
+        sent_count = 0
+        failed_count = 0
+        emails_to_update = []
+        direct_emails_to_update = {}
+
+        direct_emails = [
+            email_item.direct_email
+            for email_item in pending_emails
+            if email_item.direct_email
+        ]
+        attachment_cache = self._cache_attachments(direct_emails)
 
         futures = []
         max_workers = min(100, max(10, rate))
@@ -160,32 +199,13 @@ class Command(BaseCommand):
                     time.sleep(wait)
 
             for future in as_completed(futures):
-                email_item, success, error_msg = future.result()
-                now = timezone.now()
-
-                if success:
-                    email_item.status = EmailQueueStatus.SENT
-                    email_item.sent_at = now
-                    email_item.updated_at = now
-                    emails_to_update.append(email_item)
-
-                    if email_item.direct_email:
-                        email_item.direct_email.sent_at = now
-                        direct_emails_to_update[email_item.direct_email.id] = (
-                            email_item.direct_email
-                        )
-
-                    sent_count += 1
-                else:
-                    email_item.status = EmailQueueStatus.FAILED
-                    email_item.error_message = str(error_msg)
-                    email_item.updated_at = now
-                    emails_to_update.append(email_item)
-
-                    self.stderr.write(
-                        f"Failed to send to {email_item.to_email}: {error_msg}"
-                    )
-                    failed_count += 1
+                sent_count, failed_count = self._handle_future_result(
+                    future,
+                    emails_to_update,
+                    direct_emails_to_update,
+                    sent_count,
+                    failed_count,
+                )
 
         return sent_count, failed_count, emails_to_update, direct_emails_to_update
 

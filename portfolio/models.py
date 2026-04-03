@@ -548,39 +548,17 @@ class Portfolio(UUIDModelMixin, TimeStampedModelMixin):
             Decimal("0"),
         )
 
-    def calculate_irr(self, as_of_date: date, current_value: Decimal) -> Decimal | None:
-        """
-        Calculates the Internal Rate of Return (IRR) for the portfolio as of a given date
-        and current market value.
-        """
-        if (
-            hasattr(self, "_prefetched_objects_cache")
-            and "transactions" in self._prefetched_objects_cache  # pyright: ignore[reportAttributeAccessIssue]
-        ):
-            tx_list = [
-                tx
-                for tx in self.transactions.all()  # pyright: ignore[reportAttributeAccessIssue]
-                if tx.trade_date <= as_of_date
-            ]
-            tx_list.sort(key=lambda tx: (tx.trade_date, tx.created_at))
-
-            from django.db.models import prefetch_related_objects
-
-            prefetch_related_objects(tx_list, "asset")
-        else:
-            tx_list = list(
-                self.transactions.select_related("asset")  # pyright: ignore[reportAttributeAccessIssue]
-                .filter(trade_date__lte=as_of_date)
-                .order_by("trade_date", "created_at")
-            )
-
+    def _build_irr_cash_flows(
+        self,
+        transactions: list["PortfolioTransaction"] | QuerySet["PortfolioTransaction"],
+    ) -> list[tuple[date, Decimal]]:
         tx_cash_flows = []
         fx_rates: dict[tuple[str, str, date | None], Decimal] = {}
         asset_quantities: dict[str, Decimal] = {}
 
-        self._prefetch_fx_rates(tx_list, fx_rates)
+        self._prefetch_fx_rates(transactions, fx_rates)
 
-        for tx in tx_list:
+        for tx in transactions:
             fx_rate = self._get_or_fetch_fx_rate(
                 fx_rates, tx.asset.currency, self.currency, tx.trade_date
             )
@@ -618,6 +596,16 @@ class Portfolio(UUIDModelMixin, TimeStampedModelMixin):
                 current_quantity = Decimal("0")
 
             asset_quantities[asset_id_str] = current_quantity
+
+        return tx_cash_flows
+
+    def calculate_irr(self, as_of_date: date, current_value: Decimal) -> Decimal | None:
+        """
+        Calculates the Internal Rate of Return (IRR) for the portfolio as of a given date
+        and current market value.
+        """
+        tx_list = self._get_filtered_transactions(as_of_date)
+        tx_cash_flows = self._build_irr_cash_flows(tx_list)
 
         tx_cash_flows.append((as_of_date, current_value))
         irr = calculate_xirr(tx_cash_flows)
