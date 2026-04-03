@@ -14,6 +14,7 @@ from blog.signals import (
     _post_cache_storage_dir,
     _post_media_dir,
     blogpost_delete_files,
+    category_changed,
     invalidate_nav_cache,
 )
 
@@ -206,6 +207,13 @@ class BlogSignalsTests(TestCase):
     def test_category_changed_signal(self, mock_invalidate):
         Category.objects.create(name="New Cat")
         mock_invalidate.assert_called()
+
+    @patch("blog.signals.invalidate_nav_cache")
+    def test_category_changed_exception_handling(self, mock_invalidate):
+        mock_invalidate.side_effect = Exception("Cache error")
+        with self.assertRaises(Exception) as context:
+            category_changed(sender=Category)
+        self.assertEqual(str(context.exception), "Cache error")
 
     @patch("blog.signals.invalidate_nav_cache")
     def test_tag_changed_signal(self, mock_invalidate):

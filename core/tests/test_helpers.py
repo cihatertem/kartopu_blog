@@ -156,6 +156,36 @@ class CaptchaIsValidTest(TestCase):
         with self.assertLogs("core.helpers", level="ERROR"):
             self.assertFalse(captcha_is_valid(request))
 
+    def test_empty_string_captcha(self):
+        """Should return False when POST captcha is an empty string."""
+        request = self.factory.post("/", {"captcha": ""})
+        request.session = {CAPTCHA_SESSION_KEY: "15"}
+        self.assertFalse(captcha_is_valid(request))
+
+    def test_empty_string_session(self):
+        """Should return False when session captcha is an empty string."""
+        request = self.factory.post("/", {"captcha": "15"})
+        request.session = {CAPTCHA_SESSION_KEY: ""}
+        self.assertFalse(captcha_is_valid(request))
+
+    def test_zero_captcha(self):
+        """Should return True when both captchas are zero."""
+        request = self.factory.post("/", {"captcha": "0"})
+        request.session = {CAPTCHA_SESSION_KEY: "0"}
+        self.assertTrue(captcha_is_valid(request))
+
+    def test_negative_captcha(self):
+        """Should return True when both captchas are identical negative integers."""
+        request = self.factory.post("/", {"captcha": "-5"})
+        request.session = {CAPTCHA_SESSION_KEY: "-5"}
+        self.assertTrue(captcha_is_valid(request))
+
+    def test_whitespace_captcha(self):
+        """Should return True when POST captcha has leading/trailing whitespace but matches."""
+        request = self.factory.post("/", {"captcha": " 15 "})
+        request.session = {CAPTCHA_SESSION_KEY: "15"}
+        self.assertTrue(captcha_is_valid(request))
+
 
 class GenerateCaptchaTest(TestCase):
     def setUp(self):

@@ -64,6 +64,26 @@ class MarkdownTests(TestCase):
 
         self.assertEqual(html, "")
 
+    def test_render_markdown_empty_string(self):
+        html = render_markdown("")
+
+        self.assertEqual(html, "")
+
+    def test_render_markdown_whitespace(self):
+        html = render_markdown("   \n   ")
+
+        self.assertEqual(html, "")
+
+    def test_render_markdown_falsy_types(self):
+        self.assertEqual(render_markdown(0), "")
+        self.assertEqual(render_markdown(False), "")
+        self.assertEqual(render_markdown([]), "")
+
+    def test_render_markdown_only_stripped_tags(self):
+        html = render_markdown("<script>malicious()</script>")
+
+        self.assertEqual(html, "malicious()")
+
     def test_render_markdown_sanitizes_script(self):
         text = "<script>alert('xss');</script>Test"
 

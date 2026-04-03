@@ -1,7 +1,6 @@
 import os
-import tempfile
 from unittest import TestCase
-from unittest.mock import patch
+from unittest.mock import mock_open, patch
 
 from config.settings import get_swarm_secret_for_psg
 
@@ -31,41 +30,39 @@ class TestGetSwarmSecretForPsg(TestCase):
             result = get_swarm_secret_for_psg("MY_KEY")
             self.assertEqual(result, "my_secret_value")
 
-    def test_file_content_returned(self):
+    @patch("os.path.isfile")
+    @patch("builtins.open", new_callable=mock_open, read_data="file_secret_value\n")
+    def test_file_content_returned(self, mock_file, mock_isfile):
         """Returns the content of the file if the environment variable is a file path."""
-        with tempfile.NamedTemporaryFile(mode="w+", delete=False) as temp_file:
-            temp_file.write("file_secret_value\n")
-            temp_file_path = temp_file.name
+        mock_isfile.return_value = True
+        with patch.dict(os.environ, {"MY_KEY": "/fake/path/to/secret"}):
+            result = get_swarm_secret_for_psg("MY_KEY")
+            self.assertEqual(result, "file_secret_value")
+            mock_isfile.assert_called_once_with("/fake/path/to/secret")
+            mock_file.assert_called_once_with("/fake/path/to/secret")
 
-        try:
-            with patch.dict(os.environ, {"MY_KEY": temp_file_path}):
-                result = get_swarm_secret_for_psg("MY_KEY")
-                self.assertEqual(result, "file_secret_value")
-        finally:
-            os.remove(temp_file_path)
-
-    def test_file_content_returned_without_newline_stripping(self):
+    @patch("os.path.isfile")
+    @patch("builtins.open", new_callable=mock_open, read_data="file_secret_value")
+    def test_file_content_returned_without_newline_stripping(
+        self, mock_file, mock_isfile
+    ):
         """Returns the content of the file without trailing newlines stripped if there are none."""
-        with tempfile.NamedTemporaryFile(mode="w+", delete=False) as temp_file:
-            temp_file.write("file_secret_value")
-            temp_file_path = temp_file.name
+        mock_isfile.return_value = True
+        with patch.dict(os.environ, {"MY_KEY": "/fake/path/to/secret_no_newline"}):
+            result = get_swarm_secret_for_psg("MY_KEY")
+            self.assertEqual(result, "file_secret_value")
+            mock_isfile.assert_called_once_with("/fake/path/to/secret_no_newline")
+            mock_file.assert_called_once_with("/fake/path/to/secret_no_newline")
 
-        try:
-            with patch.dict(os.environ, {"MY_KEY": temp_file_path}):
-                result = get_swarm_secret_for_psg("MY_KEY")
-                self.assertEqual(result, "file_secret_value")
-        finally:
-            os.remove(temp_file_path)
-
-    def test_multiline_file_content_returns_first_line(self):
+    @patch("os.path.isfile")
+    @patch(
+        "builtins.open", new_callable=mock_open, read_data="first_line\nsecond_line\n"
+    )
+    def test_multiline_file_content_returns_first_line(self, mock_file, mock_isfile):
         """Returns only the first line of the file if the environment variable is a file path."""
-        with tempfile.NamedTemporaryFile(mode="w+", delete=False) as temp_file:
-            temp_file.write("first_line\nsecond_line\n")
-            temp_file_path = temp_file.name
-
-        try:
-            with patch.dict(os.environ, {"MY_KEY": temp_file_path}):
-                result = get_swarm_secret_for_psg("MY_KEY")
-                self.assertEqual(result, "first_line")
-        finally:
-            os.remove(temp_file_path)
+        mock_isfile.return_value = True
+        with patch.dict(os.environ, {"MY_KEY": "/fake/path/to/multiline_secret"}):
+            result = get_swarm_secret_for_psg("MY_KEY")
+            self.assertEqual(result, "first_line")
+            mock_isfile.assert_called_once_with("/fake/path/to/multiline_secret")
+            mock_file.assert_called_once_with("/fake/path/to/multiline_secret")

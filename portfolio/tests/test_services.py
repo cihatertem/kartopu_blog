@@ -249,6 +249,9 @@ class FetchFXRatesBulkTests(TestCase):
         mock_download.side_effect = Exception("Download failed")
         pairs = [("USD", "TRY")]
         self.assertEqual(fetch_fx_rates_bulk(pairs), {})
+        mock_logger_exception.assert_called_once_with(
+            "Yahoo Finance bulk download failed for symbols: %s", ["USDTRY=X"]
+        )
 
     @patch("portfolio.services.yf.download")
     def test_yf_download_empty_dataframe(self, mock_download):
