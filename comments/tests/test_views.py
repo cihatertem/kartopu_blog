@@ -1,8 +1,9 @@
+import ipaddress
 from unittest.mock import patch
 
 from allauth.socialaccount.models import SocialAccount
 from django.contrib.auth import get_user_model
-from django.test import Client, TestCase
+from django.test import Client, TestCase, override_settings
 from django.urls import reverse
 
 from blog.models import BlogPost, Category
@@ -72,6 +73,23 @@ class PostCommentTests(TestCase):
         self.assertEqual(response.status_code, 302)
         self.assertEqual(response.url, self.post.get_absolute_url())
         self.assertEqual(Comment.objects.count(), 0)
+
+    def test_post_comment_logs_correct_ip(self):
+        self.client.login(email="staff2@example.com", password="password")
+        with override_settings(TRUSTED_PROXY_NETS=[ipaddress.ip_network("10.0.0.0/8")]):
+            response = self.client.post(
+                self.url,
+                {"body": "IP test comment"},
+                follow=False,
+                HTTP_HOST="localhost",
+                secure=True,
+                REMOTE_ADDR="10.0.0.5",
+                HTTP_X_FORWARDED_FOR="203.0.113.195",
+            )
+        self.assertEqual(response.status_code, 302)
+        comment = Comment.objects.get(body="IP test comment")
+        # Currently this fails because it logs 10.0.0.5
+        self.assertEqual(comment.ip_address, "203.0.113.195")
 
     @patch("accounts.signals._download_and_save_social_avatar")
     def test_regular_user_with_social_account(self, mock_download_avatar):

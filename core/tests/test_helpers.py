@@ -73,33 +73,32 @@ class GetClientIPTest(TestCase):
 
 
 class NormalizeSearchQueryTest(TestCase):
-    def test_normal_case(self):
-        """Should return stripped string."""
-        self.assertEqual(
-            normalize_search_query(" Python Django Framework "),
-            "Python Django Framework",
-        )
+    def test_normalize_search_query_edge_cases(self):
+        cases = [
+            # Basic cases
+            (" Python Django Framework ", "Python Django Framework"),
+            ('"finansal özgürlük" -vergi', '"finansal özgürlük" -vergi'),
+            ("", ""),
+            ("   \t\n  ", ""),
+            # Edge cases
+            ("\xa0non-breaking\xa0", "non-breaking"),  # Non-breaking spaces
+            ("\u200bzero width\u200b", "\u200bzero width\u200b"),  # Zero-width spaces
+            (" emojis 🚀 \n", "emojis 🚀"),
+            ("A" * 1000 + "  ", "A" * 1000),  # Very long string
+            ("\0null byte\0", "\0null byte\0"),  # Null bytes
+            ("sql injection' OR '1'='1", "sql injection' OR '1'='1"),
+            ("<script>alert('xss')</script>", "<script>alert('xss')</script>"),
+            ("   multiple   internal   spaces   ", "multiple   internal   spaces"),
+            (" \r\n \t mixed whitespace \t \r\n ", "mixed whitespace"),
+            (
+                "TR \u0130 \u011e \u015e \u00c7 \u00d6 \u00dc",
+                "TR \u0130 \u011e \u015e \u00c7 \u00d6 \u00dc",
+            ),  # Turkish characters
+        ]
 
-    def test_preserves_quotes_and_negations(self):
-        """Should preserve quotes and minuses."""
-        self.assertEqual(
-            normalize_search_query('"finansal özgürlük" -vergi'),
-            '"finansal özgürlük" -vergi',
-        )
-
-    def test_empty_string(self):
-        """Should handle empty string."""
-        self.assertEqual(
-            normalize_search_query(""),
-            "",
-        )
-
-    def test_whitespace_only(self):
-        """Should handle string with only whitespaces."""
-        self.assertEqual(
-            normalize_search_query("   \t\n  "),
-            "",
-        )
+        for q, expected in cases:
+            with self.subTest(query=q):
+                self.assertEqual(normalize_search_query(q), expected)
 
 
 class CaptchaIsValidTest(TestCase):

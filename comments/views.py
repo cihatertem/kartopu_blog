@@ -7,7 +7,7 @@ from django.views.decorators.http import require_POST
 from django_ratelimit.decorators import ratelimit
 
 from blog.models import BlogPost
-from core.helpers import client_ip_key
+from core.helpers import client_ip_key, get_client_ip
 from core.models import SiteSettings
 
 from .forms import CommentForm
@@ -88,7 +88,7 @@ def post_comment(request, post_id):
     comment.author = request.user
     comment.status = status
     comment.parent = parent
-    comment.ip_address = request.META.get("REMOTE_ADDR")
+    comment.ip_address = get_client_ip(request)
     comment.user_agent = escape(request.META.get("HTTP_USER_AGENT", ""))[:500]
     comment.social_provider = social_account.provider if social_account else ""
     comment.save()

@@ -6,10 +6,15 @@ from core.tag_colors import TAG_COLOR_CLASSES, build_tag_items, get_tag_color_cl
 
 
 class TagColorsTest(TestCase):
-    def test_get_tag_color_class(self):
+    def test_get_tag_color_class_empty_input(self):
         self.assertEqual(get_tag_color_class(""), TAG_COLOR_CLASSES[0])
         self.assertEqual(get_tag_color_class(None), TAG_COLOR_CLASSES[0])
 
+    def test_get_tag_color_class_whitespace_input(self):
+        color = get_tag_color_class(" ")
+        self.assertIn(color, TAG_COLOR_CLASSES)
+
+    def test_get_tag_color_class(self):
         color1 = get_tag_color_class("python")
         color2 = get_tag_color_class("python")
         self.assertEqual(color1, color2)
