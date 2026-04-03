@@ -162,6 +162,109 @@ def fetch_yahoo_finance_price(
     return _safe_decimal(price)
 
 
+@log_exceptions(
+    default=dict, message="Yahoo Finance multiple bulk history request failed."
+)  # pyright: ignore[reportArgumentType]
+def fetch_multiple_fx_rates_bulk(
+    pairs_by_date: dict[date | None, set[tuple[str, str]]],
+) -> dict[tuple[str, str, date | None], Decimal]:
+    """
+    Fetches FX rates for multiple dates and currency pairs in a single yfinance request.
+    Returns a dictionary mapping (base_currency, target_currency, rate_date) to the exchange rate.
+    """
+    if not pairs_by_date:
+        return {}
+
+    all_pairs = set()
+    valid_dates = []
+
+    for d, pairs in pairs_by_date.items():
+        all_pairs.update(pairs)
+        if d is not None:
+            valid_dates.append(d)
+
+    pairs_to_fetch = [p for p in all_pairs if p[0] != p[1]]
+    if not pairs_to_fetch:
+        results = {}
+        for d, pairs in pairs_by_date.items():
+            for p in pairs:
+                results[(p[0], p[1], d)] = Decimal("1")
+        return results
+
+    symbols_map = {
+        f"{base}{target}=X": (base, target) for base, target in pairs_to_fetch
+    }
+    symbols = list(symbols_map.keys())
+
+    if valid_dates:
+        min_date = min(valid_dates)
+        max_date = max(valid_dates)
+        start = min_date - timedelta(days=5)
+        end = max_date + timedelta(days=1)
+    else:
+        start = date.today() - timedelta(days=5)
+        end = date.today() + timedelta(days=1)
+
+    try:
+        data = yf.download(symbols, start=start, end=end, progress=False, interval="1d")
+    except Exception:
+        logger.exception(
+            "Yahoo Finance multiple bulk download failed for symbols: %s", symbols
+        )
+        return {}
+
+    results: dict[tuple[str, str, date | None], Decimal] = {}
+
+    if data is None or data.empty or "Close" not in data:
+        return results
+
+    close_data = data["Close"]
+
+    for d, pairs in pairs_by_date.items():
+        if d is not None:
+            current_close_data = close_data[close_data.index.date <= d]  # pyright: ignore[reportAttributeAccessIssue]
+        else:
+            current_close_data = close_data
+
+        if current_close_data.empty:  # pyright: ignore[reportAttributeAccessIssue]
+            continue
+
+        for base, target in pairs:
+            if base == target:
+                results[(base, target, d)] = Decimal("1")
+                continue
+
+            symbol = f"{base}{target}=X"
+            try:
+                if hasattr(current_close_data, "columns"):
+                    if symbol in current_close_data:
+                        series = current_close_data[symbol].dropna()  # pyright: ignore[reportAttributeAccessIssue]
+                    elif len(symbols) == 1:
+                        series = current_close_data.iloc[:, 0].dropna()  # pyright: ignore[reportAttributeAccessIssue]
+                    else:
+                        continue
+                else:
+                    series = current_close_data.dropna()  # pyright: ignore[reportAttributeAccessIssue]
+
+                if series.empty:
+                    continue
+
+                price = series.iloc[-1]
+                decimal_price = _safe_decimal(price)
+                if decimal_price is not None:
+                    results[(base, target, d)] = decimal_price
+            except Exception:
+                logger.exception("Failed to parse FX rate for %s on %s", symbol, d)
+
+    # Ensure identical pairs are populated even if not in symbols
+    for d, pairs in pairs_by_date.items():
+        for p in pairs:
+            if p[0] == p[1]:
+                results[(p[0], p[1], d)] = Decimal("1")
+
+    return results
+
+
 @log_exceptions(default=dict, message="Yahoo Finance bulk history request failed.")  # pyright: ignore[reportArgumentType]
 def fetch_fx_rates_bulk(
     currency_pairs: list[tuple[str, str]],

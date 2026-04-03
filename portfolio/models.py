@@ -22,6 +22,7 @@ from portfolio.services import (
     calculate_xirr,
     fetch_fx_rate,
     fetch_fx_rates_bulk,
+    fetch_multiple_fx_rates_bulk,
     fetch_yahoo_finance_price,
 )
 
@@ -308,18 +309,19 @@ class Portfolio(UUIDModelMixin, TimeStampedModelMixin):
                         (asset_currency, self.currency)
                     )
 
-        for rate_date, pairs in uncached_pairs_by_date.items():
-            fetched_rates = fetch_fx_rates_bulk(list(pairs), rate_date=rate_date)
-            for pair in pairs:
-                currency_pair = (pair[0], pair[1], rate_date)
-                cache_key = f"fx_rate_{pair[0]}_{pair[1]}_{rate_date.isoformat() if rate_date else 'latest'}"
-                fx_rate = (fetched_rates or {}).get(pair, Decimal("1"))  # pyright: ignore[reportArgumentType]
-                cache.set(
-                    cache_key,
-                    fx_rate,
-                    timeout=getattr(settings, "CACHE_TIMEOUT", CACHE_TIMEOUT),
-                )
-                fx_rates[currency_pair] = fx_rate  # pyright: ignore[reportArgumentType]
+        if uncached_pairs_by_date:
+            fetched_rates = fetch_multiple_fx_rates_bulk(uncached_pairs_by_date)
+            for rate_date, pairs in uncached_pairs_by_date.items():
+                for pair in pairs:
+                    currency_pair = (pair[0], pair[1], rate_date)
+                    cache_key = f"fx_rate_{pair[0]}_{pair[1]}_{rate_date.isoformat() if rate_date else 'latest'}"
+                    fx_rate = fetched_rates.get(currency_pair, Decimal("1"))  # pyright: ignore
+                    cache.set(
+                        cache_key,
+                        fx_rate,
+                        timeout=getattr(settings, "CACHE_TIMEOUT", CACHE_TIMEOUT),
+                    )
+                    fx_rates[currency_pair] = fx_rate  # pyright: ignore[reportArgumentType]
 
     def _apply_transaction_to_position(
         self,

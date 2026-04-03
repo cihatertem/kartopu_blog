@@ -424,6 +424,55 @@ def archive_index(request):
     )
 
 
+def _get_cached_search_results(base_qs, cached_data, page_num):
+    total_count, post_ids = cached_data
+    posts_dict = base_qs.in_bulk(post_ids)
+    # Reconstruct list maintaining order
+    page_posts = [posts_dict[pid] for pid in post_ids if pid in posts_dict]
+
+    # Create a dummy paginator
+    paginator = Paginator(range(total_count), POST_PAGE_SIZE)
+    page_obj = paginator.get_page(page_num)
+    page_obj.object_list = page_posts  # pyright: ignore[reportAttributeAccessIssue]
+    return page_obj
+
+
+def _perform_database_search(request, base_qs, normalized_q, cache_key):
+    base_qs = base_qs.annotate(
+        tag_names=StringAgg(
+            "tags__name",
+            delimiter=" ",
+            distinct=True,
+        )
+    )
+
+    vector = (
+        SearchVector("tag_names", weight="A", config="turkish")
+        + SearchVector("title", weight="B", config="turkish")
+        + SearchVector("excerpt", weight="C", config="turkish")
+        + SearchVector("content", weight="D", config="turkish")
+    )
+
+    query = SearchQuery(
+        normalized_q,
+        search_type="websearch",
+        config="turkish",
+    )
+
+    qs = (
+        base_qs.annotate(rank=SearchRank(vector, query))
+        .filter(rank__isnull=False, rank__gt=0)
+        .order_by("-rank", "-published_at")
+    )
+
+    page_obj = get_page_obj(request, qs, per_page=POST_PAGE_SIZE)
+
+    total_count = page_obj.paginator.count
+    post_ids = [post.id for post in page_obj.object_list]
+    cache.set(cache_key, (total_count, post_ids), timeout=3600)
+    return page_obj
+
+
 def search_results(request):
     q = (request.GET.get("q") or "").strip()
     normalized_q = helpers.normalize_search_query(q)
@@ -442,48 +491,11 @@ def search_results(request):
         cached_data = cache.get(cache_key)
 
         if cached_data:
-            total_count, post_ids = cached_data
-            posts_dict = base_qs.in_bulk(post_ids)
-            # Reconstruct list maintaining order
-            page_posts = [posts_dict[pid] for pid in post_ids if pid in posts_dict]
-
-            # Create a dummy paginator
-            paginator = Paginator(range(total_count), POST_PAGE_SIZE)
-            page_obj = paginator.get_page(page_num)
-            page_obj.object_list = page_posts  # pyright: ignore[reportAttributeAccessIssue]
+            page_obj = _get_cached_search_results(base_qs, cached_data, page_num)
         else:
-            base_qs = base_qs.annotate(
-                tag_names=StringAgg(
-                    "tags__name",
-                    delimiter=" ",
-                    distinct=True,
-                )
+            page_obj = _perform_database_search(
+                request, base_qs, normalized_q, cache_key
             )
-
-            vector = (
-                SearchVector("tag_names", weight="A", config="turkish")
-                + SearchVector("title", weight="B", config="turkish")
-                + SearchVector("excerpt", weight="C", config="turkish")
-                + SearchVector("content", weight="D", config="turkish")
-            )
-
-            query = SearchQuery(
-                normalized_q,
-                search_type="websearch",
-                config="turkish",
-            )
-
-            qs = (
-                base_qs.annotate(rank=SearchRank(vector, query))
-                .filter(rank__isnull=False, rank__gt=0)
-                .order_by("-rank", "-published_at")
-            )
-
-            page_obj = get_page_obj(request, qs, per_page=POST_PAGE_SIZE)
-
-            total_count = page_obj.paginator.count
-            post_ids = [post.id for post in page_obj.object_list]
-            cache.set(cache_key, (total_count, post_ids), timeout=3600)
 
     breadcrumbs = [
         {"label": "Blog", "url": reverse("blog:post_list")},

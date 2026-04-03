@@ -791,10 +791,7 @@ def _render_savings_rate_charts_html(snapshot) -> str:
 """.format(timeseries_json=timeseries_json)
 
 
-def _render_cashflow_comparison_summary_html(comparison) -> str:
-    if not comparison:
-        return ""
-
+def _get_cashflow_comparison_context_data(comparison) -> dict:
     base = comparison.base_snapshot
     compare = comparison.compare_snapshot
     cashflow_currency = getattr(base.cashflow, "currency", None)
@@ -843,16 +840,34 @@ def _render_cashflow_comparison_summary_html(comparison) -> str:
             f"<li><strong>{label}:</strong> {compare_fmt}</li>"
         )
 
-        delta_val = compare_val - base_val
+        delta_val = compare_val - base_val  # pyright: ignore[reportOperatorIssue]
         delta_fmt = _format_currency(delta_val, cashflow_currency)
         category_delta_rows_list.append(
             f"<li><strong>{label}:</strong> {base_fmt} → {compare_fmt} "
             f'(<span class="text-muted">{delta_fmt}</span>)</li>'
         )
 
-    base_category_rows = "\n".join(base_category_rows_list)
-    compare_category_rows = "\n".join(compare_category_rows_list)
-    category_delta_rows = "\n".join(category_delta_rows_list)
+    return {
+        "base_label": base_label,
+        "compare_label": compare_label,
+        "base_period": base_period,
+        "compare_period": compare_period,
+        "base_amount": base_amount,
+        "compare_amount": compare_amount,
+        "delta": delta,
+        "pct_change": pct_change,
+        "cashflow_currency": cashflow_currency,
+        "base_category_rows": "\n".join(base_category_rows_list),
+        "compare_category_rows": "\n".join(compare_category_rows_list),
+        "category_delta_rows": "\n".join(category_delta_rows_list),
+    }
+
+
+def _render_cashflow_comparison_summary_html(comparison) -> str:
+    if not comparison:
+        return ""
+
+    ctx = _get_cashflow_comparison_context_data(comparison)
 
     html = f"""
 <section class="cashflow-comparison">
@@ -860,28 +875,28 @@ def _render_cashflow_comparison_summary_html(comparison) -> str:
   <div class="summary-card">
     <div class="comparison-grid">
       <div>
-        <p class="summary-meta"><strong>Tarih:</strong> {base_label}
-          <span class="text-muted">({base_period})</span>
+        <p class="summary-meta"><strong>Tarih:</strong> {ctx["base_label"]}
+          <span class="text-muted">({ctx["base_period"]})</span>
         </p>
         <ul class="summary-list">
-          <li><strong>Toplam Nakit Akışı:</strong> {_format_currency(base_amount, cashflow_currency)}</li>
-          {base_category_rows}
+          <li><strong>Toplam Nakit Akışı:</strong> {_format_currency(ctx["base_amount"], ctx["cashflow_currency"])}</li>
+          {ctx["base_category_rows"]}
         </ul>
       </div>
       <div>
-        <p class="summary-meta"><strong>Tarih:</strong> {compare_label}
-          <span class="text-muted">({compare_period})</span>
+        <p class="summary-meta"><strong>Tarih:</strong> {ctx["compare_label"]}
+          <span class="text-muted">({ctx["compare_period"]})</span>
         </p>
         <ul class="summary-list">
-          <li><strong>Toplam Nakit Akışı:</strong> {_format_currency(compare_amount, cashflow_currency)}</li>
-          {compare_category_rows}
+          <li><strong>Toplam Nakit Akışı:</strong> {_format_currency(ctx["compare_amount"], ctx["cashflow_currency"])}</li>
+          {ctx["compare_category_rows"]}
         </ul>
       </div>
     </div>
     <div class="comparison-footer">
-      <p class="summary-meta summary-meta--tight"><strong>Değişim:</strong> {_format_currency(delta, cashflow_currency)} ({escape(f"{float(pct_change):.2f}")}%)</p>
+      <p class="summary-meta summary-meta--tight"><strong>Değişim:</strong> {_format_currency(ctx["delta"], ctx["cashflow_currency"])} ({escape(f"{float(ctx['pct_change']):.2f}")}%)</p>
       <ul class="summary-list summary-list--compact">
-        {category_delta_rows}
+        {ctx["category_delta_rows"]}
       </ul>
     </div>
   </div>

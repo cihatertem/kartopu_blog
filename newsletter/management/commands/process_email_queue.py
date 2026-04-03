@@ -203,6 +203,46 @@ class Command(BaseCommand):
                 list(direct_emails_to_update.values()), ["sent_at"]
             )
 
+    def _run_processing_loop(
+        self,
+        daemon: bool,
+        rate: int,
+        sleep_interval: int,
+        processing_timeout: int,
+        limit: int,
+        send_interval: float,
+    ):
+        """Runs the main processing loop for email queue."""
+        while True:
+            pending_emails = self._get_pending_emails(processing_timeout, limit)
+            count = len(pending_emails)
+
+            if count == 0:
+                if not daemon:
+                    self.stdout.write(self.style.SUCCESS("No pending emails."))
+                    break
+                time.sleep(sleep_interval)
+                continue
+
+            self.stdout.write(
+                f"Processing batch of {count} emails at {rate} emails/sec..."
+            )
+
+            sent_count, failed_count, emails_to_update, direct_emails_to_update = (
+                self._process_batch(pending_emails, rate, send_interval)
+            )
+
+            self._update_results(emails_to_update, direct_emails_to_update)
+
+            self.stdout.write(
+                self.style.SUCCESS(
+                    f"Batch finished. Sent: {sent_count}, Failed: {failed_count}"
+                )
+            )
+
+            if not daemon:
+                break
+
     def handle(self, *args, **options):
         rate = options["rate"]
         limit = options["limit"]
@@ -223,35 +263,14 @@ class Command(BaseCommand):
             )
 
         try:
-            while True:
-                pending_emails = self._get_pending_emails(processing_timeout, limit)
-                count = len(pending_emails)
-
-                if count == 0:
-                    if not daemon:
-                        self.stdout.write(self.style.SUCCESS("No pending emails."))
-                        break
-                    time.sleep(sleep_interval)
-                    continue
-
-                self.stdout.write(
-                    f"Processing batch of {count} emails at {rate} emails/sec..."
-                )
-
-                sent_count, failed_count, emails_to_update, direct_emails_to_update = (
-                    self._process_batch(pending_emails, rate, send_interval)
-                )
-
-                self._update_results(emails_to_update, direct_emails_to_update)
-
-                self.stdout.write(
-                    self.style.SUCCESS(
-                        f"Batch finished. Sent: {sent_count}, Failed: {failed_count}"
-                    )
-                )
-
-                if not daemon:
-                    break
+            self._run_processing_loop(
+                daemon,
+                rate,
+                sleep_interval,
+                processing_timeout,
+                limit,
+                send_interval,
+            )
         except KeyboardInterrupt:
             self.stdout.write(self.style.WARNING("Email processor stopped."))
         finally:

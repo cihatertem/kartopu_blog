@@ -42,11 +42,14 @@ class PortfolioSnapshotCurrencyConversionTests(TestCase):
         )
         tx.portfolios.add(self.portfolio)
 
-    @patch("portfolio.models.fetch_fx_rates_bulk")
+    @patch("portfolio.models.fetch_multiple_fx_rates_bulk")
     def test_snapshot_converts_asset_prices_to_portfolio_currency(
-        self, mock_fetch_fx_rates_bulk
+        self, mock_fetch_multiple_fx_rates_bulk
     ) -> None:
-        mock_fetch_fx_rates_bulk.return_value = {("USD", "TRY"): Decimal("32")}
+        mock_fetch_multiple_fx_rates_bulk.return_value = {
+            ("USD", "TRY", date(2026, 3, 1)): Decimal("32"),
+            ("USD", "TRY", date(2026, 3, 31)): Decimal("32"),
+        }
 
         snapshot = PortfolioSnapshot.create_snapshot(
             portfolio=self.portfolio,

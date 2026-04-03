@@ -17,6 +17,38 @@ COMMENT_RATE_LIMIT = "10/m"
 COMMENT_RATE_LIMIT_KEY = "ip"
 
 
+def _get_comment_status(form, is_staff):
+    if is_staff:
+        return Comment.Status.APPROVED
+    if form.cleaned_data.get("website"):
+        return Comment.Status.SPAM
+    return Comment.Status.PENDING
+
+
+def _validate_parent_comment(parent_id, post):
+    if not parent_id:
+        return None, True
+    parent = Comment.objects.filter(
+        id=parent_id,
+        post=post,
+        status=Comment.Status.APPROVED,
+    ).first()
+    return parent, parent is not None
+
+
+def _create_comment_from_form(request, form, post, status, parent, social_account):
+    comment = form.save(commit=False)
+    comment.post = post
+    comment.author = request.user
+    comment.status = status
+    comment.parent = parent
+    comment.ip_address = get_client_ip(request)
+    comment.user_agent = escape(request.META.get("HTTP_USER_AGENT", ""))[:500]
+    comment.social_provider = social_account.provider if social_account else ""
+    comment.save()
+    return comment
+
+
 @ratelimit(
     key=client_ip_key,
     rate=COMMENT_RATE_LIMIT,
@@ -61,37 +93,15 @@ def post_comment(request, post_id):
         )
         return redirect(post.get_absolute_url())
 
-    status = Comment.Status.PENDING
-    if form.cleaned_data.get("website"):
-        status = Comment.Status.SPAM
+    parent, is_parent_valid = _validate_parent_comment(
+        form.cleaned_data.get("parent_id"), post
+    )
+    if not is_parent_valid:
+        messages.error(request, "Yanıtlamak istediğiniz yorum bulunamadı.")
+        return redirect(post.get_absolute_url())
 
-    if is_staff:
-        status = Comment.Status.APPROVED
-
-    parent = None
-    parent_id = form.cleaned_data.get("parent_id")
-    if parent_id:
-        parent = Comment.objects.filter(
-            id=parent_id,
-            post=post,
-            status=Comment.Status.APPROVED,
-        ).first()
-        if parent is None:
-            messages.error(
-                request,
-                "Yanıtlamak istediğiniz yorum bulunamadı.",
-            )
-            return redirect(post.get_absolute_url())
-
-    comment = form.save(commit=False)
-    comment.post = post
-    comment.author = request.user
-    comment.status = status
-    comment.parent = parent
-    comment.ip_address = get_client_ip(request)
-    comment.user_agent = escape(request.META.get("HTTP_USER_AGENT", ""))[:500]
-    comment.social_provider = social_account.provider if social_account else ""
-    comment.save()
+    status = _get_comment_status(form, is_staff)
+    _create_comment_from_form(request, form, post, status, parent, social_account)
 
     if status == Comment.Status.APPROVED:
         messages.success(request, "Yorumunuz başarıyla yayınlandı.")

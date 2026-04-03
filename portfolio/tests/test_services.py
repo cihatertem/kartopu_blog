@@ -9,6 +9,7 @@ from portfolio.services import (
     calculate_xirr,
     fetch_fx_rate,
     fetch_fx_rates_bulk,
+    fetch_multiple_fx_rates_bulk,
     fetch_yahoo_finance_price,
 )
 
@@ -230,6 +231,59 @@ class FetchYahooFinancePriceTests(TestCase):
         mock_get_history.return_value = mock_df
 
         self.assertIsNone(fetch_yahoo_finance_price("AAPL", price_date=d))
+
+
+class FetchMultipleFXRatesBulkTests(TestCase):
+    def test_empty_pairs_by_date(self):
+        self.assertEqual(fetch_multiple_fx_rates_bulk({}), {})
+
+    def test_only_identical_pairs(self):
+        pairs_by_date = {
+            date(2023, 1, 1): {("USD", "USD")},
+            None: {("TRY", "TRY")},
+        }
+        result = fetch_multiple_fx_rates_bulk(pairs_by_date)
+        self.assertEqual(
+            result,
+            {
+                ("USD", "USD", date(2023, 1, 1)): Decimal("1"),
+                ("TRY", "TRY", None): Decimal("1"),
+            },
+        )
+
+    @patch("portfolio.services.logger.exception")
+    @patch("portfolio.services.yf.download")
+    def test_yf_download_exception(self, mock_download, mock_logger_exception):
+        mock_download.side_effect = Exception("Download failed")
+        pairs_by_date = {date(2023, 1, 1): {("USD", "TRY")}}
+        self.assertEqual(fetch_multiple_fx_rates_bulk(pairs_by_date), {})
+        mock_logger_exception.assert_called_once_with(
+            "Yahoo Finance multiple bulk download failed for symbols: %s", ["USDTRY=X"]
+        )
+
+    @patch("portfolio.services.yf.download")
+    def test_yf_download_empty_dataframe(self, mock_download):
+        mock_download.return_value = pd.DataFrame()
+        pairs_by_date = {date(2023, 1, 1): {("USD", "TRY")}}
+        self.assertEqual(fetch_multiple_fx_rates_bulk(pairs_by_date), {})
+
+    @patch("portfolio.services.yf.download")
+    @patch("portfolio.services._safe_decimal")
+    def test_single_series_parsing(self, mock_safe_decimal, mock_download):
+        mock_df = pd.DataFrame(
+            {"Close": [30.0, 31.0]},
+            index=pd.DatetimeIndex(["2023-10-01", "2023-10-02"]),
+        )
+        mock_download.return_value = mock_df
+        mock_safe_decimal.return_value = Decimal("31.0")
+
+        d = date(2023, 10, 2)
+        pairs_by_date = {d: {("USD", "TRY"), ("TRY", "TRY")}}
+        result = fetch_multiple_fx_rates_bulk(pairs_by_date)
+
+        self.assertEqual(result.get(("USD", "TRY", d)), Decimal("31.0"))
+        self.assertEqual(result.get(("TRY", "TRY", d)), Decimal("1"))
+        mock_safe_decimal.assert_called_once_with(31.0)
 
 
 class FetchFXRatesBulkTests(TestCase):
