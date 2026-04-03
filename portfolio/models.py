@@ -1205,6 +1205,22 @@ class CashFlowSnapshot(BaseSnapshot):
         return category_totals
 
     @classmethod
+    def _build_items_data(
+        cls, category_totals: dict[str, Decimal], total_amount: Decimal
+    ) -> list[dict[str, object]]:
+        items_data = []
+        for category, amount in sorted(category_totals.items()):
+            allocation_pct = amount / total_amount if total_amount > 0 else Decimal("0")
+            items_data.append(
+                {
+                    "category": category,
+                    "amount": amount,
+                    "allocation_pct": allocation_pct,
+                }
+            )
+        return items_data
+
+    @classmethod
     def _prepare_snapshot_data(
         cls,
         *,
@@ -1250,17 +1266,7 @@ class CashFlowSnapshot(BaseSnapshot):
             "total_amount": total_amount,
             "name": name_override,
         }
-
-        items_data = []
-        for category, amount in sorted(category_totals.items()):
-            allocation_pct = amount / total_amount if total_amount > 0 else Decimal("0")
-            items_data.append(
-                {
-                    "category": category,
-                    "amount": amount,
-                    "allocation_pct": allocation_pct,
-                }
-            )
+        items_data = cls._build_items_data(category_totals, total_amount)
 
         return snapshot_date, snapshot_kwargs, items_data
 
