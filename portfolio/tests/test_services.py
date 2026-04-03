@@ -394,6 +394,43 @@ class FetchFXRatesBulkTests(TestCase):
         self.assertEqual(result, {})
         mock_logger.exception.assert_called_once()
 
+    @patch("portfolio.services.logger.exception")
+    @patch("portfolio.services.yf.download")
+    def test_individual_symbol_exception_continues(
+        self, mock_download, mock_logger_exception
+    ):
+        """Test that if one symbol raises an exception, the loop continues and parses others."""
+        mock_data = MagicMock()
+        mock_data.empty = False
+        mock_data.__contains__.side_effect = lambda key: key == "Close"
+
+        mock_close = MagicMock()
+        mock_data.__getitem__.return_value = mock_close
+
+        mock_close.columns = ["USDTRY=X", "EURTRY=X"]
+        mock_close.__contains__.side_effect = lambda key: (
+            key in ["USDTRY=X", "EURTRY=X"]
+        )
+
+        def getitem_side_effect(key):
+            if key == "USDTRY=X":
+                raise Exception("Simulated data parsing error")
+
+            import pandas as pd
+
+            return pd.Series([32.0], index=[pd.Timestamp("2023-10-02")])
+
+        mock_close.__getitem__.side_effect = getitem_side_effect
+        mock_download.return_value = mock_data
+
+        pairs = [("USD", "TRY"), ("EUR", "TRY")]
+        result = fetch_fx_rates_bulk(pairs)
+
+        self.assertEqual(result, {("EUR", "TRY"): Decimal("32.0")})
+        mock_logger_exception.assert_called_once_with(
+            "Failed to parse FX rate for %s", "USDTRY=X"
+        )
+
 
 class FetchFXRateTests(TestCase):
     def test_empty_currencies(self):

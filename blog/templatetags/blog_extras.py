@@ -825,23 +825,34 @@ def _render_cashflow_comparison_summary_html(comparison) -> str:
     }
     categories = sorted(set(base_items.keys()) | set(compare_items.keys()))
     category_label_map = dict(CashFlowEntry.Category.choices)
-    base_category_rows = "\n".join(
-        f"<li><strong>{escape(category_label_map.get(category, category))}:</strong> "
-        f"{_format_currency(base_items.get(category, Decimal('0')), cashflow_currency)}</li>"
-        for category in categories
-    )
-    compare_category_rows = "\n".join(
-        f"<li><strong>{escape(category_label_map.get(category, category))}:</strong> "
-        f"{_format_currency(compare_items.get(category, Decimal('0')), cashflow_currency)}</li>"
-        for category in categories
-    )
-    category_delta_rows = "\n".join(
-        f"<li><strong>{escape(category_label_map.get(category, category))}:</strong> "
-        f"{_format_currency(base_items.get(category, Decimal('0')), cashflow_currency)} → "
-        f"{_format_currency(compare_items.get(category, Decimal('0')), cashflow_currency)} "
-        f'(<span class="text-muted">{_format_currency(compare_items.get(category, Decimal("0")) - base_items.get(category, Decimal("0")), cashflow_currency)}</span>)</li>'  # pyright: ignore[reportOperatorIssue]
-        for category in categories
-    )
+
+    base_category_rows_list = []
+    compare_category_rows_list = []
+    category_delta_rows_list = []
+
+    for category in categories:
+        label = escape(category_label_map.get(category, category))
+        base_val = base_items.get(category, Decimal("0"))
+        compare_val = compare_items.get(category, Decimal("0"))
+
+        base_fmt = _format_currency(base_val, cashflow_currency)
+        compare_fmt = _format_currency(compare_val, cashflow_currency)
+
+        base_category_rows_list.append(f"<li><strong>{label}:</strong> {base_fmt}</li>")
+        compare_category_rows_list.append(
+            f"<li><strong>{label}:</strong> {compare_fmt}</li>"
+        )
+
+        delta_val = compare_val - base_val
+        delta_fmt = _format_currency(delta_val, cashflow_currency)
+        category_delta_rows_list.append(
+            f"<li><strong>{label}:</strong> {base_fmt} → {compare_fmt} "
+            f'(<span class="text-muted">{delta_fmt}</span>)</li>'
+        )
+
+    base_category_rows = "\n".join(base_category_rows_list)
+    compare_category_rows = "\n".join(compare_category_rows_list)
+    category_delta_rows = "\n".join(category_delta_rows_list)
 
     html = f"""
 <section class="cashflow-comparison">

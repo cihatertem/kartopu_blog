@@ -75,3 +75,38 @@ class FillMissingIrrCommandTests(TestCase):
             self.assertEqual(
                 null_snapshots.first().snapshot_date.isoformat(), "2023-02-01"
             )
+
+    @patch("sys.stdout.write")
+    @patch("sys.stderr.write")
+    def test_fill_missing_irr_command_exception(
+        self, mock_stderr_write, mock_stdout_write
+    ):
+        snapshot = PortfolioSnapshot.objects.create(
+            portfolio=self.portfolio,
+            period=PortfolioSnapshot.Period.MONTHLY,
+            snapshot_date="2023-01-01",
+            total_value=Decimal("100"),
+            total_cost=Decimal("100"),
+            target_value=Decimal("1000"),
+            total_return_pct=Decimal("0.0"),
+            irr_pct=None,
+        )
+
+        with patch.object(
+            PortfolioSnapshot,
+            "update_irr",
+            autospec=True,
+            side_effect=Exception("Test error"),
+        ) as mock_update_irr:
+            call_command("fill_missing_irr")
+
+            self.assertEqual(mock_update_irr.call_count, 1)
+
+            # Assert that the command wrote the error to stdout
+            output_calls = [call[0][0] for call in mock_stdout_write.call_args_list]
+            self.assertTrue(
+                any(
+                    f"Error updating snapshot {snapshot}: Test error" in call
+                    for call in output_calls
+                )
+            )

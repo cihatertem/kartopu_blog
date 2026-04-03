@@ -18,17 +18,22 @@ class Command(BaseCommand):
         updated_count = 0
         for snapshot in snapshots:
             self.stdout.write(f"Updating snapshot: {snapshot}")
-            irr = snapshot.update_irr()
-            if irr is not None:
-                self.stdout.write(
-                    self.style.SUCCESS(f"Successfully updated IRR to {irr:.2f}%")
-                )
-                updated_count += 1
-            else:
-                self.stdout.write(
-                    self.style.WARNING(
-                        "Could not calculate IRR (possibly insufficient data)"
+            try:
+                irr = snapshot.update_irr()
+                if irr is not None:
+                    self.stdout.write(
+                        self.style.SUCCESS(f"Successfully updated IRR to {irr:.2f}%")
                     )
+                    updated_count += 1
+                else:
+                    self.stdout.write(
+                        self.style.WARNING(
+                            "Could not calculate IRR (possibly insufficient data)"
+                        )
+                    )
+            except Exception as e:
+                self.stdout.write(
+                    self.style.ERROR(f"Error updating snapshot {snapshot}: {e}")
                 )
 
         self.stdout.write(

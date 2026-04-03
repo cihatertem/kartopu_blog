@@ -104,20 +104,7 @@ class Command(BaseCommand):
 
             if email_item.direct_email:
                 de_id = email_item.direct_email.id
-                if de_id not in attachment_cache_local:
-                    attachments_data = []
-                    for attachment in email_item.direct_email.attachments.all():  # pyright: ignore[reportGeneralTypeIssues]
-                        with attachment.file.open("rb") as f:
-                            content = f.read()
-                            attachments_data.append(
-                                (
-                                    attachment.file.name.split("/")[-1],
-                                    content,
-                                )
-                            )
-                    attachment_cache_local[de_id] = attachments_data
-
-                for filename, content in attachment_cache_local[de_id]:
+                for filename, content in attachment_cache_local.get(de_id, []):
                     message.attach(filename, content)
 
             message.send(fail_silently=False)
