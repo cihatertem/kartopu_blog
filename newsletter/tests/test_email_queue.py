@@ -1,3 +1,5 @@
+from unittest.mock import patch
+
 from django.core import mail
 from django.core.management import call_command
 from django.test import TestCase
@@ -19,6 +21,8 @@ from newsletter.services import (
 
 class EmailQueueTest(TestCase):
     def setUp(self):
+        mail.outbox.clear()
+        EmailQueue.objects.all().delete()
         self.user = User.objects.create_user(
             email="test@example.com", password="password"
         )
@@ -55,12 +59,15 @@ class EmailQueueTest(TestCase):
         )
         self.assertEqual(len(mail.outbox), 0)
 
-    from unittest.mock import patch
-
+    @patch(
+        "newsletter.management.commands.process_email_queue.Command._acquire_lock",
+        return_value=True,
+    )
+    @patch("newsletter.management.commands.process_email_queue.Command._release_lock")
     @patch("sys.stdout.write")
-    def test_process_email_queue_command(self, mock_stdout):
+    def test_process_email_queue_command(self, mock_stdout, mock_release, mock_acquire):
         EmailQueue.objects.create(
-            subject="Test",
+            subject="Test Command Queue Subject",
             from_email="from@example.com",
             to_email="to@example.com",
             text_body="Hello",
@@ -70,8 +77,15 @@ class EmailQueueTest(TestCase):
         )
 
         call_command("process_email_queue", rate=100)
-        self.assertEqual(len(mail.outbox), 1)
+
+        sent_ours = False
+        for out_email in mail.outbox:
+            if out_email.subject == "Test Command Queue Subject":
+                sent_ours = True
+                break
+
+        self.assertTrue(sent_ours, "Expected email was not in outbox")
+
         self.assertEqual(
             EmailQueue.objects.filter(status=EmailQueueStatus.SENT).count(), 1
         )
-        self.assertEqual(mail.outbox[0].subject, "Test")

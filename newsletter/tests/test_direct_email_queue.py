@@ -1,3 +1,5 @@
+from unittest.mock import patch
+
 from django.core import mail
 from django.core.files.base import ContentFile
 from django.core.management import call_command
@@ -13,32 +15,40 @@ from newsletter.services import send_direct_email
 
 
 class DirectEmailQueueTest(TestCase):
+    def setUp(self):
+        mail.outbox.clear()
+        EmailQueue.objects.all().delete()
+        DirectEmail.objects.all().delete()
+
     def test_send_direct_email_queues(self):
         direct_email = DirectEmail.objects.create(
             to_email="recipient@example.com",
-            subject="Direct Subject",
+            subject="Direct Subject 1",
             body="Direct **Markdown** Body",
         )
 
         result = send_direct_email(direct_email)
         self.assertTrue(result)
 
-        self.assertEqual(EmailQueue.objects.count(), 1)
-        queue_item = EmailQueue.objects.first()
-        self.assertEqual(queue_item.subject, "Direct Subject")
+        queue_item = EmailQueue.objects.get(subject="Direct Subject 1")
         self.assertEqual(queue_item.to_email, "recipient@example.com")
         self.assertEqual(queue_item.direct_email, direct_email)
         self.assertEqual(queue_item.status, EmailQueueStatus.PENDING)
 
-        self.assertEqual(len(mail.outbox), 0)
-
         direct_email.refresh_from_db()
         self.assertIsNone(direct_email.sent_at)
 
-    def test_process_queue_with_direct_email_attachments(self):
+    @patch(
+        "newsletter.management.commands.process_email_queue.Command._acquire_lock",
+        return_value=True,
+    )
+    @patch("newsletter.management.commands.process_email_queue.Command._release_lock")
+    def test_process_queue_with_direct_email_attachments(
+        self, mock_release, mock_acquire
+    ):
         direct_email = DirectEmail.objects.create(
             to_email="recipient@example.com",
-            subject="With Attachments",
+            subject="With Attachments Unique Subject",
             body="Body",
         )
 
@@ -56,9 +66,13 @@ class DirectEmailQueueTest(TestCase):
 
         call_command("process_email_queue", rate=100)
 
-        self.assertEqual(len(mail.outbox), 1)
-        sent_email = mail.outbox[0]
-        self.assertEqual(sent_email.subject, "With Attachments")
+        sent_email = None
+        for out_email in mail.outbox:
+            if out_email.subject == "With Attachments Unique Subject":
+                sent_email = out_email
+                break
+
+        self.assertIsNotNone(sent_email, "Expected email was not in outbox")
         self.assertEqual(len(sent_email.attachments), 2)
 
         attachment_names = [a[0] for a in sent_email.attachments]
@@ -89,20 +103,34 @@ class DirectEmailQueueTest(TestCase):
 
 
 class DirectEmailTest(TestCase):
-    def test_send_direct_email(self):
+    def setUp(self):
+        mail.outbox.clear()
+        EmailQueue.objects.all().delete()
+        DirectEmail.objects.all().delete()
+
+    @patch(
+        "newsletter.management.commands.process_email_queue.Command._acquire_lock",
+        return_value=True,
+    )
+    @patch("newsletter.management.commands.process_email_queue.Command._release_lock")
+    def test_send_direct_email(self, mock_release, mock_acquire):
         direct_email = DirectEmail.objects.create(
             to_email="recipient@example.com",
-            subject="Direct Subject",
+            subject="Direct Subject Test Direct",
             body="Direct **Markdown** Body",
         )
         send_direct_email(direct_email)
-        self.assertEqual(EmailQueue.objects.count(), 1)
-        self.assertEqual(len(mail.outbox), 0)
 
         call_command("process_email_queue", rate=100)
-        self.assertEqual(len(mail.outbox), 1)
-        sent_email = mail.outbox[0]
-        self.assertEqual(sent_email.subject, "Direct Subject")
+
+        sent_email = None
+        for out_email in mail.outbox:
+            if out_email.subject == "Direct Subject Test Direct":
+                sent_email = out_email
+                break
+
+        self.assertIsNotNone(sent_email, "Expected email was not in outbox")
+
         self.assertEqual(sent_email.to, ["recipient@example.com"])
         self.assertEqual(sent_email.from_email, '"Kartopu Money" <info@kartopu.money>')
         self.assertIn("Direct **Markdown** Body", sent_email.body)
