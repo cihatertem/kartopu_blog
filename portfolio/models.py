@@ -1137,6 +1137,16 @@ class CashFlowSnapshot(BaseSnapshot):
         return start_date, end_date
 
     @classmethod
+    def _get_entries(
+        cls, cashflow: CashFlow, start_date: date, end_date: date
+    ) -> QuerySet:
+        return CashFlowEntry.objects.filter(  # pyright: ignore[reportReturnType]
+            cashflows=cashflow,
+            entry_date__gte=start_date,
+            entry_date__lte=end_date,
+        ).values("category", "amount", "currency", "entry_date")
+
+    @classmethod
     def _get_fx_rates(
         cls,
         entries: QuerySet,
@@ -1234,11 +1244,7 @@ class CashFlowSnapshot(BaseSnapshot):
 
         start_date, end_date = cls._get_date_range(snapshot_date, period)  # pyright: ignore[reportArgumentType]
 
-        entries = CashFlowEntry.objects.filter(
-            cashflows=cashflow,  # pyright: ignore[reportArgumentType]
-            entry_date__gte=start_date,
-            entry_date__lte=end_date,
-        ).values("category", "amount", "currency", "entry_date")
+        entries = cls._get_entries(cashflow, start_date, end_date)  # pyright: ignore[reportArgumentType]
 
         fx_rates = cls._get_fx_rates(
             entries,  # pyright: ignore[reportArgumentType]
@@ -1253,18 +1259,13 @@ class CashFlowSnapshot(BaseSnapshot):
             fx_rates,
         )
 
-        total_amount = sum(
-            category_totals.values(),
-            Decimal("0"),
-        )
-
-        name_override = name or cashflow.name  # pyright: ignore[reportAttributeAccessIssue]
+        total_amount = sum(category_totals.values(), Decimal("0"))
 
         snapshot_kwargs = {
             "cashflow": cashflow,
             "period": period,
             "total_amount": total_amount,
-            "name": name_override,
+            "name": name or cashflow.name,  # pyright: ignore[reportAttributeAccessIssue]
         }
         items_data = cls._build_items_data(category_totals, total_amount)
 
