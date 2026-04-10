@@ -1538,7 +1538,7 @@ class SalarySavingsSnapshot(BaseSnapshot):
 
             snapshots.append(snapshot)
 
-        return cls.objects.bulk_create(snapshots, batch_size=500)
+        return cls.objects.bulk_create(snapshots, batch_size=500)  # pyright: ignore[reportReturnType]
 
 
 class DividendComparison(SlugMixin, UUIDModelMixin, TimeStampedModelMixin):
@@ -1876,7 +1876,11 @@ class DividendSnapshot(BaseSnapshot):
                 and "dividends" in payment._prefetched_objects_cache
             ):
                 dividend = next(
-                    (d for d in payment.dividends.all() if d.currency == currency),
+                    (
+                        d
+                        for d in payment._prefetched_objects_cache["dividends"]
+                        if d.currency == currency
+                    ),
                     None,  # pyright: ignore[reportAttributeAccessIssue]
                 )
             else:
