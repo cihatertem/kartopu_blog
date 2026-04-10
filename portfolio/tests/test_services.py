@@ -6,6 +6,9 @@ import pandas as pd
 from django.test import TestCase
 
 from portfolio.services import (
+    _get_history,
+    _get_price,
+    _get_ticker,
     calculate_xirr,
     fetch_fx_rate,
     fetch_fx_rates_bulk,
@@ -231,6 +234,71 @@ class FetchYahooFinancePriceTests(TestCase):
         mock_get_history.return_value = mock_df
 
         self.assertIsNone(fetch_yahoo_finance_price("AAPL", price_date=d))
+
+
+class YahooFinanceHelperTests(TestCase):
+    @patch("portfolio.services.yf.Ticker")
+    def test_get_ticker_returns_ticker_instance(self, mock_ticker_cls):
+        mock_ticker = MagicMock()
+        mock_ticker_cls.return_value = mock_ticker
+
+        result = _get_ticker("AAPL")
+
+        self.assertIs(result, mock_ticker)
+        mock_ticker_cls.assert_called_once_with("AAPL")
+
+    @patch("portfolio.services.yf.Ticker")
+    def test_get_ticker_returns_none_on_exception(self, mock_ticker_cls):
+        mock_ticker_cls.side_effect = RuntimeError("boom")
+
+        self.assertIsNone(_get_ticker("AAPL"))
+
+    def test_get_history_requests_daily_interval(self):
+        ticker = MagicMock()
+        ticker.history.return_value = "history-data"
+        start = date(2024, 1, 1)
+        end = date(2024, 1, 10)
+
+        result = _get_history(ticker, start=start, end=end)
+
+        self.assertEqual(result, "history-data")
+        ticker.history.assert_called_once_with(start=start, end=end, interval="1d")
+
+    def test_get_history_returns_none_on_exception(self):
+        ticker = MagicMock()
+        ticker.history.side_effect = RuntimeError("history failed")
+
+        result = _get_history(ticker, start=date(2024, 1, 1), end=date(2024, 1, 10))
+
+        self.assertIsNone(result)
+
+    def test_get_price_prefers_fast_info_last_price(self):
+        ticker = MagicMock()
+        ticker.fast_info = {"last_price": 123.45}
+        ticker.info = {"regularMarketPrice": 999.99}
+
+        result = _get_price(ticker)
+
+        self.assertEqual(result, 123.45)
+
+    def test_get_price_falls_back_to_info_regular_market_price(self):
+        ticker = MagicMock()
+        ticker.fast_info = {"last_price": None}
+        ticker.info = {"regularMarketPrice": 456.78}
+
+        result = _get_price(ticker)
+
+        self.assertEqual(result, 456.78)
+
+    def test_get_price_returns_none_on_exception(self):
+        class BrokenTicker:
+            @property
+            def fast_info(self):
+                raise RuntimeError("fast info failed")
+
+        result = _get_price(BrokenTicker())
+
+        self.assertIsNone(result)
 
 
 class FetchMultipleFXRatesBulkTests(TestCase):

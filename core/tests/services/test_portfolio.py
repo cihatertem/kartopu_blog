@@ -5,6 +5,8 @@ from django.test import TestCase
 
 from core.services.portfolio import (
     _build_slug_base,
+    SLUG_HASH_ALPHABET,
+    SLUG_HASH_LENGTH,
     build_comparison_name,
     build_snapshot_name,
     format_comparison_label,
@@ -338,6 +340,78 @@ class PortfolioServicesTest(TestCase):
         self.assertEqual(slug1, "actual-db-test#aaaaaa")
         self.assertEqual(slug2, "actual-db-test#bbbbbb")
         self.assertNotEqual(slug1, slug2)
+
+    @patch("core.services.portfolio.secrets.choice")
+    def test_generate_unique_slug_uses_snapshot_fallback_base(self, mock_choice):
+        from blog.models import Category
+
+        mock_choice.side_effect = ["c"] * 6
+
+        slug = generate_unique_slug(Category, "!!!")
+
+        self.assertEqual(slug, "snapshot#cccccc")
+
+    @patch("core.services.portfolio.secrets.choice")
+    def test_generate_unique_slug_uses_expected_candidates_during_collisions(
+        self, mock_choice
+    ):
+        from blog.models import Category
+
+        mock_choice.side_effect = ["a"] * 6 + ["b"] * 6 + ["c"] * 6
+
+        checked_slugs: list[str] = []
+        collision_map = {
+            "deterministic-name#aaaaaa": True,
+            "deterministic-name#bbbbbb": True,
+            "deterministic-name#cccccc": False,
+        }
+
+        class DummyQuerySet:
+            def __init__(self, slug: str):
+                self.slug = slug
+
+            def exists(self):
+                checked_slugs.append(self.slug)
+                return collision_map[self.slug]
+
+        with patch.object(
+            Category.objects,
+            "filter",
+            side_effect=lambda **kwargs: DummyQuerySet(kwargs["slug"]),
+        ):
+            slug = generate_unique_slug(Category, "Deterministic Name")
+
+        self.assertEqual(slug, "deterministic-name#cccccc")
+        self.assertEqual(
+            checked_slugs,
+            [
+                "deterministic-name#aaaaaa",
+                "deterministic-name#bbbbbb",
+                "deterministic-name#cccccc",
+            ],
+        )
+
+    @patch("core.services.portfolio.secrets.choice")
+    def test_generate_unique_slug_uses_configured_hash_settings(self, mock_choice):
+        from blog.models import Category
+
+        observed_alphabets: list[str] = []
+
+        def fake_choice(alphabet: str) -> str:
+            observed_alphabets.append(alphabet)
+            return "z"
+
+        mock_choice.side_effect = fake_choice
+
+        mock_qs = MagicMock()
+        mock_qs.exists.return_value = False
+
+        with patch.object(Category.objects, "filter", return_value=mock_qs):
+            slug = generate_unique_slug(Category, "Length Check")
+
+        self.assertEqual(slug, "length-check#zzzzzz")
+        self.assertEqual(len(observed_alphabets), SLUG_HASH_LENGTH)
+        self.assertEqual(observed_alphabets, [SLUG_HASH_ALPHABET] * SLUG_HASH_LENGTH)
 
     def test__build_slug_base_empty_name(self):
         base = _build_slug_base("", max_length=255)
