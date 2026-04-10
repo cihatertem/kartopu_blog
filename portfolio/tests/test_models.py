@@ -263,6 +263,50 @@ class LogicTests(ModelsTestCase):
         ]
         self.assertEqual(portfolio.total_cost_basis(), Decimal("250.0"))
 
+    def test_calculate_capital_increase_quantity(self):
+        # Normal calculation
+        self.assertEqual(
+            Portfolio._calculate_capital_increase_quantity(
+                current_quantity=Decimal("100"), increase_rate_pct=Decimal("50")
+            ),
+            Decimal("50"),
+        )
+        # Negative current_quantity
+        self.assertEqual(
+            Portfolio._calculate_capital_increase_quantity(
+                current_quantity=Decimal("-100"), increase_rate_pct=Decimal("50")
+            ),
+            Decimal("0"),
+        )
+        # Zero current_quantity
+        self.assertEqual(
+            Portfolio._calculate_capital_increase_quantity(
+                current_quantity=Decimal("0"), increase_rate_pct=Decimal("50")
+            ),
+            Decimal("0"),
+        )
+        # increase_rate_pct is None
+        self.assertEqual(
+            Portfolio._calculate_capital_increase_quantity(
+                current_quantity=Decimal("100"), increase_rate_pct=None
+            ),
+            Decimal("0"),
+        )
+        # Negative increase_rate_pct
+        self.assertEqual(
+            Portfolio._calculate_capital_increase_quantity(
+                current_quantity=Decimal("100"), increase_rate_pct=Decimal("-50")
+            ),
+            Decimal("0"),
+        )
+        # Zero increase_rate_pct
+        self.assertEqual(
+            Portfolio._calculate_capital_increase_quantity(
+                current_quantity=Decimal("100"), increase_rate_pct=Decimal("0")
+            ),
+            Decimal("0"),
+        )
+
     @patch("portfolio.models.fetch_yahoo_finance_price")
     def test_asset_refresh_price(self, mock_fetch_price):
         mock_fetch_price.return_value = Decimal("150.0")

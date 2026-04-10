@@ -236,3 +236,33 @@ class NewsletterConfirmSubscriptionViewTest(TestCase):
 
         subscriber = Subscriber.objects.get(email="test@example.com")
         self.assertEqual(subscriber.status, SubscriberStatus.UNSUBSCRIBED)
+
+
+class HandleSubscriptionActionTest(TestCase):
+    def test_subscribe_action(self):
+        from newsletter.views import _handle_subscription_action
+
+        title, message = _handle_subscription_action(
+            "new_user@example.com", "subscribe"
+        )
+
+        self.assertEqual(title, "Abonelik Onaylandı")
+        self.assertEqual(message, "Newsletter aboneliğiniz başarıyla aktif edildi.")
+
+        subscriber = Subscriber.objects.get(email="new_user@example.com")
+        self.assertEqual(subscriber.status, SubscriberStatus.ACTIVE)
+        self.assertIsNotNone(subscriber.confirmed_at)
+
+    def test_unsubscribe_action(self):
+        from newsletter.views import _handle_subscription_action
+
+        title, message = _handle_subscription_action(
+            "cancel_user@example.com", "unsubscribe"
+        )
+
+        self.assertEqual(title, "Abonelik İptal Edildi")
+        self.assertEqual(message, "Newsletter aboneliğiniz iptal edildi.")
+
+        subscriber = Subscriber.objects.get(email="cancel_user@example.com")
+        self.assertEqual(subscriber.status, SubscriberStatus.UNSUBSCRIBED)
+        self.assertIsNotNone(subscriber.unsubscribed_at)

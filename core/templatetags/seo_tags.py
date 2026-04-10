@@ -43,8 +43,9 @@ def _get_post_seo_data(seo, context):
         seo["article_author"] = post.author.get_full_name() or post.author.email
     if post.category:
         seo["article_section"] = post.category.name
-    if post.tags.exists():
-        seo["article_tags"] = [tag.name for tag in post.tags.all()]
+    tags = post.tags.all()
+    if tags:
+        seo["article_tags"] = [tag.name for tag in tags]
 
 
 def _get_about_page_seo_data(seo, context, site_name):
