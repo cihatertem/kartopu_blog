@@ -179,23 +179,6 @@ class AdminTests(TestCase):
 
         self.assertFalse(has_perm)
 
-    def test_sidebar_widget_sync_widgets(self):
-        admin = SidebarWidgetAdmin(SidebarWidget, self.site)
-
-        admin.sync_widgets()
-
-        self.assertTrue(
-            SidebarWidget.objects.filter(template_name__contains="sidebar_").exists()
-        )
-
-    def test_sidebar_widget_get_queryset_calls_sync(self):
-        SidebarWidget.objects.all().delete()
-        admin = SidebarWidgetAdmin(SidebarWidget, self.site)
-
-        qs = admin.get_queryset(self.request)
-
-        self.assertTrue(qs.count() > 0)
-
 
 class AboutPageImageInlineTests(TestCase):
     def setUp(self):

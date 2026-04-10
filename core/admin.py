@@ -174,40 +174,6 @@ class SidebarWidgetAdmin(admin.ModelAdmin):
     list_editable = ("order", "is_active")
     ordering = ("order",)
 
-    def get_queryset(self, request):
-        self.sync_widgets()
-        return super().get_queryset(request)
-
-    def sync_widgets(self):
-        import os
-
-        from django.conf import settings
-
-        template_dir = os.path.join(settings.BASE_DIR, "templates", "includes")
-        if not os.path.exists(template_dir):
-            return
-
-        files = [
-            f
-            for f in os.listdir(template_dir)
-            if f.startswith("sidebar_") and f.endswith(".html")
-        ]
-
-        for file in files:
-            template_path = f"includes/{file}"
-            # Create default title from filename
-            # e.g. sidebar_popular_posts.html -> Popular Posts
-            default_title = (
-                file.replace("sidebar_", "")
-                .replace(".html", "")
-                .replace("_", " ")
-                .title()
-            )
-            SidebarWidget.objects.get_or_create(
-                template_name=template_path,
-                defaults={"title": default_title},
-            )
-
     def has_add_permission(self, request) -> bool:
         return False
 

@@ -5,6 +5,7 @@ from urllib.parse import urljoin
 
 from django import template
 from django.core.serializers.json import DjangoJSONEncoder
+from django.db.models import prefetch_related_objects
 from django.template.loader import render_to_string
 from django.templatetags.static import static as static_url
 from django.utils.html import escape
@@ -808,6 +809,9 @@ def _render_savings_rate_charts_html(snapshot) -> str:
 def _get_cashflow_comparison_context_data(comparison) -> dict:
     base = comparison.base_snapshot
     compare = comparison.compare_snapshot
+
+    prefetch_related_objects([base, compare], "items")
+
     cashflow_currency = getattr(base.cashflow, "currency", None)
 
     base_label = escape(str(base.snapshot_date))

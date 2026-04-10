@@ -431,45 +431,41 @@ class Portfolio(UUIDModelMixin, TimeStampedModelMixin):
             increase_rate_pct=transaction.capital_increase_rate_pct,
         )
 
-        if transaction.transaction_type == PortfolioTransaction.TransactionType.BUY:
-            quantity, cost_basis, value_adjustment = self._apply_buy(
-                transaction, quantity, cost_basis, value_adjustment, fx_rate
-            )
-        elif (
-            transaction.transaction_type
-            == PortfolioTransaction.TransactionType.BONUS_CAPITAL_INCREASE
-        ):
-            quantity, cost_basis, value_adjustment = self._apply_bonus_capital_increase(
-                increase_quantity, quantity, cost_basis, value_adjustment
-            )
-        elif (
-            transaction.transaction_type
-            == PortfolioTransaction.TransactionType.RIGHTS_EXERCISED
-        ):
-            quantity, cost_basis, value_adjustment = self._apply_rights_exercised(
-                transaction,
-                increase_quantity,
-                quantity,
-                cost_basis,
-                value_adjustment,
-                fx_rate,
-            )
-        elif (
-            transaction.transaction_type
-            == PortfolioTransaction.TransactionType.RIGHTS_NOT_EXERCISED
-        ):
-            quantity, cost_basis, value_adjustment = self._apply_rights_not_exercised(
-                transaction,
-                increase_quantity,
-                quantity,
-                cost_basis,
-                value_adjustment,
-                fx_rate,
-            )
-        elif transaction.transaction_type == PortfolioTransaction.TransactionType.SELL:
-            quantity, cost_basis, value_adjustment = self._apply_sell(
-                transaction, quantity, cost_basis, value_adjustment
-            )
+        match transaction.transaction_type:
+            case PortfolioTransaction.TransactionType.BUY:
+                quantity, cost_basis, value_adjustment = self._apply_buy(
+                    transaction, quantity, cost_basis, value_adjustment, fx_rate
+                )
+            case PortfolioTransaction.TransactionType.BONUS_CAPITAL_INCREASE:
+                quantity, cost_basis, value_adjustment = (
+                    self._apply_bonus_capital_increase(
+                        increase_quantity, quantity, cost_basis, value_adjustment
+                    )
+                )
+            case PortfolioTransaction.TransactionType.RIGHTS_EXERCISED:
+                quantity, cost_basis, value_adjustment = self._apply_rights_exercised(
+                    transaction,
+                    increase_quantity,
+                    quantity,
+                    cost_basis,
+                    value_adjustment,
+                    fx_rate,
+                )
+            case PortfolioTransaction.TransactionType.RIGHTS_NOT_EXERCISED:
+                quantity, cost_basis, value_adjustment = (
+                    self._apply_rights_not_exercised(
+                        transaction,
+                        increase_quantity,
+                        quantity,
+                        cost_basis,
+                        value_adjustment,
+                        fx_rate,
+                    )
+                )
+            case PortfolioTransaction.TransactionType.SELL:
+                quantity, cost_basis, value_adjustment = self._apply_sell(
+                    transaction, quantity, cost_basis, value_adjustment
+                )
 
         if quantity <= 0:
             quantity = Decimal("0")
