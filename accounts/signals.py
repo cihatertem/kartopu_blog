@@ -47,14 +47,23 @@ def delete_user_avatar(sender, instance: User, **kwargs) -> None:
         _delete_empty_folder(storage, avatar_name)
 
 
-def _find_key_in_mapping(data: Mapping[str, object], target_key: str) -> str | None:
+def _find_key_in_mapping(
+    data: Mapping[str, object], target_key: str, visited: set | None = None
+) -> str | None:
+    if visited is None:
+        visited = set()
+
+    if not isinstance(data, Mapping):
+        return None
+
     value = data.get(target_key)
     if isinstance(value, str):
         return value
 
+    visited.add(id(data))
     for nested_value in data.values():
-        if isinstance(nested_value, Mapping):
-            result = _find_key_in_mapping(nested_value, target_key)
+        if isinstance(nested_value, Mapping) and id(nested_value) not in visited:
+            result = _find_key_in_mapping(nested_value, target_key, visited)
             if result:
                 return result
 

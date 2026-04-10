@@ -3,6 +3,7 @@ from decimal import Decimal
 from unittest.mock import patch
 
 from django.contrib.auth import get_user_model
+from django.core.cache import cache
 from django.core.exceptions import ValidationError
 from django.test import TestCase
 
@@ -21,6 +22,7 @@ from portfolio.models import (
     PortfolioTransaction,
     SalarySavingsEntry,
     SalarySavingsFlow,
+    SalarySavingsSnapshot,
 )
 
 User = get_user_model()
@@ -438,3 +440,74 @@ class LogicTests(ModelsTestCase):
                     total_return_pct=25,
                 )
                 self.assertEqual(snapshot.name, "Custom Name")
+
+
+class FxRateTests(ModelsTestCase):
+    def setUp(self):
+        super().setUp()
+        self.portfolio = Portfolio.objects.create(
+            owner=self.user, name="FX Test Portfolio", target_value=100
+        )
+        cache.clear()
+
+    def test_get_or_fetch_fx_rate_in_dict(self):
+        fx_rates = {("USD", "TRY", datetime.date(2023, 1, 1)): Decimal("20.0")}
+        rate = self.portfolio._get_or_fetch_fx_rate(
+            fx_rates, "USD", "TRY", datetime.date(2023, 1, 1)
+        )
+        self.assertEqual(rate, Decimal("20.0"))
+
+    def test_get_or_fetch_fx_rate_in_cache(self):
+        fx_rates = {}
+        rate_date = datetime.date(2023, 1, 1)
+        cache_key = f"fx_rate_USD_TRY_{rate_date.isoformat()}"
+        cache.set(cache_key, Decimal("25.0"))
+
+        rate = self.portfolio._get_or_fetch_fx_rate(fx_rates, "USD", "TRY", rate_date)
+
+        self.assertEqual(rate, Decimal("25.0"))
+        self.assertEqual(fx_rates[("USD", "TRY", rate_date)], Decimal("25.0"))
+
+    @patch("portfolio.models.fetch_fx_rate")
+    def test_get_or_fetch_fx_rate_fetch_success(self, mock_fetch):
+        mock_fetch.return_value = Decimal("30.0")
+        fx_rates = {}
+        rate_date = datetime.date(2023, 1, 1)
+
+        rate = self.portfolio._get_or_fetch_fx_rate(fx_rates, "USD", "TRY", rate_date)
+
+        self.assertEqual(rate, Decimal("30.0"))
+        self.assertEqual(fx_rates[("USD", "TRY", rate_date)], Decimal("30.0"))
+        mock_fetch.assert_called_once_with("USD", "TRY", rate_date=rate_date)
+
+        cache_key = f"fx_rate_USD_TRY_{rate_date.isoformat()}"
+        self.assertEqual(cache.get(cache_key), Decimal("30.0"))
+
+    @patch("portfolio.models.fetch_fx_rate")
+    def test_get_or_fetch_fx_rate_fetch_none_fallback(self, mock_fetch):
+        mock_fetch.return_value = None
+        fx_rates = {}
+        rate_date = datetime.date(2023, 1, 1)
+
+        rate = self.portfolio._get_or_fetch_fx_rate(fx_rates, "USD", "TRY", rate_date)
+
+        self.assertEqual(rate, Decimal("1"))
+        self.assertEqual(fx_rates[("USD", "TRY", rate_date)], Decimal("1"))
+        mock_fetch.assert_called_once_with("USD", "TRY", rate_date=rate_date)
+
+        cache_key = f"fx_rate_USD_TRY_{rate_date.isoformat()}"
+        self.assertEqual(cache.get(cache_key), Decimal("1"))
+
+    @patch("portfolio.models.fetch_fx_rate")
+    def test_get_or_fetch_fx_rate_none_date(self, mock_fetch):
+        mock_fetch.return_value = Decimal("35.0")
+        fx_rates = {}
+
+        rate = self.portfolio._get_or_fetch_fx_rate(fx_rates, "USD", "TRY", None)
+
+        self.assertEqual(rate, Decimal("35.0"))
+        self.assertEqual(fx_rates[("USD", "TRY", None)], Decimal("35.0"))
+        mock_fetch.assert_called_once_with("USD", "TRY", rate_date=None)
+
+        cache_key = "fx_rate_USD_TRY_latest"
+        self.assertEqual(cache.get(cache_key), Decimal("35.0"))

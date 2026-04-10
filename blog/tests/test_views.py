@@ -177,6 +177,49 @@ class BlogViewsTests(TestCase):
                 # It shouldn't evaluate FTS logic again
                 MockSearchQuery.assert_not_called()
 
+    @patch("blog.views.StringAgg")
+    @patch("blog.views.SearchRank")
+    def test_search_results_integration(self, mock_search_rank, mock_string_agg):
+        from django.db.models import CharField, IntegerField, Value
+
+        # Mock Postgres-specific search functions to return simple values
+        # so SQLite can execute the query without raising exceptions.
+        # This allows us to run the actual _perform_database_search function!
+        mock_string_agg.return_value = Value("mocked tags", output_field=CharField())
+
+        # We need SearchRank to simulate matched ranks. We use an IntegerField value
+        # that will be > 0 so that `.filter(rank__isnull=False, rank__gt=0)` passes.
+        mock_search_rank.return_value = Value(1, output_field=IntegerField())
+
+        url = reverse("blog:search_results")
+
+        # We have self.published_post. Let's create another published post
+        post2 = BlogPost.objects.create(
+            title="Another published post",
+            author=self.user,
+            category=self.category,
+            content="Integration testing is fun",
+            status=BlogPost.Status.PUBLISHED,
+            published_at=timezone.now() - timezone.timedelta(days=1),
+        )
+
+        response = self.client.get(url, {"q": "published"}, follow=True)
+        self.assertEqual(response.status_code, 200)
+
+        # The query should return both published posts (since rank=1 is mocked for all rows)
+        ctx = getattr(response, "context")
+        page_obj = (
+            ctx["page_obj"]
+            if type(ctx) is dict
+            else [c for c in ctx if c is not None and "page_obj" in c][0]["page_obj"]
+        )
+
+        # The result should contain the 2 published posts, but NOT the draft post.
+        self.assertEqual(len(page_obj.object_list), 2)
+        # Verify ordering is correct (order_by("-rank", "-published_at"))
+        self.assertEqual(page_obj.object_list[0].id, self.published_post.id)
+        self.assertEqual(page_obj.object_list[1].id, post2.id)
+
     def test_search_results_view_malicious_payloads(self):
 
         from unittest.mock import MagicMock, patch

@@ -3,18 +3,22 @@ from unittest.mock import patch
 
 from allauth.socialaccount.models import SocialAccount
 from django.contrib.auth import get_user_model
+from django.core.cache import cache
 from django.test import Client, TestCase, override_settings
 from django.urls import reverse
 
 from blog.models import BlogPost, Category
 from comments.models import Comment
+from comments.views import _validate_parent_comment
 from core.models import SiteSettings
 
 User = get_user_model()
 
 
+@override_settings(RATELIMIT_ENABLE=False)
 class PostCommentTests(TestCase):
     def setUp(self):
+        cache.clear()
         self.staff_user = User.objects.create_user(
             email="staff2@example.com", password="password", is_staff=True
         )
@@ -202,6 +206,48 @@ class PostCommentTests(TestCase):
 
         self.assertEqual(Comment.objects.count(), 1)
 
+    def test_invalid_parent_comment_different_post(self):
+        other_post = BlogPost.objects.create(
+            title="Other Post",
+            author=self.staff_user,
+            category=self.category,
+            status=BlogPost.Status.PUBLISHED,
+        )
+        parent_comment = Comment.objects.create(
+            post=other_post,
+            author=self.staff_user,
+            body="Parent comment",
+            status=Comment.Status.APPROVED,
+        )
+
+        self.client.login(email="staff2@example.com", password="password")
+        response = self.client.post(
+            self.url,
+            {"body": "Reply comment", "parent_id": parent_comment.id},
+            follow=False,
+            HTTP_HOST="localhost",
+            secure=True,
+        )
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(response.url, self.post.get_absolute_url())
+
+        self.assertEqual(Comment.objects.count(), 1)
+        self.assertFalse(Comment.objects.filter(body="Reply comment").exists())
+
+    def test_invalid_parent_comment_nonexistent(self):
+        self.client.login(email="staff2@example.com", password="password")
+        response = self.client.post(
+            self.url,
+            {"body": "Reply comment", "parent_id": 99999},
+            follow=False,
+            HTTP_HOST="localhost",
+            secure=True,
+        )
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(response.url, self.post.get_absolute_url())
+
+        self.assertEqual(Comment.objects.count(), 0)
+
     @patch("comments.views.ratelimit")
     def test_rate_limit(self, mock_ratelimit):
         from django.contrib.messages.storage.fallback import FallbackStorage
@@ -223,6 +269,85 @@ class PostCommentTests(TestCase):
         self.assertEqual(response.status_code, 302)
         self.assertEqual(response.url, self.post.get_absolute_url())
         self.assertEqual(Comment.objects.count(), 0)
+
+
+class ValidateParentCommentTests(TestCase):
+    def setUp(self):
+        self.staff_user = User.objects.create_user(
+            email="staff3@example.com", password="password", is_staff=True
+        )
+        self.category = Category.objects.create(
+            name="Test Category 3", slug="test-category-3"
+        )
+        self.post = BlogPost.objects.create(
+            title="Test Post 3",
+            author=self.staff_user,
+            category=self.category,
+            status=BlogPost.Status.PUBLISHED,
+        )
+
+    def test_no_parent_id(self):
+        parent, is_valid = _validate_parent_comment(None, self.post)
+        self.assertIsNone(parent)
+        self.assertTrue(is_valid)
+
+        parent, is_valid = _validate_parent_comment("", self.post)
+        self.assertIsNone(parent)
+        self.assertTrue(is_valid)
+
+    def test_valid_parent_comment(self):
+        comment = Comment.objects.create(
+            post=self.post,
+            author=self.staff_user,
+            body="Valid parent",
+            status=Comment.Status.APPROVED,
+        )
+        parent, is_valid = _validate_parent_comment(comment.id, self.post)
+        self.assertEqual(parent, comment)
+        self.assertTrue(is_valid)
+
+    def test_invalid_parent_comment_status(self):
+        pending_comment = Comment.objects.create(
+            post=self.post,
+            author=self.staff_user,
+            body="Pending parent",
+            status=Comment.Status.PENDING,
+        )
+        parent, is_valid = _validate_parent_comment(pending_comment.id, self.post)
+        self.assertIsNone(parent)
+        self.assertFalse(is_valid)
+
+        spam_comment = Comment.objects.create(
+            post=self.post,
+            author=self.staff_user,
+            body="Spam parent",
+            status=Comment.Status.SPAM,
+        )
+        parent, is_valid = _validate_parent_comment(spam_comment.id, self.post)
+        self.assertIsNone(parent)
+        self.assertFalse(is_valid)
+
+    def test_invalid_parent_comment_wrong_post(self):
+        other_post = BlogPost.objects.create(
+            title="Other Post 3",
+            author=self.staff_user,
+            category=self.category,
+            status=BlogPost.Status.PUBLISHED,
+        )
+        comment = Comment.objects.create(
+            post=other_post,
+            author=self.staff_user,
+            body="Other post parent",
+            status=Comment.Status.APPROVED,
+        )
+        parent, is_valid = _validate_parent_comment(comment.id, self.post)
+        self.assertIsNone(parent)
+        self.assertFalse(is_valid)
+
+    def test_nonexistent_parent_id(self):
+        parent, is_valid = _validate_parent_comment(99999, self.post)
+        self.assertIsNone(parent)
+        self.assertFalse(is_valid)
 
 
 class CommentModerationTests(TestCase):

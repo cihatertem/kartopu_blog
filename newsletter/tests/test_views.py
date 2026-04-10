@@ -155,44 +155,59 @@ class NewsletterConfirmSubscriptionViewTest(TestCase):
     def setUp(self):
         self.client = Client()
 
+    @override_settings(NEWSLETTER_TOKEN_MAX_AGE=-1)
     def test_expired_token(self):
-        with patch(
-            "newsletter.views.parse_token", side_effect=signing.SignatureExpired
-        ):
-            url = reverse("newsletter:confirm", kwargs={"token": "expired-token"})
-            response = self.client.get(url)
+        token = make_token("test@example.com", "subscribe")
+        url = reverse("newsletter:confirm", kwargs={"token": token})
+        response = self.client.get(url)
 
-            self.assertEqual(response.status_code, 400)
-            self.assertContains(
-                response,
-                "Onay linkinin süresi dolmuş. Lütfen yeniden deneyin.",
-                status_code=400,
-            )
+        self.assertEqual(response.status_code, 400)
+        self.assertContains(
+            response,
+            "Onay linkinin süresi dolmuş. Lütfen yeniden deneyin.",
+            status_code=400,
+        )
 
     def test_invalid_token(self):
-        with patch("newsletter.views.parse_token", side_effect=signing.BadSignature):
-            url = reverse("newsletter:confirm", kwargs={"token": "invalid-token"})
-            response = self.client.get(url)
+        url = reverse(
+            "newsletter:confirm", kwargs={"token": "this-is-not-a-valid-token"}
+        )
+        response = self.client.get(url)
 
-            self.assertEqual(response.status_code, 400)
-            self.assertContains(
-                response,
-                "Onay linki geçersiz. Lütfen yeniden deneyin.",
-                status_code=400,
-            )
+        self.assertEqual(response.status_code, 400)
+        self.assertContains(
+            response,
+            "Onay linki geçersiz. Lütfen yeniden deneyin.",
+            status_code=400,
+        )
 
     def test_invalid_payload(self):
-        with patch(
-            "newsletter.views.parse_token",
-            return_value={"email": "test@example.com", "action": "invalid"},
-        ):
-            url = reverse("newsletter:confirm", kwargs={"token": "token"})
-            response = self.client.get(url)
+        from newsletter.tokens import TOKEN_SALT
 
-            self.assertEqual(response.status_code, 400)
-            self.assertContains(
-                response, "Talep bilgileri eksik veya hatalı.", status_code=400
-            )
+        # Test with invalid action
+        token = signing.dumps(
+            {"email": "test@example.com", "action": "invalid"}, salt=TOKEN_SALT
+        )
+        url = reverse("newsletter:confirm", kwargs={"token": token})
+        response = self.client.get(url)
+
+        self.assertEqual(response.status_code, 400)
+        self.assertContains(
+            response, "Talep bilgileri eksik veya hatalı.", status_code=400
+        )
+
+    def test_missing_email_in_payload(self):
+        from newsletter.tokens import TOKEN_SALT
+
+        # Test with missing email
+        token = signing.dumps({"action": "subscribe"}, salt=TOKEN_SALT)
+        url = reverse("newsletter:confirm", kwargs={"token": token})
+        response = self.client.get(url)
+
+        self.assertEqual(response.status_code, 400)
+        self.assertContains(
+            response, "Talep bilgileri eksik veya hatalı.", status_code=400
+        )
 
     def test_valid_subscribe_token(self):
         token = make_token("test@example.com", "subscribe")

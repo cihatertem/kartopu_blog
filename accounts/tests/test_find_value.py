@@ -47,6 +47,11 @@ class FindValueByPathTests(SimpleTestCase):
         data = {"a": {"target": "first"}, "b": {"target": "second"}}
         self.assertEqual(_find_value_by_path(data, "target"), "first")
 
+    def test_circular_reference(self):
+        data = {}
+        data["self"] = data
+        self.assertIsNone(_find_value_by_path(data, "target"))
+
 
 class FindKeyInMappingTests(SimpleTestCase):
     def test_direct_match(self):
@@ -93,3 +98,14 @@ class FindKeyInMappingTests(SimpleTestCase):
     def test_non_mapping_values_ignored(self):
         data = {"key1": "value", "key2": ["list", "item"], "target_key": 42}
         self.assertIsNone(_find_key_in_mapping(data, "target_key"))
+
+    def test_circular_reference(self):
+        data = {}
+        data["self"] = data
+        self.assertIsNone(_find_key_in_mapping(data, "target"))
+
+    def test_find_key_in_mapping_invalid_type(self):
+        self.assertIsNone(_find_key_in_mapping(None, "target_key"))
+        self.assertIsNone(_find_key_in_mapping("not a mapping", "target_key"))
+        self.assertIsNone(_find_key_in_mapping([], "target_key"))
+        self.assertIsNone(_find_key_in_mapping(123, "target_key"))

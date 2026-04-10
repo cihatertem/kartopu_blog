@@ -1,16 +1,34 @@
 import ipaddress
 import logging
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
 
 from django.test import RequestFactory, TestCase, override_settings
 
-from core.middlewares import HealthCheckMiddleware, TrustedProxyMiddleware
+from core.middlewares import (
+    AdminCSPExcludeMiddleware,
+    HealthCheckMiddleware,
+    TrustedProxyMiddleware,
+)
 
 
 class HealthCheckMiddlewareTest(TestCase):
     def setUp(self):
         self.factory = RequestFactory()
         self.middleware = HealthCheckMiddleware(lambda r: "response")
+
+    def test_process_request_ping(self):
+        request = self.factory.get("/ping")
+        response = self.middleware.process_request(request)
+
+        self.assertIsNotNone(response)
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.content, b'{"response": "pong!"}')
+
+    def test_process_request_other_path(self):
+        request = self.factory.get("/")
+        response = self.middleware.process_request(request)
+
+        self.assertIsNone(response)
 
     def test_health_check_ping(self):
         request = self.factory.get("/ping")
@@ -120,3 +138,87 @@ class TrustedProxyMiddlewareTest(TestCase):
         self.assertEqual(request.META.get("HTTP_X_FORWARDED_FOR"), "1.2.3.4")
         self.assertEqual(request.META.get("HTTP_X_FORWARDED_HOST"), "example.com")
         self.assertEqual(request.META.get("HTTP_X_FORWARDED_PROTO"), "https")
+
+
+class AdminCSPExcludeMiddlewareTest(TestCase):
+    def setUp(self):
+        self.factory = RequestFactory()
+
+    def _get_mocked_get_response(self):
+        from django.http import HttpResponse
+
+        def get_response(request):
+            response = HttpResponse("dummy")
+            response.headers["Content-Security-Policy"] = "default-src 'self'"
+            response.headers["Content-Security-Policy-Report-Only"] = (
+                "default-src 'self'"
+            )
+            response.headers["Other-Header"] = "Keep-Me"
+            return response
+
+        return get_response
+
+    @patch.dict("os.environ", {"ADMIN_ADDRESS": "admin"})
+    def test_removes_csp_headers_on_admin_path(self):
+        middleware = AdminCSPExcludeMiddleware(self._get_mocked_get_response())
+        request = self.factory.get("/admin/")
+        response = middleware(request)
+
+        self.assertNotIn("Content-Security-Policy", response.headers)
+        self.assertNotIn("Content-Security-Policy-Report-Only", response.headers)
+        self.assertEqual(response.headers.get("Other-Header"), "Keep-Me")
+
+    @patch.dict("os.environ", {"ADMIN_ADDRESS": "admin"})
+    def test_removes_csp_headers_on_en_admin_path(self):
+        middleware = AdminCSPExcludeMiddleware(self._get_mocked_get_response())
+        request = self.factory.get("/en/admin/")
+        response = middleware(request)
+
+        self.assertNotIn("Content-Security-Policy", response.headers)
+        self.assertNotIn("Content-Security-Policy-Report-Only", response.headers)
+
+    @patch.dict("os.environ", {"ADMIN_ADDRESS": "admin"})
+    def test_removes_csp_headers_on_tr_admin_path(self):
+        middleware = AdminCSPExcludeMiddleware(self._get_mocked_get_response())
+        request = self.factory.get("/tr/admin/")
+        response = middleware(request)
+
+        self.assertNotIn("Content-Security-Policy", response.headers)
+        self.assertNotIn("Content-Security-Policy-Report-Only", response.headers)
+
+    @patch.dict("os.environ", {"ADMIN_ADDRESS": "admin"})
+    def test_keeps_csp_headers_on_non_admin_path(self):
+        middleware = AdminCSPExcludeMiddleware(self._get_mocked_get_response())
+        request = self.factory.get("/about/")
+        response = middleware(request)
+
+        self.assertEqual(
+            response.headers.get("Content-Security-Policy"), "default-src 'self'"
+        )
+        self.assertEqual(
+            response.headers.get("Content-Security-Policy-Report-Only"),
+            "default-src 'self'",
+        )
+
+    @patch("os.getenv")
+    def test_handles_custom_admin_prefix(self, mock_getenv):
+        mock_getenv.return_value = "custom-admin"
+
+        middleware = AdminCSPExcludeMiddleware(self._get_mocked_get_response())
+        request = self.factory.get("/custom-admin/")
+        response = middleware(request)
+
+        self.assertNotIn("Content-Security-Policy", response.headers)
+        self.assertNotIn("Content-Security-Policy-Report-Only", response.headers)
+
+        # Now verify non-admin paths with this setup
+        request2 = self.factory.get("/admin/")
+        response2 = middleware(request2)
+
+        self.assertEqual(
+            response2.headers.get("Content-Security-Policy"), "default-src 'self'"
+        )
+        self.assertEqual(
+            response2.headers.get("Content-Security-Policy-Report-Only"),
+            "default-src 'self'",
+        )
