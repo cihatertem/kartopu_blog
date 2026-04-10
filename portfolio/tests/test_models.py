@@ -9,6 +9,7 @@ from django.test import TestCase
 
 from portfolio.models import (
     Asset,
+    BaseSnapshot,
     CashFlow,
     CashFlowComparison,
     CashFlowEntry,
@@ -423,6 +424,48 @@ class LogicTests(ModelsTestCase):
 
 
 class SnapshotFallbackNameTests(ModelsTestCase):
+    def test_base_snapshot_get_fallback_name(self):
+        # BaseSnapshot is abstract, we test the un-bound method
+        self.assertEqual(BaseSnapshot._get_fallback_name(None), "")
+
+    @patch.object(PortfolioSnapshot, "_get_fallback_name", return_value="")
+    def test_base_snapshot_save_with_empty_fallback_name(self, mock_get_fallback):
+        portfolio = Portfolio.objects.create(
+            owner=self.user, name="My Portfolio", target_value=1000
+        )
+        snapshot = PortfolioSnapshot(
+            portfolio=portfolio,
+            snapshot_date=datetime.date(2023, 1, 1),
+            period=PortfolioSnapshot.Period.MONTHLY,
+            total_value=1000,
+            total_cost=800,
+            target_value=1200,
+            total_return_pct=25,
+            name="",
+        )
+        snapshot.save()
+        self.assertEqual(snapshot.name, "")
+
+    @patch.object(
+        PortfolioSnapshot, "_get_fallback_name", return_value="Truthy Fallback"
+    )
+    def test_base_snapshot_save_with_truthy_fallback_name(self, mock_get_fallback):
+        portfolio = Portfolio.objects.create(
+            owner=self.user, name="My Portfolio", target_value=1000
+        )
+        snapshot = PortfolioSnapshot(
+            portfolio=portfolio,
+            snapshot_date=datetime.date(2023, 1, 1),
+            period=PortfolioSnapshot.Period.MONTHLY,
+            total_value=1000,
+            total_cost=800,
+            target_value=1200,
+            total_return_pct=25,
+            name="",
+        )
+        snapshot.save()
+        self.assertEqual(snapshot.name, "Truthy Fallback")
+
     def test_portfolio_snapshot_fallback_name(self):
         portfolio = Portfolio.objects.create(
             owner=self.user, name="My Portfolio", target_value=1000
