@@ -114,12 +114,14 @@ class Command(BaseCommand):
 
     def _cache_attachments(self, direct_emails):
         attachment_cache = {}
-        if direct_emails:
+        unique_direct_emails = set(direct_emails)
+
+        if unique_direct_emails:
             from django.db.models import prefetch_related_objects
 
-            prefetch_related_objects(direct_emails, "attachments")
+            prefetch_related_objects(unique_direct_emails, "attachments")
 
-        for de in set(direct_emails):
+        for de in unique_direct_emails:
             attachments_data = []
             for attachment in de.attachments.all():  # pyright: ignore[reportGeneralTypeIssues]
                 with attachment.file.open("rb") as f:

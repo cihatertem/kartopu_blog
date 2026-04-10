@@ -1497,6 +1497,49 @@ class SalarySavingsSnapshot(BaseSnapshot):
         }
         return snapshot_date, snapshot_kwargs, []
 
+    @classmethod
+    def bulk_create_snapshots(
+        cls,
+        flows: list["SalarySavingsFlow"] | QuerySet["SalarySavingsFlow"],
+        snapshot_date: date | None = None,
+        name: str | None = None,
+    ) -> list["SalarySavingsSnapshot"]:
+        from core.services.portfolio import generate_unique_slug
+
+        snapshots = []
+        generated_slugs = set()
+
+        for flow in flows:
+            final_date, snapshot_kwargs, _ = cls._prepare_snapshot_data(
+                flow=flow,
+                snapshot_date=snapshot_date,
+                name=name,
+            )
+
+            snapshot = cls(
+                snapshot_date=final_date,
+                **snapshot_kwargs,
+            )
+
+            if not snapshot.name:
+                fallback = snapshot._get_fallback_name()
+                if fallback:
+                    snapshot.name = fallback
+
+            if not snapshot.slug and getattr(snapshot, "name", None):
+                original_slug = generate_unique_slug(cls, snapshot.name)
+                base_slug = original_slug
+                counter = 1
+                while base_slug in generated_slugs:
+                    base_slug = f"{original_slug}-{counter}"
+                    counter += 1
+                snapshot.slug = base_slug
+                generated_slugs.add(snapshot.slug)
+
+            snapshots.append(snapshot)
+
+        return cls.objects.bulk_create(snapshots, batch_size=500)
+
 
 class DividendComparison(SlugMixin, UUIDModelMixin, TimeStampedModelMixin):
     name = models.CharField(max_length=255, blank=True)

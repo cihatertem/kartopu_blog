@@ -335,16 +335,13 @@ class SalarySavingsFlowAdmin(StaffOwnerAdminMixin, admin.ModelAdmin):
 
     @admin.action(description="Aylık maaş/tasarruf snapshot oluştur")
     def create_monthly_snapshot(self, request, queryset):
-        created = 0
-        for flow in queryset:
-            SalarySavingsSnapshot.create_snapshot(
-                flow=flow,
-                snapshot_date=timezone.now().date(),  # pyright: ignore[reportArgumentType]
-            )
-            created += 1
+        snapshots = SalarySavingsSnapshot.bulk_create_snapshots(
+            flows=list(queryset),
+            snapshot_date=timezone.now().date(),
+        )
         self.message_user(
             request,
-            f"{created} adet snapshot oluşturuldu.",
+            f"{len(snapshots)} adet snapshot oluşturuldu.",
             level=messages.SUCCESS,
         )
 

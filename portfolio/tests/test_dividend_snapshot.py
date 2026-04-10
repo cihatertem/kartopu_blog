@@ -24,6 +24,17 @@ class DividendSnapshotTests(TestCase):
             current_price=Decimal("40.00"),
         )
 
+    def test_get_fallback_name_with_year(self):
+        snapshot = DividendSnapshot(year=2024)
+        self.assertEqual(snapshot._get_fallback_name(), "2024 Temettü Özeti")
+
+    def test_get_fallback_name_without_year(self):
+        snapshot = DividendSnapshot(year=None)
+        self.assertEqual(snapshot._get_fallback_name(), "")
+
+        snapshot2 = DividendSnapshot(year=0)
+        self.assertEqual(snapshot2._get_fallback_name(), "")
+
     @patch("portfolio.models.fetch_fx_rate")
     @patch("portfolio.models.fetch_fx_rates_bulk")
     def test_dividend_snapshot_uses_saved_dividends(
