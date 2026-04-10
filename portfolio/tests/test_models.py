@@ -497,9 +497,19 @@ class SnapshotFallbackNameTests(ModelsTestCase):
         snapshot = CashFlowSnapshot(snapshot_date=datetime.date(2023, 1, 1))
         self.assertEqual(snapshot._get_fallback_name(), "")
 
+    def test_cashflow_snapshot_fallback_name_missing_date(self):
+        cashflow = CashFlow.objects.create(owner=self.user, name="My CashFlow")
+        snapshot = CashFlowSnapshot(cashflow=cashflow, snapshot_date=None)
+        self.assertEqual(snapshot._get_fallback_name(), f"{cashflow}")
+
     def test_salary_savings_snapshot_empty_fallback_name_missing_flow(self):
         snapshot = SalarySavingsSnapshot(snapshot_date=datetime.date(2023, 1, 1))
         self.assertEqual(snapshot._get_fallback_name(), "")
+
+    def test_salary_savings_snapshot_fallback_name_missing_date(self):
+        flow = SalarySavingsFlow.objects.create(owner=self.user, name="My Flow")
+        snapshot = SalarySavingsSnapshot(flow=flow, snapshot_date=None)
+        self.assertEqual(snapshot._get_fallback_name(), f"{flow}")
 
     def test_dividend_snapshot_empty_fallback_name(self):
         snapshot = DividendSnapshot()
