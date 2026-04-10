@@ -599,14 +599,23 @@ class Portfolio(UUIDModelMixin, TimeStampedModelMixin):
     def _get_filtered_transactions(
         self, price_date: date | None
     ) -> list["PortfolioTransaction"] | QuerySet["PortfolioTransaction"]:
+        if not hasattr(self, "_filtered_transactions_cache"):
+            self._filtered_transactions_cache: dict[
+                date | None,
+                list["PortfolioTransaction"] | QuerySet["PortfolioTransaction"],
+            ] = {}
+
+        if price_date in self._filtered_transactions_cache:
+            return self._filtered_transactions_cache[price_date]
+
         if (
             hasattr(self, "_prefetched_objects_cache")
             and "transactions" in self._prefetched_objects_cache  # pyright: ignore[reportAttributeAccessIssue]
         ):
+            # Access the prefetched objects directly to avoid N+1 and redundant QuerySet creation
+            all_txs = self._prefetched_objects_cache["transactions"]  # pyright: ignore[reportAttributeAccessIssue]
             tx_list = [
-                tx
-                for tx in self.transactions.all()  # pyright: ignore[reportAttributeAccessIssue]
-                if not price_date or tx.trade_date <= price_date
+                tx for tx in all_txs if not price_date or tx.trade_date <= price_date
             ]
             tx_list.sort(key=lambda tx: (tx.trade_date, tx.created_at))
 
@@ -615,6 +624,7 @@ class Portfolio(UUIDModelMixin, TimeStampedModelMixin):
 
                 prefetch_related_objects(tx_list, "asset")
 
+            self._filtered_transactions_cache[price_date] = tx_list
             return tx_list
 
         transactions = (
@@ -626,6 +636,8 @@ class Portfolio(UUIDModelMixin, TimeStampedModelMixin):
         )
         if price_date:
             transactions = transactions.filter(trade_date__lte=price_date)
+
+        self._filtered_transactions_cache[price_date] = transactions
         return transactions
 
     def get_positions(
@@ -1137,16 +1149,6 @@ class CashFlowSnapshot(BaseSnapshot):
         return start_date, end_date
 
     @classmethod
-    def _get_entries(
-        cls, cashflow: CashFlow, start_date: date, end_date: date
-    ) -> QuerySet:
-        return CashFlowEntry.objects.filter(  # pyright: ignore[reportReturnType]
-            cashflows=cashflow,
-            entry_date__gte=start_date,
-            entry_date__lte=end_date,
-        ).values("category", "amount", "currency", "entry_date")
-
-    @classmethod
     def _get_fx_rates(
         cls,
         entries: QuerySet,
@@ -1244,7 +1246,11 @@ class CashFlowSnapshot(BaseSnapshot):
 
         start_date, end_date = cls._get_date_range(snapshot_date, period)  # pyright: ignore[reportArgumentType]
 
-        entries = cls._get_entries(cashflow, start_date, end_date)  # pyright: ignore[reportArgumentType]
+        entries = CashFlowEntry.objects.filter(
+            cashflows=cashflow,  # pyright: ignore[reportArgumentType]
+            entry_date__gte=start_date,
+            entry_date__lte=end_date,
+        ).values("category", "amount", "currency", "entry_date")
 
         fx_rates = cls._get_fx_rates(
             entries,  # pyright: ignore[reportArgumentType]
@@ -1259,13 +1265,18 @@ class CashFlowSnapshot(BaseSnapshot):
             fx_rates,
         )
 
-        total_amount = sum(category_totals.values(), Decimal("0"))
+        total_amount = sum(
+            category_totals.values(),
+            Decimal("0"),
+        )
+
+        name_override = name or cashflow.name  # pyright: ignore[reportAttributeAccessIssue]
 
         snapshot_kwargs = {
             "cashflow": cashflow,
             "period": period,
             "total_amount": total_amount,
-            "name": name or cashflow.name,  # pyright: ignore[reportAttributeAccessIssue]
+            "name": name_override,
         }
         items_data = cls._build_items_data(category_totals, total_amount)
 

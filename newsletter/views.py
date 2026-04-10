@@ -4,6 +4,7 @@ from django.core import signing
 from django.shortcuts import redirect, render
 from django.utils import timezone
 
+from core.helpers import get_safe_referer
 from core.models import SiteSettings
 
 from .forms import NewsletterEmailForm
@@ -23,21 +24,21 @@ def subscribe_request(request):
     form = NewsletterEmailForm(request.POST)
     if not form.is_valid():
         messages.error(request, "Lütfen geçerli bir e-posta adresi girin.")
-        return redirect(request.META.get("HTTP_REFERER", "/"))
+        return redirect(get_safe_referer(request))
 
     if bool(form.cleaned_data.get("name")):
         messages.success(
             request,
             "Aboneliğiniz alınmıştır. Lütfen gelen kutunuzu kontrol edin.",
         )
-        return redirect(request.META.get("HTTP_REFERER", "/"))
+        return redirect(get_safe_referer(request))
 
     email = form.cleaned_data["email"].lower()
     subscriber, created = Subscriber.objects.get_or_create(email=email)
 
     if subscriber.status == SubscriberStatus.ACTIVE:
         messages.info(request, "Bu adres zaten aktif bir abonelikte.")
-        return redirect(request.META.get("HTTP_REFERER", "/"))
+        return redirect(get_safe_referer(request))
 
     if created or subscriber.status != SubscriberStatus.PENDING:
         subscriber.status = SubscriberStatus.PENDING
@@ -51,7 +52,7 @@ def subscribe_request(request):
         "Aboneliğinizi onaylamak için e-posta gönderildi."
         " Lütfen gelen kutunuzu kontrol edin.",
     )
-    return redirect(request.META.get("HTTP_REFERER", "/"))
+    return redirect(get_safe_referer(request))
 
 
 def unsubscribe_request(request):
@@ -61,7 +62,7 @@ def unsubscribe_request(request):
     form = NewsletterEmailForm(request.POST)
     if not form.is_valid():
         messages.error(request, "Lütfen geçerli bir e-posta adresi girin.")
-        return redirect(request.META.get("HTTP_REFERER", "/"))
+        return redirect(get_safe_referer(request))
 
     email = form.cleaned_data["email"].lower()
     subscriber = Subscriber.objects.filter(email=email).first()
@@ -74,7 +75,7 @@ def unsubscribe_request(request):
         "Eğer bu e-posta kayıtlıysa iptal onayı gönderildi."
         " Lütfen gelen kutunuzu kontrol edin.",
     )
-    return redirect(request.META.get("HTTP_REFERER", "/"))
+    return redirect(get_safe_referer(request))
 
 
 def _render_error(request, title: str, message: str):

@@ -2,6 +2,7 @@ import ipaddress
 import secrets
 
 from django.conf import settings
+from django.utils.http import url_has_allowed_host_and_scheme
 
 from core.decorators import log_exceptions
 
@@ -64,3 +65,18 @@ def _generate_captcha(request):
     num_two = secrets.randbelow(10) + 1
     request.session[CAPTCHA_SESSION_KEY] = num_one + num_two
     return num_one, num_two
+
+
+def get_safe_referer(request, default: str = "/") -> str:
+    """
+    HTTP_REFERER header'ını güvenli bir şekilde döner.
+    Eğer header geçersizse veya farklı bir host'a yönlendiriyorsa default değeri döner.
+    """
+    referer = request.META.get("HTTP_REFERER")
+    if referer and url_has_allowed_host_and_scheme(
+        url=referer,
+        allowed_hosts={request.get_host()},
+        require_https=request.is_secure(),
+    ):
+        return referer
+    return default
