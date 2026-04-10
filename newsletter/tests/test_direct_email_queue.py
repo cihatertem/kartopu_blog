@@ -11,7 +11,7 @@ from newsletter.models import (
     EmailQueue,
     EmailQueueStatus,
 )
-from newsletter.services import send_direct_email
+from newsletter.services import send_direct_email, send_direct_emails_bulk
 
 
 class DirectEmailQueueTest(TestCase):
@@ -37,6 +37,31 @@ class DirectEmailQueueTest(TestCase):
 
         direct_email.refresh_from_db()
         self.assertIsNone(direct_email.sent_at)
+
+    def test_send_direct_emails_bulk_queues(self):
+        direct_emails = [
+            DirectEmail(
+                to_email=f"recipient{i}@example.com",
+                subject=f"Bulk Subject {i}",
+                body="Bulk **Markdown** Body",
+            )
+            for i in range(3)
+        ]
+        DirectEmail.objects.bulk_create(direct_emails)
+
+        queryset = DirectEmail.objects.all()
+
+        result = send_direct_emails_bulk(queryset)
+        self.assertEqual(result, 3)
+
+        queue_items = EmailQueue.objects.all()
+        self.assertEqual(queue_items.count(), 3)
+
+        for i in range(3):
+            queue_item = EmailQueue.objects.get(subject=f"Bulk Subject {i}")
+            self.assertEqual(queue_item.to_email, f"recipient{i}@example.com")
+            self.assertEqual(queue_item.direct_email.subject, f"Bulk Subject {i}")
+            self.assertEqual(queue_item.status, EmailQueueStatus.PENDING)
 
     @patch(
         "newsletter.management.commands.process_email_queue.Command._acquire_lock",

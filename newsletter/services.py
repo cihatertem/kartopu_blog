@@ -217,3 +217,27 @@ def send_direct_email(direct_email: DirectEmail) -> bool:
         direct_email=direct_email,
     )
     return True
+
+
+@log_exceptions(message="Error queuing direct emails in bulk", default=0)
+def send_direct_emails_bulk(direct_emails) -> int:
+    from core.markdown import render_markdown
+
+    from_email = '"Kartopu Money" <info@kartopu.money>'
+
+    def email_queue_generator():
+        for email in direct_emails:
+            html_body = render_markdown(email.body)
+            yield EmailQueue(
+                subject=email.subject,
+                from_email=from_email,
+                to_email=email.to_email,
+                text_body=email.body,  # Markdown text is readable enough for fallback
+                html_body=html_body,
+                direct_email=email,
+            )
+
+    created_items = EmailQueue.objects.bulk_create(
+        email_queue_generator(), batch_size=500
+    )
+    return len(created_items)

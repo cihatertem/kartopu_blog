@@ -13,7 +13,7 @@ from .models import (
     Subscriber,
     SubscriberStatus,
 )
-from .services import send_announcement, send_direct_email
+from .services import send_announcement
 
 
 @admin.action(description="Seçili abonelikleri iptal et")
@@ -97,10 +97,9 @@ class DirectEmailAdmin(admin.ModelAdmin):
 
     @admin.action(description="Seçili e-postaları gönder")
     def send_emails(self, request, queryset):
-        success_count = 0
-        for email in queryset:
-            if send_direct_email(email):
-                success_count += 1
+        from newsletter.services import send_direct_emails_bulk
+
+        success_count = send_direct_emails_bulk(queryset)
 
         if success_count > 0:
             self.message_user(request, f"{success_count} e-posta başarıyla gönderildi.")

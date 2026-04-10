@@ -108,12 +108,12 @@ class NewsletterAdminTest(TestCase):
         self.assertEqual(len(messages), 1)
         self.assertEqual(str(messages[0]), "1 e-posta tekrar kuyruğa alındı.")
 
-    @patch("newsletter.admin.send_direct_email")
-    def test_direct_email_admin_send_emails_success(self, mock_send):
-        direct_email = DirectEmail.objects.create(
+    @patch("newsletter.services.send_direct_emails_bulk")
+    def test_direct_email_admin_send_emails_success(self, mock_send_bulk):
+        DirectEmail.objects.create(
             subject="Test", to_email="to@example.com", body="Body"
         )
-        mock_send.return_value = True
+        mock_send_bulk.return_value = 1
 
         admin = DirectEmailAdmin(DirectEmail, self.site)
         request = self.get_mock_request()
@@ -121,17 +121,17 @@ class NewsletterAdminTest(TestCase):
 
         admin.send_emails(request, queryset)
 
-        mock_send.assert_called_once_with(direct_email)
+        mock_send_bulk.assert_called_once_with(queryset)
         messages = list(get_messages(request))
         self.assertEqual(len(messages), 1)
         self.assertEqual(str(messages[0]), "1 e-posta başarıyla gönderildi.")
 
-    @patch("newsletter.admin.send_direct_email")
-    def test_direct_email_admin_send_emails_failure(self, mock_send):
+    @patch("newsletter.services.send_direct_emails_bulk")
+    def test_direct_email_admin_send_emails_failure(self, mock_send_bulk):
         DirectEmail.objects.create(
             subject="Test", to_email="to@example.com", body="Body"
         )
-        mock_send.return_value = False
+        mock_send_bulk.return_value = 0
 
         admin = DirectEmailAdmin(DirectEmail, self.site)
         request = self.get_mock_request()
@@ -139,6 +139,7 @@ class NewsletterAdminTest(TestCase):
 
         admin.send_emails(request, queryset)
 
+        mock_send_bulk.assert_called_once_with(queryset)
         messages = list(get_messages(request))
         self.assertEqual(len(messages), 1)
         self.assertEqual(str(messages[0]), "E-postalar gönderilemedi.")

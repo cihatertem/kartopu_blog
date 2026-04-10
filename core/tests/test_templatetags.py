@@ -272,3 +272,75 @@ class GetSeoDataIsolatedTest(SimpleTestCase):
 
         rendered = template.render(context)
         self.assertEqual(rendered, "Template Title")
+
+    @patch("core.templatetags.seo_tags.SiteSettings.get_settings")
+    @patch("core.templatetags.seo_tags._apply_page_seo_override")
+    def test_meta_html_template_rendering(self, mock_apply_override, mock_get_settings):
+        mock_settings = MagicMock()
+        mock_settings.default_meta_title = "Meta Title"
+        mock_settings.default_meta_description = "Meta Desc"
+        mock_settings.default_meta_image = None
+        mock_get_settings.return_value = mock_settings
+
+        request = self.factory.get("/test-meta/")
+        context = Context({"request": request})
+        template = Template(
+            "{% load seo_tags %}\n"
+            "{% get_seo_data as seo %}\n"
+            "{% include 'includes/_meta.html' with seo=seo %}"
+        )
+
+        rendered = template.render(context)
+
+        self.assertIn('<meta property="og:title" content="Meta Title" />', rendered)
+        self.assertIn(
+            '<meta property="og:description" content="Meta Desc" />', rendered
+        )
+        self.assertIn('<meta property="og:type" content="website" />', rendered)
+        self.assertIn(
+            '<link rel="canonical" href="http://testserver/test-meta/" />', rendered
+        )
+        self.assertIn(
+            '<meta name="twitter:card" content="summary_large_image" />', rendered
+        )
+
+    @patch("core.templatetags.seo_tags.SiteSettings.get_settings")
+    @patch("core.templatetags.seo_tags._update_seo_from_context")
+    @patch("core.templatetags.seo_tags._apply_page_seo_override")
+    def test_meta_html_article_rendering(
+        self, mock_apply_override, mock_update_context, mock_get_settings
+    ):
+        mock_settings = MagicMock()
+        mock_settings.default_meta_title = "Default Title"
+        mock_settings.default_meta_description = "Default Desc"
+        mock_settings.default_meta_image = None
+        mock_get_settings.return_value = mock_settings
+
+        def side_effect_update(seo, context, site_name):
+            seo["type"] = "article"
+            seo["article_published_time"] = "2023-10-01T12:00:00Z"
+            seo["article_author"] = "Test Author"
+            seo["article_tags"] = ["tag1", "tag2"]
+
+        mock_update_context.side_effect = side_effect_update
+
+        request = self.factory.get("/article-path/")
+        context = Context({"request": request, "post": MagicMock()})
+        template = Template(
+            "{% load seo_tags %}\n"
+            "{% get_seo_data as seo %}\n"
+            "{% include 'includes/_meta.html' with seo=seo %}"
+        )
+
+        rendered = template.render(context)
+
+        self.assertIn('<meta property="og:type" content="article" />', rendered)
+        self.assertIn(
+            '<meta property="article:published_time" content="2023-10-01T12:00:00Z" />',
+            rendered,
+        )
+        self.assertIn(
+            '<meta property="article:author" content="Test Author" />', rendered
+        )
+        self.assertIn('<meta property="article:tag" content="tag1" />', rendered)
+        self.assertIn('<meta property="article:tag" content="tag2" />', rendered)

@@ -101,3 +101,17 @@ class PaginationServicesTest(SimpleTestCase):
 
         self.assertEqual(page_obj.number, 1)
         self.assertEqual(list(page_obj.object_list), list(range(1, 11)))
+
+    def test_get_page_obj_zero_per_page(self):
+        request = self.factory.get("/")
+        with self.assertRaisesMessage(
+            ValueError, "per_page must be a positive integer."
+        ):
+            get_page_obj(request, self.items, per_page=0)
+
+    def test_get_page_obj_negative_per_page(self):
+        request = self.factory.get("/")
+        with self.assertRaisesMessage(
+            ValueError, "per_page must be a positive integer."
+        ):
+            get_page_obj(request, self.items, per_page=-5)

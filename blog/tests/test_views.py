@@ -451,6 +451,37 @@ class ViewHelperTests(TestCase):
 
         self.assertEqual(result, "")
 
+    def test_safe_get_profile_url_success(self):
+        """Test that _safe_get_profile_url returns the profile URL on success."""
+        from unittest.mock import MagicMock
+
+        from blog.views import _safe_get_profile_url
+
+        account = MagicMock()
+        account.get_profile_url.return_value = "https://example.com/profile"
+
+        result = _safe_get_profile_url(account)
+
+        self.assertEqual(result, "https://example.com/profile")
+        account.get_profile_url.assert_called_once()
+
+    def test_safe_get_profile_url_exception(self):
+        """Test that _safe_get_profile_url safely handles exceptions and logs an error."""
+        from unittest.mock import MagicMock
+
+        from blog.views import _safe_get_profile_url
+
+        account = MagicMock()
+        account.get_profile_url.side_effect = Exception("Profile URL Exception")
+
+        with self.assertLogs("blog.views", level="ERROR") as log:
+            result = _safe_get_profile_url(account)
+
+        self.assertIsNone(result)
+        self.assertTrue(
+            any("Error getting social profile url" in msg for msg in log.output)
+        )
+
     @patch("accounts.signals._download_and_save_social_avatar")
     def test_build_comment_context_social_profile_url(self, mock_download_avatar):
         """Test that _build_comment_context correctly fetches and assigns social_profile_url."""

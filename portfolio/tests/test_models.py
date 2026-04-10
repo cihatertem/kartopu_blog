@@ -374,3 +374,67 @@ class LogicTests(ModelsTestCase):
             float(Decimal("2") / Decimal("100")),
             places=4,
         )
+
+        class SnapshotFallbackNameTests(ModelsTestCase):
+            def test_portfolio_snapshot_fallback_name(self):
+                portfolio = Portfolio.objects.create(
+                    owner=self.user, name="My Portfolio"
+                )
+                snapshot_date = datetime.date(2023, 1, 1)
+                snapshot = PortfolioSnapshot.objects.create(
+                    portfolio=portfolio,
+                    snapshot_date=snapshot_date,
+                    period=PortfolioSnapshot.Period.MONTHLY,
+                    total_value=1000,
+                    total_cost=800,
+                    target_value=1200,
+                    total_return_pct=25,
+                )
+                self.assertEqual(snapshot.name, f"My Portfolio - {snapshot_date}")
+
+            def test_cashflow_snapshot_fallback_name(self):
+                cashflow = CashFlow.objects.create(owner=self.user, name="My CashFlow")
+                snapshot_date = datetime.date(2023, 1, 1)
+                snapshot = CashFlowSnapshot.objects.create(
+                    cashflow=cashflow,
+                    snapshot_date=snapshot_date,
+                    period=CashFlowSnapshot.Period.MONTHLY,
+                    total_amount=500,
+                )
+                self.assertEqual(snapshot.name, f"My CashFlow - {snapshot_date}")
+
+            def test_salary_savings_snapshot_fallback_name(self):
+                flow = SalarySavingsFlow.objects.create(owner=self.user, name="My Flow")
+                snapshot_date = datetime.date(2023, 1, 1)
+                snapshot = SalarySavingsSnapshot.objects.create(
+                    flow=flow,
+                    snapshot_date=snapshot_date,
+                    total_amount=1000,
+                    savings_amount=200,
+                    savings_rate=20,
+                )
+                self.assertEqual(snapshot.name, f"My Flow - {snapshot_date}")
+
+            def test_dividend_snapshot_fallback_name(self):
+                snapshot = DividendSnapshot.objects.create(
+                    year=2023,
+                    currency="TRY",
+                    total_amount=1000,
+                )
+                self.assertEqual(snapshot.name, "2023 Temettü Özeti")
+
+            def test_snapshot_explicit_name_not_overridden(self):
+                portfolio = Portfolio.objects.create(
+                    owner=self.user, name="My Portfolio"
+                )
+                snapshot = PortfolioSnapshot.objects.create(
+                    portfolio=portfolio,
+                    snapshot_date=datetime.date(2023, 1, 1),
+                    period=PortfolioSnapshot.Period.MONTHLY,
+                    name="Custom Name",
+                    total_value=1000,
+                    total_cost=800,
+                    target_value=1200,
+                    total_return_pct=25,
+                )
+                self.assertEqual(snapshot.name, "Custom Name")
