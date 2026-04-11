@@ -9,6 +9,7 @@ from newsletter.services import (
     prepare_templated_email,
     send_subscribe_confirmation,
     send_templated_email,
+    send_unsubscribe_confirmation,
 )
 from newsletter.tokens import parse_token
 
@@ -39,6 +40,28 @@ class ServicesTest(TestCase):
             subject="Newsletter aboneliğinizi onaylayın",
             to_email=email,
             template_prefix="subscribe_confirm",
+            context=expected_context,
+        )
+
+    @patch("newsletter.services.send_templated_email")
+    @patch("newsletter.services.build_unsubscribe_url")
+    def test_send_unsubscribe_confirmation(self, mock_build_unsub, mock_send):
+        mock_build_unsub.return_value = "http://testserver/unsubscribe"
+
+        email = "test@example.com"
+        send_unsubscribe_confirmation(email)
+
+        mock_build_unsub.assert_called_once_with(email)
+
+        expected_context = {
+            "unsubscribe_url": "http://testserver/unsubscribe",
+            "site_name": "Kartopu Money",
+        }
+
+        mock_send.assert_called_once_with(
+            subject="Newsletter abonelik iptal isteği",
+            to_email=email,
+            template_prefix="unsubscribe_confirm",
             context=expected_context,
         )
 

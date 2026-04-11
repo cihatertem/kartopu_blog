@@ -44,6 +44,14 @@ class NewsletterSubscribeViewTest(TestCase):
         self.assertEqual(len(messages), 1)
         self.assertEqual(str(messages[0]), "Lütfen geçerli bir e-posta adresi girin.")
 
+    def test_invalid_form_no_referer(self):
+        response = self.client.post(self.url, {"email": "invalid-email"})
+
+        self.assertRedirects(response, "/", fetch_redirect_response=False)
+        messages = list(get_messages(response.wsgi_request))
+        self.assertEqual(len(messages), 1)
+        self.assertEqual(str(messages[0]), "Lütfen geçerli bir e-posta adresi girin.")
+
     def test_honeypot_field(self):
         response = self.client.post(
             self.url,

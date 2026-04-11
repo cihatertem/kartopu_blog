@@ -50,6 +50,25 @@ class EmailQueueTest(TestCase):
         )
         self.assertEqual(len(mail.outbox), 0)
 
+    def test_send_post_published_with_cover_image(self):
+        from django.core.files.uploadedfile import SimpleUploadedFile
+
+        self.post.cover_image = SimpleUploadedFile("cover.jpg", b"fake data")
+        # Mock cover_rendition
+        self.post.cover_rendition = {"src": "/media/blog/test-post/cover.webp"}
+        self.post.save()
+
+        with self.settings(SITE_BASE_URL="https://kartopu.money"):
+            send_post_published_email(self.post)
+
+        queue_item = EmailQueue.objects.filter(to_email="sub1@example.com").first()
+        self.assertIn(
+            "https://kartopu.money/media/blog/test-post/cover.webp",
+            queue_item.html_body,
+        )
+        self.assertIn("https://kartopu.money/blog/test-post/", queue_item.html_body)
+        self.assertIn("Yeni yazı yayında: Test Post", queue_item.subject)
+
     def test_send_announcement_queues_emails(self):
         announcement = Announcement.objects.create(subject="Hello", body="World")
         send_announcement(announcement)

@@ -40,20 +40,37 @@ class ProcessEmailQueueCommandTest(TestCase):
     @patch("sys.stdout.write")
     def test_stale_processing_rows_reverted_to_pending(self, mock_stdout):
         stale_time = timezone.now() - timedelta(minutes=20)
+        fresh_time = timezone.now() - timedelta(minutes=5)
 
-        email = EmailQueue.objects.create(
+        email_stale = EmailQueue.objects.create(
             subject="Test Stale",
             from_email="from@example.com",
             to_email="to@example.com",
             text_body="body",
             status=EmailQueueStatus.PROCESSING,
         )
-        EmailQueue.objects.filter(id=email.id).update(updated_at=stale_time)
+        EmailQueue.objects.filter(id=email_stale.id).update(updated_at=stale_time)
+
+        email_fresh = EmailQueue.objects.create(
+            subject="Test Fresh",
+            from_email="from@example.com",
+            to_email="to@example.com",
+            text_body="body",
+            status=EmailQueueStatus.PROCESSING,
+        )
+        EmailQueue.objects.filter(id=email_fresh.id).update(updated_at=fresh_time)
 
         call_command("process_email_queue", rate=100)
 
-        email.refresh_from_db()
-        self.assertEqual(email.status, EmailQueueStatus.SENT)
+        email_stale.refresh_from_db()
+        self.assertEqual(email_stale.status, EmailQueueStatus.SENT)
+
+        email_fresh.refresh_from_db()
+        # Fresh processing row should NOT be reverted to pending, and thus NOT picked up in this batch
+        # unless it was finished by some other instance (unlikely here).
+        # Wait, if it is in PROCESSING, _get_pending_emails does NOT return it unless it reverts it.
+        # So it should still be in PROCESSING.
+        self.assertEqual(email_fresh.status, EmailQueueStatus.PROCESSING)
         self.assertEqual(len(mail.outbox), 1)
 
     @patch("sys.stdout.write")

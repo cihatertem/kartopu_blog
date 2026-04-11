@@ -34,6 +34,14 @@ class SubscriberModelTest(TestCase):
         self.assertIsNotNone(subscriber.subscribed_at)
         self.assertIsNone(subscriber.unsubscribed_at)
 
+    def test_mark_pending_when_active(self):
+        subscriber = Subscriber.objects.create(
+            email="active@example.com",
+            status=SubscriberStatus.ACTIVE,
+        )
+        subscriber.mark_pending()
+        self.assertEqual(subscriber.status, SubscriberStatus.PENDING)
+
     def test_activate_without_prior_subscribed_at(self):
         subscriber = Subscriber.objects.create(
             email="test@example.com",
@@ -72,6 +80,14 @@ class SubscriberModelTest(TestCase):
         subscriber.refresh_from_db()
         self.assertEqual(subscriber.status, SubscriberStatus.UNSUBSCRIBED)
         self.assertIsNotNone(subscriber.unsubscribed_at)
+        unsub_at = subscriber.unsubscribed_at
+
+        # Call again
+        subscriber.unsubscribe()
+        subscriber.refresh_from_db()
+        self.assertEqual(subscriber.status, SubscriberStatus.UNSUBSCRIBED)
+        # Should update unsubscribed_at to now
+        self.assertGreaterEqual(subscriber.unsubscribed_at, unsub_at)
 
 
 class BlogPostNotificationModelTest(TestCase):

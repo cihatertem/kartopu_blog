@@ -85,6 +85,27 @@ class NewsletterAdminTest(TestCase):
         self.assertIn("Sent zaten gönderildi.", message_strings)
         self.assertIn("Draft duyurusu 5 aboneye gönderildi.", message_strings)
 
+    @patch("newsletter.admin.send_announcement")
+    def test_announcement_admin_send_selected_announcements_all_sent(self, mock_send):
+        Announcement.objects.create(
+            subject="Sent1", body="Body", status=AnnouncementStatus.SENT
+        )
+        Announcement.objects.create(
+            subject="Sent2", body="Body", status=AnnouncementStatus.SENT
+        )
+
+        admin = AnnouncementAdmin(Announcement, self.site)
+        request = self.get_mock_request()
+        queryset = Announcement.objects.all()
+
+        send_selected_announcements(admin, request, queryset)
+
+        mock_send.assert_not_called()
+        messages = list(get_messages(request))
+        self.assertEqual(len(messages), 2)
+        for msg in messages:
+            self.assertIn("zaten gönderildi", str(msg))
+
     def test_email_queue_admin_requeue_emails(self):
         email_queue = EmailQueue.objects.create(
             subject="Test",
