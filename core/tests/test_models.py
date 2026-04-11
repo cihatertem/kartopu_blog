@@ -167,6 +167,31 @@ class AboutPageImageTest(TestCase):
         img = AboutPageImage(page=page)
         self.assertIsNone(img.rendition)
 
+    def test_rendition_property_with_image(self):
+        page = AboutPage.objects.create(title="About Me", content="Content")
+
+        import io
+
+        img_buffer = io.BytesIO()
+        # Use a larger image to ensure it's resized to 1200
+        valid_img = Image.new("RGB", (2000, 1600), color="red")
+        valid_img.save(img_buffer, format="JPEG")
+        valid_image_content = img_buffer.getvalue()
+
+        img = AboutPageImage.objects.create(
+            page=page,
+            image=SimpleUploadedFile(
+                "test.jpg", valid_image_content, content_type="image/jpeg"
+            ),
+        )
+
+        rendition = img.rendition
+        self.assertIsNotNone(rendition)
+        self.assertEqual(rendition["width"], 1200)
+        self.assertEqual(rendition["height"], 960)  # 1600 * (1200/2000) = 960
+        self.assertIn("src", rendition)
+        self.assertIn("srcset", rendition)
+
 
 class SidebarWidgetTest(TestCase):
     def setUp(self):

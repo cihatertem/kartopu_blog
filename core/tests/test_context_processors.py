@@ -210,6 +210,30 @@ class ContextProcessorsTests(TestCase):
             snapshot["remaining_pct"]["fill_class"], "goal-widget__fill--1"
         )
 
+    def test_get_goal_widget_snapshot_target_zero(self):
+        PortfolioSnapshot.objects.filter(pk=self.snapshot.pk).update(
+            target_value=Decimal("0"),
+            total_value=Decimal("100"),
+        )
+
+        snapshot = _get_goal_widget_snapshot()
+
+        self.assertIsNotNone(snapshot)
+        self.assertEqual(snapshot["remaining_pct"]["value"], 100)
+        self.assertEqual(snapshot["remaining_pct"]["display"], 0)
+
+    def test_get_goal_widget_snapshot_completed(self):
+        PortfolioSnapshot.objects.filter(pk=self.snapshot.pk).update(
+            target_value=Decimal("10000"),
+            total_value=Decimal("15000"),
+        )
+
+        snapshot = _get_goal_widget_snapshot()
+
+        self.assertIsNotNone(snapshot)
+        self.assertEqual(snapshot["remaining_pct"]["value"], 100)
+        self.assertEqual(snapshot["remaining_pct"]["display"], 0)
+
     def test_get_has_pending_messages_or_comments_only_unread_message(self):
         request = self.factory.get("/")
         request.user = self.staff_user

@@ -72,6 +72,65 @@ class GetClientIPTest(TestCase):
         self.assertEqual(client_ip_key("test_group", request), "unknown")
 
 
+class ParseIntTest(TestCase):
+    def test_parse_int_valid(self):
+        from core.helpers import _parse_int
+
+        self.assertEqual(_parse_int("123"), 123)
+        self.assertEqual(_parse_int("0"), 0)
+        self.assertEqual(_parse_int("-5"), -5)
+
+    def test_parse_int_invalid(self):
+        from core.helpers import _parse_int
+
+        with self.assertLogs("core.helpers", level="ERROR"):
+            self.assertIsNone(_parse_int("abc"))
+
+    def test_parse_int_none_or_empty(self):
+        from core.helpers import _parse_int
+
+        self.assertIsNone(_parse_int(None))
+        self.assertIsNone(_parse_int(""))
+
+
+class GetSafeRefererTest(TestCase):
+    def setUp(self):
+        self.factory = RequestFactory()
+
+    def test_get_safe_referer_valid_internal(self):
+        from core.helpers import get_safe_referer
+
+        request = self.factory.get("/")
+        request.META["HTTP_REFERER"] = "http://testserver/about/"
+        self.assertEqual(get_safe_referer(request), "http://testserver/about/")
+
+    def test_get_safe_referer_invalid_external(self):
+        from core.helpers import get_safe_referer
+
+        request = self.factory.get("/")
+        request.META["HTTP_REFERER"] = "http://malicious.com/"
+        self.assertEqual(get_safe_referer(request), "/")
+        self.assertEqual(get_safe_referer(request, default="/home"), "/home")
+
+    def test_get_safe_referer_missing(self):
+        from core.helpers import get_safe_referer
+
+        request = self.factory.get("/")
+        self.assertEqual(get_safe_referer(request), "/")
+
+    def test_get_safe_referer_secure_request(self):
+        from core.helpers import get_safe_referer
+
+        request = self.factory.get("/", secure=True)
+        # Should be secure referer
+        request.META["HTTP_REFERER"] = "https://testserver/about/"
+        self.assertEqual(get_safe_referer(request), "https://testserver/about/")
+
+        # Insecure referer on secure request should be rejected
+        request.META["HTTP_REFERER"] = "http://testserver/about/"
+        self.assertEqual(get_safe_referer(request), "/")
+
+
 class NormalizeSearchQueryTest(TestCase):
     def test_normalize_search_query_edge_cases(self):
         cases = [
