@@ -155,6 +155,16 @@ class UserManagerTests(TestCase):
                 email=email, password=password, is_superuser=False
             )
 
+    def test_create_user_email_normalization(self):
+        email = "TEST@Example.Com"
+        user = User.objects.create_user(email=email)
+        self.assertEqual(user.email, "TEST@example.com")
+
+    def test_create_user_without_email(self):
+        user = User.objects.create_user(email=None, password="password")
+        self.assertIsNone(user.email)
+        self.assertTrue(user.check_password("password"))
+
 
 class UserModelTests(TestCase):
     def test_str_with_full_name(self):
@@ -166,12 +176,30 @@ class UserModelTests(TestCase):
 
         self.assertEqual(result, "John Doe")
 
+    def test_str_with_only_first_name(self):
+        user = User.objects.create_user(
+            email="onlyfirst@example.com", first_name="John", password="pwd"
+        )
+        self.assertEqual(str(user), "John")
+
+    def test_str_with_only_last_name(self):
+        user = User.objects.create_user(
+            email="onlylast@example.com", last_name="Doe", password="pwd"
+        )
+        self.assertEqual(str(user), "Doe")
+
     def test_str_with_only_email(self):
         user = User.objects.create_user(email="test2@example.com", password="pwd")
 
         result = str(user)
 
         self.assertEqual(result, "test2@example.com")
+
+    def test_str_with_empty_name_fields(self):
+        user = User.objects.create_user(
+            email="empty@example.com", first_name="", last_name="", password="pwd"
+        )
+        self.assertEqual(str(user), "empty@example.com")
 
     def test_full_name_property(self):
         user = User.objects.create_user(
@@ -202,3 +230,63 @@ class UserModelTests(TestCase):
         self.assertIsNotNone(result)
         self.assertIn("src", result)
         self.assertIn("srcset", result)
+
+    def test_save_converts_empty_email_to_none(self):
+        user = User(email="", first_name="No", last_name="Email")
+        user.save()
+        self.assertIsNone(user.email)
+
+
+class StorageAndPathTests(TestCase):
+    def test_overwrite_avatar_storage_get_available_name(self):
+        from django.core.files.base import ContentFile
+        from django.core.files.storage import default_storage
+
+        from accounts.models import OverWriteAvatarStorage
+
+        storage = OverWriteAvatarStorage()
+        name = "test_file.txt"
+        content = ContentFile(b"hello")
+
+        # Ensure it doesn't exist
+        if default_storage.exists(name):
+            default_storage.delete(name)
+
+        # First save
+        storage.save(name, content)
+        self.assertTrue(default_storage.exists(name))
+
+        # get_available_name should return same name and delete existing
+        available_name = storage.get_available_name(name)
+        self.assertEqual(available_name, name)
+        # In SQLite/Local storage, it might still exist until next save,
+        # but the mixin implementation calls delete().
+        # Let's verify it actually deleted it.
+        self.assertFalse(default_storage.exists(name))
+
+    def test_user_avatar_upload_path(self):
+        from accounts.models import user_avatar_upload_path
+
+        user = User(email="test@example.com", first_name="John", last_name="Doe")
+        path = user_avatar_upload_path(user, "my_avatar.PNG")
+
+        self.assertTrue(path.startswith("avatars/john-doe/avatar_"))
+        self.assertTrue(path.endswith(".png"))
+
+    def test_user_avatar_upload_path_fallback_to_email(self):
+        from accounts.models import user_avatar_upload_path
+
+        user = User(email="onlyemail@example.com")
+        path = user_avatar_upload_path(user, "img.jpg")
+
+        self.assertTrue(path.startswith("avatars/onlyemail/avatar_"))
+        self.assertTrue(path.endswith(".jpg"))
+
+    def test_user_avatar_upload_path_unicode(self):
+        from accounts.models import user_avatar_upload_path
+
+        user = User(first_name="Çiğdem", last_name="Işık")
+        path = user_avatar_upload_path(user, "image.jpeg")
+
+        # slugify("Çiğdem Işık") produces "cigdem-isk" in default Django slugify
+        self.assertTrue(path.startswith("avatars/cigdem-isk/avatar_"))

@@ -173,3 +173,65 @@ class CustomSocialAppAdminTests(TestCase):
 
         instance = form.save(commit=True)
         self.assertNotIn("avatar_url_field", instance.settings)
+
+    def test_custom_social_app_form_no_instance_pk(self):
+        """Test form initialization without an existing instance"""
+        form = CustomSocialAppForm()
+        # Default initial for CharField is None if not specified
+        self.assertIsNone(form.fields["avatar_url_field"].initial)
+
+    def test_custom_social_app_form_instance_with_no_settings(self):
+        """Test form initialization with instance that has no settings"""
+        app = SocialApp(provider="google", name="Google")
+        # No settings assigned, and no PK yet
+        form = CustomSocialAppForm(instance=app)
+        self.assertIsNone(form.fields["avatar_url_field"].initial)
+
+    def test_custom_social_app_form_instance_with_pk_no_settings(self):
+        """Test form initialization with instance that has PK but no settings"""
+        app = SocialApp.objects.create(provider="google", name="Google")
+        form = CustomSocialAppForm(instance=app)
+        # Should be "" because settings is None or {} and we use .get(..., "")
+        self.assertEqual(form.fields["avatar_url_field"].initial, "")
+
+
+class UserAdminConfigurationTests(TestCase):
+    def setUp(self):
+        self.site = AdminSite()
+        self.admin = UserAdmin(User, self.site)
+
+    def test_user_admin_list_display(self):
+        self.assertEqual(
+            self.admin.list_display,
+            (
+                "email",
+                "full_name",
+                "is_staff",
+                "is_active",
+                "last_login",
+                "updated_at",
+                "created_at",
+            ),
+        )
+
+    def test_user_admin_search_fields(self):
+        self.assertEqual(
+            self.admin.search_fields,
+            (
+                "email",
+                "first_name",
+                "last_name",
+            ),
+        )
+
+    def test_user_admin_list_filter(self):
+        self.assertEqual(
+            self.admin.list_filter,
+            (
+                "is_staff",
+                "is_active",
+                "created_at",
+                "updated_at",
+                "last_login",
+            ),
+        )

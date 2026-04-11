@@ -260,3 +260,36 @@ class SocialAvatarDownloadTests(TestCase):
         _download_and_save_social_avatar(self.sociallogin)
 
         mock_get.assert_not_called()
+
+    @patch("accounts.signals._download_and_save_social_avatar")
+    def test_allauth_signals_trigger_download(self, mock_download):
+        from allauth.socialaccount.signals import (
+            social_account_added,
+            social_account_updated,
+        )
+
+        social_account_added.send(
+            sender=SocialAccount, request=None, sociallogin=self.sociallogin
+        )
+        self.assertEqual(mock_download.call_count, 1)
+
+        social_account_updated.send(
+            sender=SocialAccount, request=None, sociallogin=self.sociallogin
+        )
+        self.assertEqual(mock_download.call_count, 2)
+
+
+class UserSignalTests(TestCase):
+    def test_delete_user_avatar_signal(self):
+        from django.core.files.base import ContentFile
+        from django.core.files.storage import default_storage
+
+        user = User.objects.create_user(email="delete-me@example.com")
+        user.avatar.save("to_be_deleted.jpg", ContentFile(b"image data"), save=True)
+        avatar_name = user.avatar.name
+
+        self.assertTrue(default_storage.exists(avatar_name))
+
+        user.delete()
+
+        self.assertFalse(default_storage.exists(avatar_name))
