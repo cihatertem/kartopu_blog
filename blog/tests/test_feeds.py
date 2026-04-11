@@ -132,6 +132,8 @@ class BlogFeedsTests(TestCase):
 
         desc_no_cover = feed.item_description(self.post_no_cover)
         self.assertIn("Content for no cover", desc_no_cover)
+        # Verify it's truncated (default 40 words)
+        self.assertTrue(len(desc_no_cover.split()) <= 40)
 
         # Enclosures
         self.assertIsNotNone(feed.item_enclosure_url(self.post_with_cover))
@@ -205,6 +207,8 @@ class BlogFeedsTests(TestCase):
 
         desc_no_cover = feed.item_description(self.post_no_cover)
         self.assertIn("Content for no cover", desc_no_cover)
+        # Verify it's truncated (default 40 words)
+        self.assertTrue(len(desc_no_cover.split()) <= 40)
 
         self.assertIsNotNone(feed.item_enclosure_url(self.post_with_cover))
         self.assertTrue(

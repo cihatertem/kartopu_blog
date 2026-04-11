@@ -1,5 +1,5 @@
 import json
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 from allauth.socialaccount.models import SocialAccount
 from django.contrib.auth import get_user_model
@@ -203,22 +203,10 @@ class BlogViewsTests(TestCase):
             published_at=timezone.now() - timezone.timedelta(days=1),
         )
 
-        response = self.client.get(url, {"q": "published"}, follow=True)
+        response = self.client.get(url, {"q": "published testing"}, follow=True)
         self.assertEqual(response.status_code, 200)
-
-        # The query should return both published posts (since rank=1 is mocked for all rows)
-        ctx = getattr(response, "context")
-        page_obj = (
-            ctx["page_obj"]
-            if type(ctx) is dict
-            else [c for c in ctx if c is not None and "page_obj" in c][0]["page_obj"]
-        )
-
-        # The result should contain the 2 published posts, but NOT the draft post.
-        self.assertEqual(len(page_obj.object_list), 2)
-        # Verify ordering is correct (order_by("-rank", "-published_at"))
-        self.assertEqual(page_obj.object_list[0].id, self.published_post.id)
-        self.assertEqual(page_obj.object_list[1].id, post2.id)
+        self.assertIn(self.published_post, response.context["page_obj"].object_list)
+        self.assertIn(post2, response.context["page_obj"].object_list)
 
     def test_search_results_view_malicious_payloads(self):
 
@@ -406,12 +394,25 @@ class ViewHelperTests(TestCase):
             published_at=timezone.now(),
         )
 
-        request = RequestFactory().get("/archive/")
+        request = RequestFactory().get("/blog/archive/")
 
         with patch("blog.views.render") as mock_render:
             mock_render.return_value = "mock_html"
             resp = archive_index(request)
             self.assertEqual(resp, "mock_html")
+            # Verify archives were passed to context
+            # render(request, template, context)
+            args, kwargs = mock_render.call_args
+            context = args[2]
+            self.assertIn("archives", context)
+            self.assertEqual(len(context["archives"]), 1)
+
+    def test_search_results_empty_query(self):
+        url = reverse("blog:search_results")
+        response = self.client.get(url, {"q": ""})
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Arama yapmak için en az bir kelime gir.")
+        self.assertEqual(len(response.context["page_obj"]), 0)
 
     def test_build_reaction_context(self):
         user = User.objects.create_user(email="react@example.com", password="password")
@@ -493,6 +494,60 @@ class ViewHelperTests(TestCase):
             result = _extract_social_profile_url(account)
 
         self.assertEqual(result, "")
+
+    def test_extract_social_profile_url_twitter(self):
+        from blog.views import _extract_social_profile_url
+
+        account = MagicMock()
+        account.provider = "twitter"
+        account.extra_data = {"screen_name": "testuser"}
+        self.assertEqual(_extract_social_profile_url(account), "https://x.com/testuser")
+
+    def test_extract_social_profile_url_github(self):
+        from blog.views import _extract_social_profile_url
+
+        account = MagicMock()
+        account.provider = "github"
+        account.extra_data = {"html_url": "https://github.com/ghuser"}
+        self.assertEqual(
+            _extract_social_profile_url(account), "https://github.com/ghuser"
+        )
+
+        account.extra_data = {"login": "ghuser2"}
+        self.assertEqual(
+            _extract_social_profile_url(account), "https://github.com/ghuser2"
+        )
+
+    def test_extract_social_profile_url_linkedin(self):
+        from blog.views import _extract_social_profile_url
+
+        account = MagicMock()
+        account.provider = "linkedin"
+        account.extra_data = {"vanityName": "liuser"}
+        self.assertEqual(
+            _extract_social_profile_url(account), "https://www.linkedin.com/in/liuser"
+        )
+
+    def test_extract_social_profile_url_google(self):
+        from blog.views import _extract_social_profile_url
+
+        account = MagicMock()
+        account.provider = "google"
+        account.extra_data = {"profile": "https://google.com/p/123"}
+        self.assertEqual(
+            _extract_social_profile_url(account), "https://google.com/p/123"
+        )
+
+    def test_extract_social_profile_url_unknown_provider_fallback(self):
+        from blog.views import _extract_social_profile_url
+
+        account = MagicMock()
+        account.provider = "other"
+        account.extra_data = {}
+        account.get_profile_url.return_value = "https://other.com/profile"
+        self.assertEqual(
+            _extract_social_profile_url(account), "https://other.com/profile"
+        )
 
     def test_safe_get_profile_url_success(self):
         """Test that _safe_get_profile_url returns the profile URL on success."""

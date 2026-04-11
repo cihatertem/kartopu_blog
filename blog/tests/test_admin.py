@@ -103,6 +103,12 @@ class BlogAdminTests(TestCase):
         self.post.refresh_from_db()
         self.assertEqual(self.post.status, BlogPost.Status.PUBLISHED)
         self.assertIsNotNone(self.post.published_at)
+        pub_at = self.post.published_at
+
+        # Test that publishing again doesn't change published_at
+        model_admin.publish_posts(request, queryset)
+        self.post.refresh_from_db()
+        self.assertEqual(self.post.published_at, pub_at)
 
         model_admin.archive_posts(request, queryset)
         self.post.refresh_from_db()
@@ -116,6 +122,9 @@ class BlogAdminTests(TestCase):
         model_admin.toggle_is_featured(request, queryset)
         self.post.refresh_from_db()
         self.assertTrue(self.post.is_featured)
+        model_admin.toggle_is_featured(request, queryset)
+        self.post.refresh_from_db()
+        self.assertFalse(self.post.is_featured)
 
     @patch("blog.admin.send_post_published_email")
     def test_resend_newsletter_notifications_action(self, mock_send):
@@ -130,6 +139,7 @@ class BlogAdminTests(TestCase):
 
         queryset = BlogPost.objects.filter(pk=self.post.pk)
 
+        # Skip draft post
         model_admin.resend_newsletter_notifications(request, queryset)
         mock_send.assert_not_called()
 

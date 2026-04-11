@@ -64,6 +64,8 @@ class TestTemplateTagsHelpers(TestCase):
     def test_format_tr_number(self):
         self.assertEqual(_format_tr_number(Decimal("1000")), "1.000")
         self.assertEqual(_format_tr_number(Decimal("1000.50")), "1.000,50")
+        with self.assertLogs("blog.templatetags.blog_extras", level="ERROR"):
+            self.assertEqual(_format_tr_number("abc"), "abc")
 
     def test_coerce_identifier(self):
         self.assertEqual(_coerce_identifier(None), None)
@@ -445,6 +447,8 @@ class BlogExtrasFiltersTests(TestCase):
     def test_mul100(self):
         self.assertEqual(blog_extras.mul100(0.12), 12.0)
         self.assertEqual(blog_extras.mul100(None), 0)
+        with self.assertLogs("blog.templatetags.blog_extras", level="ERROR"):
+            self.assertEqual(blog_extras.mul100({"a": 1}), 0)
 
     def test_safe_float(self):
         self.assertEqual(blog_extras.safe_float("1.23"), 1.23)

@@ -4,7 +4,7 @@ from django.contrib.auth import get_user_model
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import TestCase
 
-from blog.models import BlogPost, BlogPostImage, Category, Tag
+from blog.models import BlogPost, BlogPostImage, BlogPostReaction, Category, Tag
 
 User = get_user_model()
 
@@ -70,14 +70,27 @@ class BlogModelsTests(TestCase):
         post = BlogPost(title="My Title", author=self.user)
         self.assertEqual(post.effective_meta_title, "My Title | Kartopu Money")
 
+        post.meta_title = "A" * 100
+        # Should be truncated to 60
+        self.assertEqual(len(post.effective_meta_title), 60)
+
         post.meta_title = "SEO Title"
         self.assertEqual(post.effective_meta_title, "SEO Title | Kartopu Money")
 
         self.assertEqual(post.effective_meta_description, "")
         post.excerpt = "Short"
         self.assertEqual(post.effective_meta_description, "Short")
-        post.meta_description = "SEO Desc"
-        self.assertEqual(post.effective_meta_description, "SEO Desc")
+        post.meta_description = "B" * 200
+        # Should be truncated to 160
+        self.assertEqual(len(post.effective_meta_description), 160)
+        self.assertEqual(post.effective_meta_description, ("B" * 159) + "…")
+
+    def test_blogpost_reaction_str(self):
+        post = BlogPost.objects.create(title="React Post", author=self.user)
+        reaction = BlogPostReaction.objects.create(
+            post=post, user=self.user, reaction=BlogPostReaction.Reaction.KALP.value
+        )
+        self.assertEqual(str(reaction), "React Post - Sevgi")
 
     @patch("blog.models.optimize_uploaded_image_field")
     def test_blogpost_cover_optimize(self, mock_opt):
