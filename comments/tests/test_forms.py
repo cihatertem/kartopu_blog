@@ -57,3 +57,8 @@ class CommentFormTests(TestCase):
         form = CommentForm(data={"body": "Valid body", "parent_id": parent_uuid})
         self.assertTrue(form.is_valid())
         self.assertEqual(form.cleaned_data["parent_id"], parent_uuid)
+
+    def test_parent_id_invalid_uuid(self):
+        form = CommentForm(data={"body": "Valid body", "parent_id": "not-a-uuid"})
+        self.assertFalse(form.is_valid())
+        self.assertIn("parent_id", form.errors)

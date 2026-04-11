@@ -69,3 +69,15 @@ class CommentAdminTests(TestCase):
         self.comment2.refresh_from_db()
         self.assertEqual(self.comment1.status, Comment.Status.SPAM)
         self.assertEqual(self.comment2.status, Comment.Status.SPAM)
+
+    def test_admin_readonly_fields(self):
+        self.assertEqual(
+            self.admin.readonly_fields,
+            (
+                "ip_address",
+                "user_agent",
+                "social_provider",
+                "created_at",
+                "updated_at",
+            ),
+        )

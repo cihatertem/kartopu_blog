@@ -95,6 +95,21 @@ class PostCommentTests(TestCase):
         # Currently this fails because it logs 10.0.0.5
         self.assertEqual(comment.ip_address, "203.0.113.195")
 
+    def test_post_comment_logs_correct_user_agent(self):
+        self.client.login(email="staff2@example.com", password="password")
+        long_ua = "Mozilla/5.0 " + ("a" * 600)
+        self.client.post(
+            self.url,
+            {"body": "UA test comment"},
+            follow=False,
+            HTTP_HOST="localhost",
+            secure=True,
+            HTTP_USER_AGENT=long_ua,
+        )
+        comment = Comment.objects.get(body="UA test comment")
+        self.assertEqual(len(comment.user_agent), 500)
+        self.assertTrue(comment.user_agent.startswith("Mozilla/5.0"))
+
     @patch("accounts.signals._download_and_save_social_avatar")
     def test_regular_user_with_social_account(self, mock_download_avatar):
         SocialAccount.objects.create(user=self.regular_user, provider="google")
@@ -269,6 +284,38 @@ class PostCommentTests(TestCase):
         self.assertEqual(response.status_code, 302)
         self.assertEqual(response.url, self.post.get_absolute_url())
         self.assertEqual(Comment.objects.count(), 0)
+
+    def test_post_comment_non_published_post(self):
+        draft_post = BlogPost.objects.create(
+            title="Draft Post",
+            author=self.staff_user,
+            category=self.category,
+            status=BlogPost.Status.DRAFT,
+        )
+        self.client.login(email="staff2@example.com", password="password")
+        response = self.client.post(
+            reverse("comments:post_comment", kwargs={"post_id": draft_post.id}),
+            {"body": "Should not work"},
+            follow=False,
+            HTTP_HOST="localhost",
+            secure=True,
+        )
+        self.assertEqual(response.status_code, 404)
+        self.assertEqual(Comment.objects.filter(post=draft_post).count(), 0)
+
+    def test_post_comment_nonexistent_post(self):
+        import uuid
+
+        random_uuid = uuid.uuid4()
+        self.client.login(email="staff2@example.com", password="password")
+        response = self.client.post(
+            reverse("comments:post_comment", kwargs={"post_id": random_uuid}),
+            {"body": "Should not work"},
+            follow=False,
+            HTTP_HOST="localhost",
+            secure=True,
+        )
+        self.assertEqual(response.status_code, 404)
 
 
 class ValidateParentCommentTests(TestCase):
@@ -449,5 +496,21 @@ class CommentModerationTests(TestCase):
             HTTP_HOST="localhost",
             secure=True,
         )
+        self.comment.refresh_from_db()
+        self.assertEqual(self.comment.status, Comment.Status.PENDING)
+
+    def test_moderate_comment_invalid_action(self):
+        self.client.login(email="staff@example.com", password="password")
+        url = reverse(
+            "comments:moderate_comment", kwargs={"comment_id": self.comment.id}
+        )
+        response = self.client.post(
+            url,
+            {"action": "invalid_action", "csrfmiddlewaretoken": "test"},
+            follow=False,
+            HTTP_HOST="localhost",
+            secure=True,
+        )
+        self.assertEqual(response.status_code, 302)
         self.comment.refresh_from_db()
         self.assertEqual(self.comment.status, Comment.Status.PENDING)

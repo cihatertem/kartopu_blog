@@ -47,3 +47,28 @@ class CommentModelTests(TestCase):
         self.comment.status = Comment.Status.SPAM
         self.comment.save()
         self.assertFalse(self.comment.is_public)
+
+    def test_comment_ordering(self):
+        # Create another comment
+        import time
+
+        time.sleep(0.01)  # Ensure different created_at
+        comment2 = Comment.objects.create(
+            post=self.post,
+            author=self.user,
+            body="Second test comment",
+        )
+        comments = Comment.objects.all()
+        self.assertEqual(comments[0], comment2)
+        self.assertEqual(comments[1], self.comment)
+
+    def test_comment_replies_relationship(self):
+        reply = Comment.objects.create(
+            post=self.post,
+            author=self.user,
+            body="Reply comment",
+            parent=self.comment,
+        )
+        self.assertEqual(self.comment.replies.count(), 1)
+        self.assertEqual(self.comment.replies.first(), reply)
+        self.assertEqual(reply.parent, self.comment)
