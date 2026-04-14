@@ -294,7 +294,13 @@ def _get_portfolio_prefetches():
                 "items__asset",
                 Prefetch(
                     "portfolio__snapshots",
-                    queryset=PortfolioSnapshot.objects.all().order_by("snapshot_date"),
+                    queryset=PortfolioSnapshot.objects.only(
+                        "snapshot_date",
+                        "total_value",
+                        "irr_pct",
+                        "portfolio_id",
+                        "period",
+                    ).order_by("snapshot_date"),
                     to_attr="prefetched_snapshots",
                 ),
             )
@@ -328,7 +334,9 @@ def _get_cashflow_prefetches():
                 "items",
                 Prefetch(
                     "cashflow__snapshots",
-                    queryset=CashFlowSnapshot.objects.all().order_by("snapshot_date"),
+                    queryset=CashFlowSnapshot.objects.only(
+                        "snapshot_date", "total_amount", "cashflow_id", "period"
+                    ).order_by("snapshot_date"),
                     to_attr="prefetched_snapshots",
                 ),
             )
@@ -359,9 +367,9 @@ def _get_salary_savings_prefetches():
             .prefetch_related(
                 Prefetch(
                     "flow__snapshots",
-                    queryset=SalarySavingsSnapshot.objects.all().order_by(
-                        "snapshot_date"
-                    ),
+                    queryset=SalarySavingsSnapshot.objects.only(
+                        "snapshot_date", "savings_rate", "flow_id"
+                    ).order_by("snapshot_date"),
                     to_attr="prefetched_snapshots",
                 )
             )

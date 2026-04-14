@@ -213,7 +213,7 @@ class BlogPostAdmin(admin.ModelAdmin):
 
     def get_queryset(self, request):
         queryset = super().get_queryset(request)
-        queryset = queryset.annotate(
+        queryset = queryset.select_related("author", "category").annotate(
             _reaction_count=Count("reactions", distinct=True),
             _comment_count=Count("comments", distinct=True),
         )
