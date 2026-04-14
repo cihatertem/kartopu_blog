@@ -29,6 +29,7 @@ document.addEventListener("DOMContentLoaded", () => {
         input.addEventListener("input", () => {
             if (input.id !== "run-btn") {
                 updateWithdrawalDisplays();
+                setRunButtonState();
                 // We don't auto-run for random scenario if it's too frequent,
                 // but for others it's fine.
                 const scenario = document.getElementById("scenario").value;
@@ -41,11 +42,27 @@ document.addEventListener("DOMContentLoaded", () => {
 
     lastWType = document.getElementById("w_type").value;
 
-    runBtn.addEventListener("click", runSimulation);
+    runBtn.addEventListener("click", () => {
+        const scenario = document.getElementById("scenario").value;
+        if (scenario === "random") {
+            runSimulation();
+        }
+    });
 
     // Initial run
+    setRunButtonState();
     updateWithdrawalDisplays();
     runSimulation();
+
+    function setRunButtonState() {
+        const isRandomScenario =
+            document.getElementById("scenario").value === "random";
+        runBtn.disabled = !isRandomScenario;
+        runBtn.setAttribute("aria-disabled", String(!isRandomScenario));
+        runBtn.title = isRandomScenario
+            ? ""
+            : "Bu düğme yalnızca Rastgele Simülasyon seçildiğinde kullanılabilir.";
+    }
 
     function updateWithdrawalDisplays() {
         const pv = parseFloat(document.getElementById("pv").value) || 0;
