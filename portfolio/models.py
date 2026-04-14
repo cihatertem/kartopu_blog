@@ -730,11 +730,21 @@ class Portfolio(UUIDModelMixin, TimeStampedModelMixin):
         Returns the IRR performance history based on snapshots.
         If until_date is provided, only snapshots up to that date are included.
         """
-        snapshots = self.snapshots.filter(irr_pct__isnull=False).order_by(  # pyright: ignore[reportAttributeAccessIssue]
-            "snapshot_date"
-        )
+        # Check if we have prefetched snapshots for the portfolio
+        if hasattr(self, "prefetched_snapshots"):
+            snapshots = [s for s in self.prefetched_snapshots if s.irr_pct is not None]
+        else:
+            snapshots = self.snapshots.filter(irr_pct__isnull=False).order_by(  # pyright: ignore[reportAttributeAccessIssue]
+                "snapshot_date"
+            )
+
         if until_date:
-            snapshots = snapshots.filter(snapshot_date__lte=until_date)
+            # If prefetched, it's a list, so we filter in Python.
+            # If not prefetched, it's a QuerySet, filter() will hit DB.
+            if isinstance(snapshots, list):
+                snapshots = [s for s in snapshots if s.snapshot_date <= until_date]
+            else:
+                snapshots = snapshots.filter(snapshot_date__lte=until_date)
 
         if not snapshots:
             return []

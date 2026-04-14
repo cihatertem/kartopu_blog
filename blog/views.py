@@ -288,9 +288,17 @@ def _get_portfolio_prefetches():
     return [
         Prefetch(
             "portfolio_snapshots",
-            queryset=PortfolioSnapshot.objects.select_related("portfolio").order_by(
-                "snapshot_date"
-            ),
+            queryset=PortfolioSnapshot.objects.select_related("portfolio")
+            .prefetch_related(
+                "items",
+                "items__asset",
+                Prefetch(
+                    "portfolio__snapshots",
+                    queryset=PortfolioSnapshot.objects.all().order_by("snapshot_date"),
+                    to_attr="prefetched_snapshots",
+                ),
+            )
+            .order_by("snapshot_date"),
         ),
         Prefetch(
             "portfolio_comparisons",
@@ -299,7 +307,14 @@ def _get_portfolio_prefetches():
                 "compare_snapshot",
                 "base_snapshot__portfolio",
                 "compare_snapshot__portfolio",
-            ).order_by("created_at"),
+            )
+            .prefetch_related(
+                "base_snapshot__items",
+                "base_snapshot__items__asset",
+                "compare_snapshot__items",
+                "compare_snapshot__items__asset",
+            )
+            .order_by("created_at"),
         ),
     ]
 
@@ -308,9 +323,16 @@ def _get_cashflow_prefetches():
     return [
         Prefetch(
             "cashflow_snapshots",
-            queryset=CashFlowSnapshot.objects.select_related("cashflow").order_by(
-                "snapshot_date"
-            ),
+            queryset=CashFlowSnapshot.objects.select_related("cashflow")
+            .prefetch_related(
+                "items",
+                Prefetch(
+                    "cashflow__snapshots",
+                    queryset=CashFlowSnapshot.objects.all().order_by("snapshot_date"),
+                    to_attr="prefetched_snapshots",
+                ),
+            )
+            .order_by("snapshot_date"),
         ),
         Prefetch(
             "cashflow_comparisons",
@@ -319,7 +341,12 @@ def _get_cashflow_prefetches():
                 "compare_snapshot",
                 "base_snapshot__cashflow",
                 "compare_snapshot__cashflow",
-            ).order_by("created_at"),
+            )
+            .prefetch_related(
+                "base_snapshot__items",
+                "compare_snapshot__items",
+            )
+            .order_by("created_at"),
         ),
     ]
 
@@ -328,9 +355,17 @@ def _get_salary_savings_prefetches():
     return [
         Prefetch(
             "salary_savings_snapshots",
-            queryset=SalarySavingsSnapshot.objects.select_related("flow").order_by(
-                "snapshot_date"
-            ),
+            queryset=SalarySavingsSnapshot.objects.select_related("flow")
+            .prefetch_related(
+                Prefetch(
+                    "flow__snapshots",
+                    queryset=SalarySavingsSnapshot.objects.all().order_by(
+                        "snapshot_date"
+                    ),
+                    to_attr="prefetched_snapshots",
+                )
+            )
+            .order_by("snapshot_date"),
         ),
     ]
 
@@ -339,14 +374,26 @@ def _get_dividend_prefetches():
     return [
         Prefetch(
             "dividend_snapshots",
-            queryset=DividendSnapshot.objects.order_by("-year", "-created_at"),
+            queryset=DividendSnapshot.objects.prefetch_related(
+                "asset_items",
+                "asset_items__asset",
+                "payment_items",
+                "payment_items__asset",
+            ).order_by("-year", "-created_at"),
         ),
         Prefetch(
             "dividend_comparisons",
             queryset=DividendComparison.objects.select_related(
                 "base_snapshot",
                 "compare_snapshot",
-            ).order_by("created_at"),
+            )
+            .prefetch_related(
+                "base_snapshot__asset_items",
+                "base_snapshot__asset_items__asset",
+                "compare_snapshot__asset_items",
+                "compare_snapshot__asset_items__asset",
+            )
+            .order_by("created_at"),
         ),
     ]
 

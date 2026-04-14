@@ -151,9 +151,12 @@ class PortfolioTransactionAdmin(admin.ModelAdmin):
         "notes",
     )
 
+    def get_queryset(self, request):
+        return super().get_queryset(request).prefetch_related("portfolios")
+
     @admin.display(description="Portföyler")
     def portfolio_list(self, obj):
-        return ", ".join(obj.portfolios.values_list("name", flat=True).order_by("name"))
+        return ", ".join(sorted([p.name for p in obj.portfolios.all()]))
 
 
 class PortfolioSnapshotItemInline(admin.TabularInline):
@@ -274,9 +277,12 @@ class CashFlowEntryAdmin(admin.ModelAdmin):
     search_fields = ("cashflows__name",)
     autocomplete_fields = ("cashflows",)
 
+    def get_queryset(self, request):
+        return super().get_queryset(request).prefetch_related("cashflows")
+
     @admin.display(description="Nakit Akışları")
     def cashflows_display(self, obj):
-        return ", ".join(obj.cashflows.values_list("name", flat=True).order_by("name"))
+        return ", ".join(sorted([cf.name for cf in obj.cashflows.all()]))
 
 
 class CashFlowSnapshotItemInline(admin.TabularInline):

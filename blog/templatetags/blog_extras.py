@@ -187,26 +187,40 @@ def _render_portfolio_charts_html(snapshot) -> str:
     if not snapshot:
         return ""
 
-    items = (
-        snapshot.items.select_related("asset")
-        .filter(market_value__gt=0)
-        .order_by("-allocation_pct")
+    # Use prefetched items if available, otherwise fallback to DB
+    all_items = snapshot.items.all()
+    items = sorted(
+        [item for item in all_items if item.market_value > 0],
+        key=lambda x: x.allocation_pct,
+        reverse=True,
     )
+
     allocation = {
         "labels": [(item.asset.symbol or item.asset.name) for item in items],
         "values": [_safe_float(item.allocation_pct) * 100 for item in items],  # pyright: ignore[reportOptionalOperand]
     }
-    snapshots_qs = (
-        snapshot.__class__.objects.filter(
-            portfolio=snapshot.portfolio,
-            period=snapshot.period,
+
+    # If the snapshot belongs to a portfolio that has other snapshots, we can show history.
+    portfolio = snapshot.portfolio
+    if hasattr(portfolio, "prefetched_snapshots"):
+        snapshots_list = [
+            s for s in portfolio.prefetched_snapshots if s.period == snapshot.period
+        ]
+        timeseries_data = [(s.snapshot_date, s.total_value) for s in snapshots_list]
+    else:
+        # Fallback to DB query
+        timeseries_data = (
+            snapshot.__class__.objects.filter(
+                portfolio=portfolio,
+                period=snapshot.period,
+            )
+            .order_by("snapshot_date")
+            .values_list("snapshot_date", "total_value")
         )
-        .order_by("snapshot_date")
-        .values_list("snapshot_date", "total_value")
-    )
+
     timeseries = {
-        "labels": [d.isoformat() for d, _ in snapshots_qs],
-        "values": [_safe_float(v) for _, v in snapshots_qs],
+        "labels": [d.isoformat() for d, _ in timeseries_data],
+        "values": [_safe_float(v) for _, v in timeseries_data],
     }
     allocation_json = escape(json.dumps(allocation, cls=DjangoJSONEncoder))
     timeseries_json = escape(json.dumps(timeseries, cls=DjangoJSONEncoder))
@@ -239,10 +253,11 @@ def _render_portfolio_category_summary_html(snapshot) -> str:
     if not snapshot:
         return ""
 
-    items = (
-        snapshot.items.select_related("asset")
-        .filter(market_value__gt=0)
-        .order_by("-allocation_pct")
+    all_items = snapshot.items.all()
+    items = sorted(
+        [item for item in all_items if item.market_value > 0],
+        key=lambda x: x.allocation_pct,
+        reverse=True,
     )
     category_totals: dict[str, float] = {}
     for item in items:
@@ -684,7 +699,11 @@ def _render_cashflow_summary_html(snapshot) -> str:
     )
     snapshot_date = escape(str(snapshot.snapshot_date))
     total_amount = _format_currency(snapshot.total_amount, cashflow_currency)
-    category_items = snapshot.items.order_by("-amount")
+    category_items = sorted(
+        snapshot.items.all(),
+        key=lambda x: x.amount,
+        reverse=True,
+    )
     category_rows = "\n".join(
         f"<li><strong>{escape(item.get_category_display())}:</strong> "
         f"{_format_currency(item.amount, cashflow_currency)}</li>"
@@ -712,22 +731,36 @@ def _render_cashflow_charts_html(snapshot) -> str:
     if not snapshot:
         return ""
 
-    items = snapshot.items.filter(amount__gt=0).order_by("-allocation_pct")
+    all_items = snapshot.items.all()
+    items = sorted(
+        [item for item in all_items if item.amount > 0],
+        key=lambda x: x.allocation_pct,
+        reverse=True,
+    )
     allocation = {
         "labels": [item.get_category_display() for item in items],
         "values": [_safe_float(item.allocation_pct) * 100 for item in items],  # pyright: ignore[reportOptionalOperand]
     }
-    snapshots_qs = (
-        CashFlowSnapshot.objects.filter(
-            cashflow=snapshot.cashflow,
-            period=snapshot.period,
+    cashflow = snapshot.cashflow
+    if hasattr(cashflow, "prefetched_snapshots"):
+        snapshots_list = [
+            s for s in cashflow.prefetched_snapshots if s.period == snapshot.period
+        ]
+        timeseries_data = [(s.snapshot_date, s.total_amount) for s in snapshots_list]
+    else:
+        # Fallback to DB query
+        timeseries_data = (
+            CashFlowSnapshot.objects.filter(
+                cashflow=cashflow,
+                period=snapshot.period,
+            )
+            .order_by("snapshot_date")
+            .values_list("snapshot_date", "total_amount")
         )
-        .order_by("snapshot_date")
-        .values_list("snapshot_date", "total_amount")
-    )
+
     timeseries = {
-        "labels": [d.isoformat() for d, _ in snapshots_qs],
-        "values": [_safe_float(v) for _, v in snapshots_qs],
+        "labels": [d.isoformat() for d, _ in timeseries_data],
+        "values": [_safe_float(v) for _, v in timeseries_data],
     }
     allocation_json = escape(json.dumps(allocation, cls=DjangoJSONEncoder))
     timeseries_json = escape(json.dumps(timeseries, cls=DjangoJSONEncoder))
@@ -781,14 +814,22 @@ def _render_savings_rate_charts_html(snapshot) -> str:
     if not snapshot:
         return ""
 
-    snapshots_qs = (
-        SalarySavingsSnapshot.objects.filter(flow=snapshot.flow)
-        .order_by("snapshot_date")
-        .values_list("snapshot_date", "savings_rate")
-    )
+    flow = snapshot.flow
+    if hasattr(flow, "prefetched_snapshots"):
+        timeseries_data = [
+            (s.snapshot_date, s.savings_rate) for s in flow.prefetched_snapshots
+        ]
+    else:
+        # Fallback to DB query
+        timeseries_data = (
+            SalarySavingsSnapshot.objects.filter(flow=flow)
+            .order_by("snapshot_date")
+            .values_list("snapshot_date", "savings_rate")
+        )
+
     timeseries = {
-        "labels": [d.isoformat() for d, _ in snapshots_qs],
-        "values": [_safe_float(rate) * 100 for _, rate in snapshots_qs],  # pyright: ignore[reportOptionalOperand]
+        "labels": [d.isoformat() for d, _ in timeseries_data],
+        "values": [_safe_float(rate) * 100 for _, rate in timeseries_data],  # pyright: ignore[reportOptionalOperand]
     }
     timeseries_json = escape(json.dumps(timeseries, cls=DjangoJSONEncoder))
 
@@ -960,8 +1001,10 @@ def _render_dividend_summary_html(snapshot) -> str:
     total_amount = _format_currency(snapshot.total_amount, snapshot.currency)
     year = escape(str(snapshot.year))
     currency = escape(snapshot.currency)
-    payment_items = snapshot.payment_items.select_related("asset").order_by(
-        "payment_date"
+
+    payment_items = sorted(
+        snapshot.payment_items.all(),
+        key=lambda x: x.payment_date,
     )
 
     context = {
@@ -979,10 +1022,11 @@ def _render_dividend_charts_html(snapshot) -> str:
     if not snapshot:
         return ""
 
-    items = (
-        snapshot.asset_items.select_related("asset")
-        .filter(total_amount__gt=0)
-        .order_by("-allocation_pct")
+    all_items = snapshot.asset_items.all()
+    items = sorted(
+        [item for item in all_items if item.total_amount > 0],
+        key=lambda x: x.allocation_pct,
+        reverse=True,
     )
     allocation = {
         "labels": [(item.asset.symbol or item.asset.name) for item in items],

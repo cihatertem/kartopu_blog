@@ -41,6 +41,7 @@ class DummySnapshot:
 
         mock_qs = MagicMock()
         mock_qs.select_related.return_value.order_by.return_value = payment_items or []
+        mock_qs.all.return_value = payment_items or []
         self.payment_items = mock_qs
         self.asset_items = mock_qs
         self.items = mock_qs
@@ -273,6 +274,14 @@ class TestRenderHTMLFunctions(TestCase):
         self.assertEqual(_render_portfolio_charts_html(None), "")
         s = DummySnapshot()
 
+        class MItem:
+            asset = MagicMock()
+            asset.symbol = "TST"
+            market_value = Decimal("100")
+            allocation_pct = Decimal("0.5")
+
+        s.items.all.return_value = [MItem()]
+
         class DummyQS:
             def filter(self, *args, **kwargs):
                 return self
@@ -282,6 +291,9 @@ class TestRenderHTMLFunctions(TestCase):
 
             def values_list(self, *args, **kwargs):
                 return [(datetime.date(2025, 1, 1), 100)]
+
+            def all(self):
+                return self
 
         s.__class__.objects = DummyQS()
         html = _render_portfolio_charts_html(s)
@@ -294,11 +306,10 @@ class TestRenderHTMLFunctions(TestCase):
         class MItem:
             asset = MagicMock()
             asset.get_asset_type_display.return_value = "Hisse"
+            market_value = Decimal("100")
             allocation_pct = Decimal("0.5")
 
-        s.items.select_related.return_value.filter.return_value.order_by.return_value = [
-            MItem()
-        ]
+        s.items.all.return_value = [MItem()]
         html = _render_portfolio_category_summary_html(s)
         self.assertIn("Hisse", html)
 
@@ -315,12 +326,12 @@ class TestRenderHTMLFunctions(TestCase):
         s = DummySnapshot(total_amount="1500")
 
         class CItem:
-            amount = 100
+            amount = Decimal("100")
 
             def get_category_display(self):
                 return "Kira"
 
-        s.items.order_by.return_value = [CItem()]
+        s.items.all.return_value = [CItem()]
         html = _render_cashflow_summary_html(s)
         self.assertIn("1.500 ₺", html)
         self.assertIn("Kira", html)
@@ -388,6 +399,14 @@ class TestRenderHTMLFunctions(TestCase):
     def test_render_dividend_charts_html(self):
         self.assertEqual(_render_dividend_charts_html(None), "")
         s = DummySnapshot()
+
+        class MItem:
+            asset = MagicMock()
+            asset.symbol = "TST"
+            total_amount = Decimal("100")
+            allocation_pct = Decimal("0.5")
+
+        s.asset_items.all.return_value = [MItem()]
         html = _render_dividend_charts_html(s)
         self.assertIn("dividend-charts", html)
 
