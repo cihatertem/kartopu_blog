@@ -8,7 +8,8 @@ from django.conf import settings
 from django.core.cache import cache
 from django.core.exceptions import ValidationError
 from django.db import models
-from django.db.models import QuerySet
+from django.db.models import DecimalField, QuerySet, Sum, Value
+from django.db.models.functions import Coalesce
 from django.utils import timezone
 
 from core.mixins import SlugMixin, TimeStampedModelMixin, UUIDModelMixin
@@ -31,6 +32,7 @@ MAX_DECIMAL_PLACES = 8
 MAX_DECIMAL_PLACES_FOR_QUANTITY = 5
 MAX_DECIMAL_PLACES_FOR_RATE = 8
 CACHE_TIMEOUT = 600  # 10 minutes
+BULK_CREATE_BATCH_SIZE = 500
 
 
 class BaseSnapshot(SlugMixin, UUIDModelMixin, TimeStampedModelMixin):
@@ -732,7 +734,7 @@ class Portfolio(UUIDModelMixin, TimeStampedModelMixin):
         """
         # Check if we have prefetched snapshots for the portfolio
         if hasattr(self, "prefetched_snapshots"):
-            snapshots = [s for s in self.prefetched_snapshots if s.irr_pct is not None]
+            snapshots = [s for s in self.prefetched_snapshots if s.irr_pct is not None]  # pyright: ignore[reportAttributeAccessIssue]
         else:
             snapshots = self.snapshots.filter(irr_pct__isnull=False).order_by(  # pyright: ignore[reportAttributeAccessIssue]
                 "snapshot_date"
@@ -997,7 +999,10 @@ class PortfolioSnapshot(BaseSnapshot):
             for position in items_data
         ]
         if items:
-            PortfolioSnapshotItem.objects.bulk_create(items)
+            PortfolioSnapshotItem.objects.bulk_create(
+                items,
+                batch_size=BULK_CREATE_BATCH_SIZE,
+            )
 
 
 class PortfolioSnapshotItem(UUIDModelMixin, TimeStampedModelMixin):
@@ -1302,7 +1307,10 @@ class CashFlowSnapshot(BaseSnapshot):
             for item in items_data
         ]
         if objects_to_create:
-            CashFlowSnapshotItem.objects.bulk_create(objects_to_create)
+            CashFlowSnapshotItem.objects.bulk_create(
+                objects_to_create,
+                batch_size=BULK_CREATE_BATCH_SIZE,
+            )
 
 
 class CashFlowSnapshotItem(UUIDModelMixin, TimeStampedModelMixin):
@@ -1464,6 +1472,46 @@ class SalarySavingsSnapshot(BaseSnapshot):
         return ""
 
     @classmethod
+    def _get_snapshot_window(cls, snapshot_date: date) -> tuple[date, date]:
+        start_date = snapshot_date.replace(day=1)
+        last_day = calendar.monthrange(snapshot_date.year, snapshot_date.month)[1]
+        end_date = snapshot_date.replace(day=last_day)
+        if snapshot_date < end_date:
+            end_date = snapshot_date
+        return start_date, end_date
+
+    @classmethod
+    def _sum_expression(cls, field_name: str):
+        money_field = DecimalField(
+            max_digits=MAX_DIGITS,
+            decimal_places=MAX_DECIMAL_PLACES,
+        )
+        return Coalesce(
+            Sum(field_name),
+            Value(Decimal("0"), output_field=money_field),
+            output_field=money_field,
+        )
+
+    @staticmethod
+    def _build_snapshot_kwargs(
+        *,
+        flow: "SalarySavingsFlow",
+        name: str | None,
+        total_salary: Decimal,
+        total_savings: Decimal,
+    ) -> dict[str, object]:
+        savings_rate = (
+            total_savings / total_salary if total_salary > 0 else Decimal("0")
+        )
+        return {
+            "flow": flow,
+            "name": name or "",
+            "total_salary": total_salary,
+            "total_savings": total_savings,
+            "savings_rate": savings_rate,
+        }
+
+    @classmethod
     def _prepare_snapshot_data(
         cls,
         *,
@@ -1473,38 +1521,24 @@ class SalarySavingsSnapshot(BaseSnapshot):
     ) -> tuple[date, dict[str, object], list[object]]:
         flow = kwargs["flow"]
         snapshot_date = snapshot_date or timezone.now().date()  # pyright: ignore[reportAssignmentType]
-        start_date = snapshot_date.replace(day=1)
-        last_day = calendar.monthrange(snapshot_date.year, snapshot_date.month)[1]
-        end_date = snapshot_date.replace(day=last_day)
-        if snapshot_date < end_date:
-            end_date = snapshot_date
+        start_date, end_date = cls._get_snapshot_window(snapshot_date)
 
-        totals = list(
-            flow.entries.filter(  # pyright: ignore[reportAttributeAccessIssue]
-                entry_date__gte=start_date,
-                entry_date__lte=end_date,
-            ).values_list("salary_amount", "savings_amount")
+        totals = flow.entries.filter(  # pyright: ignore[reportAttributeAccessIssue]
+            entry_date__gte=start_date,
+            entry_date__lte=end_date,
+        ).aggregate(
+            total_salary=cls._sum_expression("salary_amount"),
+            total_savings=cls._sum_expression("savings_amount"),
         )
 
-        total_salary = sum(
-            ((salary or Decimal("0")) for salary, _ in totals),
-            Decimal("0"),
+        total_salary = totals["total_salary"] or Decimal("0")
+        total_savings = totals["total_savings"] or Decimal("0")
+        snapshot_kwargs = cls._build_snapshot_kwargs(
+            flow=flow,  # pyright: ignore[reportArgumentType]
+            name=name,
+            total_salary=total_salary,
+            total_savings=total_savings,
         )
-        total_savings = sum(
-            ((savings or Decimal("0")) for _, savings in totals),
-            Decimal("0"),
-        )
-        savings_rate = (
-            total_savings / total_salary if total_salary > 0 else Decimal("0")
-        )
-
-        snapshot_kwargs = {
-            "flow": flow,
-            "name": name or "",
-            "total_salary": total_salary,
-            "total_savings": total_savings,
-            "savings_rate": savings_rate,
-        }
         return snapshot_date, snapshot_kwargs, []
 
     @classmethod
@@ -1516,14 +1550,38 @@ class SalarySavingsSnapshot(BaseSnapshot):
     ) -> list["SalarySavingsSnapshot"]:
         from core.services.portfolio import generate_unique_slug
 
+        flows = list(flows)
+        if not flows:
+            return []
+
+        final_date = snapshot_date or timezone.now().date()
+        start_date, end_date = cls._get_snapshot_window(final_date)
+        totals_by_flow_id = {
+            row["flow_id"]: row
+            for row in SalarySavingsEntry.objects.filter(
+                flow_id__in=[flow.pk for flow in flows],
+                entry_date__gte=start_date,
+                entry_date__lte=end_date,
+            )
+            .values("flow_id")
+            .annotate(
+                total_salary=cls._sum_expression("salary_amount"),
+                total_savings=cls._sum_expression("savings_amount"),
+            )
+        }
+
         snapshots = []
         generated_slugs = set()
 
         for flow in flows:
-            final_date, snapshot_kwargs, _ = cls._prepare_snapshot_data(
+            totals = totals_by_flow_id.get(flow.pk, {})
+            total_salary = totals.get("total_salary", Decimal("0"))
+            total_savings = totals.get("total_savings", Decimal("0"))
+            snapshot_kwargs = cls._build_snapshot_kwargs(
                 flow=flow,
-                snapshot_date=snapshot_date,
                 name=name,
+                total_salary=total_salary,
+                total_savings=total_savings,
             )
 
             snapshot = cls(
@@ -1548,7 +1606,10 @@ class SalarySavingsSnapshot(BaseSnapshot):
 
             snapshots.append(snapshot)
 
-        return cls.objects.bulk_create(snapshots, batch_size=500)  # pyright: ignore[reportReturnType]
+        return cls.objects.bulk_create(
+            snapshots,
+            batch_size=BULK_CREATE_BATCH_SIZE,
+        )  # pyright: ignore[reportReturnType]
 
 
 class DividendComparison(SlugMixin, UUIDModelMixin, TimeStampedModelMixin):
@@ -1665,6 +1726,7 @@ class DividendPayment(UUIDModelMixin, TimeStampedModelMixin):
         if dividends_to_create_or_update:
             Dividend.objects.bulk_create(
                 dividends_to_create_or_update,
+                batch_size=BULK_CREATE_BATCH_SIZE,
                 update_conflicts=True,
                 unique_fields=["payment", "currency"],
                 update_fields=["per_share_net_amount", "total_net_amount"],
@@ -2013,9 +2075,15 @@ class DividendSnapshot(BaseSnapshot):
                 )
 
         if asset_items:
-            DividendSnapshotAssetItem.objects.bulk_create(asset_items)
+            DividendSnapshotAssetItem.objects.bulk_create(
+                asset_items,
+                batch_size=BULK_CREATE_BATCH_SIZE,
+            )
         if payment_items:
-            DividendSnapshotPaymentItem.objects.bulk_create(payment_items)
+            DividendSnapshotPaymentItem.objects.bulk_create(
+                payment_items,
+                batch_size=BULK_CREATE_BATCH_SIZE,
+            )
 
 
 class DividendSnapshotAssetItem(UUIDModelMixin, TimeStampedModelMixin):
