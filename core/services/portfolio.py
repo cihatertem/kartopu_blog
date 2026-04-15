@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections import Counter
 import secrets
 import string
 from datetime import date
@@ -71,12 +72,48 @@ def _build_slug_base(name: str, max_length: int) -> str:
     return base[:max_base_length]
 
 
+def _generate_slug_candidate(base: str) -> str:
+    hash_part = "".join(
+        secrets.choice(SLUG_HASH_ALPHABET) for _ in range(SLUG_HASH_LENGTH)
+    )
+    return f"{base}#{hash_part}"
+
+
 def generate_unique_slug(model_cls: type[models.Model], name: str) -> str:
     base = _build_slug_base(name, max_length=255)
     while True:
-        hash_part = "".join(
-            secrets.choice(SLUG_HASH_ALPHABET) for _ in range(SLUG_HASH_LENGTH)
-        )
-        slug = f"{base}#{hash_part}"
+        slug = _generate_slug_candidate(base)
         if not model_cls.objects.filter(slug=slug).exists():
             return slug
+
+
+def generate_unique_slugs(model_cls: type[models.Model], names: list[str]) -> list[str]:
+    if not names:
+        return []
+
+    bases = [_build_slug_base(name, max_length=255) for name in names]
+    resolved_slugs: list[str | None] = [None] * len(names)
+    pending_indexes = list(range(len(names)))
+
+    while pending_indexes:
+        candidate_map = {
+            index: _generate_slug_candidate(bases[index]) for index in pending_indexes
+        }
+        candidate_counts = Counter(candidate_map.values())
+        existing_slugs = set(
+            model_cls.objects.filter(slug__in=list(candidate_map.values())).values_list(
+                "slug",
+                flat=True,
+            )
+        )
+
+        next_pending_indexes: list[int] = []
+        for index, candidate in candidate_map.items():
+            if candidate in existing_slugs or candidate_counts[candidate] > 1:
+                next_pending_indexes.append(index)
+                continue
+            resolved_slugs[index] = candidate
+
+        pending_indexes = next_pending_indexes
+
+    return [slug for slug in resolved_slugs if slug is not None]

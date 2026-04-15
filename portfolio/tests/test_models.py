@@ -578,6 +578,28 @@ class SnapshotFallbackNameTests(ModelsTestCase):
         )
         self.assertEqual(snapshot.name, "Custom Name")
 
+    @patch.object(
+        PortfolioSnapshot,
+        "_create_snapshot_items",
+        side_effect=RuntimeError("item creation failed"),
+    )
+    def test_create_snapshot_rolls_back_when_item_creation_fails(
+        self, mock_create_items
+    ):
+        portfolio = Portfolio.objects.create(
+            owner=self.user, name="Rollback Portfolio", target_value=1000
+        )
+
+        with self.assertRaises(RuntimeError):
+            PortfolioSnapshot.create_snapshot(
+                portfolio=portfolio,
+                period=PortfolioSnapshot.Period.MONTHLY,
+                snapshot_date=datetime.date(2023, 1, 1),
+            )
+
+        self.assertEqual(PortfolioSnapshot.objects.count(), 0)
+        mock_create_items.assert_called_once()
+
 
 class FxRateTests(ModelsTestCase):
     def setUp(self):

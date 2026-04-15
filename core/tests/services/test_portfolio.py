@@ -12,6 +12,7 @@ from core.services.portfolio import (
     format_comparison_label,
     format_snapshot_label,
     generate_unique_slug,
+    generate_unique_slugs,
 )
 
 
@@ -412,6 +413,40 @@ class PortfolioServicesTest(TestCase):
         self.assertEqual(slug, "length-check#zzzzzz")
         self.assertEqual(len(observed_alphabets), SLUG_HASH_LENGTH)
         self.assertEqual(observed_alphabets, [SLUG_HASH_ALPHABET] * SLUG_HASH_LENGTH)
+
+    @patch("core.services.portfolio.secrets.choice")
+    def test_generate_unique_slugs_retries_db_and_batch_collisions(self, mock_choice):
+        from blog.models import Category
+
+        existing_slug = "batch-name#aaaaaa"
+        Category.objects.create(name="Existing", slug=existing_slug)
+
+        mock_choice.side_effect = (
+            ["a"] * 6
+            + ["a"] * 6
+            + ["c"] * 6
+            + ["b"] * 6
+            + ["d"] * 6
+        )
+
+        slugs = generate_unique_slugs(
+            Category,
+            ["Batch Name", "Batch Name", "Other Name"],
+        )
+
+        self.assertEqual(
+            slugs,
+            [
+                "batch-name#bbbbbb",
+                "batch-name#dddddd",
+                "other-name#cccccc",
+            ],
+        )
+
+    def test_generate_unique_slugs_returns_empty_for_empty_input(self):
+        from blog.models import Category
+
+        self.assertEqual(generate_unique_slugs(Category, []), [])
 
     def test__build_slug_base_empty_name(self):
         base = _build_slug_base("", max_length=255)

@@ -7,8 +7,8 @@ from decimal import Decimal
 from django.conf import settings
 from django.core.cache import cache
 from django.core.exceptions import ValidationError
-from django.db import models
-from django.db.models import DecimalField, QuerySet, Sum, Value
+from django.db import models, transaction
+from django.db.models import DecimalField, Q, QuerySet, Sum, Value
 from django.db.models.functions import Coalesce
 from django.utils import timezone
 
@@ -18,6 +18,7 @@ from core.services.portfolio import (
     build_snapshot_name,
     format_comparison_label,
     format_snapshot_label,
+    generate_unique_slugs,
 )
 from portfolio.services import (
     calculate_xirr,
@@ -45,11 +46,18 @@ class BaseSnapshot(SlugMixin, UUIDModelMixin, TimeStampedModelMixin):
     def _get_fallback_name(self) -> str:
         return ""
 
+    def _apply_fallback_name(self) -> None:
+        if self.name:
+            return
+        fallback = self._get_fallback_name()
+        if fallback:
+            self.name = fallback
+
+    def _after_snapshot_created(self) -> None:
+        return None
+
     def save(self, *args: object, **kwargs: object) -> None:
-        if not self.name:
-            fallback = self._get_fallback_name()
-            if fallback:
-                self.name = fallback
+        self._apply_fallback_name()
         super().save(*args, **kwargs)  # pyright: ignore[reportArgumentType]
 
     @classmethod
@@ -76,17 +84,109 @@ class BaseSnapshot(SlugMixin, UUIDModelMixin, TimeStampedModelMixin):
             **kwargs,
         )
 
-        snapshot = cls.objects.create(
-            snapshot_date=snapshot_date,
-            **snapshot_kwargs,
-        )
+        with transaction.atomic():
+            snapshot = cls.objects.create(
+                snapshot_date=snapshot_date,
+                **snapshot_kwargs,
+            )
 
-        cls._create_snapshot_items(snapshot, items_data)
+            cls._create_snapshot_items(snapshot, items_data)
 
-        if hasattr(snapshot, "update_irr"):
-            snapshot.update_irr()  # pyright: ignore[reportAttributeAccessIssue]
+            snapshot._after_snapshot_created()
 
         return snapshot
+
+    @classmethod
+    def _bulk_create_instances(
+        cls,
+        model_cls: type[models.Model],
+        instances: list[models.Model],
+    ) -> None:
+        if instances:
+            model_cls.objects.bulk_create(
+                instances,
+                batch_size=BULK_CREATE_BATCH_SIZE,
+            )
+
+    @classmethod
+    def _get_fx_cache_key(
+        cls,
+        source_currency: str,
+        target_currency: str,
+        rate_date: date | None,
+    ) -> str:
+        date_label = rate_date.isoformat() if rate_date else "latest"
+        return f"fx_rate_{source_currency}_{target_currency}_{date_label}"
+
+    @classmethod
+    def _get_cached_fx_rates(
+        cls,
+        source_currencies: set[str],
+        target_currency: str,
+        rate_date: date | None,
+    ) -> dict[tuple[str, str, date | None], Decimal]:
+        fx_rates: dict[tuple[str, str, date | None], Decimal] = {}
+        if not source_currencies:
+            return fx_rates
+
+        uncached_pairs: list[tuple[str, str]] = []
+        cache_key_map = {
+            cls._get_fx_cache_key(source_currency, target_currency, rate_date): (
+                source_currency,
+                (source_currency, target_currency, rate_date),
+            )
+            for source_currency in source_currencies
+        }
+
+        cached_rates = cache.get_many(list(cache_key_map.keys()))
+        for cache_key, (source_currency, currency_pair) in cache_key_map.items():
+            cached_rate = cached_rates.get(cache_key)
+            if cached_rate is not None:
+                fx_rates[currency_pair] = cached_rate  # pyright: ignore[reportArgumentType]
+                continue
+            uncached_pairs.append((source_currency, target_currency))
+
+        if uncached_pairs:
+            fetched_rates = fetch_fx_rates_bulk(uncached_pairs, rate_date=rate_date)
+            for source_currency, target_currency in uncached_pairs:
+                currency_pair = (source_currency, target_currency, rate_date)
+                cache_key = cls._get_fx_cache_key(
+                    source_currency,
+                    target_currency,
+                    rate_date,
+                )
+                fx_rate = (fetched_rates or {}).get(
+                    (source_currency, target_currency),
+                    Decimal("1"),
+                )
+                cache.set(
+                    cache_key,
+                    fx_rate,
+                    timeout=getattr(settings, "CACHE_TIMEOUT", CACHE_TIMEOUT),
+                )
+                fx_rates[currency_pair] = fx_rate  # pyright: ignore[reportArgumentType]
+
+        return fx_rates
+
+    @classmethod
+    def _prepare_for_bulk_create(cls, snapshots: list["BaseSnapshot"]) -> None:
+        for snapshot in snapshots:
+            snapshot._apply_fallback_name()
+
+        snapshots_needing_slugs = [
+            snapshot
+            for snapshot in snapshots
+            if not snapshot.slug and getattr(snapshot, "name", None)
+        ]
+        if not snapshots_needing_slugs:
+            return
+
+        generated_slugs = generate_unique_slugs(
+            cls,
+            [str(snapshot.name) for snapshot in snapshots_needing_slugs],
+        )
+        for snapshot, slug in zip(snapshots_needing_slugs, generated_slugs):
+            snapshot.slug = slug
 
     @classmethod
     def _create_snapshot_items(
@@ -911,27 +1011,27 @@ class PortfolioSnapshot(BaseSnapshot):
             return build_snapshot_name(f"{self.portfolio}", self.snapshot_date)
         return ""
 
+    def _after_snapshot_created(self) -> None:
+        self.update_irr()
+
     def update_irr(self) -> Decimal | None:
         """
         Calculates and updates the irr_pct for this snapshot.
         """
-        has_earlier_snapshot = self.__class__.objects.filter(
-            portfolio=self.portfolio,
-            snapshot_date__lt=self.snapshot_date,
-        ).exists()
-        has_same_day_earlier_snapshot = False
-        if not has_earlier_snapshot and self.pk:
-            has_same_day_earlier_snapshot = (
-                self.__class__.objects.filter(
-                    portfolio=self.portfolio,
+        has_prior_snapshot = (
+            self.__class__.objects.filter(portfolio_id=self.portfolio_id)
+            .exclude(pk=self.pk)
+            .filter(
+                Q(snapshot_date__lt=self.snapshot_date)
+                | Q(
                     snapshot_date=self.snapshot_date,
                     created_at__lt=self.created_at,
                 )
-                .exclude(pk=self.pk)
-                .exists()
             )
+            .exists()
+        )
 
-        if not has_earlier_snapshot and not has_same_day_earlier_snapshot:
+        if not has_prior_snapshot:
             self.irr_pct = None
             self.save(update_fields=["irr_pct", "updated_at"])
             return self.irr_pct
@@ -998,11 +1098,7 @@ class PortfolioSnapshot(BaseSnapshot):
             )
             for position in items_data
         ]
-        if items:
-            PortfolioSnapshotItem.objects.bulk_create(
-                items,
-                batch_size=BULK_CREATE_BATCH_SIZE,
-            )
+        cls._bulk_create_instances(PortfolioSnapshotItem, items)
 
 
 class PortfolioSnapshotItem(UUIDModelMixin, TimeStampedModelMixin):
@@ -1162,53 +1258,24 @@ class CashFlowSnapshot(BaseSnapshot):
     @classmethod
     def _get_fx_rates(
         cls,
-        entries: QuerySet,
+        entries: list[dict[str, object]],
         base_currency: str,
         snapshot_date: date,
     ) -> dict[tuple[str, str, date | None], Decimal]:
-        fx_rates: dict[tuple[str, str, date | None], Decimal] = {}
-        unique_currencies = {
-            entry["currency"] for entry in entries if entry["currency"] != base_currency
-        }
-
-        uncached_pairs = []
-        cache_keys = {}
-
-        for entry_currency in unique_currencies:
-            currency_pair = (entry_currency, base_currency, snapshot_date)
-            cache_key = (
-                f"fx_rate_{entry_currency}_{base_currency}_{snapshot_date.isoformat()}"
-            )
-            cache_keys[cache_key] = (entry_currency, currency_pair)
-
-        if cache_keys:
-            cached_rates = cache.get_many(list(cache_keys.keys()))
-            for cache_key, (entry_currency, currency_pair) in cache_keys.items():
-                cached_rate = cached_rates.get(cache_key)
-                if cached_rate is not None:
-                    fx_rates[currency_pair] = cached_rate  # pyright: ignore[reportArgumentType]
-                else:
-                    uncached_pairs.append((entry_currency, base_currency))
-
-        if uncached_pairs:
-            fetched_rates = fetch_fx_rates_bulk(uncached_pairs, rate_date=snapshot_date)
-            for pair in uncached_pairs:
-                currency_pair = (pair[0], pair[1], snapshot_date)
-                cache_key = f"fx_rate_{pair[0]}_{pair[1]}_{snapshot_date.isoformat()}"
-                fx_rate = (fetched_rates or {}).get(pair, Decimal("1"))
-                cache.set(
-                    cache_key,
-                    fx_rate,
-                    timeout=getattr(settings, "CACHE_TIMEOUT", CACHE_TIMEOUT),
-                )
-                fx_rates[currency_pair] = fx_rate  # pyright: ignore[reportArgumentType]
-
-        return fx_rates
+        return cls._get_cached_fx_rates(
+            {
+                str(entry["currency"])
+                for entry in entries
+                if entry["currency"] != base_currency
+            },
+            base_currency,
+            snapshot_date,
+        )
 
     @classmethod
     def _calculate_category_totals(
         cls,
-        entries: QuerySet,
+        entries: list[dict[str, object]],
         cashflow_currency: str,
         snapshot_date: date,
         fx_rates: dict[tuple[str, str, date | None], Decimal],
@@ -1257,11 +1324,13 @@ class CashFlowSnapshot(BaseSnapshot):
 
         start_date, end_date = cls._get_date_range(snapshot_date, period)  # pyright: ignore[reportArgumentType]
 
-        entries = CashFlowEntry.objects.filter(
-            cashflows=cashflow,  # pyright: ignore[reportArgumentType]
-            entry_date__gte=start_date,
-            entry_date__lte=end_date,
-        ).values("category", "amount", "currency", "entry_date")
+        entries = list(
+            CashFlowEntry.objects.filter(
+                cashflows=cashflow,  # pyright: ignore[reportArgumentType]
+                entry_date__gte=start_date,
+                entry_date__lte=end_date,
+            ).values("category", "amount", "currency")
+        )
 
         fx_rates = cls._get_fx_rates(
             entries,  # pyright: ignore[reportArgumentType]
@@ -1306,11 +1375,7 @@ class CashFlowSnapshot(BaseSnapshot):
             )
             for item in items_data
         ]
-        if objects_to_create:
-            CashFlowSnapshotItem.objects.bulk_create(
-                objects_to_create,
-                batch_size=BULK_CREATE_BATCH_SIZE,
-            )
+        cls._bulk_create_instances(CashFlowSnapshotItem, objects_to_create)
 
 
 class CashFlowSnapshotItem(UUIDModelMixin, TimeStampedModelMixin):
@@ -1548,8 +1613,6 @@ class SalarySavingsSnapshot(BaseSnapshot):
         snapshot_date: date | None = None,
         name: str | None = None,
     ) -> list["SalarySavingsSnapshot"]:
-        from core.services.portfolio import generate_unique_slug
-
         flows = list(flows)
         if not flows:
             return []
@@ -1571,7 +1634,6 @@ class SalarySavingsSnapshot(BaseSnapshot):
         }
 
         snapshots = []
-        generated_slugs = set()
 
         for flow in flows:
             totals = totals_by_flow_id.get(flow.pk, {})
@@ -1588,23 +1650,9 @@ class SalarySavingsSnapshot(BaseSnapshot):
                 snapshot_date=final_date,
                 **snapshot_kwargs,
             )
-
-            if not snapshot.name:
-                fallback = snapshot._get_fallback_name()
-                if fallback:
-                    snapshot.name = fallback
-
-            if not snapshot.slug and getattr(snapshot, "name", None):
-                original_slug = generate_unique_slug(cls, snapshot.name)
-                base_slug = original_slug
-                counter = 1
-                while base_slug in generated_slugs:
-                    base_slug = f"{original_slug}-{counter}"
-                    counter += 1
-                snapshot.slug = base_slug
-                generated_slugs.add(snapshot.slug)
-
             snapshots.append(snapshot)
+
+        cls._prepare_for_bulk_create(snapshots)
 
         return cls.objects.bulk_create(
             snapshots,
@@ -1798,49 +1846,19 @@ class DividendSnapshot(BaseSnapshot):
     @classmethod
     def _get_fx_rates(
         cls,
-        payments: QuerySet,  # pyright: ignore[reportMissingTypeArgument]
+        payments: list["DividendPayment"],
         target_currency: str,
         snapshot_date: date,
     ) -> dict[tuple[str, str, date | None], Decimal]:
-        fx_rates: dict[tuple[str, str, date | None], Decimal] = {}
-
-        unique_currencies = {
-            payment.asset.currency
-            for payment in payments
-            if payment.asset.currency != target_currency
-        }
-
-        uncached_pairs = []
-        cache_keys = {}
-
-        for entry_currency in unique_currencies:
-            currency_pair = (entry_currency, target_currency, snapshot_date)
-            cache_key = f"fx_rate_{entry_currency}_{target_currency}_{snapshot_date.isoformat() if snapshot_date else 'latest'}"
-            cache_keys[cache_key] = (entry_currency, currency_pair)
-
-        if cache_keys:
-            cached_rates = cache.get_many(list(cache_keys.keys()))
-            for cache_key, (entry_currency, currency_pair) in cache_keys.items():
-                cached_rate = cached_rates.get(cache_key)
-                if cached_rate is not None:
-                    fx_rates[currency_pair] = cached_rate  # pyright: ignore[reportArgumentType]
-                else:
-                    uncached_pairs.append((entry_currency, target_currency))
-
-        if uncached_pairs:
-            fetched_rates = fetch_fx_rates_bulk(uncached_pairs, rate_date=snapshot_date)
-            for pair in uncached_pairs:
-                currency_pair = (pair[0], pair[1], snapshot_date)
-                cache_key = f"fx_rate_{pair[0]}_{pair[1]}_{snapshot_date.isoformat() if snapshot_date else 'latest'}"
-                fx_rate = (fetched_rates or {}).get(pair, Decimal("1"))
-                cache.set(
-                    cache_key,
-                    fx_rate,
-                    timeout=getattr(settings, "CACHE_TIMEOUT", CACHE_TIMEOUT),
-                )
-                fx_rates[currency_pair] = fx_rate  # pyright: ignore[reportArgumentType]
-
-        return fx_rates
+        return cls._get_cached_fx_rates(
+            {
+                payment.asset.currency
+                for payment in payments
+                if payment.asset.currency != target_currency
+            },
+            target_currency,
+            snapshot_date,
+        )
 
     @classmethod
     def _build_items_data(
@@ -1930,7 +1948,7 @@ class DividendSnapshot(BaseSnapshot):
     @classmethod
     def _process_payments(
         cls,
-        payments: QuerySet,  # pyright: ignore[reportMissingTypeArgument]
+        payments: list["DividendPayment"],
         currency: str,
         snapshot_date: date,
         fx_rates: dict[tuple[str, str, date | None], Decimal],
@@ -1939,10 +1957,9 @@ class DividendSnapshot(BaseSnapshot):
         asset_totals: dict[str, dict[str, object]] = {}
         payment_rows: list[dict[str, object]] = []
 
-        payments_list = list(payments)
-        dividends_map = cls._get_dividends_map(payments_list, currency)
+        dividends_map = cls._get_dividends_map(payments, currency)
 
-        for payment in payments_list:
+        for payment in payments:
             if (
                 hasattr(payment, "_prefetched_objects_cache")
                 and "dividends" in payment._prefetched_objects_cache
@@ -2007,7 +2024,7 @@ class DividendSnapshot(BaseSnapshot):
         year = kwargs["year"]
         currency = kwargs["currency"]
         snapshot_date = snapshot_date or date(year, 12, 31)  # pyright: ignore[reportArgumentType]
-        payments = (
+        payments = list(
             DividendPayment.objects.select_related("asset")
             .prefetch_related("dividends")
             .filter(payment_date__year=year, payment_date__lte=snapshot_date)
@@ -2075,15 +2092,9 @@ class DividendSnapshot(BaseSnapshot):
                 )
 
         if asset_items:
-            DividendSnapshotAssetItem.objects.bulk_create(
-                asset_items,
-                batch_size=BULK_CREATE_BATCH_SIZE,
-            )
+            cls._bulk_create_instances(DividendSnapshotAssetItem, asset_items)
         if payment_items:
-            DividendSnapshotPaymentItem.objects.bulk_create(
-                payment_items,
-                batch_size=BULK_CREATE_BATCH_SIZE,
-            )
+            cls._bulk_create_instances(DividendSnapshotPaymentItem, payment_items)
 
 
 class DividendSnapshotAssetItem(UUIDModelMixin, TimeStampedModelMixin):
