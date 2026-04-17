@@ -197,7 +197,7 @@ def _render_portfolio_charts_html(snapshot) -> str:
 
     allocation = {
         "labels": [(item.asset.symbol or item.asset.name) for item in items],
-        "values": [_safe_float(item.allocation_pct) * 100 for item in items],  # pyright: ignore[reportOptionalOperand]
+        "values": [_to_float(item.allocation_pct) * 100 for item in items],  # pyright: ignore[reportOptionalOperand]
     }
 
     # If the snapshot belongs to a portfolio that has other snapshots, we can show history.
@@ -220,7 +220,7 @@ def _render_portfolio_charts_html(snapshot) -> str:
 
     timeseries = {
         "labels": [d.isoformat() for d, _ in timeseries_data],
-        "values": [_safe_float(v) for _, v in timeseries_data],
+        "values": [_to_float(v) for _, v in timeseries_data],
     }
     allocation_json = escape(json.dumps(allocation, cls=DjangoJSONEncoder))
     timeseries_json = escape(json.dumps(timeseries, cls=DjangoJSONEncoder))
@@ -264,7 +264,7 @@ def _render_portfolio_category_summary_html(snapshot) -> str:
         asset = item.asset
         label = asset.get_asset_type_display() if asset else "Diğer"
         category_totals[label] = category_totals.get(label, 0) + float(
-            _safe_float(item.allocation_pct) * 100  # pyright: ignore[reportOptionalOperand]
+            _to_float(item.allocation_pct) * 100  # pyright: ignore[reportOptionalOperand]
         )
 
     if not category_totals:
@@ -304,9 +304,9 @@ def _safe_decimal(value) -> Decimal:
 @log_exceptions(
     default=0.0,
     exception_types=(TypeError, ValueError),
-    message="Error in _safe_float",
+    message="Error in _to_float",
 )
-def _safe_float(value) -> float:
+def _to_float(value) -> float:
     return float(value or 0)
 
 
@@ -661,12 +661,12 @@ def _render_portfolio_comparison_charts_html(comparison) -> str:
     payload = {
         "labels": ["Toplam Maliyet", "Toplam Değer"],
         "base": [
-            _safe_float(base.total_cost),
-            _safe_float(base.total_value),
+            _to_float(base.total_cost),
+            _to_float(base.total_value),
         ],
         "compare": [
-            _safe_float(compare.total_cost),
-            _safe_float(compare.total_value),
+            _to_float(compare.total_cost),
+            _to_float(compare.total_value),
         ],
         "base_label": f"{base.snapshot_date}",
         "compare_label": f"{compare.snapshot_date}",
@@ -739,7 +739,7 @@ def _render_cashflow_charts_html(snapshot) -> str:
     )
     allocation = {
         "labels": [item.get_category_display() for item in items],
-        "values": [_safe_float(item.allocation_pct) * 100 for item in items],  # pyright: ignore[reportOptionalOperand]
+        "values": [_to_float(item.allocation_pct) * 100 for item in items],  # pyright: ignore[reportOptionalOperand]
     }
     cashflow = snapshot.cashflow
     if hasattr(cashflow, "prefetched_snapshots"):
@@ -760,7 +760,7 @@ def _render_cashflow_charts_html(snapshot) -> str:
 
     timeseries = {
         "labels": [d.isoformat() for d, _ in timeseries_data],
-        "values": [_safe_float(v) for _, v in timeseries_data],
+        "values": [_to_float(v) for _, v in timeseries_data],
     }
     allocation_json = escape(json.dumps(allocation, cls=DjangoJSONEncoder))
     timeseries_json = escape(json.dumps(timeseries, cls=DjangoJSONEncoder))
@@ -795,7 +795,7 @@ def _render_savings_rate_summary_html(snapshot) -> str:
 
     flow_name = escape(getattr(snapshot.flow, "name", ""))
     snapshot_date = escape(str(snapshot.snapshot_date))
-    savings_rate_pct = escape(f"{_safe_float(snapshot.savings_rate) * 100:.2f}")  # pyright: ignore[reportOptionalOperand]
+    savings_rate_pct = escape(f"{_to_float(snapshot.savings_rate) * 100:.2f}")  # pyright: ignore[reportOptionalOperand]
 
     return f"""
 <section class="savings-rate-snapshot">
@@ -829,7 +829,7 @@ def _render_savings_rate_charts_html(snapshot) -> str:
 
     timeseries = {
         "labels": [d.isoformat() for d, _ in timeseries_data],
-        "values": [_safe_float(rate) * 100 for _, rate in timeseries_data],  # pyright: ignore[reportOptionalOperand]
+        "values": [_to_float(rate) * 100 for _, rate in timeseries_data],  # pyright: ignore[reportOptionalOperand]
     }
     timeseries_json = escape(json.dumps(timeseries, cls=DjangoJSONEncoder))
 
@@ -972,8 +972,8 @@ def _render_cashflow_comparison_charts_html(comparison) -> str:
 
     payload = {
         "labels": ["Toplam Nakit Akışı"],
-        "base": [_safe_float(base.total_amount)],
-        "compare": [_safe_float(compare.total_amount)],
+        "base": [_to_float(base.total_amount)],
+        "compare": [_to_float(compare.total_amount)],
         "base_label": f"{base.snapshot_date}",
         "compare_label": f"{compare.snapshot_date}",
     }
@@ -1030,7 +1030,7 @@ def _render_dividend_charts_html(snapshot) -> str:
     )
     allocation = {
         "labels": [(item.asset.symbol or item.asset.name) for item in items],
-        "values": [_safe_float(item.allocation_pct) * 100 for item in items],  # pyright: ignore[reportOptionalOperand]
+        "values": [_to_float(item.allocation_pct) * 100 for item in items],  # pyright: ignore[reportOptionalOperand]
     }
     allocation_json = escape(json.dumps(allocation, cls=DjangoJSONEncoder))
 
@@ -1365,5 +1365,5 @@ def format_currency(value, currency_code: str | None) -> str:
 
 
 @register.filter
-def safe_float(value) -> float:
-    return _safe_float(value)  # pyright: ignore[reportReturnType]
+def to_float(value) -> float:
+    return _to_float(value)  # pyright: ignore[reportReturnType]

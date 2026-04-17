@@ -172,26 +172,26 @@ class CaptchaIsValidTest(TestCase):
         self.factory = RequestFactory()
 
     def test_valid_captcha(self):
-        """Should return True when POST captcha matches session captcha."""
-        request = self.factory.post("/", {"captcha": "15"})
-        request.session = {CAPTCHA_SESSION_KEY: "15"}
+        """Should return True when POST captcha matches session captcha (case-insensitive)."""
+        request = self.factory.post("/", {"captcha": "ABcDe"})
+        request.session = {CAPTCHA_SESSION_KEY: "aBcDe"}
         self.assertTrue(captcha_is_valid(request))
 
     def test_invalid_captcha(self):
         """Should return False when POST captcha does not match session captcha."""
-        request = self.factory.post("/", {"captcha": "12"})
-        request.session = {CAPTCHA_SESSION_KEY: "15"}
+        request = self.factory.post("/", {"captcha": "XYZ"})
+        request.session = {CAPTCHA_SESSION_KEY: "ABC"}
         self.assertFalse(captcha_is_valid(request))
 
     def test_missing_post_captcha(self):
         """Should return False when POST captcha is missing."""
         request = self.factory.post("/")
-        request.session = {CAPTCHA_SESSION_KEY: "15"}
+        request.session = {CAPTCHA_SESSION_KEY: "ABC"}
         self.assertFalse(captcha_is_valid(request))
 
     def test_missing_session_captcha(self):
         """Should return False when session captcha is missing."""
-        request = self.factory.post("/", {"captcha": "15"})
+        request = self.factory.post("/", {"captcha": "ABC"})
         request.session = {}
         self.assertFalse(captcha_is_valid(request))
 
@@ -206,12 +206,12 @@ class CaptchaIsValidTest(TestCase):
         request = self.factory.post("/")
         request.POST._mutable = True
         request.POST["captcha"] = None
-        request.session = {CAPTCHA_SESSION_KEY: "15"}
+        request.session = {CAPTCHA_SESSION_KEY: "ABC"}
         self.assertFalse(captcha_is_valid(request))
 
     def test_session_captcha_is_explicitly_none(self):
         """Should return False when session captcha value is explicitly None."""
-        request = self.factory.post("/", {"captcha": "15"})
+        request = self.factory.post("/", {"captcha": "ABC"})
         request.session = {CAPTCHA_SESSION_KEY: None}
         self.assertFalse(captcha_is_valid(request))
 
@@ -223,55 +223,22 @@ class CaptchaIsValidTest(TestCase):
         request.session = {CAPTCHA_SESSION_KEY: None}
         self.assertFalse(captcha_is_valid(request))
 
-    def test_non_integer_captcha(self):
-        """Should return False when POST captcha is not an integer."""
-        request = self.factory.post("/", {"captcha": "abc"})
-        request.session = {CAPTCHA_SESSION_KEY: "15"}
-        with self.assertLogs("core.helpers", level="ERROR"):
-            self.assertFalse(captcha_is_valid(request))
-
-    def test_non_integer_session(self):
-        """Should return False when session captcha is not an integer."""
-        request = self.factory.post("/", {"captcha": "15"})
-        request.session = {CAPTCHA_SESSION_KEY: "abc"}
-        with self.assertLogs("core.helpers", level="ERROR"):
-            self.assertFalse(captcha_is_valid(request))
-
-    def test_both_non_integer(self):
-        """Should return False when both captchas are not integers."""
-        request = self.factory.post("/", {"captcha": "abc"})
-        request.session = {CAPTCHA_SESSION_KEY: "abc"}
-        with self.assertLogs("core.helpers", level="ERROR"):
-            self.assertFalse(captcha_is_valid(request))
-
     def test_empty_string_captcha(self):
         """Should return False when POST captcha is an empty string."""
         request = self.factory.post("/", {"captcha": ""})
-        request.session = {CAPTCHA_SESSION_KEY: "15"}
+        request.session = {CAPTCHA_SESSION_KEY: "ABC"}
         self.assertFalse(captcha_is_valid(request))
 
     def test_empty_string_session(self):
         """Should return False when session captcha is an empty string."""
-        request = self.factory.post("/", {"captcha": "15"})
+        request = self.factory.post("/", {"captcha": "ABC"})
         request.session = {CAPTCHA_SESSION_KEY: ""}
         self.assertFalse(captcha_is_valid(request))
 
-    def test_zero_captcha(self):
-        """Should return True when both captchas are zero."""
-        request = self.factory.post("/", {"captcha": "0"})
-        request.session = {CAPTCHA_SESSION_KEY: "0"}
-        self.assertTrue(captcha_is_valid(request))
-
-    def test_negative_captcha(self):
-        """Should return True when both captchas are identical negative integers."""
-        request = self.factory.post("/", {"captcha": "-5"})
-        request.session = {CAPTCHA_SESSION_KEY: "-5"}
-        self.assertTrue(captcha_is_valid(request))
-
     def test_whitespace_captcha(self):
         """Should return True when POST captcha has leading/trailing whitespace but matches."""
-        request = self.factory.post("/", {"captcha": " 15 "})
-        request.session = {CAPTCHA_SESSION_KEY: "15"}
+        request = self.factory.post("/", {"captcha": " ABC "})
+        request.session = {CAPTCHA_SESSION_KEY: "ABC"}
         self.assertTrue(captcha_is_valid(request))
 
 
@@ -280,18 +247,16 @@ class GenerateCaptchaTest(TestCase):
         self.factory = RequestFactory()
 
     def test_generate_captcha(self):
-        """Should return two integers between 1 and 10 and set session correctly."""
+        """Should return base64 encoded image string and set session to a 5 char string."""
         request = self.factory.get("/")
         request.session = {}
 
-        num_one, num_two = _generate_captcha(request)
+        b64_image = _generate_captcha(request)
 
-        self.assertIsInstance(num_one, int)
-        self.assertIsInstance(num_two, int)
-        self.assertGreaterEqual(num_one, 1)
-        self.assertLessEqual(num_one, 10)
-        self.assertGreaterEqual(num_two, 1)
-        self.assertLessEqual(num_two, 10)
+        self.assertIsInstance(b64_image, str)
+        self.assertGreater(len(b64_image), 100)  # Basic check for base64 data length
 
         self.assertIn(CAPTCHA_SESSION_KEY, request.session)
-        self.assertEqual(request.session[CAPTCHA_SESSION_KEY], num_one + num_two)
+        captcha_text = request.session[CAPTCHA_SESSION_KEY]
+        self.assertIsInstance(captcha_text, str)
+        self.assertEqual(len(captcha_text), 5)

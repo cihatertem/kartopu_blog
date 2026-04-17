@@ -94,11 +94,10 @@
         </div>
       </div>
       <div class="comment-form__field captcha">
-        <label for="captcha" class="captcha-question"
-          ><span class="num1">{{ num1 }}</span> +
-          <span class="num2">{{ num2 }}</span> =
+        <label for="captcha" class="captcha-question">
+          <img src="data:image/png;base64,{{ captcha_image }}" alt="Güvenlik Kodu" class="captcha-img">
         </label>
-        <input type="number" id="captcha" name="captcha" class="input-field" placeholder="Toplam ?" required />
+        <input type="text" id="captcha" name="captcha" class="input-field" placeholder="Güvenlik Kodu ?" required />
       </div>
       <button class="button button--primary" type="submit">
         Gönder

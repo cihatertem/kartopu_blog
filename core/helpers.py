@@ -57,17 +57,58 @@ def captcha_is_valid(request) -> bool:
     Returns True if posted captcha matches expected answer in session.
     Missing/invalid values return False.
     """
-    expected = _parse_int(request.session.get(CAPTCHA_SESSION_KEY))
-    got = _parse_int(request.POST.get("captcha"))
+    expected = request.session.get(CAPTCHA_SESSION_KEY)
+    got = request.POST.get("captcha")
 
-    return expected is not None and got is not None and got == expected
+    if not expected or not got:
+        return False
+
+    return str(got).strip().upper() == str(expected).upper()
 
 
 def _generate_captcha(request):
-    num_one = secrets.randbelow(10) + 1
-    num_two = secrets.randbelow(10) + 1
-    request.session[CAPTCHA_SESSION_KEY] = num_one + num_two
-    return num_one, num_two
+    import base64
+    import io
+    import os
+    import string
+
+    from django.conf import settings
+    from PIL import Image, ImageDraw, ImageFont
+
+    FONT_PATH = os.path.join(
+        settings.BASE_DIR, "static", "fonts", "UbuntuMono-Regular.ttf"
+    )
+
+    alphabet = string.ascii_uppercase + string.digits
+    captcha_text = "".join(secrets.choice(alphabet) for _ in range(5))
+
+    img = Image.new("RGB", (100, 40), color=(240, 240, 240))
+    draw = ImageDraw.Draw(img)
+    try:
+        font_size = 20
+        font = ImageFont.truetype(FONT_PATH, font_size)
+    except IOError:
+        # Font dosyası bulunamazsa fallback olarak varsayılanı kullanır
+        font = ImageFont.load_default()
+
+    for _ in range(7):
+        draw.line(
+            [
+                (secrets.randbelow(100), secrets.randbelow(40)),
+                (secrets.randbelow(100), secrets.randbelow(40)),
+            ],
+            fill=(150, 150, 150),
+            width=2,
+        )
+
+    draw.text((25, 10), captcha_text, fill=(50, 50, 50), font=font)
+
+    buf = io.BytesIO()
+    img.save(buf, format="PNG")
+    b64 = base64.b64encode(buf.getvalue()).decode("utf-8")
+
+    request.session[CAPTCHA_SESSION_KEY] = captcha_text
+    return b64
 
 
 def get_safe_referer(request, default: str = "/") -> str:

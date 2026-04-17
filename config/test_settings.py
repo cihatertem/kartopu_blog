@@ -26,7 +26,6 @@ MIGRATION_MODULES = {
     "newsletter": None,
     "portfolio": None,
     "comments": None,
-    "sites": None,
     "redirects": None,
     "socialaccount": None,
     "account": None,
@@ -66,4 +65,5 @@ try:
     django.contrib.postgres.search.SearchVector = MockSearchVector
 except ImportError:
     pass
-ALLOWED_HOSTS = ["*"]
+ALLOWED_HOSTS = ["testserver", "localhost", "127.0.0.1", "[::1]"]
+SECURE_SSL_REDIRECT = False

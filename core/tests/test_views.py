@@ -58,8 +58,8 @@ class ViewsTest(TestCase):
         self.assertTemplateUsed(response, "core/contact.html")
         self.assertEqual(response.context["active_nav"], "contact")
         self.assertIn("form", response.context)
-        self.assertIn("num1", response.context)
-        self.assertIn("num2", response.context)
+        self.assertIn("captcha_image", response.context)
+        self.assertIsInstance(response.context["captcha_image"], str)
 
     def test_contact_view_post_disabled(self):
         self.settings.is_contact_enabled = False
@@ -74,25 +74,25 @@ class ViewsTest(TestCase):
     def test_contact_view_post_invalid_captcha(self):
         url = reverse("core:contact")
         session = self.client.session
-        session[CAPTCHA_SESSION_KEY] = 5
+        session[CAPTCHA_SESSION_KEY] = "ABCDE"
         session.save()
 
-        response = self.client.post(url, {"captcha": "10"})
+        response = self.client.post(url, {"captcha": "WRONG"})
         self.assertRedirects(response, url)
         messages = list(response.wsgi_request._messages)
         self.assertEqual(
-            str(messages[0]), "Toplam alanı boş ya da hatalı. Lütfen tekrar deneyin."
+            str(messages[0]), "Güvenlik kodu boş ya da hatalı. Lütfen tekrar deneyin."
         )
 
     def test_contact_view_post_valid(self):
         url = reverse("core:contact")
 
         session = self.client.session
-        session[CAPTCHA_SESSION_KEY] = 5
+        session[CAPTCHA_SESSION_KEY] = "ABCDE"
         session.save()
 
         data = {
-            "captcha": "5",
+            "captcha": "abcde",
             "name": "Jane",
             "subject": "Greetings",
             "email": "jane@example.com",
@@ -116,11 +116,11 @@ class ViewsTest(TestCase):
         url = reverse("core:contact")
 
         session = self.client.session
-        session[CAPTCHA_SESSION_KEY] = 5
+        session[CAPTCHA_SESSION_KEY] = "ABCDE"
         session.save()
 
         data = {
-            "captcha": "5",
+            "captcha": "ABCDE",
             "name": "Spam",
             "subject": "Spam subject",
             "email": "spam@example.com",
@@ -144,11 +144,11 @@ class ViewsTest(TestCase):
         url = reverse("core:contact")
 
         session = self.client.session
-        session[CAPTCHA_SESSION_KEY] = 5
+        session[CAPTCHA_SESSION_KEY] = "ABCDE"
         session.save()
 
         data = {
-            "captcha": "5",
+            "captcha": "abcde",
         }
 
         response = self.client.post(url, data)

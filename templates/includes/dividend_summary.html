@@ -29,8 +29,8 @@
             <td class="data-table__cell">{{ item.asset.name }}</td>
             <td class="data-table__cell data-table__cell--hide-mobile">{{ item.payment_date|date:"Y-m-d" }}</td>
             <td class="data-table__cell">{{ item.per_share_net_amount|format_currency:currency }}</td>
-            <td class="data-table__cell">{{ item.dividend_yield_on_payment_price|safe_float|mul100|floatformat:2 }}%</td>
-            <td class="data-table__cell data-table__cell--hide-mobile">{{ item.dividend_yield_on_average_cost|safe_float|mul100|floatformat:2 }}%</td>
+            <td class="data-table__cell">{{ item.dividend_yield_on_payment_price|to_float|mul100|floatformat:2 }}%</td>
+            <td class="data-table__cell data-table__cell--hide-mobile">{{ item.dividend_yield_on_average_cost|to_float|mul100|floatformat:2 }}%</td>
             <td class="data-table__cell">{{ item.total_net_amount|format_currency:currency }}</td>
           </tr>
           {% endfor %}
@@ -52,11 +52,11 @@
       </div>
       <div class="dividend-summary-card__row">
         <span>Ödeme Günü Temettü Verimi</span>
-        <strong>{{ item.dividend_yield_on_payment_price|safe_float|mul100|floatformat:2 }}%</strong>
+        <strong>{{ item.dividend_yield_on_payment_price|to_float|mul100|floatformat:2 }}%</strong>
       </div>
       <div class="dividend-summary-card__row">
         <span>Ortalama Maliyet Temettü Verimi</span>
-        <strong>{{ item.dividend_yield_on_average_cost|safe_float|mul100|floatformat:2 }}%</strong>
+        <strong>{{ item.dividend_yield_on_average_cost|to_float|mul100|floatformat:2 }}%</strong>
       </div>
       <div class="dividend-summary-card__row dividend-summary-card__row--total">
         <span>Toplam Net Temettü</span>

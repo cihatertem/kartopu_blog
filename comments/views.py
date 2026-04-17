@@ -2,7 +2,6 @@ from allauth.socialaccount.models import SocialAccount
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.shortcuts import get_object_or_404, redirect
-from django.utils.html import escape
 from django.views.decorators.http import require_POST
 from django_ratelimit.decorators import ratelimit
 
@@ -43,7 +42,7 @@ def _create_comment_from_form(request, form, post, status, parent, social_accoun
     comment.status = status
     comment.parent = parent
     comment.ip_address = get_client_ip(request)
-    comment.user_agent = escape(request.META.get("HTTP_USER_AGENT", ""))[:500]
+    comment.user_agent = str(request.META.get("HTTP_USER_AGENT", ""))[:500]
     comment.social_provider = social_account.provider if social_account else ""
     comment.save()
     return comment

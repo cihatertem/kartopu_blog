@@ -1,6 +1,5 @@
 from django.contrib import messages
 from django.shortcuts import redirect, render
-from django.utils.html import escape
 from django.views.decorators.http import require_http_methods
 from django_ratelimit.decorators import ratelimit
 
@@ -69,7 +68,9 @@ def _handle_contact_post(request, site_settings, form):
         return redirect("core:contact")
 
     if not captcha_is_valid(request):
-        messages.error(request, "Toplam alanı boş ya da hatalı. Lütfen tekrar deneyin.")
+        messages.error(
+            request, "Güvenlik kodu boş ya da hatalı. Lütfen tekrar deneyin."
+        )
         return redirect("core:contact")
 
     request.session.pop(CAPTCHA_SESSION_KEY, None)
@@ -85,9 +86,7 @@ def _handle_contact_post(request, site_settings, form):
             return redirect("core:contact")
 
         contact_message.ip_address = get_client_ip(request)
-        contact_message.user_agent = escape(request.META.get("HTTP_USER_AGENT", ""))[
-            :500
-        ]
+        contact_message.user_agent = str(request.META.get("HTTP_USER_AGENT", ""))[:500]
         contact_message.save()
         messages.success(
             request,
@@ -115,13 +114,12 @@ def contact_view(request):
         if response:
             return response
 
-    num_one, num_two = _generate_captcha(request)
+    captcha_image = _generate_captcha(request)
 
     context = {
         "active_nav": "contact",
         "form": form,
-        "num1": num_one,
-        "num2": num_two,
+        "captcha_image": captcha_image,
     }
 
     return render(request, "core/contact.html", context)
