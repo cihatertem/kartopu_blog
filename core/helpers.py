@@ -22,7 +22,10 @@ def get_client_ip(request) -> str | None:
     if not remote:
         return None
 
-    ra = ipaddress.ip_address(remote)
+    try:
+        ra = ipaddress.ip_address(remote)
+    except ValueError:
+        return remote
 
     trusted_nets = getattr(settings, "TRUSTED_PROXY_NETS", None) or []
 

@@ -58,8 +58,15 @@ class GetClientIPTest(TestCase):
         request = self.factory.get("/")
         request.META["REMOTE_ADDR"] = "invalid-ip"
 
-        with self.assertRaises(ValueError):
-            get_client_ip(request)
+        # Instead of ValueError, we expect the fallback logic to return the raw invalid string
+        self.assertEqual(get_client_ip(request), "invalid-ip")
+
+    def test_malformed_ip_list_in_remote_addr(self):
+        request = self.factory.get("/")
+        request.META["REMOTE_ADDR"] = "192.168.1.10, 10.0.0.5"
+
+        # Should fall back to the string itself
+        self.assertEqual(get_client_ip(request), "192.168.1.10, 10.0.0.5")
 
     def test_client_ip_key_with_ip(self):
         request = self.factory.get("/")
@@ -192,6 +199,28 @@ class CaptchaIsValidTest(TestCase):
         """Should return False when both POST and session captchas are missing."""
         request = self.factory.post("/")
         request.session = {}
+        self.assertFalse(captcha_is_valid(request))
+
+    def test_post_captcha_is_explicitly_none(self):
+        """Should return False when POST captcha value is explicitly None."""
+        request = self.factory.post("/")
+        request.POST._mutable = True
+        request.POST["captcha"] = None
+        request.session = {CAPTCHA_SESSION_KEY: "15"}
+        self.assertFalse(captcha_is_valid(request))
+
+    def test_session_captcha_is_explicitly_none(self):
+        """Should return False when session captcha value is explicitly None."""
+        request = self.factory.post("/", {"captcha": "15"})
+        request.session = {CAPTCHA_SESSION_KEY: None}
+        self.assertFalse(captcha_is_valid(request))
+
+    def test_both_explicitly_none(self):
+        """Should return False when both session and POST captchas are explicitly None."""
+        request = self.factory.post("/")
+        request.POST._mutable = True
+        request.POST["captcha"] = None
+        request.session = {CAPTCHA_SESSION_KEY: None}
         self.assertFalse(captcha_is_valid(request))
 
     def test_non_integer_captcha(self):

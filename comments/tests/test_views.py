@@ -9,10 +9,40 @@ from django.urls import reverse
 
 from blog.models import BlogPost, Category
 from comments.models import Comment
-from comments.views import _validate_parent_comment
+from comments.views import _get_comment_status, _validate_parent_comment
 from core.models import SiteSettings
 
 User = get_user_model()
+
+
+class GetCommentStatusTests(TestCase):
+    def setUp(self):
+        class MockForm:
+            def __init__(self, cleaned_data=None):
+                self.cleaned_data = cleaned_data or {}
+
+        self.MockForm = MockForm
+
+    def test_staff_user_with_website_is_approved(self):
+        # Even if a staff user leaves a website, it shouldn't be marked as spam
+        form = self.MockForm(cleaned_data={"website": "https://example.com"})
+        status = _get_comment_status(form, is_staff=True)
+        self.assertEqual(status, Comment.Status.APPROVED)
+
+    def test_staff_user_without_website_is_approved(self):
+        form = self.MockForm(cleaned_data={})
+        status = _get_comment_status(form, is_staff=True)
+        self.assertEqual(status, Comment.Status.APPROVED)
+
+    def test_regular_user_with_website_is_spam(self):
+        form = self.MockForm(cleaned_data={"website": "https://spam.com"})
+        status = _get_comment_status(form, is_staff=False)
+        self.assertEqual(status, Comment.Status.SPAM)
+
+    def test_regular_user_without_website_is_pending(self):
+        form = self.MockForm(cleaned_data={})
+        status = _get_comment_status(form, is_staff=False)
+        self.assertEqual(status, Comment.Status.PENDING)
 
 
 @override_settings(RATELIMIT_ENABLE=False)

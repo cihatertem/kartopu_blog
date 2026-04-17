@@ -17,10 +17,17 @@ media/
 
 # OS
 .DS_Store
+.bash_history
+.python_history
 
 # Env
 .env
 #.env.*
+
+# Backups and temporary files
+*.sql
+*.patch
+bakim.html
 
 # Docker
 pgdata/

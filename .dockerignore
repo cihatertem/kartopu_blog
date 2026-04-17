@@ -55,13 +55,18 @@ htmlcov/
 .coverage.*
 .pytest_cache/
 
+# Tests (don't need them in prod)
+**/tests/
+
+# Project documentation & misc
 git_oncesi_notlar.md
 yol_haritasi.md
 README.md
-codex.patch
-jules.patch
+*.patch
 .python-version
 kartopu_local_backup.sql
 aws_setup_and_swarm_services_settings.md
 GEMINI.md
 AGENTS.md
+bakim.html
+.bash_history

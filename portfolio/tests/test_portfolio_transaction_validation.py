@@ -2,6 +2,7 @@ import datetime
 from decimal import Decimal
 
 from django.contrib.auth import get_user_model
+from django.core.exceptions import ValidationError
 from django.test import TestCase
 
 from portfolio.models import Asset, Portfolio, PortfolioTransaction
@@ -33,8 +34,54 @@ class PortfolioTransactionTests(TestCase):
             quantity=Decimal("10"),
             price_per_unit=Decimal("10"),
         )
-        with self.assertRaises(Exception):  # Assuming ValidationError is raised
+        with self.assertRaises(ValidationError) as context:
             tx.full_clean()
+        self.assertIn(
+            "Sermaye artırımı oranı 0'dan büyük olmalıdır.", str(context.exception)
+        )
+
+    def test_rights_exercised_missing_rate(self):
+        tx = PortfolioTransaction(
+            asset=self.asset,
+            transaction_type=PortfolioTransaction.TransactionType.RIGHTS_EXERCISED,
+            trade_date=datetime.date(2024, 1, 1),
+            quantity=Decimal("10"),
+            price_per_unit=Decimal("10"),
+        )
+        with self.assertRaises(ValidationError) as context:
+            tx.full_clean()
+        self.assertIn(
+            "Sermaye artırımı oranı 0'dan büyük olmalıdır.", str(context.exception)
+        )
+
+    def test_rights_not_exercised_missing_rate(self):
+        tx = PortfolioTransaction(
+            asset=self.asset,
+            transaction_type=PortfolioTransaction.TransactionType.RIGHTS_NOT_EXERCISED,
+            trade_date=datetime.date(2024, 1, 1),
+            quantity=Decimal("10"),
+            price_per_unit=Decimal("10"),
+        )
+        with self.assertRaises(ValidationError) as context:
+            tx.full_clean()
+        self.assertIn(
+            "Sermaye artırımı oranı 0'dan büyük olmalıdır.", str(context.exception)
+        )
+
+    def test_capital_increase_negative_rate(self):
+        tx = PortfolioTransaction(
+            asset=self.asset,
+            transaction_type=PortfolioTransaction.TransactionType.BONUS_CAPITAL_INCREASE,
+            trade_date=datetime.date(2024, 1, 1),
+            quantity=Decimal("10"),
+            price_per_unit=Decimal("10"),
+            capital_increase_rate_pct=Decimal("-5"),
+        )
+        with self.assertRaises(ValidationError) as context:
+            tx.full_clean()
+        self.assertIn(
+            "Sermaye artırımı oranı 0'dan büyük olmalıdır.", str(context.exception)
+        )
 
     def test_buy_transaction_with_valid_data(self):
         tx = PortfolioTransaction.objects.create(

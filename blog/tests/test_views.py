@@ -1,3 +1,4 @@
+import datetime
 import json
 from unittest.mock import MagicMock, patch
 
@@ -407,9 +408,63 @@ class ViewHelperTests(TestCase):
             self.assertIn("archives", context)
             self.assertEqual(len(context["archives"]), 1)
 
+    def test_archive_index_multiple_months(self):
+        user = User.objects.create_user(
+            email="archive_multi@example.com", password="password"
+        )
+
+        dates = [
+            timezone.datetime(2023, 1, 15, tzinfo=datetime.timezone.utc),
+            timezone.datetime(2023, 1, 20, tzinfo=datetime.timezone.utc),
+            timezone.datetime(2023, 2, 10, tzinfo=datetime.timezone.utc),
+            timezone.datetime(2022, 12, 5, tzinfo=datetime.timezone.utc),
+        ]
+
+        for i, dt in enumerate(dates):
+            BlogPost.objects.create(
+                title=f"ArchMulti{i}",
+                author=user,
+                status=BlogPost.Status.PUBLISHED,
+                published_at=dt,
+            )
+
+        # Create an unpublished post to ensure it's excluded
+        BlogPost.objects.create(
+            title="Unpublished",
+            author=user,
+            status=BlogPost.Status.DRAFT,
+            published_at=timezone.datetime(2023, 1, 10, tzinfo=datetime.timezone.utc),
+        )
+
+        request = RequestFactory().get("/blog/archive/")
+
+        with patch("blog.views.render") as mock_render:
+            mock_render.return_value = "mock_html"
+            resp = archive_index(request)
+            self.assertEqual(resp, "mock_html")
+
+            args, kwargs = mock_render.call_args
+            context = args[2]
+            self.assertIn("archives", context)
+
+            archives = list(context["archives"])
+            self.assertEqual(len(archives), 3)
+
+            self.assertEqual(archives[0]["year"], 2023)
+            self.assertEqual(archives[0]["month"], 2)
+            self.assertEqual(archives[0]["count"], 1)
+
+            self.assertEqual(archives[1]["year"], 2023)
+            self.assertEqual(archives[1]["month"], 1)
+            self.assertEqual(archives[1]["count"], 2)
+
+            self.assertEqual(archives[2]["year"], 2022)
+            self.assertEqual(archives[2]["month"], 12)
+            self.assertEqual(archives[2]["count"], 1)
+
     def test_search_results_empty_query(self):
         url = reverse("blog:search_results")
-        response = self.client.get(url, {"q": ""})
+        response = self.client.get(url, {"q": ""}, follow=True)
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "Arama yapmak için en az bir kelime gir.")
         self.assertEqual(len(response.context["page_obj"]), 0)
