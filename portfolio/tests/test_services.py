@@ -237,6 +237,18 @@ class FetchYahooFinancePriceTests(TestCase):
 
 
 class YahooFinanceHelperTests(TestCase):
+    def setUp(self):
+        super().setUp()
+        import logging
+
+        self.services_logger = logging.getLogger("portfolio.services")
+        patcher_err = patch.object(self.services_logger, "error")
+        patcher_exc = patch.object(self.services_logger, "exception")
+        self.mock_logger_error = patcher_err.start()
+        self.mock_logger_exception = patcher_exc.start()
+        self.addCleanup(patcher_err.stop)
+        self.addCleanup(patcher_exc.stop)
+
     @patch("portfolio.services.yf.Ticker")
     def test_get_ticker_returns_ticker_instance(self, mock_ticker_cls):
         mock_ticker = MagicMock()

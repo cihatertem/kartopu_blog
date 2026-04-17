@@ -15,6 +15,18 @@ from portfolio.services import (
 
 
 class ServicesEdgeCaseTests(TestCase):
+    def setUp(self):
+        super().setUp()
+        import logging
+
+        self.services_logger = logging.getLogger("portfolio.services")
+        patcher_err = patch.object(self.services_logger, "error")
+        patcher_exc = patch.object(self.services_logger, "exception")
+        self.mock_logger_error = patcher_err.start()
+        self.mock_logger_exception = patcher_exc.start()
+        self.addCleanup(patcher_err.stop)
+        self.addCleanup(patcher_exc.stop)
+
     def test_safe_decimal_conversion(self) -> None:
         """Test _safe_decimal with various inputs."""
         self.assertEqual(_safe_decimal(10.5), Decimal("10.5"))
