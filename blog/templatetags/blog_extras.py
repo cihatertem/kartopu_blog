@@ -25,7 +25,7 @@ GENERIC_PATTERN = re.compile(
 
 def _to_json_attribute(obj) -> str:
     """Safe JSON string serialization for HTML data attributes without HTML entity escaping."""
-    json_str = json.dumps(obj, cls=DjangoJSONEncoder)
+    json_str = json.dumps(obj, cls=DjangoJSONEncoder, separators=(",", ":"))
     return json_str.translate(
         {
             ord("<"): "\\u003c",
