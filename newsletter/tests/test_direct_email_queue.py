@@ -63,13 +63,14 @@ class DirectEmailQueueTest(TestCase):
             self.assertEqual(queue_item.direct_email.subject, f"Bulk Subject {i}")
             self.assertEqual(queue_item.status, EmailQueueStatus.PENDING)
 
+    @patch("sys.stdout.write")
     @patch(
         "newsletter.management.commands.process_email_queue.Command._acquire_lock",
         return_value=True,
     )
     @patch("newsletter.management.commands.process_email_queue.Command._release_lock")
     def test_process_queue_with_direct_email_attachments(
-        self, mock_release, mock_acquire
+        self, mock_release, mock_acquire, mock_stdout
     ):
         direct_email = DirectEmail.objects.create(
             to_email="recipient@example.com",
@@ -133,12 +134,13 @@ class DirectEmailTest(TestCase):
         EmailQueue.objects.all().delete()
         DirectEmail.objects.all().delete()
 
+    @patch("sys.stdout.write")
     @patch(
         "newsletter.management.commands.process_email_queue.Command._acquire_lock",
         return_value=True,
     )
     @patch("newsletter.management.commands.process_email_queue.Command._release_lock")
-    def test_send_direct_email(self, mock_release, mock_acquire):
+    def test_send_direct_email(self, mock_release, mock_acquire, mock_stdout):
         direct_email = DirectEmail.objects.create(
             to_email="recipient@example.com",
             subject="Direct Subject Test Direct",

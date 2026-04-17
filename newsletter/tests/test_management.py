@@ -164,11 +164,11 @@ class ProcessEmailQueueCommandTest(TestCase):
         self.assertTrue(mail.outbox[1].attachments[0][0].startswith("test1"))
         self.assertTrue(mail.outbox[1].attachments[0][0].endswith(".txt"))
 
-    def test_daemon_mode(self):
+    @patch("sys.stdout.write")
+    def test_daemon_mode(self, mock_stdout):
         with patch("time.sleep") as mock_sleep:
             mock_sleep.side_effect = KeyboardInterrupt
-            with patch("sys.stdout.write") as mock_stdout:
-                call_command("process_email_queue", daemon=True)
+            call_command("process_email_queue", daemon=True)
 
             self.assertTrue(
                 any(
@@ -209,23 +209,23 @@ class ProcessEmailQueueCommandTest(TestCase):
         args, kwargs = mock_sleep.call_args
         self.assertAlmostEqual(args[0], 0.05, places=2)
 
-    def test_daemon_mode_no_emails_sleep(self):
+    @patch("sys.stdout.write")
+    def test_daemon_mode_no_emails_sleep(self, mock_stdout):
         with patch("time.sleep") as mock_sleep:
             mock_sleep.side_effect = KeyboardInterrupt
-            with patch("sys.stdout.write"):
-                call_command("process_email_queue", daemon=True, sleep=3)
+            call_command("process_email_queue", daemon=True, sleep=3)
             mock_sleep.assert_called_once_with(3)
 
-    def test_daemon_mode_no_emails_continue(self):
+    @patch("sys.stdout.write")
+    def test_daemon_mode_no_emails_continue(self, mock_stdout):
         with patch("time.sleep") as mock_sleep:
             mock_sleep.side_effect = [None, KeyboardInterrupt]
-            with patch("sys.stdout.write"):
-                call_command("process_email_queue", daemon=True, sleep=3)
+            call_command("process_email_queue", daemon=True, sleep=3)
             self.assertEqual(mock_sleep.call_count, 2)
 
-    def test_no_pending_emails(self):
-        with patch("sys.stdout.write") as mock_stdout:
-            call_command("process_email_queue", rate=100)
+    @patch("sys.stdout.write")
+    def test_no_pending_emails(self, mock_stdout):
+        call_command("process_email_queue", rate=100)
 
         self.assertTrue(
             any(
