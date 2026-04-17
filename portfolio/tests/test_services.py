@@ -319,6 +319,26 @@ class FetchMultipleFXRatesBulkTests(TestCase):
             },
         )
 
+    @patch("portfolio.services.yf.download")
+    def test_empty_valid_dates(self, mock_download):
+        from datetime import timedelta
+
+        mock_download.return_value = pd.DataFrame()
+        pairs_by_date = {None: {("USD", "TRY")}}
+
+        result = fetch_multiple_fx_rates_bulk(pairs_by_date)
+
+        expected_start = date.today() - timedelta(days=5)
+        expected_end = date.today() + timedelta(days=1)
+        mock_download.assert_called_once_with(
+            ["USDTRY=X"],
+            start=expected_start,
+            end=expected_end,
+            progress=False,
+            interval="1d",
+        )
+        self.assertEqual(result, {})
+
     @patch("portfolio.services.logger.exception")
     @patch("portfolio.services.yf.download")
     def test_yf_download_exception(self, mock_download, mock_logger_exception):

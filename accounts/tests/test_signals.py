@@ -285,7 +285,14 @@ class UserSignalTests(TestCase):
         from django.core.files.storage import default_storage
 
         user = User.objects.create_user(email="delete-me@example.com")
-        user.avatar.save("to_be_deleted.jpg", ContentFile(b"image data"), save=True)
+        import io
+
+        from PIL import Image
+
+        file = io.BytesIO()
+        image = Image.new("RGB", (100, 100), "white")
+        image.save(file, "JPEG")
+        user.avatar.save("to_be_deleted.jpg", ContentFile(file.getvalue()), save=True)
         avatar_name = user.avatar.name
 
         self.assertTrue(default_storage.exists(avatar_name))

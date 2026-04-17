@@ -1,5 +1,6 @@
 import datetime
 from decimal import Decimal
+from unittest.mock import patch
 
 from django.contrib.auth import get_user_model
 from django.core.exceptions import ValidationError
@@ -93,3 +94,41 @@ class PortfolioTransactionTests(TestCase):
         )
         tx.portfolios.add(self.portfolio)
         self.assertEqual(tx.total_cost, Decimal("1000"))
+
+    @patch("portfolio.models.Asset.refresh_price")
+    def test_portfolio_transaction_save_handles_asset_refresh_failure(
+        self, mock_refresh_price
+    ):
+        mock_refresh_price.side_effect = Exception("API Error")
+
+        # Set asset price properties to None to trigger refresh_price in tx.save()
+        self.asset.current_price = None
+        self.asset.price_updated_at = None
+        self.asset.save(update_fields=["current_price", "price_updated_at"])
+
+        tx = PortfolioTransaction(
+            asset=self.asset,
+            transaction_type=PortfolioTransaction.TransactionType.BUY,
+            trade_date=datetime.date(2024, 1, 1),
+            quantity=Decimal("10"),
+            price_per_unit=Decimal("100"),
+        )
+
+        import logging
+
+        # Suppress log noise by capturing the expected exception log.
+        # It logs at ERROR level because log_exceptions without include_traceback defaults to logger.error.
+        with self.assertLogs("portfolio.models", level=logging.ERROR) as cm:
+            try:
+                tx.save()
+            except Exception as e:
+                self.fail(f"tx.save() raised an unexpected exception: {e}")
+
+        self.assertTrue(
+            any(
+                "Error updating asset price during Transaction Save" in log
+                for log in cm.output
+            )
+        )
+        mock_refresh_price.assert_called_once()
+        self.assertIsNotNone(tx.pk)

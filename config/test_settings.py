@@ -1,5 +1,3 @@
-import django.contrib.postgres.indexes
-import django.contrib.postgres.search
 from django.db import models
 from django.db.models.expressions import Expression
 
@@ -46,7 +44,12 @@ class MockGinIndex(models.Index):
         return ""
 
 
-django.contrib.postgres.indexes.GinIndex = MockGinIndex
+try:
+    import django.contrib.postgres.indexes
+
+    django.contrib.postgres.indexes.GinIndex = MockGinIndex
+except ImportError:
+    pass
 
 
 class MockSearchVector(Expression):
@@ -57,5 +60,10 @@ class MockSearchVector(Expression):
         return self
 
 
-django.contrib.postgres.search.SearchVector = MockSearchVector
+try:
+    import django.contrib.postgres.search
+
+    django.contrib.postgres.search.SearchVector = MockSearchVector
+except ImportError:
+    pass
 ALLOWED_HOSTS = ["*"]

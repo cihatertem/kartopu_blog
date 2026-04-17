@@ -33,9 +33,16 @@ def _delete_storage_dir_if_exists(path: str) -> None:
     if not path:
         return
 
-    directories, files = default_storage.listdir(path)
+    try:
+        directories, files = default_storage.listdir(path)
+    except Exception:
+        return
+
     for file_name in files:
-        default_storage.delete(os.path.join(path, file_name))
+        try:
+            default_storage.delete(os.path.join(path, file_name))
+        except Exception:
+            pass
     for directory in directories:
         _delete_storage_dir_if_exists(os.path.join(path, directory))
 

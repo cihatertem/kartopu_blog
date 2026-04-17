@@ -12,6 +12,7 @@ from django.db.models import DecimalField, Q, QuerySet, Sum, Value
 from django.db.models.functions import Coalesce
 from django.utils import timezone
 
+from core.decorators import log_exceptions
 from core.mixins import SlugMixin, TimeStampedModelMixin, UUIDModelMixin
 from core.services.portfolio import (
     build_comparison_name,
@@ -943,12 +944,16 @@ class PortfolioTransaction(UUIDModelMixin, TimeStampedModelMixin):
                 }
             )
 
+    @log_exceptions(message="Error updating asset price during Transaction Save: %s")
+    def _refresh_asset_price(self) -> None:
+        self.asset.refresh_price()
+        self.asset.save(
+            update_fields=["current_price", "price_updated_at", "updated_at"]
+        )
+
     def save(self, *args: object, **kwargs: object) -> None:
         if not self.asset.current_price or not self.asset.price_updated_at:
-            self.asset.refresh_price()
-            self.asset.save(
-                update_fields=["current_price", "price_updated_at", "updated_at"]
-            )
+            self._refresh_asset_price()
 
         super().save(*args, **kwargs)  # pyright: ignore[reportArgumentType]
 

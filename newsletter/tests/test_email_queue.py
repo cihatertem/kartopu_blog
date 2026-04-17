@@ -51,9 +51,15 @@ class EmailQueueTest(TestCase):
         self.assertEqual(len(mail.outbox), 0)
 
     def test_send_post_published_with_cover_image(self):
-        from django.core.files.uploadedfile import SimpleUploadedFile
+        import io
 
-        self.post.cover_image = SimpleUploadedFile("cover.jpg", b"fake data")
+        from django.core.files.uploadedfile import SimpleUploadedFile
+        from PIL import Image
+
+        file = io.BytesIO()
+        image = Image.new("RGB", (100, 100), "white")
+        image.save(file, "JPEG")
+        self.post.cover_image = SimpleUploadedFile("cover.jpg", file.getvalue())
         # Mock cover_rendition
         self.post.cover_rendition = {"src": "/media/blog/test-post/cover.webp"}
         self.post.save()

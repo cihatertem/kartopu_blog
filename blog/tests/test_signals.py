@@ -85,6 +85,38 @@ class BlogSignalsTests(TestCase):
         self.assertIsNone(_delete_storage_dir_if_exists(""))
         self.assertIsNone(_delete_storage_dir_if_exists(None))
 
+    @patch("blog.signals.default_storage")
+    def test_delete_storage_dir_if_exists_listdir_exception(self, mock_storage):
+        def listdir_side_effect(path):
+            if path == "my_dir":
+                return (["subdir1", "subdir2"], [])
+            elif path == "my_dir/subdir1":
+                raise Exception("listdir failed")
+            elif path == "my_dir/subdir2":
+                return ([], ["file.jpg"])
+            return ([], [])
+
+        mock_storage.listdir.side_effect = listdir_side_effect
+        _delete_storage_dir_if_exists("my_dir")
+
+        mock_storage.delete.assert_called_once_with("my_dir/subdir2/file.jpg")
+
+    @patch("blog.signals.default_storage")
+    def test_delete_storage_dir_if_exists_delete_exception(self, mock_storage):
+        mock_storage.listdir.return_value = ([], ["file1.jpg", "file2.jpg"])
+
+        def delete_side_effect(path):
+            if path == "my_dir/file1.jpg":
+                raise Exception("delete failed")
+
+        mock_storage.delete.side_effect = delete_side_effect
+
+        _delete_storage_dir_if_exists("my_dir")
+
+        mock_storage.delete.assert_any_call("my_dir/file1.jpg")
+        mock_storage.delete.assert_any_call("my_dir/file2.jpg")
+        self.assertEqual(mock_storage.delete.call_count, 2)
+
     def test_post_media_dir_empty_settings(self):
         with self.settings(MEDIA_ROOT=""):
             self.assertEqual(_post_media_dir(self.post), "")
