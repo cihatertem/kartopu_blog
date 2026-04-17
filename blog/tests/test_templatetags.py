@@ -130,10 +130,8 @@ class TestRenderHTMLFunctions(TestCase):
         html = _render_portfolio_irr_charts_html(s)
         self.assertIn("portfolio-irr-charts", html)
         s.portfolio.get_irr_history.assert_called_once_with(until_date=s.snapshot_date)
-        self.assertIn(
-            "&quot;labels&quot;: [&quot;2024-12-01&quot;, &quot;2025-01-01&quot;]", html
-        )
-        self.assertIn("&quot;values&quot;: [&quot;5.5&quot;, &quot;10.2&quot;]", html)
+        self.assertIn('"labels": ["2024-12-01", "2025-01-01"]', html)
+        self.assertIn('"values": ["5.5", "10.2"]', html)
 
     def test_render_portfolio_irr_charts_html_empty(self):
         s = DummySnapshot()
@@ -141,8 +139,8 @@ class TestRenderHTMLFunctions(TestCase):
         s.portfolio.get_irr_history.return_value = []
         html = _render_portfolio_irr_charts_html(s)
         self.assertIn("portfolio-irr-charts", html)
-        self.assertIn("&quot;labels&quot;: []", html)
-        self.assertIn("&quot;values&quot;: []", html)
+        self.assertIn('"labels": []', html)
+        self.assertIn('"values": []', html)
 
     @patch("blog.templatetags.blog_extras._render_portfolio_irr_charts_html")
     @patch("blog.templatetags.blog_extras._get_item_by_identifier")

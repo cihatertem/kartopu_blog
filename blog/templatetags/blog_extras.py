@@ -23,6 +23,19 @@ GENERIC_PATTERN = re.compile(
 )
 
 
+def _to_json_attribute(obj) -> str:
+    """Safe JSON string serialization for HTML data attributes without HTML entity escaping."""
+    json_str = json.dumps(obj, cls=DjangoJSONEncoder)
+    return json_str.translate(
+        {
+            ord("<"): "\\u003c",
+            ord(">"): "\\u003e",
+            ord("&"): "\\u0026",
+            ord("'"): "\\u0027",
+        }
+    )
+
+
 @register.filter
 def absolute_url(path: str, base_url: str) -> str:
     if not path:
@@ -165,10 +178,10 @@ def _render_portfolio_irr_charts_html(snapshot) -> str:
         "labels": [item["date"] for item in irr_history],
         "values": [item["irr"] for item in irr_history],
     }
-    timeseries_json = escape(json.dumps(timeseries, cls=DjangoJSONEncoder))
+    timeseries_json = _to_json_attribute(timeseries)
 
     return """
-<section class="chart-section portfolio-irr-charts" data-portfolio-irr="{timeseries_json}">
+<section class="chart-section portfolio-irr-charts" data-portfolio-irr='{timeseries_json}'>
   <div class="chart-fallback portfolio-irr-chart-fallback is-hidden">
     Grafikler yüklenemedi. (Tarayıcı eklentisi / ağ politikası / CSP engelliyor olabilir.)
   </div>
@@ -222,11 +235,11 @@ def _render_portfolio_charts_html(snapshot) -> str:
         "labels": [d.isoformat() for d, _ in timeseries_data],
         "values": [_to_float(v) for _, v in timeseries_data],
     }
-    allocation_json = escape(json.dumps(allocation, cls=DjangoJSONEncoder))
-    timeseries_json = escape(json.dumps(timeseries, cls=DjangoJSONEncoder))
+    allocation_json = _to_json_attribute(allocation)
+    timeseries_json = _to_json_attribute(timeseries)
 
     return """
-<section class="chart-section portfolio-charts" data-portfolio-allocation="{allocation_json}" data-portfolio-timeseries="{timeseries_json}">
+<section class="chart-section portfolio-charts" data-portfolio-allocation='{allocation_json}' data-portfolio-timeseries='{timeseries_json}'>
   <div class="chart-fallback portfolio-chart-fallback is-hidden">
     Grafikler yüklenemedi. (Tarayıcı eklentisi / ağ politikası / CSP engelliyor olabilir.)
   </div>
@@ -275,10 +288,10 @@ def _render_portfolio_category_summary_html(snapshot) -> str:
         "labels": [label for label, _ in sorted_items],
         "values": [value for _, value in sorted_items],
     }
-    allocation_json = escape(json.dumps(allocation, cls=DjangoJSONEncoder))
+    allocation_json = _to_json_attribute(allocation)
 
     return """
-<section class="chart-section portfolio-category-charts" data-portfolio-category-allocation="{allocation_json}">
+<section class="chart-section portfolio-category-charts" data-portfolio-category-allocation='{allocation_json}'>
   <div class="chart-fallback portfolio-category-chart-fallback is-hidden">
     Grafikler yüklenemedi. (Tarayıcı eklentisi / ağ politikası / CSP engelliyor olabilir.)
   </div>
@@ -671,10 +684,10 @@ def _render_portfolio_comparison_charts_html(comparison) -> str:
         "base_label": f"{base.snapshot_date}",
         "compare_label": f"{compare.snapshot_date}",
     }
-    comparison_json = escape(json.dumps(payload, cls=DjangoJSONEncoder))
+    comparison_json = _to_json_attribute(payload)
 
     return """
-<section class="chart-section portfolio-comparison-charts" data-portfolio-comparison="{comparison_json}">
+<section class="chart-section portfolio-comparison-charts" data-portfolio-comparison='{comparison_json}'>
   <div class="chart-fallback portfolio-comparison-chart-fallback is-hidden">
     Grafikler yüklenemedi. (Tarayıcı eklentisi / ağ politikası / CSP engelliyor olabilir.)
   </div>
@@ -762,11 +775,11 @@ def _render_cashflow_charts_html(snapshot) -> str:
         "labels": [d.isoformat() for d, _ in timeseries_data],
         "values": [_to_float(v) for _, v in timeseries_data],
     }
-    allocation_json = escape(json.dumps(allocation, cls=DjangoJSONEncoder))
-    timeseries_json = escape(json.dumps(timeseries, cls=DjangoJSONEncoder))
+    allocation_json = _to_json_attribute(allocation)
+    timeseries_json = _to_json_attribute(timeseries)
 
     return """
-<section class="chart-section cashflow-charts" data-cashflow-allocation="{allocation_json}" data-cashflow-timeseries="{timeseries_json}">
+<section class="chart-section cashflow-charts" data-cashflow-allocation='{allocation_json}' data-cashflow-timeseries='{timeseries_json}'>
   <div class="chart-fallback cashflow-chart-fallback is-hidden">
     Grafikler yüklenemedi. (Tarayıcı eklentisi / ağ politikası / CSP engelliyor olabilir.)
   </div>
@@ -831,10 +844,10 @@ def _render_savings_rate_charts_html(snapshot) -> str:
         "labels": [d.isoformat() for d, _ in timeseries_data],
         "values": [_to_float(rate) * 100 for _, rate in timeseries_data],  # pyright: ignore[reportOptionalOperand]
     }
-    timeseries_json = escape(json.dumps(timeseries, cls=DjangoJSONEncoder))
+    timeseries_json = _to_json_attribute(timeseries)
 
     return """
-<section class="chart-section savings-rate-charts" data-savings-rate-timeseries="{timeseries_json}">
+<section class="chart-section savings-rate-charts" data-savings-rate-timeseries='{timeseries_json}'>
   <div class="chart-fallback savings-rate-chart-fallback is-hidden">
     Grafikler yüklenemedi. (Tarayıcı eklentisi / ağ politikası / CSP engelliyor olabilir.)
   </div>
@@ -977,10 +990,10 @@ def _render_cashflow_comparison_charts_html(comparison) -> str:
         "base_label": f"{base.snapshot_date}",
         "compare_label": f"{compare.snapshot_date}",
     }
-    comparison_json = escape(json.dumps(payload, cls=DjangoJSONEncoder))
+    comparison_json = _to_json_attribute(payload)
 
     return """
-<section class="chart-section cashflow-comparison-charts" data-cashflow-comparison="{comparison_json}">
+<section class="chart-section cashflow-comparison-charts" data-cashflow-comparison='{comparison_json}'>
   <div class="chart-fallback cashflow-comparison-chart-fallback is-hidden">
     Grafikler yüklenemedi. (Tarayıcı eklentisi / ağ politikası / CSP engelliyor olabilir.)
   </div>
@@ -1032,10 +1045,10 @@ def _render_dividend_charts_html(snapshot) -> str:
         "labels": [(item.asset.symbol or item.asset.name) for item in items],
         "values": [_to_float(item.allocation_pct) * 100 for item in items],  # pyright: ignore[reportOptionalOperand]
     }
-    allocation_json = escape(json.dumps(allocation, cls=DjangoJSONEncoder))
+    allocation_json = _to_json_attribute(allocation)
 
     return """
-<section class="chart-section dividend-charts" data-dividend-allocation="{allocation_json}">
+<section class="chart-section dividend-charts" data-dividend-allocation='{allocation_json}'>
   <div class="chart-fallback dividend-chart-fallback is-hidden">
     Grafikler yüklenemedi. (Tarayıcı eklentisi / ağ politikası / CSP engelliyor olabilir.)
   </div>
