@@ -1,9 +1,11 @@
+import secrets
+
 from django.db import models
 from django.db.models.expressions import Expression
 
 from config.settings import *
 
-SECRET_KEY = "django-insecure-test-key"
+SECRET_KEY = secrets.token_urlsafe(50)
 
 DATABASES = {
     "default": {

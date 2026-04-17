@@ -25,6 +25,13 @@ def get_swarm_secret_for_psg(key: str, default: str = "") -> str:
     return value.strip("\n")
 
 
+def get_samesite_setting(env_var: str, default="Lax") -> str:
+    value = os.getenv(env_var, default).title()
+    if value in ["Lax", "Strict", "None"]:
+        return value
+    return default
+
+
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
@@ -420,7 +427,7 @@ if not DEBUG:
     CSRF_COOKIE_SECURE = True
     CSRF_COOKIE_HTTPONLY = True
     CSRF_COOKIE_PATH = "/"
-    CSRF_COOKIE_SAMESITE = os.getenv("DJANGO_CSRF_COOKIE_SAMESITE", "Lax")
+    CSRF_COOKIE_SAMESITE = get_samesite_setting("DJANGO_CSRF_COOKIE_SAMESITE")
     CSRF_TRUSTED_ORIGINS = [
         f"https://{host}" for host in ALLOWED_HOSTS
     ]  # e.g. ["https://example.com"]
@@ -429,7 +436,7 @@ if not DEBUG:
     SESSION_COOKIE_SECURE = True
     SESSION_COOKIE_HTTPONLY = True
     SESSION_COOKIE_PATH = "/"
-    SESSION_COOKIE_SAMESITE = os.getenv("DJANGO_SESSION_COOKIE_SAMESITE", "Lax")
+    SESSION_COOKIE_SAMESITE = get_samesite_setting("DJANGO_SESSION_COOKIE_SAMESITE")
 
     SECURE_SSL_REDIRECT = True
     SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")

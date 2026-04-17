@@ -90,15 +90,23 @@ class SnapshotSwapAdminMixin:
     @admin.action(description="Base/Compare snapshotlarını değiştir")
     def swap_snapshots(self, request, queryset):
         updated = 0
+        comparisons_to_update = []
+        now = timezone.now()
         for comparison in queryset:
             comparison.base_snapshot, comparison.compare_snapshot = (
                 comparison.compare_snapshot,
                 comparison.base_snapshot,
             )
-            comparison.save(
-                update_fields=["base_snapshot", "compare_snapshot", "updated_at"]
-            )
+            comparison.updated_at = now
+            comparisons_to_update.append(comparison)
             updated += 1
+
+        if comparisons_to_update:
+            queryset.model.objects.bulk_update(
+                comparisons_to_update,
+                fields=["base_snapshot", "compare_snapshot", "updated_at"],
+            )
+
         self.message_user(  # pyright: ignore[reportAttributeAccessIssue]
             request,
             f"{updated} karşılaştırma güncellendi.",

@@ -190,14 +190,23 @@ class ProcessEmailQueueCommandTest(TestCase):
         def fake_time():
             if not hasattr(fake_time, "count"):
                 fake_time.count = 0
-            res = 1.0 if fake_time.count == 0 else 1.05
+            # Return 1.0 consistently to ensure target_start_time > current time
+            # For i=1, target is 1.1, time is 1.0, wait is 0.1
+            res = 1.0
             fake_time.count += 1
             return res
 
         mock_time.side_effect = fake_time
 
         EmailQueue.objects.create(
-            subject="Test Sleep",
+            subject="Test Sleep 1",
+            from_email="from@example.com",
+            to_email="to@example.com",
+            text_body="body",
+            status=EmailQueueStatus.PENDING,
+        )
+        EmailQueue.objects.create(
+            subject="Test Sleep 2",
             from_email="from@example.com",
             to_email="to@example.com",
             text_body="body",
@@ -206,8 +215,11 @@ class ProcessEmailQueueCommandTest(TestCase):
 
         call_command("process_email_queue", rate=10)
         self.assertTrue(mock_sleep.called)
-        args, kwargs = mock_sleep.call_args
-        self.assertAlmostEqual(args[0], 0.05, places=2)
+
+        # mock_sleep is called for i=0: wait=0, NO SLEEP
+        # i=1: target=1.1, time=1.0, wait=0.1 -> sleep(0.1)
+        sleep_args = [call.args[0] for call in mock_sleep.call_args_list]
+        self.assertTrue(any(abs(arg - 0.1) < 1e-5 for arg in sleep_args))
 
     @patch("sys.stdout.write")
     def test_daemon_mode_no_emails_sleep(self, mock_stdout):

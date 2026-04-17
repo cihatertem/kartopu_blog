@@ -90,6 +90,15 @@ class Command(BaseCommand):
             .order_by("created_at")
         )
 
+    def _delayed_send_email_task(
+        self, email_item, attachment_cache_local, target_start_time: float
+    ):
+        """Sleeps until target_start_time and then sends the email."""
+        wait = target_start_time - time.time()
+        if wait > 0:
+            time.sleep(wait)
+        return self._send_email_task(email_item, attachment_cache_local)
+
     def _send_email_task(self, email_item, attachment_cache_local):
         """Builds and sends an individual email with attachments."""
         try:
@@ -187,18 +196,17 @@ class Command(BaseCommand):
         max_workers = min(100, max(10, rate))
 
         with ThreadPoolExecutor(max_workers=max_workers) as executor:
-            for email_item in pending_emails:
-                start_time = time.time()
+            batch_start_time = time.time()
 
+            for i, email_item in enumerate(pending_emails):
+                target_start_time = batch_start_time + (i * send_interval)
                 future = executor.submit(
-                    self._send_email_task, email_item, attachment_cache
+                    self._delayed_send_email_task,
+                    email_item,
+                    attachment_cache,
+                    target_start_time,
                 )
                 futures.append(future)
-
-                elapsed = time.time() - start_time
-                wait = send_interval - elapsed
-                if wait > 0:
-                    time.sleep(wait)
 
             for future in as_completed(futures):
                 sent_count, failed_count = self._handle_future_result(
