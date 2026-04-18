@@ -116,6 +116,51 @@ class ProcessEmailQueueCommandTest(TestCase):
         self.assertEqual(email.error_message, "SMTP Connection Error")
         self.assertEqual(len(mail.outbox), 0)
 
+    @patch("sys.stderr.write")
+    @patch("sys.stdout.write")
+    @patch("django.core.mail.EmailMultiAlternatives.send")
+    def test_failing_email_continues_execution(
+        self, mock_send, mock_stdout, mock_stderr
+    ):
+        import smtplib
+
+        mock_send.side_effect = [
+            smtplib.SMTPException("SMTP Connection Error"),
+            None,
+        ]
+
+        email_failed = EmailQueue.objects.create(
+            subject="Test Error",
+            from_email="from@example.com",
+            to_email="to@example.com",
+            text_body="body",
+            status=EmailQueueStatus.PENDING,
+        )
+        email_success = EmailQueue.objects.create(
+            subject="Test Success",
+            from_email="from@example.com",
+            to_email="to2@example.com",
+            text_body="body",
+            status=EmailQueueStatus.PENDING,
+        )
+
+        call_command("process_email_queue", rate=100)
+
+        email_failed.refresh_from_db()
+        email_success.refresh_from_db()
+
+        self.assertEqual(email_failed.status, EmailQueueStatus.FAILED)
+        self.assertEqual(email_failed.error_message, "SMTP Connection Error")
+
+        self.assertEqual(email_success.status, EmailQueueStatus.SENT)
+
+        self.assertTrue(
+            any(
+                "SMTP Connection Error" in call.args[0]
+                for call in mock_stderr.call_args_list
+            )
+        )
+
     @patch("sys.stdout.write")
     def test_direct_email_attachments(self, mock_stdout):
         from django.core.files.uploadedfile import SimpleUploadedFile
