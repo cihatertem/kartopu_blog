@@ -137,10 +137,10 @@
   {% include "includes/share_widget.html" %}
 
   <!-- Post Navigation Section -->
-  {% include "blog/includes/post_navigation.html" %}
+  {% include "includes/post_navigation.html" %}
 
   <!-- Tags Section -->
-  {% if post.tags.exists %}
+  {% if post.tags.all %}
     <hr />
 
     <section>

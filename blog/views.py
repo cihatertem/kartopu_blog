@@ -407,16 +407,24 @@ def _get_dividend_prefetches():
 
 
 def _post_detail_queryset():
-    return BlogPost.objects.select_related(
-        "category",
-        "author",
-    ).prefetch_related(
-        "tags",
-        "images",
-        *_get_portfolio_prefetches(),
-        *_get_cashflow_prefetches(),
-        *_get_salary_savings_prefetches(),
-        *_get_dividend_prefetches(),
+    return (
+        BlogPost.objects.select_related(
+            "category",
+            "author",
+            "previous_post",
+        )
+        .prefetch_related(
+            "tags",
+            "images",
+            Prefetch(
+                "next_posts", queryset=BlogPost.objects.defer("content", "excerpt")
+            ),
+            *_get_portfolio_prefetches(),
+            *_get_cashflow_prefetches(),
+            *_get_salary_savings_prefetches(),
+            *_get_dividend_prefetches(),
+        )
+        .defer("previous_post__content", "previous_post__excerpt")
     )
 
 

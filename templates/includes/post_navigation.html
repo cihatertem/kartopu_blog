@@ -1,6 +1,6 @@
 {% load static %}
 
-{% if post.previous_post or post.next_posts.exists %}
+{% if post.previous_post or post.next_posts.all %}
   <nav class="post-navigation">
     {% if post.previous_post %}
       <a href="{{ post.previous_post.get_absolute_url }}" class="nav-card prev-card">
@@ -23,8 +23,8 @@
       </a>
     {% endif %}
 
-    {% if post.next_posts.exists %}
-      {% with next_post=post.next_posts.first %}
+    {% if post.next_posts.all %}
+      {% with next_post=post.next_posts.all|first %}
         <a href="{{ next_post.get_absolute_url }}" class="nav-card next-card">
           <div class="nav-content">
             <span class="nav-label">
