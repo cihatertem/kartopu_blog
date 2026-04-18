@@ -83,6 +83,7 @@ class BlogPostAdmin(admin.ModelAdmin):
     prepopulated_fields = {"slug": ("title",)}
     autocomplete_fields = (
         "category",
+        "previous_post",
         "portfolio_snapshots",
         "portfolio_comparisons",
         "cashflow_snapshots",
@@ -103,6 +104,7 @@ class BlogPostAdmin(admin.ModelAdmin):
                     "slug",
                     "author",
                     "category",
+                    "previous_post",
                     "portfolio_snapshots",
                     "portfolio_comparisons",
                     "cashflow_snapshots",
@@ -147,6 +149,12 @@ class BlogPostAdmin(admin.ModelAdmin):
             qs = qs.filter(socialaccount__isnull=True)
             qs = qs.distinct()
 
+            kwargs["queryset"] = qs
+        elif db_field.name == "previous_post":
+            obj = getattr(request, "_obj_", None)
+            qs = BlogPost.objects.filter(status=BlogPost.Status.PUBLISHED)
+            if obj and obj.pk:
+                qs = qs.exclude(pk=obj.pk)
             kwargs["queryset"] = qs
 
         return super().formfield_for_foreignkey(db_field, request, **kwargs)
@@ -218,6 +226,15 @@ class BlogPostAdmin(admin.ModelAdmin):
             _comment_count=Count("comments", distinct=True),
         )
         return queryset
+
+    def get_search_results(self, request, queryset, search_term):
+        queryset, use_distinct = super().get_search_results(
+            request, queryset, search_term
+        )
+        # Sadece yayınlanmış yazıları getir
+        if request.GET.get("field_name") == "previous_post":
+            queryset = queryset.filter(status=BlogPost.Status.PUBLISHED)
+        return queryset, use_distinct
 
     @admin.display(description="Tepki", ordering="_reaction_count")
     def reaction_count(self, obj):

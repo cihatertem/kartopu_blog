@@ -267,6 +267,15 @@ class BlogPost(
         help_text="Bu yazı ile ilişkili temettü karşılaştırmaları",
     )
 
+    previous_post = models.ForeignKey(
+        "self",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="next_posts",
+        help_text="Önceki yazı (seri takibi için)",
+    )
+
     class Meta:  # pyright: ignore[reportIncompatibleVariableOverride]
         ordering = ["-published_at", "-created_at"]
         verbose_name = "Blog Yazısı"

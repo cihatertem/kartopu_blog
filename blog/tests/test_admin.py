@@ -169,6 +169,32 @@ class BlogAdminTests(TestCase):
         )
         self.assertNotIn(normal_user, qs)
 
+    def test_formfield_for_foreignkey_previous_post(self):
+        model_admin = BlogPostAdmin(BlogPost, self.site)
+        request = MockRequest()
+
+        # Published post that can be chosen
+        post_pub = BlogPost.objects.create(
+            title="Pub", author=self.admin_user, status=BlogPost.Status.PUBLISHED
+        )
+        # Draft post that should NOT be chosen
+        post_draft = BlogPost.objects.create(
+            title="Draft", author=self.admin_user, status=BlogPost.Status.DRAFT
+        )
+
+        db_field = BlogPost._meta.get_field("previous_post")
+
+        # Test for new post (no obj)
+        formfield = model_admin.formfield_for_foreignkey(db_field, request)
+        self.assertIn(post_pub, formfield.queryset)
+        self.assertNotIn(post_draft, formfield.queryset)
+
+        # Test for existing post (exclude itself)
+        request._obj_ = self.post
+        formfield = model_admin.formfield_for_foreignkey(db_field, request)
+        self.assertIn(post_pub, formfield.queryset)
+        self.assertNotIn(self.post, formfield.queryset)
+
     def test_get_changeform_initial_data(self):
         model_admin = BlogPostAdmin(BlogPost, self.site)
         request = self.factory.get("/")

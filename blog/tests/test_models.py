@@ -188,3 +188,15 @@ class BlogModelsTests(TestCase):
         path3 = post_image_upload_path(bpi, "FILE NAME.png")
         self.assertTrue(path3.startswith("blog/path-test/images/file-name_"))
         self.assertTrue(path3.endswith(".png"))
+
+    def test_blogpost_previous_post(self):
+        post1 = BlogPost.objects.create(title="First Post", author=self.user)
+        post2 = BlogPost.objects.create(
+            title="Second Post", author=self.user, previous_post=post1
+        )
+        self.assertEqual(post2.previous_post, post1)
+        self.assertIn(post2, post1.next_posts.all())
+
+        post1.delete()
+        post2.refresh_from_db()
+        self.assertIsNone(post2.previous_post)
