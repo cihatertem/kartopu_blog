@@ -1280,6 +1280,19 @@ MARKER_MAP = {
 }
 
 
+def _process_image_marker(arg: str | None, images: list) -> str:
+    """Markdown metni içindeki {{ image:1 }} etiketini isler ve HTML'e cevirir."""
+    if not arg:
+        return ""
+    try:
+        index = int(arg) - 1
+    except ValueError:
+        return ""
+    if index < 0 or index >= len(images):
+        return ""
+    return _render_responsive_image_figure(images[index])
+
+
 @register.simple_tag(takes_context=True)
 def render_post_body(context, post):
     """BlogPost içeriğini (markdown) render eder; image + portfolio placeholder'larını genişletir.
@@ -1331,15 +1344,7 @@ def render_post_body(context, post):
         arg = match.group("arg")
 
         if tag == "image":
-            if not arg:
-                return ""
-            try:
-                index = int(arg) - 1
-            except ValueError:
-                return ""
-            if index < 0 or index >= len(images):
-                return ""
-            return _render_responsive_image_figure(images[index])
+            return _process_image_marker(arg, images)
 
         elif tag == "legal_disclaimer":
             return legal_disclaimer_html

@@ -765,6 +765,46 @@ class Portfolio(UUIDModelMixin, TimeStampedModelMixin):
             Decimal("0"),
         )
 
+    def _process_irr_transaction(
+        self,
+        tx: "PortfolioTransaction",
+        fx_rate: Decimal,
+        tx_cash_flows: list[tuple[date, Decimal]],
+        asset_quantities: dict[str, Decimal],
+    ) -> None:
+        asset_id_str = str(tx.asset_id)  # pyright: ignore[reportAttributeAccessIssue]
+        current_quantity = asset_quantities.get(asset_id_str, Decimal("0"))
+
+        rights_quantity = self._calculate_capital_increase_quantity(
+            current_quantity=current_quantity,
+            increase_rate_pct=tx.capital_increase_rate_pct,
+        )
+        amount = tx.total_cost * fx_rate
+        if tx.transaction_type == PortfolioTransaction.TransactionType.BUY:
+            tx_cash_flows.append((tx.trade_date, -amount))
+        elif (
+            tx.transaction_type == PortfolioTransaction.TransactionType.RIGHTS_EXERCISED
+        ):
+            rights_cost = rights_quantity * tx.price_per_unit * fx_rate
+            tx_cash_flows.append((tx.trade_date, -rights_cost))
+        elif tx.transaction_type == PortfolioTransaction.TransactionType.SELL:
+            tx_cash_flows.append((tx.trade_date, amount))
+
+        if tx.transaction_type == PortfolioTransaction.TransactionType.BUY:
+            current_quantity += tx.quantity
+        elif tx.transaction_type == PortfolioTransaction.TransactionType.SELL:
+            current_quantity -= tx.quantity
+        elif tx.transaction_type in (
+            PortfolioTransaction.TransactionType.BONUS_CAPITAL_INCREASE,
+            PortfolioTransaction.TransactionType.RIGHTS_EXERCISED,
+        ):
+            current_quantity += rights_quantity
+
+        if current_quantity < 0:
+            current_quantity = Decimal("0")
+
+        asset_quantities[asset_id_str] = current_quantity
+
     def _build_irr_cash_flows(
         self,
         transactions: list["PortfolioTransaction"] | QuerySet["PortfolioTransaction"],
@@ -779,40 +819,12 @@ class Portfolio(UUIDModelMixin, TimeStampedModelMixin):
             fx_rate = self._get_or_fetch_fx_rate(
                 fx_rates, tx.asset.currency, self.currency, tx.trade_date
             )
-
-            asset_id_str = str(tx.asset_id)  # pyright: ignore[reportAttributeAccessIssue]
-            current_quantity = asset_quantities.get(asset_id_str, Decimal("0"))
-
-            rights_quantity = self._calculate_capital_increase_quantity(
-                current_quantity=current_quantity,
-                increase_rate_pct=tx.capital_increase_rate_pct,
+            self._process_irr_transaction(
+                tx=tx,
+                fx_rate=fx_rate,
+                tx_cash_flows=tx_cash_flows,
+                asset_quantities=asset_quantities,
             )
-            amount = tx.total_cost * fx_rate
-            if tx.transaction_type == PortfolioTransaction.TransactionType.BUY:
-                tx_cash_flows.append((tx.trade_date, -amount))
-            elif (
-                tx.transaction_type
-                == PortfolioTransaction.TransactionType.RIGHTS_EXERCISED
-            ):
-                rights_cost = rights_quantity * tx.price_per_unit * fx_rate
-                tx_cash_flows.append((tx.trade_date, -rights_cost))
-            elif tx.transaction_type == PortfolioTransaction.TransactionType.SELL:
-                tx_cash_flows.append((tx.trade_date, amount))
-
-            if tx.transaction_type == PortfolioTransaction.TransactionType.BUY:
-                current_quantity += tx.quantity
-            elif tx.transaction_type == PortfolioTransaction.TransactionType.SELL:
-                current_quantity -= tx.quantity
-            elif tx.transaction_type in (
-                PortfolioTransaction.TransactionType.BONUS_CAPITAL_INCREASE,
-                PortfolioTransaction.TransactionType.RIGHTS_EXERCISED,
-            ):
-                current_quantity += rights_quantity
-
-            if current_quantity < 0:
-                current_quantity = Decimal("0")
-
-            asset_quantities[asset_id_str] = current_quantity
 
         return tx_cash_flows
 
