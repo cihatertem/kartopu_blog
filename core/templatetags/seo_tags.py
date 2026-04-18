@@ -85,6 +85,35 @@ def _get_search_seo_data(seo, context, site_name):
     seo["description"] = f"'{query}' için arama sonuçları."
 
 
+def _fetch_page_seo_data(path):
+    page_seo = (
+        PageSEO.objects.filter(
+            Q(path=path) | Q(path=path.rstrip("/")) | Q(path=path.rstrip("/") + "/"),
+            is_active=True,
+        )
+        .only("title", "description", "image")
+        .first()
+    )
+
+    if page_seo:
+        return {
+            "title": page_seo.title,
+            "description": page_seo.description,
+            "image_url": page_seo.image.url if page_seo.image else None,
+        }
+    return {}
+
+
+def _update_seo_with_page_data(seo, page_seo_data):
+    if page_seo_data:
+        if page_seo_data.get("title"):
+            seo["title"] = page_seo_data["title"]
+        if page_seo_data.get("description"):
+            seo["description"] = page_seo_data["description"]
+        if page_seo_data.get("image_url"):
+            seo["image"] = _make_absolute(page_seo_data["image_url"])
+
+
 def _apply_page_seo_override(seo, request):
     try:
         path = request.path
@@ -94,35 +123,10 @@ def _apply_page_seo_override(seo, request):
         page_seo_data = cache.get(cache_key)
 
         if page_seo_data is None:
-            page_seo = (
-                PageSEO.objects.filter(
-                    Q(path=path)
-                    | Q(path=path.rstrip("/"))
-                    | Q(path=path.rstrip("/") + "/"),
-                    is_active=True,
-                )
-                .only("title", "description", "image")
-                .first()
-            )
-
-            if page_seo:
-                page_seo_data = {
-                    "title": page_seo.title,
-                    "description": page_seo.description,
-                    "image_url": page_seo.image.url if page_seo.image else None,
-                }
-            else:
-                page_seo_data = {}
-
+            page_seo_data = _fetch_page_seo_data(path)
             cache.set(cache_key, page_seo_data, timeout=3600)
 
-        if page_seo_data:
-            if page_seo_data.get("title"):
-                seo["title"] = page_seo_data["title"]
-            if page_seo_data.get("description"):
-                seo["description"] = page_seo_data["description"]
-            if page_seo_data.get("image_url"):
-                seo["image"] = _make_absolute(page_seo_data["image_url"])
+        _update_seo_with_page_data(seo, page_seo_data)
 
     except Exception:
         logger.exception("Error generating SEO data for path: %s", request.path)

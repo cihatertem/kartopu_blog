@@ -120,6 +120,26 @@ def _safe_decimal(value) -> Decimal | None:
     return Decimal(str(value))
 
 
+def _extract_price_from_close_data(
+    close_data, symbol: str, symbols_count: int
+) -> Decimal | None:
+    if hasattr(close_data, "columns"):
+        if symbol in close_data:
+            series = close_data[symbol].dropna()  # pyright: ignore[reportAttributeAccessIssue]
+        elif symbols_count == 1:
+            series = close_data.iloc[:, 0].dropna()  # pyright: ignore[reportAttributeAccessIssue]
+        else:
+            return None
+    else:
+        series = close_data.dropna()  # pyright: ignore[reportAttributeAccessIssue]
+
+    if series.empty:
+        return None
+
+    price = series.iloc[-1]
+    return _safe_decimal(price)
+
+
 def fetch_yahoo_finance_price(
     symbol: str,
     price_date: date | None = None,
@@ -236,21 +256,9 @@ def fetch_multiple_fx_rates_bulk(
 
             symbol = f"{base}{target}=X"
             try:
-                if hasattr(current_close_data, "columns"):
-                    if symbol in current_close_data:
-                        series = current_close_data[symbol].dropna()  # pyright: ignore[reportAttributeAccessIssue]
-                    elif len(symbols) == 1:
-                        series = current_close_data.iloc[:, 0].dropna()  # pyright: ignore[reportAttributeAccessIssue]
-                    else:
-                        continue
-                else:
-                    series = current_close_data.dropna()  # pyright: ignore[reportAttributeAccessIssue]
-
-                if series.empty:
-                    continue
-
-                price = series.iloc[-1]
-                decimal_price = _safe_decimal(price)
+                decimal_price = _extract_price_from_close_data(
+                    current_close_data, symbol, len(symbols)
+                )
                 if decimal_price is not None:
                     results[(base, target, d)] = decimal_price
             except Exception:
@@ -317,22 +325,9 @@ def fetch_fx_rates_bulk(
 
     for symbol in symbols:
         try:
-            # yfinance can return different shapes for single/multiple symbols.
-            if hasattr(close_data, "columns"):
-                if symbol in close_data:
-                    series = close_data[symbol].dropna()  # pyright: ignore[reportAttributeAccessIssue]
-                elif len(symbols) == 1:
-                    series = close_data.iloc[:, 0].dropna()  # pyright: ignore[reportAttributeAccessIssue]
-                else:
-                    continue
-            else:
-                series = close_data.dropna()  # pyright: ignore[reportAttributeAccessIssue]
-
-            if series.empty:
-                continue
-
-            price = series.iloc[-1]
-            decimal_price = _safe_decimal(price)
+            decimal_price = _extract_price_from_close_data(
+                close_data, symbol, len(symbols)
+            )
             if decimal_price is not None:
                 results[symbols_map[symbol]] = decimal_price
         except Exception:
