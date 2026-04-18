@@ -1,0 +1,49 @@
+{% load static %}
+
+{% if post.previous_post or post.next_posts.exists %}
+  <nav class="post-navigation">
+    {% if post.previous_post %}
+      <a href="{{ post.previous_post.get_absolute_url }}" class="nav-card prev-card">
+        {% with cover=post.previous_post.cover_thumb_rendition %}
+          <div class="nav-image-wrapper">
+            {% if cover %}
+              <img src="{{ cover.src }}" srcset="{{ cover.srcset }}" alt="{{ post.previous_post.title }}" loading="lazy">
+            {% else %}
+              <img src="{% static 'images/placeholder.png' %}" alt="Placeholder" loading="lazy">
+            {% endif %}
+          </div>
+        {% endwith %}
+        <div class="nav-content">
+          <span class="nav-label">
+            <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"></path></svg>
+            Önceki Yazı
+          </span>
+          <h4 class="nav-title">{{ post.previous_post.title }}</h4>
+        </div>
+      </a>
+    {% endif %}
+
+    {% if post.next_posts.exists %}
+      {% with next_post=post.next_posts.first %}
+        <a href="{{ next_post.get_absolute_url }}" class="nav-card next-card">
+          <div class="nav-content">
+            <span class="nav-label">
+              Sonraki Yazı
+              <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3"></path></svg>
+            </span>
+            <h4 class="nav-title">{{ next_post.title }}</h4>
+          </div>
+          {% with cover=next_post.cover_thumb_rendition %}
+            <div class="nav-image-wrapper">
+              {% if cover %}
+                <img src="{{ cover.src }}" srcset="{{ cover.srcset }}" alt="{{ next_post.title }}" loading="lazy">
+              {% else %}
+                <img src="{% static 'images/placeholder.png' %}" alt="Placeholder" loading="lazy">
+              {% endif %}
+            </div>
+          {% endwith %}
+        </a>
+      {% endwith %}
+    {% endif %}
+  </nav>
+{% endif %}

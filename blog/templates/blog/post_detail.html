@@ -4,6 +4,7 @@
 {% block title %}{{ post.effective_meta_title }}{% endblock %}
 {% block page_css %}
   {% preload_stylesheet 'css/blog.css' %}
+  {% preload_stylesheet 'css/blog_navigation.css' %}
   {% preload_stylesheet 'css/forms.css' %}
 {% endblock %}
 
@@ -128,9 +129,17 @@
        {% render_post_body post %}
       {% endcache %}
     </div>
+
   </article>
 
-   <!-- Tags Section -->
+
+  <!-- Social Share Section -->
+  {% include "includes/share_widget.html" %}
+
+  <!-- Post Navigation Section -->
+  {% include "blog/includes/post_navigation.html" %}
+
+  <!-- Tags Section -->
   {% if post.tags.exists %}
     <hr />
 
@@ -147,9 +156,6 @@
     </section>
   {% endif %}
   <hr />
-
-  <!-- Social Share Section -->
-  {% include "includes/share_widget.html" %}
 
   <!-- Social Reaction Section -->
   {% include "includes/social_reaction.html" %}
