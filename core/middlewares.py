@@ -1,4 +1,5 @@
 import ipaddress
+import os
 from http import HTTPStatus
 
 from django.conf import settings
@@ -53,17 +54,17 @@ class AdminCSPExcludeMiddleware:
 
     def __init__(self, get_response):
         self.get_response = get_response
+        self.admin_address = os.getenv("ADMIN_ADDRESS", "admin")
+        self.admin_prefixes = (
+            f"/{self.admin_address}",
+            f"/en/{self.admin_address}",
+            f"/tr/{self.admin_address}",
+        )
 
     def __call__(self, request):
         response = self.get_response(request)
-        import os
-
-        admin_prefix = f"/{os.getenv('ADMIN_ADDRESS', 'admin')}"
-        if (
-            request.path.startswith(admin_prefix)
-            or request.path.startswith(f"/en{admin_prefix}")
-            or request.path.startswith(f"/tr{admin_prefix}")
-        ):
+        path = request.path
+        if any(path.startswith(prefix) for prefix in self.admin_prefixes):
             response.headers.pop("Content-Security-Policy", None)
             response.headers.pop("Content-Security-Policy-Report-Only", None)
         return response
