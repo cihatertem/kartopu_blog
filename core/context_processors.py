@@ -53,11 +53,15 @@ def breadcrumbs_context(request):
 def _get_nav_categories():
     nav_categories = cache.get(NAV_CATEGORIES_KEY)
     if nav_categories is None:
-        qs = Category.objects.order_by("name").annotate(
-            post_count=Count(
-                "posts",
-                filter=Q(posts__status=BlogPost.Status.PUBLISHED),
-                distinct=True,
+        qs = (
+            Category.objects.only("name", "slug")
+            .order_by("name")
+            .annotate(
+                post_count=Count(
+                    "posts",
+                    filter=Q(posts__status=BlogPost.Status.PUBLISHED),
+                    distinct=True,
+                )
             )
         )
         nav_categories = []
@@ -118,6 +122,9 @@ def _get_nav_tags():
             .values("id", "name", "slug", "post_count")
         )
         nav_tags = list(qs)
+        for t in nav_tags:
+            t["get_absolute_url"] = reverse("blog:tag_detail", args=[t["slug"]])
+
         _calculate_tag_cloud_sizes(nav_tags)
         cache.set(NAV_TAGS_KEY, nav_tags, timeout=CACHE_TIMEOUT)
     return nav_tags

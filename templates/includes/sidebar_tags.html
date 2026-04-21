@@ -6,7 +6,7 @@
   <div class="tag-cloud">
     {% for tag in nav_tags %}
       <a
-        href="{% url 'blog:tag_detail' tag.slug %}"
+        href="{{ tag.get_absolute_url }}"
         class="tag-cloud__item {{ tag.color_class }} {{ tag.cloud_size_class }} {% if active_tag_slug == tag.slug %}is-active{% endif %}"
       >
         #{{ tag.name }}

@@ -149,6 +149,8 @@ class ContextProcessorsTests(TestCase):
 
         self.assertEqual(len(tags), 1)
         self.assertEqual(tags[0]["name"], "Tag 1")
+        self.assertIn("get_absolute_url", tags[0])
+        self.assertIn("/tag-1/", tags[0]["get_absolute_url"])
         self.assertIn("cloud_size", tags[0])
         self.assertEqual(tags[0]["cloud_size"], 1.0)
         self.assertEqual(tags[0]["cloud_size_class"], "tag-cloud__item--size-2")
