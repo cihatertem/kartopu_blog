@@ -8,7 +8,7 @@ from django.contrib.postgres.search import SearchQuery, SearchRank, SearchVector
 from django.core.cache import cache
 from django.core.exceptions import PermissionDenied
 from django.core.paginator import Paginator
-from django.db.models import Count, F, Prefetch
+from django.db.models import Count, F, Prefetch, prefetch_related_objects
 from django.http import JsonResponse
 from django.shortcuts import get_object_or_404, render
 from django.urls import reverse
@@ -419,10 +419,6 @@ def _post_detail_queryset():
             Prefetch(
                 "next_posts", queryset=BlogPost.objects.defer("content", "excerpt")
             ),
-            *_get_portfolio_prefetches(),
-            *_get_cashflow_prefetches(),
-            *_get_salary_savings_prefetches(),
-            *_get_dividend_prefetches(),
         )
         .defer("previous_post__content", "previous_post__excerpt")
     )
@@ -432,7 +428,27 @@ def _get_post_for_detail(slug: str, *, include_unpublished: bool):
     qs = _post_detail_queryset()
     if not include_unpublished:
         qs = qs.filter(status=BlogPost.Status.PUBLISHED)
-    return get_object_or_404(qs, slug=slug)
+
+    post = get_object_or_404(qs, slug=slug)
+
+    # Dinamik Prefetch: İçerikte kullanılan marker'lara göre ek verileri getir.
+    # Bu, t3.micro üzerinde gereksiz RAM kullanımını önler (OOM koruması).
+    prefetches = []
+    deps = post.content_dependencies or []
+
+    if "portfolio" in deps:
+        prefetches.extend(_get_portfolio_prefetches())
+    if "cashflow" in deps:
+        prefetches.extend(_get_cashflow_prefetches())
+    if "salary_savings" in deps:
+        prefetches.extend(_get_salary_savings_prefetches())
+    if "dividend" in deps:
+        prefetches.extend(_get_dividend_prefetches())
+
+    if prefetches:
+        prefetch_related_objects([post], *prefetches)
+
+    return post
 
 
 def _build_post_breadcrumbs(post, *, is_preview: bool) -> list[dict[str, str | None]]:

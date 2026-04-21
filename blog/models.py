@@ -276,6 +276,12 @@ class BlogPost(
         help_text="Önceki yazı (seri takibi için)",
     )
 
+    content_dependencies = models.JSONField(
+        default=list,
+        blank=True,
+        help_text="İçerikte tespit edilen veri bağımlılıkları (portfolio, cashflow, etc.)",
+    )
+
     class Meta:  # pyright: ignore[reportIncompatibleVariableOverride]
         ordering = ["-published_at", "-created_at"]
         verbose_name = "Blog Yazısı"
@@ -294,6 +300,11 @@ class BlogPost(
         return str(self.title)
 
     def save(self, *args, **kwargs):
+        # İçerik bağımlılıklarını tespit et
+        from blog.services import detect_content_dependencies
+
+        self.content_dependencies = detect_content_dependencies(self.content)
+
         # slug otomatik üret
         if not self.slug:
             self.slug = slugify(self.title)
