@@ -35,7 +35,6 @@ def get_samesite_setting(env_var: str, default="Lax") -> str:
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
-
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/5.2/howto/deployment/checklist/
 
@@ -129,7 +128,6 @@ TEMPLATES = [
 
 WSGI_APPLICATION = "config.wsgi.application"
 
-
 # Database
 # https://docs.djangoproject.com/en/5.2/ref/settings/#databases
 
@@ -166,16 +164,6 @@ else:
                 "keepalives_count": DB_KEEPALIVES_COUNT,
                 "connect_timeout": 10,
             },
-            # "CONN_MAX_AGE": 0,
-            # "OPTIONS": {
-            #     "connect_timeout": 10,
-            #     "pool": {
-            #         "min_size": 1,
-            #         "max_size": 4,
-            #         "timeout": 30,
-            #         "max_lifetime": 600,
-            #     },
-            # },
         }
     }
 
@@ -196,7 +184,6 @@ AUTH_PASSWORD_VALIDATORS = [
         "NAME": "django.contrib.auth.password_validation.NumericPasswordValidator",
     },
 ]
-
 
 # Internationalization
 # https://docs.djangoproject.com/en/5.2/topics/i18n/
@@ -245,7 +232,6 @@ if os.getenv("DJANGO_LOGGING", "0") == "1":
             },
         },
     }
-
 
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/5.2/howto/static-files/
@@ -367,7 +353,6 @@ IMAGEKIT_CACHEFILE_DIR = "caches"
 if not DEBUG:
     IMAGEKIT_DEFAULT_CACHEFILE_STRATEGY = "imagekit.cachefiles.strategies.Optimistic"
 
-
 # Email (Gmail SMTP)
 EMAIL_BACKEND = "django.core.mail.backends.smtp.EmailBackend"
 EMAIL_HOST = os.getenv("EMAIL_HOST", "smtp.gmail.com")
@@ -453,10 +438,9 @@ if not DEBUG:
 
     SECURE_HSTS_SECONDS = int(os.getenv("DJANGO_SECURE_HSTS_SECONDS", "63072000"))
     SECURE_HSTS_INCLUDE_SUBDOMAINS = (
-        os.getenv("DJANGO_SECURE_HSTS_INCLUDE_SUBDOMAINS", "1") == "1"
+            os.getenv("DJANGO_SECURE_HSTS_INCLUDE_SUBDOMAINS", "1") == "1"
     )
     SECURE_HSTS_PRELOAD = os.getenv("DJANGO_SECURE_HSTS_PRELOAD", "1") == "1"
-
 
 SECURE_CSP = {
     # default olarak sadece kendi origin
