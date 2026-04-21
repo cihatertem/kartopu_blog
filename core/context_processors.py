@@ -19,7 +19,7 @@ from blog.cache_keys import (
     NAV_RECENT_POSTS_KEY,
     NAV_TAGS_KEY,
 )
-from core.cache_keys import GOAL_WIDGET_KEY
+from core.cache_keys import GOAL_WIDGET_KEY, STAFF_PENDING_NOTIFICATIONS_KEY
 from blog.models import BlogPost, Category, Tag
 from comments.models import Comment
 from portfolio.models import PortfolioSnapshot
@@ -265,13 +265,20 @@ def _get_goal_widget_snapshot():
 
 
 def _get_has_pending_messages_or_comments(request):
-    has_pending = False
-    if request.user.is_authenticated and request.user.is_staff:
+    if not (request.user.is_authenticated and request.user.is_staff):
+        return False
+
+    cache_key = STAFF_PENDING_NOTIFICATIONS_KEY.format(user_id=request.user.id)
+    has_pending = cache.get(cache_key)
+
+    if has_pending is None:
         has_unread_messages = ContactMessage.objects.filter(is_read=False).exists()
         has_pending_comments = Comment.objects.filter(
             status=Comment.Status.PENDING
         ).exists()
         has_pending = has_unread_messages or has_pending_comments
+        cache.set(cache_key, has_pending, timeout=300)  # 5 minutes
+
     return has_pending
 
 

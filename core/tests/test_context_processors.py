@@ -14,7 +14,7 @@ from blog.cache_keys import (
     NAV_RECENT_POSTS_KEY,
     NAV_TAGS_KEY,
 )
-from core.cache_keys import GOAL_WIDGET_KEY
+from core.cache_keys import GOAL_WIDGET_KEY, STAFF_PENDING_NOTIFICATIONS_KEY
 from blog.models import BlogPost, Category, Tag
 from comments.models import Comment
 from core.context_processors import (
@@ -309,6 +309,30 @@ class ContextProcessorsTests(TestCase):
         has_pending = _get_has_pending_messages_or_comments(request)
 
         self.assertFalse(has_pending)
+
+    def test_get_has_pending_messages_or_comments_caching(self):
+        request = self.factory.get("/")
+        request.user = self.staff_user
+
+        # 1. First call - populates cache (contact message exists)
+        has_pending1 = _get_has_pending_messages_or_comments(request)
+        self.assertTrue(has_pending1)
+
+        cache_key = STAFF_PENDING_NOTIFICATIONS_KEY.format(user_id=self.staff_user.id)
+        self.assertTrue(cache.get(cache_key))
+
+        # 2. Update DB - mark as read
+        self.contact_msg.is_read = True
+        self.contact_msg.save()
+
+        # 3. Second call - should still return True from cache
+        has_pending2 = _get_has_pending_messages_or_comments(request)
+        self.assertTrue(has_pending2)
+
+        # 4. Clear cache and call again
+        cache.clear()
+        has_pending3 = _get_has_pending_messages_or_comments(request)
+        self.assertFalse(has_pending3)
 
     def test_get_has_pending_messages_or_comments_normal_user(self):
         request = self.factory.get("/")
