@@ -3,7 +3,6 @@ from datetime import date
 
 from allauth.socialaccount.models import SocialAccount
 from django.contrib.auth.decorators import login_required
-from django.contrib.postgres.aggregates import StringAgg
 from django.contrib.postgres.search import SearchQuery, SearchRank, SearchVector
 from django.core.cache import cache
 from django.core.exceptions import PermissionDenied
@@ -558,21 +557,6 @@ def _get_cached_search_results(base_qs, cached_data, page_num):
 
 
 def _perform_database_search(request, base_qs, normalized_q, cache_key):
-    base_qs = base_qs.annotate(
-        tag_names=StringAgg(
-            "tags__name",
-            delimiter=" ",
-            distinct=True,
-        )
-    )
-
-    vector = (
-        SearchVector("tag_names", weight="A", config="turkish")
-        + SearchVector("title", weight="B", config="turkish")
-        + SearchVector("excerpt", weight="C", config="turkish")
-        + SearchVector("content", weight="D", config="turkish")
-    )
-
     query = SearchQuery(
         normalized_q,
         search_type="websearch",
@@ -580,8 +564,8 @@ def _perform_database_search(request, base_qs, normalized_q, cache_key):
     )
 
     qs = (
-        base_qs.annotate(rank=SearchRank(vector, query))
-        .filter(rank__isnull=False, rank__gt=0)
+        base_qs.annotate(rank=SearchRank("search_vector", query))
+        .filter(search_vector=query, rank__isnull=False, rank__gt=0)
         .order_by("-rank", "-published_at")
     )
 

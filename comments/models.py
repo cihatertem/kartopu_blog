@@ -53,7 +53,7 @@ class Comment(
         verbose_name = "Yorum"
         verbose_name_plural = "Yorumlar"
         indexes = [
-            models.Index(fields=["status", "created_at"]),
+            models.Index(fields=["post", "status", "-created_at"]),
         ]
 
     def __str__(self) -> str:

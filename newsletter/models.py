@@ -129,6 +129,13 @@ class EmailQueue(UUIDModelMixin, TimeStampedModelMixin):
         verbose_name = "E-posta Kuyruğu"
         verbose_name_plural = "E-posta Kuyruğu"
         ordering = ("created_at",)
+        indexes = (
+            models.Index(
+                fields=["status", "created_at"],
+                condition=models.Q(status=EmailQueueStatus.PENDING),
+                name="email_queue_pending_idx",
+            ),
+        )
 
     def __str__(self) -> str:
         return f"{self.subject} -> {self.to_email}"

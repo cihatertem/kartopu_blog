@@ -3,7 +3,7 @@ from functools import cached_property
 
 from django.conf import settings
 from django.contrib.postgres.indexes import GinIndex
-from django.contrib.postgres.search import SearchVector
+from django.contrib.postgres.search import SearchVector, SearchVectorField
 from django.db import models
 from django.urls import reverse
 from django.utils import timezone
@@ -37,7 +37,6 @@ class Category(
         verbose_name = "Kategori"
         verbose_name_plural = "Kategoriler"
         ordering = ("name",)
-        indexes = (models.Index(fields=["slug"]),)
 
     def __str__(self) -> str:
         return str(self.name)
@@ -282,6 +281,8 @@ class BlogPost(
         help_text="İçerikte tespit edilen veri bağımlılıkları (portfolio, cashflow, etc.)",
     )
 
+    search_vector = SearchVectorField(null=True, blank=True)
+
     class Meta:  # pyright: ignore[reportIncompatibleVariableOverride]
         ordering = ["-published_at", "-created_at"]
         verbose_name = "Blog Yazısı"
@@ -290,10 +291,7 @@ class BlogPost(
         indexes = (
             models.Index(fields=["slug"]),
             models.Index(fields=["status", "published_at"]),
-            GinIndex(
-                SearchVector("title", "excerpt", "content", config="turkish"),
-                name="blogpost_fts_gin",
-            ),
+            GinIndex(fields=["search_vector"], name="blogpost_fts_gin"),
         )
 
     def __str__(self) -> str:

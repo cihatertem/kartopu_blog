@@ -2,8 +2,11 @@ import os
 import shutil
 
 from django.conf import settings
+from django.contrib.postgres.search import SearchVector
 from django.core.cache import cache
 from django.core.files.storage import default_storage
+from django.db import connection
+from django.db.models import Value
 from django.db.models.signals import m2m_changed, post_delete, post_save
 from django.dispatch import receiver
 
@@ -84,6 +87,20 @@ def invalidate_nav_cache():
     cache.delete_many(NAV_KEYS)
 
 
+def update_search_vector(post: BlogPost):
+    if connection.vendor != "postgresql":
+        return
+
+    tags_str = " ".join(tag.name for tag in post.tags.all())
+    vector = (
+        SearchVector(Value(tags_str), weight="A", config="turkish")
+        + SearchVector("title", weight="B", config="turkish")
+        + SearchVector("excerpt", weight="C", config="turkish")
+        + SearchVector("content", weight="D", config="turkish")
+    )
+    BlogPost.objects.filter(pk=post.pk).update(search_vector=vector)
+
+
 @receiver(post_save, sender=Category)
 @receiver(post_delete, sender=Category)
 def category_changed(sender, **kwargs):
@@ -97,12 +114,18 @@ def tag_changed(sender, **kwargs):
 
 
 @receiver(post_save, sender=BlogPost)
+def post_changed_save(sender, instance: BlogPost, **kwargs):
+    update_search_vector(instance)
+    invalidate_nav_cache()
+
+
 @receiver(post_delete, sender=BlogPost)
-def post_changed(sender, instance: BlogPost, **kwargs):
+def post_changed_delete(sender, instance: BlogPost, **kwargs):
     invalidate_nav_cache()
 
 
 @receiver(m2m_changed, sender=BlogPost.tags.through)
-def post_tags_changed(sender, action, **kwargs):
+def post_tags_changed(sender, instance, action, **kwargs):
     if action in ("post_add", "post_remove", "post_clear"):
+        update_search_vector(instance)
         invalidate_nav_cache()

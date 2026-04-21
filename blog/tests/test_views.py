@@ -1,9 +1,11 @@
 import datetime
 import json
+import unittest
 from unittest.mock import MagicMock, patch
 
 from allauth.socialaccount.models import SocialAccount
 from django.contrib.auth import get_user_model
+from django.db import connection
 from django.test import Client, RequestFactory, TestCase
 from django.urls import reverse
 from django.utils import timezone
@@ -178,15 +180,16 @@ class BlogViewsTests(TestCase):
                 # It shouldn't evaluate FTS logic again
                 MockSearchQuery.assert_not_called()
 
-    @patch("blog.views.StringAgg")
+    @unittest.skipIf(
+        connection.vendor != "postgresql", "PostgreSQL required for FTS tests"
+    )
     @patch("blog.views.SearchRank")
-    def test_search_results_integration(self, mock_search_rank, mock_string_agg):
-        from django.db.models import CharField, IntegerField, Value
+    def test_search_results_integration(self, mock_search_rank):
+        from django.db.models import IntegerField, Value
 
         # Mock Postgres-specific search functions to return simple values
         # so SQLite can execute the query without raising exceptions.
         # This allows us to run the actual _perform_database_search function!
-        mock_string_agg.return_value = Value("mocked tags", output_field=CharField())
 
         # We need SearchRank to simulate matched ranks. We use an IntegerField value
         # that will be > 0 so that `.filter(rank__isnull=False, rank__gt=0)` passes.
