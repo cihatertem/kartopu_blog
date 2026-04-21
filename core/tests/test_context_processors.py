@@ -14,6 +14,7 @@ from blog.cache_keys import (
     NAV_RECENT_POSTS_KEY,
     NAV_TAGS_KEY,
 )
+from core.cache_keys import GOAL_WIDGET_KEY
 from blog.models import BlogPost, Category, Tag
 from comments.models import Comment
 from core.context_processors import (
@@ -233,6 +234,31 @@ class ContextProcessorsTests(TestCase):
         self.assertIsNotNone(snapshot)
         self.assertEqual(snapshot["remaining_pct"]["value"], 100)
         self.assertEqual(snapshot["remaining_pct"]["display"], 0)
+
+    def test_get_goal_widget_snapshot_caching(self):
+        # 1. First call - populates cache
+        snapshot1 = _get_goal_widget_snapshot()
+        self.assertIsNotNone(snapshot1)
+        self.assertEqual(cache.get(GOAL_WIDGET_KEY), snapshot1)
+
+        # 2. Update DB without clearing cache (directly via update)
+        PortfolioSnapshot.objects.filter(pk=self.snapshot.pk).update(
+            total_value=Decimal("99999")
+        )
+
+        # 3. Second call - should still return old value from cache
+        snapshot2 = _get_goal_widget_snapshot()
+        self.assertEqual(snapshot2["current_value"], Decimal("50000"))
+
+        # 4. Save the instance - should trigger signal and clear cache
+        self.snapshot.total_value = Decimal("99999")
+        self.snapshot.save()
+
+        self.assertIsNone(cache.get(GOAL_WIDGET_KEY))
+
+        # 5. Third call - should return new value
+        snapshot3 = _get_goal_widget_snapshot()
+        self.assertEqual(snapshot3["current_value"], Decimal("99999"))
 
     def test_get_has_pending_messages_or_comments_only_unread_message(self):
         request = self.factory.get("/")

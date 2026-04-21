@@ -19,6 +19,7 @@ from blog.cache_keys import (
     NAV_RECENT_POSTS_KEY,
     NAV_TAGS_KEY,
 )
+from core.cache_keys import GOAL_WIDGET_KEY
 from blog.models import BlogPost, Category, Tag
 from comments.models import Comment
 from portfolio.models import PortfolioSnapshot
@@ -214,6 +215,10 @@ def _get_nav_portfolio_posts():
 
 
 def _get_goal_widget_snapshot():
+    goal_widget_snapshot = cache.get(GOAL_WIDGET_KEY)
+    if goal_widget_snapshot is not None:
+        return goal_widget_snapshot
+
     featured_snapshot = (
         PortfolioSnapshot.objects.select_related("portfolio")
         .filter(is_featured=True)
@@ -221,7 +226,6 @@ def _get_goal_widget_snapshot():
         .first()
     )
 
-    goal_widget_snapshot = None
     if featured_snapshot:
         target_value = featured_snapshot.target_value
         total_value = featured_snapshot.total_value
@@ -255,6 +259,8 @@ def _get_goal_widget_snapshot():
             "target_display": f"{formatted_target} ₺",
             "remaining_pct": target_pct,
         }
+
+    cache.set(GOAL_WIDGET_KEY, goal_widget_snapshot, timeout=CACHE_TIMEOUT)
     return goal_widget_snapshot
 
 
