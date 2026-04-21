@@ -141,7 +141,7 @@ class ContextProcessorsTests(TestCase):
         cats = _get_nav_categories()
 
         self.assertTrue(len(cats) > 0)
-        self.assertEqual(cats[0].name, "Cat 1")
+        self.assertEqual(cats[0]["name"], "Cat 1")
         self.assertEqual(cache.get(NAV_CATEGORIES_KEY), cats)
 
     def test_get_nav_tags(self):
@@ -169,21 +169,21 @@ class ContextProcessorsTests(TestCase):
         posts = _get_nav_recent_posts()
 
         self.assertEqual(len(posts), 2)
-        self.assertEqual(posts[0].slug, "portfolio-post")
+        self.assertEqual(posts[0]["slug"], "portfolio-post")
         self.assertEqual(cache.get(NAV_RECENT_POSTS_KEY), posts)
 
     def test_get_nav_popular_posts(self):
         posts = _get_nav_popular_posts()
 
         self.assertEqual(len(posts), 2)
-        self.assertEqual(posts[0].slug, "post-1")
+        self.assertEqual(posts[0]["slug"], "post-1")
         self.assertEqual(cache.get(NAV_POPULAR_POSTS_KEY), posts)
 
     def test_get_nav_portfolio_posts(self):
         posts = _get_nav_portfolio_posts()
 
         self.assertEqual(len(posts), 1)
-        self.assertEqual(posts[0].slug, "portfolio-post")
+        self.assertEqual(posts[0]["slug"], "portfolio-post")
         self.assertEqual(cache.get(NAV_PORTFOLIO_POSTS_KEY), posts)
 
     def test_get_goal_widget_snapshot(self):
@@ -379,4 +379,6 @@ class ContextProcessorsTests(TestCase):
         request = self.factory.get("/")
         context = sidebar_widgets_context(request)
         self.assertEqual(len(context["sidebar_widgets"]), 1)
-        self.assertEqual(context["sidebar_widgets"][0].title, "Widget 1")
+        self.assertEqual(
+            context["sidebar_widgets"][0]["template_name"], "includes/sidebar_1.html"
+        )

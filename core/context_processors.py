@@ -53,15 +53,23 @@ def breadcrumbs_context(request):
 def _get_nav_categories():
     nav_categories = cache.get(NAV_CATEGORIES_KEY)
     if nav_categories is None:
-        nav_categories = list(
-            Category.objects.order_by("name").annotate(
-                post_count=Count(
-                    "posts",
-                    filter=Q(posts__status=BlogPost.Status.PUBLISHED),
-                    distinct=True,
-                )
+        qs = Category.objects.order_by("name").annotate(
+            post_count=Count(
+                "posts",
+                filter=Q(posts__status=BlogPost.Status.PUBLISHED),
+                distinct=True,
             )
         )
+        nav_categories = []
+        for c in qs:
+            nav_categories.append(
+                {
+                    "name": c.name,
+                    "slug": c.slug,
+                    "post_count": c.post_count,
+                    "get_absolute_url": c.get_absolute_url(),
+                }
+            )
         cache.set(NAV_CATEGORIES_KEY, nav_categories, timeout=CACHE_TIMEOUT)
     return nav_categories
 
@@ -152,7 +160,7 @@ def _get_nav_archives():
 def _get_nav_recent_posts():
     nav_recent_posts = cache.get(NAV_RECENT_POSTS_KEY)
     if nav_recent_posts is None:
-        nav_recent_posts = list(
+        qs = (
             BlogPost.objects.filter(
                 status=BlogPost.Status.PUBLISHED,
                 published_at__isnull=False,
@@ -160,6 +168,18 @@ def _get_nav_recent_posts():
             .order_by("-published_at")
             .only("title", "slug", "published_at", "cover_image")[:5]
         )
+        nav_recent_posts = []
+        for post in qs:
+            nav_recent_posts.append(
+                {
+                    "title": post.title,
+                    "slug": post.slug,
+                    "published_at": post.published_at,
+                    "get_absolute_url": post.get_absolute_url(),
+                    "cover_thumb_rendition": post.cover_thumb_rendition,
+                    "cover_image": bool(post.cover_image),
+                }
+            )
         cache.set(NAV_RECENT_POSTS_KEY, nav_recent_posts, timeout=CACHE_TIMEOUT)
     return nav_recent_posts
 
@@ -167,7 +187,7 @@ def _get_nav_recent_posts():
 def _get_nav_popular_posts():
     nav_popular_posts = cache.get(NAV_POPULAR_POSTS_KEY)
     if nav_popular_posts is None:
-        nav_popular_posts = list(
+        qs = (
             BlogPost.objects.filter(
                 status=BlogPost.Status.PUBLISHED,
                 published_at__isnull=False,
@@ -194,6 +214,18 @@ def _get_nav_popular_posts():
             .order_by("-popularity_score", "-view_count", "-published_at")
             .only("title", "slug", "view_count", "published_at", "cover_image")[:5]
         )
+        nav_popular_posts = []
+        for post in qs:
+            nav_popular_posts.append(
+                {
+                    "title": post.title,
+                    "slug": post.slug,
+                    "published_at": post.published_at,
+                    "get_absolute_url": post.get_absolute_url(),
+                    "cover_thumb_rendition": post.cover_thumb_rendition,
+                    "cover_image": bool(post.cover_image),
+                }
+            )
         cache.set(NAV_POPULAR_POSTS_KEY, nav_popular_posts, timeout=CACHE_TIMEOUT)
     return nav_popular_posts
 
@@ -201,7 +233,7 @@ def _get_nav_popular_posts():
 def _get_nav_portfolio_posts():
     nav_portfolio_posts = cache.get(NAV_PORTFOLIO_POSTS_KEY)
     if nav_portfolio_posts is None:
-        nav_portfolio_posts = list(
+        qs = (
             BlogPost.objects.filter(
                 status=BlogPost.Status.PUBLISHED,
                 published_at__isnull=False,
@@ -210,6 +242,18 @@ def _get_nav_portfolio_posts():
             .order_by("-published_at")
             .only("title", "slug", "published_at", "cover_image")[:5]
         )
+        nav_portfolio_posts = []
+        for post in qs:
+            nav_portfolio_posts.append(
+                {
+                    "title": post.title,
+                    "slug": post.slug,
+                    "published_at": post.published_at,
+                    "get_absolute_url": post.get_absolute_url(),
+                    "cover_thumb_rendition": post.cover_thumb_rendition,
+                    "cover_image": bool(post.cover_image),
+                }
+            )
         cache.set(NAV_PORTFOLIO_POSTS_KEY, nav_portfolio_posts, timeout=CACHE_TIMEOUT)
     return nav_portfolio_posts
 
@@ -323,7 +367,9 @@ def sidebar_widgets_context(request):
     sidebar_widgets = cache.get("sidebar_widgets")
     if sidebar_widgets is None:
         sidebar_widgets = list(
-            SidebarWidget.objects.filter(is_active=True).order_by("order")
+            SidebarWidget.objects.filter(is_active=True)
+            .order_by("order")
+            .values("template_name")
         )
         cache.set("sidebar_widgets", sidebar_widgets, timeout=3600)
     return {"sidebar_widgets": sidebar_widgets}
