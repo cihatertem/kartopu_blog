@@ -226,7 +226,13 @@ def send_direct_emails_bulk(direct_emails) -> int:
     from_email = '"Kartopu Money" <info@kartopu.money>'
 
     def email_queue_generator():
-        for email in direct_emails:
+        # Iterate in chunks if it's a queryset to prevent memory bloat
+        iterator = (
+            direct_emails.iterator(chunk_size=500)
+            if hasattr(direct_emails, "iterator")
+            else direct_emails
+        )
+        for email in iterator:
             html_body = render_markdown(email.body)
             yield EmailQueue(
                 subject=email.subject,
