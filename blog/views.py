@@ -220,9 +220,7 @@ def _get_social_maps(author_ids):
     if not author_ids:
         return social_avatar_map, social_profile_map
 
-    social_accounts = SocialAccount.objects.select_related("user").filter(
-        user_id__in=author_ids
-    )
+    social_accounts = SocialAccount.objects.filter(user_id__in=author_ids)
     for account in social_accounts:
         avatar_url = _extract_social_avatar_url(account.extra_data or {})
         if not avatar_url:
