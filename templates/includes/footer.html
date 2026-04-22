@@ -1,5 +1,8 @@
+{% load cache %}
+{% cache 86400 footer request.LANGUAGE_CODE %}
 <footer class="site-footer">
   <div class="site-footer__inner">
     <small>© {% now "Y" %} kartopu.money</small>
   </div>
 </footer>
+{% endcache %}

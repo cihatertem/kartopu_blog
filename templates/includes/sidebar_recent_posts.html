@@ -1,6 +1,6 @@
 {% load static cache %}
 
-{% cache 3600 sidebar_recent_posts %}
+{% cache 3600 sidebar_recent_posts request.LANGUAGE_CODE %}
 <section class="sidebar-card">
   <h3 class="sidebar-title">Son Yazılar</h3>
 

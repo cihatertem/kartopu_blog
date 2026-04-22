@@ -1,5 +1,6 @@
-{% load blog_extras %}
+{% load blog_extras cache %}
 
+{% cache 86400 dividend_summary_html snapshot.id request.LANGUAGE_CODE %}
 <section class="dividend-summary">
   <div class="summary-card dividend-summary__meta-card">
     <p class="summary-meta"><strong>Yıl:</strong> {{ year }}</p>
@@ -66,3 +67,4 @@
     {% endfor %}
   </div>
 </section>
+{% endcache %}

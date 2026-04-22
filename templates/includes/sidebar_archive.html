@@ -1,5 +1,5 @@
 {% load cache %}
-{% cache 600 sidebar_archives active_archive_key %}
+{% cache 86400 sidebar_archives active_archive_key request.LANGUAGE_CODE %}
 <section class="sidebar-card">
   <h3 class="sidebar-title">Arşiv</h3>
 
