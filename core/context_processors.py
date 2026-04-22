@@ -52,8 +52,12 @@ def breadcrumbs_context(request):
     return {"breadcrumbs": breadcrumbs}
 
 
-def _get_nav_categories():
-    nav_categories = cache.get(NAV_CATEGORIES_KEY)
+def _get_nav_categories(cached_data=None):
+    if cached_data is not None:
+        nav_categories = cached_data.get(NAV_CATEGORIES_KEY)
+    else:
+        nav_categories = cache.get(NAV_CATEGORIES_KEY)
+
     if nav_categories is None:
         qs = (
             Category.objects.only("name", "slug")
@@ -108,8 +112,12 @@ def _calculate_tag_cloud_sizes(nav_tags):
             t["color_class"] = get_tag_color_class(t["slug"])
 
 
-def _get_nav_tags():
-    nav_tags = cache.get(NAV_TAGS_KEY)
+def _get_nav_tags(cached_data=None):
+    if cached_data is not None:
+        nav_tags = cached_data.get(NAV_TAGS_KEY)
+    else:
+        nav_tags = cache.get(NAV_TAGS_KEY)
+
     if nav_tags is None:
         qs = (
             Tag.objects.annotate(
@@ -132,9 +140,13 @@ def _get_nav_tags():
     return nav_tags
 
 
-def _get_nav_archives():
+def _get_nav_archives(cached_data=None):
     nav_archives_key = f"{NAV_ARCHIVES_KEY}:{get_language() or 'tr'}"
-    nav_archives = cache.get(nav_archives_key)
+    if cached_data is not None:
+        nav_archives = cached_data.get(nav_archives_key)
+    else:
+        nav_archives = cache.get(nav_archives_key)
+
     if nav_archives is None:
         archive_rows = (
             BlogPost.objects.filter(
@@ -166,8 +178,12 @@ def _get_nav_archives():
     return nav_archives
 
 
-def _get_nav_recent_posts():
-    nav_recent_posts = cache.get(NAV_RECENT_POSTS_KEY)
+def _get_nav_recent_posts(cached_data=None):
+    if cached_data is not None:
+        nav_recent_posts = cached_data.get(NAV_RECENT_POSTS_KEY)
+    else:
+        nav_recent_posts = cache.get(NAV_RECENT_POSTS_KEY)
+
     if nav_recent_posts is None:
         qs = (
             BlogPost.objects.filter(
@@ -193,8 +209,12 @@ def _get_nav_recent_posts():
     return nav_recent_posts
 
 
-def _get_nav_popular_posts():
-    nav_popular_posts = cache.get(NAV_POPULAR_POSTS_KEY)
+def _get_nav_popular_posts(cached_data=None):
+    if cached_data is not None:
+        nav_popular_posts = cached_data.get(NAV_POPULAR_POSTS_KEY)
+    else:
+        nav_popular_posts = cache.get(NAV_POPULAR_POSTS_KEY)
+
     if nav_popular_posts is None:
         qs = (
             BlogPost.objects.filter(
@@ -239,8 +259,12 @@ def _get_nav_popular_posts():
     return nav_popular_posts
 
 
-def _get_nav_portfolio_posts():
-    nav_portfolio_posts = cache.get(NAV_PORTFOLIO_POSTS_KEY)
+def _get_nav_portfolio_posts(cached_data=None):
+    if cached_data is not None:
+        nav_portfolio_posts = cached_data.get(NAV_PORTFOLIO_POSTS_KEY)
+    else:
+        nav_portfolio_posts = cache.get(NAV_PORTFOLIO_POSTS_KEY)
+
     if nav_portfolio_posts is None:
         qs = (
             BlogPost.objects.filter(
@@ -267,8 +291,12 @@ def _get_nav_portfolio_posts():
     return nav_portfolio_posts
 
 
-def _get_goal_widget_snapshot():
-    goal_widget_snapshot = cache.get(GOAL_WIDGET_KEY)
+def _get_goal_widget_snapshot(cached_data=None):
+    if cached_data is not None:
+        goal_widget_snapshot = cached_data.get(GOAL_WIDGET_KEY)
+    else:
+        goal_widget_snapshot = cache.get(GOAL_WIDGET_KEY)
+
     if goal_widget_snapshot is not None:
         return goal_widget_snapshot
 
@@ -317,12 +345,15 @@ def _get_goal_widget_snapshot():
     return goal_widget_snapshot
 
 
-def _get_has_pending_messages_or_comments(request):
+def _get_has_pending_messages_or_comments(request, cached_data=None):
     if not (request.user.is_authenticated and request.user.is_staff):
         return False
 
     cache_key = STAFF_PENDING_NOTIFICATIONS_KEY.format(user_id=request.user.id)
-    has_pending = cache.get(cache_key)
+    if cached_data is not None:
+        has_pending = cached_data.get(cache_key)
+    else:
+        has_pending = cache.get(cache_key)
 
     if has_pending is None:
         has_unread_messages = ContactMessage.objects.filter(is_read=False).exists()
@@ -336,16 +367,37 @@ def _get_has_pending_messages_or_comments(request):
 
 
 def categories_tags_context(request):
+    language = get_language() or "tr"
+    nav_archives_key = f"{NAV_ARCHIVES_KEY}:{language}"
+
+    keys = [
+        NAV_CATEGORIES_KEY,
+        NAV_TAGS_KEY,
+        nav_archives_key,
+        NAV_RECENT_POSTS_KEY,
+        NAV_POPULAR_POSTS_KEY,
+        NAV_PORTFOLIO_POSTS_KEY,
+        GOAL_WIDGET_KEY,
+    ]
+
+    if request.user.is_authenticated and request.user.is_staff:
+        staff_key = STAFF_PENDING_NOTIFICATIONS_KEY.format(user_id=request.user.id)
+        keys.append(staff_key)
+    else:
+        staff_key = None
+
+    cached_data = cache.get_many(keys)
+
     return {
-        "nav_categories": _get_nav_categories(),
-        "nav_tags": _get_nav_tags(),
-        "nav_archives": _get_nav_archives(),
-        "nav_recent_posts": _get_nav_recent_posts(),
-        "nav_popular_posts": _get_nav_popular_posts(),
-        "nav_portfolio_posts": _get_nav_portfolio_posts(),
-        "goal_widget_snapshot": _get_goal_widget_snapshot(),
+        "nav_categories": _get_nav_categories(cached_data),
+        "nav_tags": _get_nav_tags(cached_data),
+        "nav_archives": _get_nav_archives(cached_data),
+        "nav_recent_posts": _get_nav_recent_posts(cached_data),
+        "nav_popular_posts": _get_nav_popular_posts(cached_data),
+        "nav_portfolio_posts": _get_nav_portfolio_posts(cached_data),
+        "goal_widget_snapshot": _get_goal_widget_snapshot(cached_data),
         "has_pending_messages_or_comments": _get_has_pending_messages_or_comments(
-            request
+            request, cached_data
         ),
     }
 
