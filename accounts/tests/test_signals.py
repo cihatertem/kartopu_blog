@@ -151,7 +151,7 @@ class SocialAvatarDownloadTests(TestCase):
         self.assertIn("avatars/", self.user.avatar.name)
         mock_get.assert_called_once_with(
             "http://example.com/avatar.jpg",
-            timeout=10,
+            timeout=5,
             headers={"User-Agent": "kartopu-blog-avatar-fetcher/1.0"},
         )
 
@@ -171,7 +171,7 @@ class SocialAvatarDownloadTests(TestCase):
         self.assertTrue(self.user.avatar)
         mock_get.assert_called_once_with(
             "http://example.com/fallback.jpg",
-            timeout=10,
+            timeout=5,
             headers={"User-Agent": "kartopu-blog-avatar-fetcher/1.0"},
         )
 
@@ -197,7 +197,7 @@ class SocialAvatarDownloadTests(TestCase):
         self.assertTrue(user.avatar)
         mock_get.assert_called_once_with(
             "http://example.com/new.jpg",
-            timeout=10,
+            timeout=5,
             headers={"User-Agent": "kartopu-blog-avatar-fetcher/1.0"},
         )
 
@@ -227,7 +227,7 @@ class SocialAvatarDownloadTests(TestCase):
         self.assertTrue(self.user.avatar)
         mock_get.assert_called_once_with(
             "http://example.com/twitter_avatar.jpg",
-            timeout=10,
+            timeout=5,
             headers={"User-Agent": "kartopu-blog-avatar-fetcher/1.0"},
         )
 

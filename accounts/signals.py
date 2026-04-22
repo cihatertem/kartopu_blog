@@ -162,7 +162,7 @@ def _download_and_save_social_avatar(sociallogin) -> None:
             # Download the avatar
             response = requests.get(
                 avatar_url,
-                timeout=10,
+                timeout=5,
                 headers={"User-Agent": "kartopu-blog-avatar-fetcher/1.0"},
             )
             response.raise_for_status()

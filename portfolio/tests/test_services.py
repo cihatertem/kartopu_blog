@@ -348,6 +348,7 @@ class FetchMultipleFXRatesBulkTests(TestCase):
             end=expected_end,
             progress=False,
             interval="1d",
+            timeout=5,
         )
         self.assertEqual(result, {})
 

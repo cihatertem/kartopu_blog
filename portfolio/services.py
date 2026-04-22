@@ -226,7 +226,14 @@ def fetch_multiple_fx_rates_bulk(
         end = date.today() + timedelta(days=1)
 
     try:
-        data = yf.download(symbols, start=start, end=end, progress=False, interval="1d")
+        data = yf.download(
+            symbols,
+            start=start,
+            end=end,
+            progress=False,
+            interval="1d",
+            timeout=5,
+        )
     except Exception:
         logger.exception(
             "Yahoo Finance multiple bulk download failed for symbols: %s", symbols
@@ -301,7 +308,14 @@ def fetch_fx_rates_bulk(
 
     try:
         # yf.download can be noisy; setting progress=False avoids stdout spam
-        data = yf.download(symbols, start=start, end=end, progress=False, interval="1d")
+        data = yf.download(
+            symbols,
+            start=start,
+            end=end,
+            progress=False,
+            interval="1d",
+            timeout=5,
+        )
     except Exception:
         logger.exception("Yahoo Finance bulk download failed for symbols: %s", symbols)
         return {}
