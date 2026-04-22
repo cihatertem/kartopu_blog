@@ -69,7 +69,8 @@
                 width="56"
                 height="56"
                 alt="{{ post.author.full_name|default:post.author.email }}"
-                loading="lazy"
+                loading="eager"
+                fetchpriority="high"
                 decoding="async"
               />
             {% else %}

@@ -10,7 +10,7 @@
     {% include "includes/_meta.html" with seo=seo %}
     <script nonce="{{ csp_nonce }}" src="{% static 'js/head.js' %}"></script>
     <link rel="preconnect" href="https://static.kartopu.money">
-    <link rel="stylesheet" href="{% static 'css/head.css' %}">
+    {% preload_stylesheet 'css/head.css' %}
     {% preload_stylesheet 'css/site.css' %}
     {% block page_css %}{% endblock %}
     <script nonce="{{ csp_nonce }}" src="{% static 'js/preload.js' %}"></script>

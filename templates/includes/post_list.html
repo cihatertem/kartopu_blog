@@ -33,8 +33,13 @@
                 alt="Portföy görseli"
                 width="600"
                 height="600"
-                loading="lazy"
                 decoding="async"
+                {% if forloop.first %}
+                  loading="eager"
+                  fetchpriority="high"
+                {% else %}
+                  loading="lazy"
+                {% endif %}
               />
             </figure>
           {% endif %}
@@ -46,8 +51,13 @@
             alt="Portföy görseli"
             width="600"
             height="600"
-            loading="lazy"
             decoding="async"
+            {% if forloop.first %}
+              loading="eager"
+              fetchpriority="high"
+            {% else %}
+              loading="lazy"
+            {% endif %}
           />
         </figure>
       {% endif %}
@@ -65,8 +75,13 @@
                   width="42"
                   height="42"
                   alt="{{ post.author.full_name|default:post.author.email }}"
-                  loading="lazy"
                   decoding="async"
+                  {% if forloop.first %}
+                    loading="eager"
+                    fetchpriority="high"
+                  {% else %}
+                    loading="lazy"
+                  {% endif %}
                 />
               {% else %}
                 <span class="post-list__avatar-fallback" aria-hidden="true">
