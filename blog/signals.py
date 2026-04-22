@@ -10,7 +10,7 @@ from django.db.models import Value
 from django.db.models.signals import m2m_changed, post_delete, post_save
 from django.dispatch import receiver
 
-from blog.cache_keys import NAV_KEYS
+from blog.cache_keys import BLOG_POST_DETAIL_KEY_PREFIX, NAV_ARCHIVES_KEY, NAV_KEYS
 from core.decorators import log_exceptions
 
 from .models import BlogPost, BlogPostImage, Category, Tag
@@ -84,7 +84,12 @@ def blogpost_delete_files(sender, instance: BlogPost, **kwargs):
 
 
 def invalidate_nav_cache():
-    cache.delete_many(NAV_KEYS)
+    keys_to_delete = list(NAV_KEYS)
+    if NAV_ARCHIVES_KEY in keys_to_delete:
+        keys_to_delete.remove(NAV_ARCHIVES_KEY)
+        for lang_code, _ in getattr(settings, "LANGUAGES", [("tr", "Turkish")]):
+            keys_to_delete.append(f"{NAV_ARCHIVES_KEY}:{lang_code}")
+    cache.delete_many(keys_to_delete)
 
 
 def update_search_vector(post: BlogPost):
@@ -116,11 +121,13 @@ def tag_changed(sender, **kwargs):
 @receiver(post_save, sender=BlogPost)
 def post_changed_save(sender, instance: BlogPost, **kwargs):
     update_search_vector(instance)
+    cache.delete(f"{BLOG_POST_DETAIL_KEY_PREFIX}{instance.slug}")
     invalidate_nav_cache()
 
 
 @receiver(post_delete, sender=BlogPost)
 def post_changed_delete(sender, instance: BlogPost, **kwargs):
+    cache.delete(f"{BLOG_POST_DETAIL_KEY_PREFIX}{instance.slug}")
     invalidate_nav_cache()
 
 

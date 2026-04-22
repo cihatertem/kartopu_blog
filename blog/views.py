@@ -14,6 +14,8 @@ from django.urls import reverse
 from django.utils.formats import date_format
 from django.views.decorators.http import require_POST
 
+from blog.cache_keys import BLOG_POST_DETAIL_KEY_PREFIX
+from blog.models import BlogPost, BlogPostReaction, Category, Tag
 from comments.forms import CommentForm
 from comments.models import MAX_COMMENT_LENGTH, Comment
 from core import helpers
@@ -31,8 +33,6 @@ from portfolio.models import (
     PortfolioSnapshot,
     SalarySavingsSnapshot,
 )
-
-from .models import BlogPost, BlogPostReaction, Category, Tag
 
 COMMENT_PAGE_SIZE = 10
 POST_PAGE_SIZE = 10
@@ -422,6 +422,13 @@ def _post_detail_queryset():
 
 
 def _get_post_for_detail(slug: str, *, include_unpublished: bool):
+    cache_key = f"{BLOG_POST_DETAIL_KEY_PREFIX}{slug}"
+
+    if not include_unpublished:
+        post = cache.get(cache_key)
+        if post is not None:
+            return post
+
     qs = _post_detail_queryset()
     if not include_unpublished:
         qs = qs.filter(status=BlogPost.Status.PUBLISHED)
@@ -444,6 +451,9 @@ def _get_post_for_detail(slug: str, *, include_unpublished: bool):
 
     if prefetches:
         prefetch_related_objects([post], *prefetches)
+
+    if not include_unpublished:
+        cache.set(cache_key, post, timeout=3600)  # 1 saat
 
     return post
 

@@ -74,8 +74,10 @@ class SiteSettingsTest(TestCase):
         settings.is_comments_enabled = False
         settings.save()
 
-        cached_settings = cache.get("site_settings")
-        self.assertFalse(cached_settings.is_comments_enabled)
+        from blog.cache_keys import SITE_SETTINGS_KEY
+
+        cached_settings = cache.get(SITE_SETTINGS_KEY)
+        self.assertIsNone(cached_settings)
 
         settings_from_method = SiteSettings.get_settings()
         self.assertFalse(settings_from_method.is_comments_enabled)

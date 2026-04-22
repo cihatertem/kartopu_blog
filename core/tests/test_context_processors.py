@@ -8,13 +8,14 @@ from django.urls import resolve
 from django.utils import timezone
 
 from blog.cache_keys import (
+    GOAL_WIDGET_KEY,
     NAV_CATEGORIES_KEY,
     NAV_POPULAR_POSTS_KEY,
     NAV_PORTFOLIO_POSTS_KEY,
     NAV_RECENT_POSTS_KEY,
     NAV_TAGS_KEY,
+    STAFF_PENDING_NOTIFICATIONS_KEY,
 )
-from core.cache_keys import GOAL_WIDGET_KEY, STAFF_PENDING_NOTIFICATIONS_KEY
 from blog.models import BlogPost, Category, Tag
 from comments.models import Comment
 from core.context_processors import (

@@ -232,8 +232,17 @@ class BlogSignalsTests(TestCase):
 
     @patch("blog.signals.cache.delete_many")
     def test_invalidate_nav_cache(self, mock_delete_many):
+        from django.conf import settings
+
+        from blog.cache_keys import NAV_ARCHIVES_KEY, NAV_KEYS
+
+        expected_keys = list(NAV_KEYS)
+        expected_keys.remove(NAV_ARCHIVES_KEY)
+        for lang_code, _ in getattr(settings, "LANGUAGES", [("tr", "Turkish")]):
+            expected_keys.append(f"{NAV_ARCHIVES_KEY}:{lang_code}")
+
         invalidate_nav_cache()
-        mock_delete_many.assert_called_once_with(NAV_KEYS)
+        mock_delete_many.assert_called_once_with(expected_keys)
 
     @patch("blog.signals.invalidate_nav_cache")
     def test_category_changed_signal(self, mock_invalidate):

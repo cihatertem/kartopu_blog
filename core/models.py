@@ -78,19 +78,18 @@ class SiteSettings(
     def get_settings(cls):
         from django.core.cache import cache
 
-        settings_obj = cache.get("site_settings")
+        from blog.cache_keys import SITE_SETTINGS_KEY
+
+        settings_obj = cache.get(SITE_SETTINGS_KEY)
         if settings_obj is None:
             settings_obj, _ = cls.objects.get_or_create()
             cache.set(
-                "site_settings", settings_obj, timeout=CACHE_SITE_SETTINGS_TIMEOUT
+                SITE_SETTINGS_KEY, settings_obj, timeout=CACHE_SITE_SETTINGS_TIMEOUT
             )
         return settings_obj
 
     def save(self, *args: object, **kwargs: object) -> None:
         super().save(*args, **kwargs)  # pyright: ignore[reportArgumentType]
-        from django.core.cache import cache
-
-        cache.set("site_settings", self, timeout=CACHE_SITE_SETTINGS_TIMEOUT)
 
 
 class PageSEO(
@@ -291,13 +290,6 @@ class SidebarWidget(
 
     def save(self, *args: object, **kwargs: object) -> None:
         super().save(*args, **kwargs)  # pyright: ignore[reportArgumentType]
-        self.invalidate_cache()
 
     def delete(self, *args: object, **kwargs: object) -> None:  # pyright: ignore[reportIncompatibleMethodOverride]
         super().delete(*args, **kwargs)  # pyright: ignore[reportArgumentType]
-        self.invalidate_cache()
-
-    def invalidate_cache(self) -> None:
-        from django.core.cache import cache
-
-        cache.delete("sidebar_widgets")

@@ -14,3 +14,11 @@ NAV_KEYS = [
     NAV_POPULAR_POSTS_KEY,
     NAV_PORTFOLIO_POSTS_KEY,
 ]
+
+# Core and Global Keys
+GOAL_WIDGET_KEY = "goal_widget_snapshot"
+STAFF_PENDING_NOTIFICATIONS_KEY = "staff_pending_notifications:{user_id}"
+SIDEBAR_WIDGETS_KEY = "sidebar_widgets"
+SITE_SETTINGS_KEY = "site_settings"
+
+BLOG_POST_DETAIL_KEY_PREFIX = "blog_post:detail:"

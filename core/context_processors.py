@@ -12,14 +12,16 @@ from django.utils.formats import date_format
 from django.utils.translation import get_language
 
 from blog.cache_keys import (
+    GOAL_WIDGET_KEY,
     NAV_ARCHIVES_KEY,
     NAV_CATEGORIES_KEY,
     NAV_POPULAR_POSTS_KEY,
     NAV_PORTFOLIO_POSTS_KEY,
     NAV_RECENT_POSTS_KEY,
     NAV_TAGS_KEY,
+    SIDEBAR_WIDGETS_KEY,
+    STAFF_PENDING_NOTIFICATIONS_KEY,
 )
-from core.cache_keys import GOAL_WIDGET_KEY, STAFF_PENDING_NOTIFICATIONS_KEY
 from blog.models import BlogPost, Category, Tag
 from comments.models import Comment
 from portfolio.models import PortfolioSnapshot
@@ -371,12 +373,12 @@ def site_settings_context(request):
 
 
 def sidebar_widgets_context(request):
-    sidebar_widgets = cache.get("sidebar_widgets")
+    sidebar_widgets = cache.get(SIDEBAR_WIDGETS_KEY)
     if sidebar_widgets is None:
         sidebar_widgets = list(
             SidebarWidget.objects.filter(is_active=True)
             .order_by("order")
             .values("template_name")
         )
-        cache.set("sidebar_widgets", sidebar_widgets, timeout=3600)
+        cache.set(SIDEBAR_WIDGETS_KEY, sidebar_widgets, timeout=3600)
     return {"sidebar_widgets": sidebar_widgets}
