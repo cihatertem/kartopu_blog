@@ -6,6 +6,7 @@ import pandas as pd
 from django.test import TestCase
 
 from portfolio.services import (
+    YF_API_TIMEOUT,
     _get_history,
     _get_price,
     _get_ticker,
@@ -348,7 +349,7 @@ class FetchMultipleFXRatesBulkTests(TestCase):
             end=expected_end,
             progress=False,
             interval="1d",
-            timeout=5,
+            timeout=YF_API_TIMEOUT,
         )
         self.assertEqual(result, {})
 

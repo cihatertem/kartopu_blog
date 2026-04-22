@@ -17,6 +17,8 @@ from core.decorators import log_exceptions
 
 from .models import User
 
+AVATAR_DOWNLOAD_TIMEOUT = 5
+
 
 @log_exceptions(
     exception_types=(OSError, NotImplementedError),
@@ -162,7 +164,7 @@ def _download_and_save_social_avatar(sociallogin) -> None:
             # Download the avatar
             response = requests.get(
                 avatar_url,
-                timeout=5,
+                timeout=AVATAR_DOWNLOAD_TIMEOUT,
                 headers={"User-Agent": "kartopu-blog-avatar-fetcher/1.0"},
             )
             response.raise_for_status()

@@ -8,7 +8,11 @@ from django.test import TestCase
 from PIL import Image
 
 from accounts.models import User
-from accounts.signals import _delete_empty_folder, _download_and_save_social_avatar
+from accounts.signals import (
+    AVATAR_DOWNLOAD_TIMEOUT,
+    _delete_empty_folder,
+    _download_and_save_social_avatar,
+)
 
 
 class DeleteEmptyFolderTests(TestCase):
@@ -151,7 +155,7 @@ class SocialAvatarDownloadTests(TestCase):
         self.assertIn("avatars/", self.user.avatar.name)
         mock_get.assert_called_once_with(
             "http://example.com/avatar.jpg",
-            timeout=5,
+            timeout=AVATAR_DOWNLOAD_TIMEOUT,
             headers={"User-Agent": "kartopu-blog-avatar-fetcher/1.0"},
         )
 
@@ -171,7 +175,7 @@ class SocialAvatarDownloadTests(TestCase):
         self.assertTrue(self.user.avatar)
         mock_get.assert_called_once_with(
             "http://example.com/fallback.jpg",
-            timeout=5,
+            timeout=AVATAR_DOWNLOAD_TIMEOUT,
             headers={"User-Agent": "kartopu-blog-avatar-fetcher/1.0"},
         )
 
@@ -197,7 +201,7 @@ class SocialAvatarDownloadTests(TestCase):
         self.assertTrue(user.avatar)
         mock_get.assert_called_once_with(
             "http://example.com/new.jpg",
-            timeout=5,
+            timeout=AVATAR_DOWNLOAD_TIMEOUT,
             headers={"User-Agent": "kartopu-blog-avatar-fetcher/1.0"},
         )
 
@@ -227,7 +231,7 @@ class SocialAvatarDownloadTests(TestCase):
         self.assertTrue(self.user.avatar)
         mock_get.assert_called_once_with(
             "http://example.com/twitter_avatar.jpg",
-            timeout=5,
+            timeout=AVATAR_DOWNLOAD_TIMEOUT,
             headers={"User-Agent": "kartopu-blog-avatar-fetcher/1.0"},
         )
 

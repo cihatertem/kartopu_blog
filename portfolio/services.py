@@ -10,6 +10,8 @@ from core.decorators import log_exceptions
 
 logger = logging.getLogger(__name__)
 
+YF_API_TIMEOUT = 10
+
 
 def calculate_xirr(cash_flows: list[tuple[date, Decimal]]) -> float | None:
     """
@@ -232,7 +234,7 @@ def fetch_multiple_fx_rates_bulk(
             end=end,
             progress=False,
             interval="1d",
-            timeout=5,
+            timeout=YF_API_TIMEOUT,
         )
     except Exception:
         logger.exception(
@@ -314,7 +316,7 @@ def fetch_fx_rates_bulk(
             end=end,
             progress=False,
             interval="1d",
-            timeout=5,
+            timeout=YF_API_TIMEOUT,
         )
     except Exception:
         logger.exception("Yahoo Finance bulk download failed for symbols: %s", symbols)
