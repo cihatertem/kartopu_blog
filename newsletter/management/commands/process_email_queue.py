@@ -5,27 +5,27 @@ from datetime import timedelta
 
 from django.core.mail import EmailMultiAlternatives
 from django.core.management.base import BaseCommand
-from django.db import transaction
+from django.db import close_old_connections, reset_queries, transaction
 from django.utils import timezone
 
 from newsletter.models import EmailQueue, EmailQueueStatus
 
 
 class Command(BaseCommand):
-    help = "Processes the email queue with rate limiting."
+    help = "Processes the email queue with rate limiting and memory optimization."
 
     def add_arguments(self, parser):
         parser.add_argument(
             "--rate",
             type=int,
             default=10,
-            help="Maximum number of emails per second (default: 10).",
+            help="Maximum number of emails per second. AWS SES limit is 14/sec (default: 10).",
         )
         parser.add_argument(
             "--limit",
             type=int,
-            default=100,
-            help="Number of emails to process in each batch (default: 100).",
+            default=50,
+            help="Number of emails to process in each batch. Lower is better for t3.micro RAM (default: 50).",
         )
         parser.add_argument(
             "--daemon",
@@ -60,7 +60,10 @@ class Command(BaseCommand):
     def _release_lock(self, lock_file: str) -> None:
         """Releases the lock file if it exists."""
         if os.path.exists(lock_file):
-            os.remove(lock_file)
+            try:
+                os.remove(lock_file)
+            except OSError:
+                pass
 
     def _get_pending_emails(self, processing_timeout: int, limit: int):
         """Reverts stuck processing rows to pending and fetches a new batch."""
@@ -90,17 +93,8 @@ class Command(BaseCommand):
             .order_by("created_at")
         )
 
-    def _delayed_send_email_task(
-        self, email_item, attachment_cache_local, target_start_time: float
-    ):
-        """Sleeps until target_start_time and then sends the email."""
-        wait = target_start_time - time.time()
-        if wait > 0:
-            time.sleep(wait)
-        return self._send_email_task(email_item, attachment_cache_local)
-
-    def _send_email_task(self, email_item, attachment_cache_local):
-        """Builds and sends an individual email with attachments."""
+    def _send_email_task(self, email_item):
+        """Builds and sends an individual email with attachments. Evaluated lazily to save RAM."""
         try:
             message = EmailMultiAlternatives(
                 subject=email_item.subject,
@@ -112,36 +106,14 @@ class Command(BaseCommand):
                 message.attach_alternative(email_item.html_body, "text/html")
 
             if email_item.direct_email:
-                de_id = email_item.direct_email.id
-                for filename, content in attachment_cache_local.get(de_id, []):
-                    message.attach(filename, content)
+                for attachment in email_item.direct_email.attachments.all():  # pyright: ignore[reportGeneralTypeIssues]
+                    with attachment.file.open("rb") as f:
+                        message.attach(attachment.file.name.split("/")[-1], f.read())
 
             message.send(fail_silently=False)
             return (email_item, True, None)
         except Exception as e:
             return (email_item, False, e)
-
-    def _cache_attachments(self, direct_emails):
-        attachment_cache = {}
-        unique_direct_emails = set(direct_emails)
-
-        if unique_direct_emails:
-            from django.db.models import prefetch_related_objects
-
-            prefetch_related_objects(unique_direct_emails, "attachments")
-
-        for de in unique_direct_emails:
-            attachments_data = []
-            for attachment in de.attachments.all():  # pyright: ignore[reportGeneralTypeIssues]
-                with attachment.file.open("rb") as f:
-                    attachments_data.append(
-                        (
-                            attachment.file.name.split("/")[-1],
-                            f.read(),
-                        )
-                    )
-            attachment_cache[de.id] = attachments_data
-        return attachment_cache
 
     def _handle_future_result(
         self,
@@ -190,23 +162,28 @@ class Command(BaseCommand):
             for email_item in pending_emails
             if email_item.direct_email
         ]
-        attachment_cache = self._cache_attachments(direct_emails)
+
+        if direct_emails:
+            from django.db.models import prefetch_related_objects
+
+            prefetch_related_objects(direct_emails, "attachments")
 
         futures = []
-        max_workers = min(100, max(10, rate))
+        # t3.micro constraint: keep workers bounded to avoid CPU/RAM spikes.
+        # Capping at max 14 (SES limit) ensures we don't spawn too many threads.
+        max_workers = min(14, max(4, rate))
 
         with ThreadPoolExecutor(max_workers=max_workers) as executor:
-            batch_start_time = time.time()
-
-            for i, email_item in enumerate(pending_emails):
-                target_start_time = batch_start_time + (i * send_interval)
+            for email_item in pending_emails:
                 future = executor.submit(
-                    self._delayed_send_email_task,
+                    self._send_email_task,
                     email_item,
-                    attachment_cache,
-                    target_start_time,
                 )
                 futures.append(future)
+
+                # Sleep in the main thread ensures an absolute cap on submission rate
+                # and prevents ThreadPoolExecutor from queueing up and hoarding RAM.
+                time.sleep(send_interval)
 
             for future in as_completed(futures):
                 sent_count, failed_count = self._handle_future_result(
@@ -244,34 +221,47 @@ class Command(BaseCommand):
     ):
         """Runs the main processing loop for email queue."""
         while True:
-            pending_emails = self._get_pending_emails(processing_timeout, limit)
-            count = len(pending_emails)
+            try:
+                # Close stale database connections to prevent connection drops on t3.micro
+                close_old_connections()
 
-            if count == 0:
-                if not daemon:
-                    self.stdout.write(self.style.SUCCESS("No pending emails."))
-                    break
-                time.sleep(sleep_interval)
-                continue
+                pending_emails = self._get_pending_emails(processing_timeout, limit)
+                count = len(pending_emails)
 
-            self.stdout.write(
-                f"Processing batch of {count} emails at {rate} emails/sec..."
-            )
+                if count == 0:
+                    if not daemon:
+                        self.stdout.write(self.style.SUCCESS("No pending emails."))
+                        break
+                    time.sleep(sleep_interval)
+                    continue
 
-            sent_count, failed_count, emails_to_update, direct_emails_to_update = (
-                self._process_batch(pending_emails, rate, send_interval)
-            )
-
-            self._update_results(emails_to_update, direct_emails_to_update)
-
-            self.stdout.write(
-                self.style.SUCCESS(
-                    f"Batch finished. Sent: {sent_count}, Failed: {failed_count}"
+                self.stdout.write(
+                    f"Processing batch of {count} emails at {rate} emails/sec..."
                 )
-            )
 
-            if not daemon:
-                break
+                sent_count, failed_count, emails_to_update, direct_emails_to_update = (
+                    self._process_batch(pending_emails, rate, send_interval)
+                )
+
+                self._update_results(emails_to_update, direct_emails_to_update)
+
+                self.stdout.write(
+                    self.style.SUCCESS(
+                        f"Batch finished. Sent: {sent_count}, Failed: {failed_count}"
+                    )
+                )
+
+                if not daemon:
+                    break
+
+            except Exception as e:
+                self.stderr.write(self.style.ERROR(f"Error in processing loop: {e}"))
+                if not daemon:
+                    raise
+                time.sleep(sleep_interval)
+            finally:
+                # Clear Django query log to prevent memory leaks in daemon mode
+                reset_queries()
 
     def handle(self, *args, **options):
         rate = options["rate"]
@@ -279,6 +269,14 @@ class Command(BaseCommand):
         daemon = options["daemon"]
         sleep_interval = options["sleep"]
         processing_timeout = options["processing_timeout"]
+
+        # Enforce hard limit of 14 for AWS SES
+        if rate > 14:
+            self.stdout.write(
+                self.style.WARNING("Rate clamped to 14 to respect AWS SES limits.")
+            )
+            rate = 14
+
         send_interval = 1.0 / rate
 
         lock_file = "/tmp/process_email_queue.lock"
@@ -303,5 +301,7 @@ class Command(BaseCommand):
             )
         except KeyboardInterrupt:
             self.stdout.write(self.style.WARNING("Email processor stopped."))
+        except Exception as e:
+            self.stderr.write(self.style.ERROR(f"Fatal error: {e}"))
         finally:
             self._release_lock(lock_file)

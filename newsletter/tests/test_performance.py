@@ -50,7 +50,9 @@ class ProcessEmailQueuePerformanceTest(TransactionTestCase):
             os.remove(self.lock_file)
 
     @patch("sys.stdout.write")
-    def test_no_n_plus_one_queries(self, mock_stdout):
+    @patch("newsletter.management.commands.process_email_queue.reset_queries")
+    @patch("newsletter.management.commands.process_email_queue.close_old_connections")
+    def test_no_n_plus_one_queries(self, mock_close, mock_reset, mock_stdout):
         with self.assertNumQueries(13):
             call_command("process_email_queue", rate=1000, limit=100)
 
