@@ -1,7 +1,8 @@
-{% load static blog_extras %}
+{% load static blog_extras cache %}
 
 <ul class="post-list">
   {% for post in posts %}
+    {% cache 3600 post_item post.id post.updated_at forloop.first %}
     <li class="post-list__item">
       <h2 class="post-list__title">
         <a href="{{ post.get_absolute_url }}">{{ post.title }}</a>
@@ -116,5 +117,6 @@
       {% endif %}
     </li>
     <hr />
+    {% endcache %}
   {% endfor %}
 </ul>

@@ -1,4 +1,5 @@
 from django.urls import path
+from django.views.decorators.cache import cache_page
 
 from . import feeds, views
 
@@ -6,7 +7,7 @@ app_name = "blog"
 
 urlpatterns = [
     path("", views.post_list, name="post_list"),
-    path("rss/", feeds.LatestPostsFeed(), name="post_feed"),
+    path("rss/", cache_page(3600)(feeds.LatestPostsFeed()), name="post_feed"),
     path("search/", views.search_results, name="search_results"),
     path(
         "archive/<int:year>/<int:month>/", views.archive_detail, name="archive_detail"
@@ -14,7 +15,7 @@ urlpatterns = [
     path("category/<slug:slug>/", views.category_detail, name="category_detail"),
     path(
         "category/<slug:slug>/rss/",
-        feeds.CategoryPostsFeed(),
+        cache_page(3600)(feeds.CategoryPostsFeed()),
         name="category_feed",
     ),
     path("tag/<slug:slug>/", views.tag_detail, name="tag_detail"),
