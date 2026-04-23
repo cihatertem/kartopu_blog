@@ -1,6 +1,4 @@
-import threading
 
-from django.db import transaction
 from django.test import TransactionTestCase
 
 from newsletter.management.commands.process_email_queue import Command

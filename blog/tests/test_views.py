@@ -122,7 +122,7 @@ class BlogViewsTests(TestCase):
     def test_search_results_view(self):
         from unittest.mock import patch
 
-        with patch("blog.views.SearchVector"):
+        with patch("blog.views.SearchQuery"), patch("blog.views.SearchRank"):
             url = reverse("blog:search_results")
 
             response = self.client.get(url, follow=True)

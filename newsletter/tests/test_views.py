@@ -10,7 +10,7 @@ from newsletter.models import Subscriber, SubscriberStatus
 from newsletter.tokens import make_token
 
 
-@override_settings(SECURE_SSL_REDIRECT=False)
+@override_settings(SECURE_SSL_REDIRECT=False, RATELIMIT_ENABLE=False)
 class NewsletterSubscribeViewTest(TestCase):
     def setUp(self):
         self.client = Client()
@@ -105,7 +105,7 @@ class NewsletterSubscribeViewTest(TestCase):
         mock_send.assert_called_once_with("test@example.com")
 
 
-@override_settings(SECURE_SSL_REDIRECT=False)
+@override_settings(SECURE_SSL_REDIRECT=False, RATELIMIT_ENABLE=False)
 class NewsletterUnsubscribeViewTest(TestCase):
     def setUp(self):
         self.client = Client()
@@ -158,7 +158,7 @@ class NewsletterUnsubscribeViewTest(TestCase):
         mock_send.assert_called_once_with("test@example.com")
 
 
-@override_settings(SECURE_SSL_REDIRECT=False)
+@override_settings(SECURE_SSL_REDIRECT=False, RATELIMIT_ENABLE=False)
 class NewsletterConfirmSubscriptionViewTest(TestCase):
     def setUp(self):
         self.client = Client()

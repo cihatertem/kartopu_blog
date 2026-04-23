@@ -3,6 +3,7 @@ from django.contrib import messages
 from django.core import signing
 from django.shortcuts import redirect, render
 from django.utils import timezone
+from django_ratelimit.decorators import ratelimit
 
 from core.helpers import get_safe_referer
 from core.models import SiteSettings
@@ -13,6 +14,7 @@ from .services import send_subscribe_confirmation, send_unsubscribe_confirmation
 from .tokens import parse_token
 
 
+@ratelimit(key="ip", rate="3/m", block=True)
 def subscribe_request(request):
     if not SiteSettings.get_settings().is_newsletter_enabled:
         messages.error(request, "Bülten aboneliği şu anda kapalıdır.")
@@ -55,6 +57,7 @@ def subscribe_request(request):
     return redirect(get_safe_referer(request))
 
 
+@ratelimit(key="ip", rate="3/m", block=True)
 def unsubscribe_request(request):
     if request.method != "POST":
         return redirect("/")

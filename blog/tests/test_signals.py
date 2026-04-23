@@ -234,7 +234,7 @@ class BlogSignalsTests(TestCase):
     def test_invalidate_nav_cache(self, mock_delete_many):
         from django.conf import settings
 
-        from blog.cache_keys import NAV_ARCHIVES_KEY, NAV_KEYS
+        from blog.cache_keys import NAV_ARCHIVES_KEY
 
         expected_keys = list(NAV_KEYS)
         expected_keys.remove(NAV_ARCHIVES_KEY)

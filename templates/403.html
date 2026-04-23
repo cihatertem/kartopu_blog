@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}403 - Erişim Reddedildi | Kartopu Money{% endblock %}
+
+{% block content %}
+  <section class="not-found">
+    <div class="not-found__card">
+      <div class="not-found__content">
+        <p class="not-found__eyebrow">Erişim Engellendi</p>
+        <h1 class="not-found__title">403 - Çok Fazla İstek</h1>
+        <p class="not-found__text">
+          Sistemimizi korumak adına kısa sürede çok fazla istek gönderdiğiniz için geçici olarak engellendiniz. Lütfen bir dakika bekleyip tekrar deneyin.
+        </p>
+        <div class="not-found__actions">
+          <a class="button button--primary" href="{% url 'core:home' %}">Ana sayfaya dön</a>
+          <a class="button button--ghost" href="{% url 'blog:post_list' %}">Blog yazılarına göz at</a>
+        </div>
+      </div>
+      <div class="not-found__visual">
+        <img src="{% static 'images/home/hero-snow-ball.png' %}" alt="Kartopu simgesi" width="190" height="190" loading="eager" fetchpriority="high" decoding="async" />
+      </div>
+    </div>
+  </section>
+{% endblock %}
+
+{% block sidebar %}{% endblock %}
