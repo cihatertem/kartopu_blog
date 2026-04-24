@@ -149,6 +149,7 @@ class BaseSnapshot(SlugMixin, UUIDModelMixin, TimeStampedModelMixin):
 
         if uncached_pairs:
             fetched_rates = fetch_fx_rates_bulk(uncached_pairs, rate_date=rate_date)
+            new_cache_data = {}
             for source_currency, target_currency in uncached_pairs:
                 currency_pair = (source_currency, target_currency, rate_date)
                 cache_key = cls._get_fx_cache_key(
@@ -157,15 +158,17 @@ class BaseSnapshot(SlugMixin, UUIDModelMixin, TimeStampedModelMixin):
                     rate_date,
                 )
                 fx_rate = (fetched_rates or {}).get(
-                    (source_currency, target_currency),
+                    (source_currency, target_currency),  # pyright: ignore[reportArgumentType]
                     Decimal("1"),
                 )
-                cache.set(
-                    cache_key,
-                    fx_rate,
+                new_cache_data[cache_key] = fx_rate
+                fx_rates[currency_pair] = fx_rate  # pyright: ignore[reportArgumentType]
+
+            if new_cache_data:
+                cache.set_many(
+                    new_cache_data,
                     timeout=getattr(settings, "CACHE_TIMEOUT", CACHE_TIMEOUT),
                 )
-                fx_rates[currency_pair] = fx_rate  # pyright: ignore[reportArgumentType]
 
         return fx_rates
 
@@ -1036,7 +1039,7 @@ class PortfolioSnapshot(BaseSnapshot):
         Calculates and updates the irr_pct for this snapshot.
         """
         has_prior_snapshot = (
-            self.__class__.objects.filter(portfolio_id=self.portfolio_id)
+            self.__class__.objects.filter(portfolio_id=self.portfolio_id)  # pyright: ignore[reportAttributeAccessIssue]
             .exclude(pk=self.pk)
             .filter(
                 Q(snapshot_date__lt=self.snapshot_date)
@@ -1115,7 +1118,7 @@ class PortfolioSnapshot(BaseSnapshot):
             )
             for position in items_data
         ]
-        cls._bulk_create_instances(PortfolioSnapshotItem, items)
+        cls._bulk_create_instances(PortfolioSnapshotItem, items)  # pyright: ignore[reportArgumentType]
 
 
 class PortfolioSnapshotItem(UUIDModelMixin, TimeStampedModelMixin):
@@ -1304,10 +1307,10 @@ class CashFlowSnapshot(BaseSnapshot):
             fx_rate = Decimal("1")
             if entry_currency != cashflow_currency:
                 currency_pair = (entry_currency, cashflow_currency, snapshot_date)
-                fx_rate = fx_rates.get(currency_pair, Decimal("1"))
-            converted_amount = amount * fx_rate
-            category_totals[entry["category"]] = (
-                category_totals.get(entry["category"], Decimal("0")) + converted_amount
+                fx_rate = fx_rates.get(currency_pair, Decimal("1"))  # pyright: ignore[reportCallIssue, reportArgumentType]
+            converted_amount = amount * fx_rate  # pyright: ignore[reportOperatorIssue]
+            category_totals[entry["category"]] = (  # pyright: ignore[reportArgumentType]
+                category_totals.get(entry["category"], Decimal("0")) + converted_amount  # pyright: ignore[reportCallIssue, reportArgumentType]
             )
         return category_totals
 
@@ -1392,7 +1395,7 @@ class CashFlowSnapshot(BaseSnapshot):
             )
             for item in items_data
         ]
-        cls._bulk_create_instances(CashFlowSnapshotItem, objects_to_create)
+        cls._bulk_create_instances(CashFlowSnapshotItem, objects_to_create)  # pyright:ignore[reportArgumentType]
 
 
 class CashFlowSnapshotItem(UUIDModelMixin, TimeStampedModelMixin):
@@ -1979,18 +1982,18 @@ class DividendSnapshot(BaseSnapshot):
         for payment in payments:
             if (
                 hasattr(payment, "_prefetched_objects_cache")
-                and "dividends" in payment._prefetched_objects_cache
+                and "dividends" in payment._prefetched_objects_cache  # pyright: ignore[reportAttributeAccessIssue]
             ):
                 dividend = next(
                     (
                         d
-                        for d in payment._prefetched_objects_cache["dividends"]
+                        for d in payment._prefetched_objects_cache["dividends"]  # pyright: ignore[reportAttributeAccessIssue]
                         if d.currency == currency
                     ),
                     None,  # pyright: ignore[reportAttributeAccessIssue]
                 )
             else:
-                dividend = dividends_map.get(payment.id)
+                dividend = dividends_map.get(payment.id)  # pyright: ignore[reportArgumentType]
 
             per_share, total_payment = cls._calculate_payment_amounts(
                 payment, dividend, currency, snapshot_date, fx_rates

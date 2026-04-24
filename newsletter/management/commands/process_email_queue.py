@@ -93,8 +93,11 @@ class Command(BaseCommand):
             .order_by("created_at")
         )
 
-    def _send_email_task(self, email_item):
+    def _send_email_task(self, email_item, attachment_contents=None):
         """Builds and sends an individual email with attachments. Evaluated lazily to save RAM."""
+        if attachment_contents is None:
+            attachment_contents = {}
+
         try:
             message = EmailMultiAlternatives(
                 subject=email_item.subject,
@@ -107,8 +110,14 @@ class Command(BaseCommand):
 
             if email_item.direct_email:
                 for attachment in email_item.direct_email.attachments.all():  # pyright: ignore[reportGeneralTypeIssues]
-                    with attachment.file.open("rb") as f:
-                        message.attach(attachment.file.name.split("/")[-1], f.read())
+                    if attachment.id in attachment_contents:
+                        filename, content = attachment_contents[attachment.id]
+                        message.attach(filename, content)
+                    else:
+                        with attachment.file.open("rb") as f:
+                            message.attach(
+                                attachment.file.name.split("/")[-1], f.read()
+                            )
 
             message.send(fail_silently=False)
             return (email_item, True, None)
@@ -168,6 +177,16 @@ class Command(BaseCommand):
 
             prefetch_related_objects(direct_emails, "attachments")
 
+        attachment_contents = {}
+        for direct_email in direct_emails:
+            for attachment in direct_email.attachments.all():
+                if attachment.id not in attachment_contents:
+                    with attachment.file.open("rb") as f:
+                        attachment_contents[attachment.id] = (
+                            attachment.file.name.split("/")[-1],
+                            f.read(),
+                        )
+
         futures = []
         # t3.micro constraint: keep workers bounded to avoid CPU/RAM spikes.
         # Capping at max 14 (SES limit) ensures we don't spawn too many threads.
@@ -178,6 +197,7 @@ class Command(BaseCommand):
                 future = executor.submit(
                     self._send_email_task,
                     email_item,
+                    attachment_contents,
                 )
                 futures.append(future)
 
