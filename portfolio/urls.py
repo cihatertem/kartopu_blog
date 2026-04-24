@@ -6,6 +6,7 @@ from . import views
 app_name = "portfolio"
 
 urlpatterns = [
+    path("butce-takibi/", views.BudgetTrackerView.as_view(), name="budget_tracker"),
     path(
         "fire-hesaplayici/", views.FireCalculatorView.as_view(), name="fire_calculator"
     ),

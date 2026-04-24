@@ -1,6 +1,21 @@
 from django.views.generic import TemplateView
 
 
+class BudgetTrackerView(TemplateView):
+    template_name = "portfolio/budget_tracker.html"
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context.update(
+            {
+                "title": "Maaş Günü 7 Adım Bütçe Takip Platformu",
+                "description": "Aylık gelirinizi ve giderlerinizi analiz edin, acil durum fonu ve yatırımlarınızı planlayın. Kişisel finansınızı kontrol altına alın.",
+                "active_nav": "budget-tracker",
+            }
+        )
+        return context
+
+
 class FireCalculatorView(TemplateView):
     template_name = "portfolio/fire_calculator.html"
 

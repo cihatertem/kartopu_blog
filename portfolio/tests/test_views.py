@@ -3,6 +3,20 @@ from django.urls import reverse
 
 
 @override_settings(SECURE_SSL_REDIRECT=False)
+class BudgetTrackerViewTests(TestCase):
+    def test_get_context_data(self):
+        url = reverse("portfolio:budget_tracker")
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, 200)
+        self.assertTemplateUsed(response, "portfolio/budget_tracker.html")
+        self.assertEqual(
+            response.context["title"], "Maaş Günü 7 Adım Bütçe Takip Platformu"
+        )
+        self.assertEqual(response.context["active_nav"], "budget-tracker")
+        self.assertContains(response, "Bütçe Takip Sistemi")
+
+
+@override_settings(SECURE_SSL_REDIRECT=False)
 class FireCalculatorViewTests(TestCase):
     def test_get_context_data(self):
         url = reverse("portfolio:fire_calculator")

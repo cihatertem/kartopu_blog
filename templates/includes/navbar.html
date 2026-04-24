@@ -28,10 +28,17 @@
         </a>
 
         <div class="nav-dropdown">
-            <div class="site-nav__link nav-dropdown__trigger {% if active_nav == 'fire-calculator' or active_nav == 'portfolio-sim' or active_nav == 'sorr-analysis' %}is-active{% endif %}">
+            <div class="site-nav__link nav-dropdown__trigger {% if active_nav == 'fire-calculator' or active_nav == 'portfolio-sim' or active_nav == 'sorr-analysis' or active_nav == 'budget-tracker' %}is-active{% endif %}">
                 Hesaplayıcılar <span class="nav-dropdown__icon">▼</span>
             </div>
             <div class="nav-dropdown__content">
+                <a
+                  href="{% url 'portfolio:budget_tracker' %}"
+                  title="Maaş Günü 7 Adım Bütçe Takip Platformu | Kartopu Money"
+                  class="nav-dropdown__item {% if active_nav == 'budget-tracker' %}is-active{% endif %}"
+                >
+                  Bütçe Takip
+                </a>
                 <a
                   href="{% url 'portfolio:fire_calculator' %}"
                   title="Finansal Özgürlük (FIRE) Hesaplayıcı: Ne zaman finansal özgür olabileceğinizi hesaplayın | Kartopu Money"

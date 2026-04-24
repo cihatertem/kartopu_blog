@@ -1,0 +1,188 @@
+{% extends "base.html" %}
+{% load static blog_extras %}
+
+{% block title %}{{ title }} | Kartopu Money{% endblock %}
+{% block description %}{{ description }}{% endblock %}
+
+{% block page_css %}
+  {% preload_stylesheet "css/budget_tracker.css" %}
+{% endblock %}
+
+
+{% block content %}
+<div class="budget-tracker-container">
+    <div class="bt-header">
+        <h1>Bütçe Takip Sistemi</h1>
+        <div class="month-selector">
+            <label for="bt-month-select">Dönem Seçin:</label>
+            <select id="bt-month-select" aria-label="Bütçe Dönemi"></select>
+        </div>
+    </div>
+
+    <!-- Progress Navigation -->
+    <div class="progress-container">
+        <div class="progress-pills">
+            <div class="step-pill active" data-step="1">1. Yaşama Maliyeti</div>
+            <div class="step-pill" data-step="2">2. Acil Durum</div>
+            <div class="step-pill" data-step="3">3. Borç</div>
+            <div class="step-pill" data-step="4">4. Yatırım</div>
+            <div class="step-pill" data-step="5">5. Final</div>
+        </div>
+    </div>
+
+    <!-- Step 1: Yaşama Maliyeti -->
+    <div class="step-content active" id="step-1">
+        <h2>Adım 1: Yaşama Maliyeti</h2>
+        <p class="text-secondary">Barınma, beslenme, faturalar ve ulaşım gibi temel ihtiyaçlarınızı listeleyin.</p>
+
+        <div class="form-group form-group-sm mb-24">
+            <label for="monthly-income">Aylık Net Geliriniz (₺)</label>
+            <input type="number" id="monthly-income" class="input-field" placeholder="Örn: 50000">
+        </div>
+
+        <div class="flex-between mb-12">
+            <h3>Sabit ve Değişken Giderler</h3>
+            <span id="cost-ratio-badge" class="badge">Hesaplanıyor...</span>
+        </div>
+
+        <div id="living-costs-container"></div>
+
+        <button type="button" class="btn btn-success mt-10" id="add-cost-btn">+ Gider Ekle</button>
+
+        <div class="action-buttons flex-end">
+            <button class="btn btn-primary next-step" data-target="2">İleri: Acil Durum Fonu &rarr;</button>
+        </div>
+    </div>
+
+    <!-- Step 2: Acil Durum Fonu -->
+    <div class="step-content" id="step-2">
+        <h2>Adım 2: Acil Durum Fonu</h2>
+        <p class="text-secondary">Giderlerinizin 3 ila 6 aylık tutarı kadar bir fon oluşturmayı hedefliyoruz.</p>
+
+        <div class="info-note">
+            <strong>Öneri:</strong> Acil durum fonunuzu enflasyona karşı korumak için, hemen nakde dönebilen Para Piyasası Fonlarında tutmayı değerlendirebilirsiniz.
+        </div>
+
+        <div class="form-group form-group-sm">
+            <label for="ef-target">Hedef Süre (Ay)</label>
+            <select id="ef-target" class="input-field">
+                <option value="3">3 Ay (Minimum)</option>
+                <option value="6">6 Ay (Güvenli)</option>
+            </select>
+        </div>
+
+        <div class="form-group form-group-sm">
+            <label for="ef-current">Mevcut Birikim (₺)</label>
+            <input type="number" id="ef-current" class="input-field" placeholder="0">
+        </div>
+
+        <div class="mt-20">
+            <p id="ef-progress-text" class="font-medium mb-8">Hesaplanıyor...</p>
+            <div class="ef-progress-track">
+                <div id="ef-progress-bar-fill" class="ef-progress-fill"></div>
+            </div>
+        </div>
+
+        <div class="action-buttons flex-between">
+            <button class="btn btn-primary prev-step" data-target="1">&larr; Geri</button>
+            <button class="btn btn-primary next-step" data-target="3">İleri: Borç Kartopu &rarr;</button>
+        </div>
+    </div>
+
+    <!-- Step 3: Borç Kartopu -->
+    <div class="step-content" id="step-3">
+        <h2>Adım 3: Borç Kartopu</h2>
+        <p class="text-secondary">Tüm borçlarınızı faiz oranına bakmaksızın küçükten büyüğe sıralayarak ödeme motivasyonunuzu artırın.</p>
+
+        <div class="info-note">
+            <strong>Borç Kartopu Yöntemi:</strong> Minimum ödemeleri yaparken, kalan tüm ekstra bütçeyi en küçük borcu kapatmaya yönlendirin. Kapandıkça elde edilen boşluğu bir sonraki borca ekleyerek (kartopu etkisi) ilerleyin.
+        </div>
+
+        <div id="debt-ratio-text" class="font-semibold text-danger mb-16"></div>
+
+        <div id="debts-container"></div>
+        <button type="button" class="btn btn-success mt-10" id="add-debt-btn">+ Borç Ekle</button>
+
+        <div class="action-buttons flex-between">
+            <button class="btn btn-primary prev-step" data-target="2">&larr; Geri</button>
+            <button class="btn btn-primary next-step" data-target="4">İleri: Yatırım &rarr;</button>
+        </div>
+    </div>
+
+    <!-- Step 4: Yatırım -->
+    <div class="step-content" id="step-4">
+        <h2>Adım 4: Yatırım</h2>
+        <p class="text-secondary">Geleceğinizi güvence altına almak için yatırıma ayırdığınız tutarları girin.</p>
+
+        <div class="info-note">
+            <strong>Bileşik Getirinin Gücü:</strong> 72 kuralına göre, yıllık %10 getiri sağlayan bir yatırım yaklaşık 7.2 yılda ikiye katlanır. Erken ve düzenli yatırım anahtardır.
+        </div>
+
+        <div class="form-group form-group-sm">
+            <label for="inv-bes">BES (Aylık Katkı - ₺)</label>
+            <input type="number" id="inv-bes" class="input-field" placeholder="0">
+        </div>
+
+        <div class="form-group form-group-sm">
+            <label for="inv-stock">Borsa / Yatırım Fonları (Aylık - ₺)</label>
+            <input type="number" id="inv-stock" class="input-field" placeholder="0">
+        </div>
+
+        <p id="investment-total-text" class="font-semibold mt-16"></p>
+
+        <div class="action-buttons flex-between">
+            <button class="btn btn-primary prev-step" data-target="3">&larr; Geri</button>
+            <button class="btn btn-primary next-step" data-target="5">İleri: Final &rarr;</button>
+        </div>
+    </div>
+
+    <!-- Step 5: Final Özeti -->
+    <div class="step-content" id="step-5">
+        <h2>Adım 5: Öngörülmez Rezerv & Final Özeti</h2>
+
+        <div class="form-group form-group-sm mb-24">
+            <label for="reserve-amount">Esneklik Tamponu / Rezerv (₺)</label>
+            <input type="number" id="reserve-amount" class="input-field" placeholder="Hesapta bırakılacak esneme payı">
+            <small class="text-secondary">Beklenmedik ufak harcamalar için bir miktar nakit ayırın.</small>
+        </div>
+
+        <div class="summary-grid">
+            <div class="summary-card">
+                <h3>Genel Durum</h3>
+                <table class="summary-table">
+                    <tr>
+                        <td>Aylık Gelir:</td>
+                        <td class="text-right font-semibold" id="summary-income">0 ₺</td>
+                    </tr>
+                    <tr>
+                        <td>Dağıtılan Toplam:</td>
+                        <td class="text-right font-semibold" id="summary-allocated">0 ₺</td>
+                    </tr>
+                    <tr class="total-row">
+                        <td>Kalan Boşluk:</td>
+                        <td class="text-right font-semibold" id="summary-remaining">0 ₺</td>
+                    </tr>
+                </table>
+                <div class="summary-actions">
+                    <button id="copy-summary-btn" class="btn btn-outline">📋 Özeti Kopyala (AI İçin)</button>
+                    <button id="export-csv-btn" class="btn btn-success">📥 CSV İndir</button>
+                </div>
+            </div>
+            <div class="summary-card">
+                <div class="chart-container">
+                    <canvas id="budgetChart"></canvas>
+                </div>
+            </div>
+        </div>
+
+        <div class="action-buttons flex-start mt-30">
+            <button class="btn btn-primary prev-step" data-target="4">&larr; Geri</button>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block js_script %}
+<script nonce="{{ csp_nonce }}" defer src="{% static 'vendor/chart.umd.min.js' %}"></script>
+<script nonce="{{ csp_nonce }}" defer src="{% static 'js/budget_tracker.js' %}"></script>
+{% endblock %}

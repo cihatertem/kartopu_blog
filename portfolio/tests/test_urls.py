@@ -1,10 +1,20 @@
 from django.test import SimpleTestCase
 from django.urls import resolve, reverse
 
-from portfolio.views import FireCalculatorView, PortfolioSimView, SorrAnalysisView
+from portfolio.views import (
+    BudgetTrackerView,
+    FireCalculatorView,
+    PortfolioSimView,
+    SorrAnalysisView,
+)
 
 
 class UrlsTestCase(SimpleTestCase):
+    def test_budget_tracker_url_resolves(self):
+        url = reverse("portfolio:budget_tracker")
+        self.assertEqual(url, "/portfoy/butce-takibi/")
+        self.assertEqual(resolve(url).func.view_class, BudgetTrackerView)
+
     def test_fire_calculator_url_resolves(self):
         url = reverse("portfolio:fire_calculator")
         self.assertEqual(url, "/portfoy/fire-hesaplayici/")
