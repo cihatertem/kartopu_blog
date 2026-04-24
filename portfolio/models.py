@@ -433,17 +433,20 @@ class Portfolio(UUIDModelMixin, TimeStampedModelMixin):
             return
 
         fetched_rates = fetch_multiple_fx_rates_bulk(uncached_pairs_by_date)
+        cache_data = {}
         for rate_date, pairs in uncached_pairs_by_date.items():
             for pair in pairs:
                 currency_pair = (pair[0], pair[1], rate_date)
                 cache_key = f"fx_rate_{pair[0]}_{pair[1]}_{rate_date.isoformat() if rate_date else 'latest'}"
                 fx_rate = fetched_rates.get(currency_pair, Decimal("1"))  # pyright: ignore
-                cache.set(
-                    cache_key,
-                    fx_rate,
-                    timeout=getattr(settings, "CACHE_TIMEOUT", CACHE_TIMEOUT),
-                )
+                cache_data[cache_key] = fx_rate
                 fx_rates[currency_pair] = fx_rate  # pyright: ignore[reportArgumentType]
+
+        if cache_data:
+            cache.set_many(
+                cache_data,
+                timeout=getattr(settings, "CACHE_TIMEOUT", CACHE_TIMEOUT),
+            )
 
     def _prefetch_fx_rates(
         self,
