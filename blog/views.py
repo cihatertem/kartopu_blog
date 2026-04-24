@@ -528,31 +528,6 @@ def _build_post_detail_context(request, post, *, is_preview: bool):
     }
 
 
-def archive_index(request):
-    qs = BlogPost.objects.filter(
-        status=BlogPost.Status.PUBLISHED, published_at__isnull=False
-    )
-
-    archives = (
-        qs.annotate(
-            year=F("published_at__year"),
-            month=F("published_at__month"),
-        )
-        .values("year", "month")
-        .annotate(count=Count("id"))
-        .order_by("-year", "-month")
-    )
-
-    return render(
-        request,
-        "blog/archive_index.html",
-        {
-            "archives": archives,
-            "active_nav": "blog",
-        },
-    )
-
-
 def _get_cached_search_results(base_qs, cached_data, page_num):
     total_count, post_ids = cached_data
     posts_dict = base_qs.in_bulk(post_ids)

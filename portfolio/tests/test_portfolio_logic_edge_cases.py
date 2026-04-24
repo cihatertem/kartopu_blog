@@ -112,6 +112,30 @@ class PortfolioLogicEdgeCaseTests(TestCase):
         )
         self.assertEqual(res, Decimal("0"))
 
+        # Fractional quantities and rates
+        res = Portfolio._calculate_capital_increase_quantity(
+            current_quantity=Decimal("10.5"), increase_rate_pct=Decimal("12.5")
+        )
+        self.assertEqual(res, Decimal("1.3125"))
+
+        # Small positive numbers
+        res = Portfolio._calculate_capital_increase_quantity(
+            current_quantity=Decimal("0.01"), increase_rate_pct=Decimal("0.01")
+        )
+        self.assertEqual(res, Decimal("0.000001"))
+
+        # Large numbers
+        res = Portfolio._calculate_capital_increase_quantity(
+            current_quantity=Decimal("999999999"), increase_rate_pct=Decimal("999")
+        )
+        self.assertEqual(res, Decimal("9989999990.01"))
+
+        # Both negative
+        res = Portfolio._calculate_capital_increase_quantity(
+            current_quantity=Decimal("-100"), increase_rate_pct=Decimal("-10")
+        )
+        self.assertEqual(res, Decimal("0"))
+
     def test_apply_transaction_sequence(self) -> None:
         """Test a full sequence of different transaction types on a position."""
         data = {

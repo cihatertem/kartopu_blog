@@ -100,6 +100,12 @@ class ParseIntTest(TestCase):
         self.assertIsNone(_parse_int(None))
         self.assertIsNone(_parse_int(""))
 
+    def test_parse_int_type_error(self):
+        from core.helpers import _parse_int
+
+        with self.assertLogs("core.helpers", level="ERROR"):
+            self.assertIsNone(_parse_int(["unsupported", "type"]))
+
 
 class GetSafeRefererTest(TestCase):
     def setUp(self):

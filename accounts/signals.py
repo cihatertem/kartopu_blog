@@ -20,14 +20,15 @@ from .models import User
 AVATAR_DOWNLOAD_TIMEOUT = 5
 
 
-@log_exceptions(
-    exception_types=(OSError, NotImplementedError),
-    message="Error deleting empty avatar folder",
-)
 def _delete_empty_folder(storage, path: str) -> None:
-    folder = os.path.dirname(storage.path(path))
-    if os.path.isdir(folder) and not os.listdir(folder):
-        os.rmdir(folder)
+    try:
+        if not path:
+            return
+        dirs, files = storage.listdir(path)
+        if not dirs and not files:
+            storage.delete(path)
+    except OSError, NotImplementedError:
+        pass
 
 
 @receiver(post_delete, sender=User)
@@ -46,7 +47,7 @@ def delete_user_avatar(sender, instance: User, **kwargs) -> None:
     avatar.delete(save=False)  # pyright: ignore[reportAttributeAccessIssue]
 
     if isinstance(storage, FileSystemStorage):
-        _delete_empty_folder(storage, avatar_name)
+        _delete_empty_folder(storage, os.path.dirname(avatar_name))
 
 
 def _find_key_in_mapping(

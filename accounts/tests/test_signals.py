@@ -18,79 +18,53 @@ from accounts.signals import (
 class DeleteEmptyFolderTests(TestCase):
     def setUp(self):
         self.mock_storage = MagicMock()
-        self.mock_storage.path.return_value = "/path/to/folder/file.txt"
 
-    @patch("accounts.signals.os.path.dirname")
-    @patch("accounts.signals.os.path.isdir")
-    @patch("accounts.signals.os.listdir")
-    @patch("accounts.signals.os.rmdir")
-    def test_delete_empty_folder_success(
-        self, mock_rmdir, mock_listdir, mock_isdir, mock_dirname
-    ):
-        mock_dirname.return_value = "/path/to/folder"
-        mock_isdir.return_value = True
-        mock_listdir.return_value = []
+    def test_delete_empty_folder_empty_path(self):
+        _delete_empty_folder(self.mock_storage, "")
+        _delete_empty_folder(self.mock_storage, None)
 
-        _delete_empty_folder(self.mock_storage, "folder/file.txt")
+        self.mock_storage.listdir.assert_not_called()
+        self.mock_storage.delete.assert_not_called()
 
-        mock_rmdir.assert_called_once_with("/path/to/folder")
+    def test_delete_empty_folder_success(self):
+        self.mock_storage.listdir.return_value = ([], [])
 
-    @patch("accounts.signals.os.path.dirname")
-    @patch("accounts.signals.os.path.isdir")
-    @patch("accounts.signals.os.listdir")
-    @patch("accounts.signals.os.rmdir")
-    def test_delete_empty_folder_not_empty(
-        self, mock_rmdir, mock_listdir, mock_isdir, mock_dirname
-    ):
-        mock_dirname.return_value = "/path/to/folder"
-        mock_isdir.return_value = True
-        mock_listdir.return_value = ["other_file.txt"]
+        _delete_empty_folder(self.mock_storage, "avatars/empty_folder")
 
-        _delete_empty_folder(self.mock_storage, "folder/file.txt")
+        self.mock_storage.listdir.assert_called_once_with("avatars/empty_folder")
+        self.mock_storage.delete.assert_called_once_with("avatars/empty_folder")
 
-        mock_rmdir.assert_not_called()
+    def test_delete_empty_folder_has_files(self):
+        self.mock_storage.listdir.return_value = ([], ["file.jpg"])
 
-    @patch("accounts.signals.os.path.dirname")
-    @patch("accounts.signals.os.path.isdir")
-    @patch("accounts.signals.os.listdir")
-    @patch("accounts.signals.os.rmdir")
-    def test_delete_empty_folder_not_a_dir(
-        self, mock_rmdir, mock_listdir, mock_isdir, mock_dirname
-    ):
-        mock_dirname.return_value = "/path/to/folder"
-        mock_isdir.return_value = False
+        _delete_empty_folder(self.mock_storage, "avatars/not_empty")
 
-        _delete_empty_folder(self.mock_storage, "folder/file.txt")
+        self.mock_storage.listdir.assert_called_once_with("avatars/not_empty")
+        self.mock_storage.delete.assert_not_called()
 
-        mock_rmdir.assert_not_called()
-        mock_listdir.assert_not_called()
+    def test_delete_empty_folder_has_dirs(self):
+        self.mock_storage.listdir.return_value = (["subdir"], [])
 
-    @patch("accounts.signals.os.path.dirname")
-    @patch("accounts.signals.os.path.isdir")
-    @patch("accounts.signals.os.listdir")
-    @patch("accounts.signals.os.rmdir")
-    def test_delete_empty_folder_oserror_caught(
-        self, mock_rmdir, mock_listdir, mock_isdir, mock_dirname
-    ):
-        mock_dirname.return_value = "/path/to/folder"
-        mock_isdir.return_value = True
-        mock_listdir.return_value = []
-        mock_rmdir.side_effect = OSError("Permission denied")
+        _delete_empty_folder(self.mock_storage, "avatars/not_empty")
 
-        with self.assertLogs("accounts.signals", level="ERROR") as cm:
-            _delete_empty_folder(self.mock_storage, "folder/file.txt")
+        self.mock_storage.listdir.assert_called_once_with("avatars/not_empty")
+        self.mock_storage.delete.assert_not_called()
 
-        self.assertIn("Error deleting empty avatar folder", cm.output[0])
+    def test_delete_empty_folder_oserror_caught(self):
+        self.mock_storage.listdir.side_effect = OSError("Permission denied")
+
+        _delete_empty_folder(self.mock_storage, "avatars/folder")
+
+        self.mock_storage.delete.assert_not_called()
 
     def test_delete_empty_folder_not_implemented_error(self):
-        self.mock_storage.path.side_effect = NotImplementedError(
-            "This storage doesn't support path()"
+        self.mock_storage.listdir.side_effect = NotImplementedError(
+            "This storage doesn't support listdir()"
         )
 
-        with self.assertLogs("accounts.signals", level="ERROR") as cm:
-            _delete_empty_folder(self.mock_storage, "folder/file.txt")
+        _delete_empty_folder(self.mock_storage, "avatars/folder")
 
-        self.assertIn("Error deleting empty avatar folder", cm.output[0])
+        self.mock_storage.delete.assert_not_called()
 
 
 class SocialAvatarDownloadTests(TestCase):

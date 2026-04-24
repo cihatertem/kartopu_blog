@@ -267,19 +267,26 @@ class BlogSignalsTests(TestCase):
         self.post.save()
         mock_invalidate.assert_called()
 
+    @patch("blog.signals.update_search_vector")
     @patch("blog.signals.invalidate_nav_cache")
-    def test_post_tags_changed_signal(self, mock_invalidate):
+    def test_post_tags_changed_signal(self, mock_invalidate, mock_update_search_vector):
         tag = Tag.objects.create(name="T1")
         mock_invalidate.reset_mock()
+        mock_update_search_vector.reset_mock()
 
         self.post.tags.add(tag)
         mock_invalidate.assert_called()
+        mock_update_search_vector.assert_called_with(self.post)
 
         mock_invalidate.reset_mock()
+        mock_update_search_vector.reset_mock()
         self.post.tags.remove(tag)
         mock_invalidate.assert_called()
+        mock_update_search_vector.assert_called_with(self.post)
 
         self.post.tags.add(tag)
         mock_invalidate.reset_mock()
+        mock_update_search_vector.reset_mock()
         self.post.tags.clear()
         mock_invalidate.assert_called()
+        mock_update_search_vector.assert_called_with(self.post)
