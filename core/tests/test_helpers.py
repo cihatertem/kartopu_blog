@@ -69,6 +69,30 @@ class GetClientIPTest(TestCase):
         # Should fall back to the string itself
         self.assertEqual(get_client_ip(request), "192.168.1.10, 10.0.0.5")
 
+    def test_get_client_ip_invalid_formats_value_error(self):
+        """
+        Verify that ipaddress.ip_address raises ValueError on various invalid inputs
+        and the helper gracefully falls back to returning the raw string.
+        """
+        invalid_ips = [
+            "256.256.256.256",  # Out of range IPv4
+            "192.168.1",  # Incomplete IPv4
+            "192.168.1.10/24",  # Network mask instead of address
+            "2001:db8:::1",  # Invalid IPv6 (multiple ::)
+            "2001:db8:xyz::1",  # Invalid IPv6 (invalid hex)
+            "  192.168.1.10  ",  # Leading/trailing spaces
+        ]
+
+        for invalid_ip in invalid_ips:
+            with self.subTest(invalid_ip=invalid_ip):
+                request = self.factory.get("/")
+                request.META["REMOTE_ADDR"] = invalid_ip
+
+                # Mock ipaddress.ip_address to verify it is called and raises ValueError?
+                # Not necessary since we know invalid inputs raise ValueError naturally.
+
+                self.assertEqual(get_client_ip(request), invalid_ip)
+
     def test_client_ip_key_with_ip(self):
         request = self.factory.get("/")
         request.META["REMOTE_ADDR"] = "192.168.1.10"

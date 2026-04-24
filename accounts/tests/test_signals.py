@@ -278,3 +278,19 @@ class UserSignalTests(TestCase):
         user.delete()
 
         self.assertFalse(default_storage.exists(avatar_name))
+
+
+class BuildSocialLoginLikeTests(TestCase):
+    def test_build_sociallogin_like(self):
+        user = User.objects.create_user(
+            email="test_social_like@example.com", password="password"
+        )
+        account = SocialAccount.objects.create(user=user, provider="google", uid="123")
+
+        from accounts.signals import _build_sociallogin_like
+
+        login = _build_sociallogin_like(account)
+
+        self.assertIsInstance(login, SocialLogin)
+        self.assertEqual(login.user, user)
+        self.assertEqual(login.account, account)

@@ -724,3 +724,26 @@ class RenderPostBodyTests(TestCase):
         self.assertEqual(blog_extras.dividend_summary(ctx), "")
         self.assertEqual(blog_extras.dividend_charts(ctx), "")
         self.assertEqual(blog_extras.dividend_comparison(ctx), "")
+
+
+class ProcessImageMarkerTests(TestCase):
+    def test_process_image_marker_invalid_arg(self):
+        self.assertEqual(blog_extras._process_image_marker("invalid", []), "")
+        self.assertEqual(blog_extras._process_image_marker("1a", []), "")
+        self.assertEqual(blog_extras._process_image_marker(None, []), "")
+
+    def test_process_image_marker_valid_arg(self):
+        class MockImage:
+            pass
+
+        with patch(
+            "blog.templatetags.blog_extras._render_responsive_image_figure",
+            return_value="<figure>mock</figure>",
+        ):
+            self.assertEqual(
+                blog_extras._process_image_marker("1", [MockImage()]),
+                "<figure>mock</figure>",
+            )
+            self.assertEqual(
+                blog_extras._process_image_marker("2", [MockImage()]), ""
+            )  # out of bounds

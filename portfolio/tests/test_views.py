@@ -10,7 +10,7 @@ class BudgetTrackerViewTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertTemplateUsed(response, "portfolio/budget_tracker.html")
         self.assertEqual(
-            response.context["title"], "Maaş Günü 7 Adım Bütçe Takip Platformu"
+            response.context["title"], "Maaş Günü 5 Adım Bütçe Takip Platformu"
         )
         self.assertEqual(response.context["active_nav"], "budget-tracker")
         self.assertContains(response, "Bütçe Takip Sistemi")

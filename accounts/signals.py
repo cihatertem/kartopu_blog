@@ -121,12 +121,10 @@ def _resolve_social_app_settings(sociallogin) -> dict:
 
 
 def _build_sociallogin_like(account: SocialAccount):
-    class _SocialLoginLike:
-        def __init__(self, social_account: SocialAccount):
-            self.account = social_account
-            self.app = None
+    from allauth.socialaccount.models import SocialLogin
 
-    return _SocialLoginLike(account)
+    login = SocialLogin(user=account.user, account=account)
+    return login
 
 
 @log_exceptions(

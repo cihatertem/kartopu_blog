@@ -185,7 +185,23 @@ class NewsletterConfirmSubscriptionViewTest(TestCase):
         self.assertEqual(response.status_code, 400)
         self.assertContains(
             response,
-            "Onay linki geçersiz. Lütfen yeniden deneyin.",
+            "Bu onay bağlantısı geçersiz veya bozuk.",
+            status_code=400,
+        )
+
+    @patch("newsletter.views.parse_token")
+    def test_bad_signature(self, mock_parse_token):
+        mock_parse_token.side_effect = signing.BadSignature
+
+        token = make_token("test@example.com", "subscribe")
+        url = reverse("newsletter:confirm", kwargs={"token": token})
+
+        response = self.client.get(url)
+
+        self.assertEqual(response.status_code, 400)
+        self.assertContains(
+            response,
+            "Bu onay bağlantısı geçersiz veya bozuk.",
             status_code=400,
         )
 

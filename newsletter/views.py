@@ -120,7 +120,7 @@ def confirm_subscription(request, token: str):
         )
     except signing.BadSignature:
         return _render_error(
-            request, "Geçersiz Link", "Onay linki geçersiz. Lütfen yeniden deneyin."
+            request, "Geçersiz Bağlantı", "Bu onay bağlantısı geçersiz veya bozuk."
         )
 
     email = payload.get("email")

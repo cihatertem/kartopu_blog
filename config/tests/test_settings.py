@@ -2,7 +2,48 @@ import os
 from unittest import TestCase
 from unittest.mock import mock_open, patch
 
-from config.settings import get_swarm_secret_for_psg
+from config.settings import get_samesite_setting, get_swarm_secret_for_psg
+
+
+class TestGetSameSiteSetting(TestCase):
+    def test_default_value_when_env_not_set(self):
+        """Returns the default value (Lax) if the environment variable is not set."""
+        with patch.dict(os.environ, {}, clear=True):
+            result = get_samesite_setting("NON_EXISTENT_KEY")
+            self.assertEqual(result, "Lax")
+
+    def test_custom_default_value_when_env_not_set(self):
+        """Returns the custom default value if the environment variable is not set."""
+        with patch.dict(os.environ, {}, clear=True):
+            result = get_samesite_setting("NON_EXISTENT_KEY", default="Strict")
+            self.assertEqual(result, "Strict")
+
+    def test_valid_values_returned_directly(self):
+        """Returns valid SameSite values correctly."""
+        for value in ["Lax", "Strict", "None"]:
+            with patch.dict(os.environ, {"MY_KEY": value}):
+                result = get_samesite_setting("MY_KEY")
+                self.assertEqual(result, value)
+
+    def test_values_are_case_insensitive(self):
+        """Returns Title Cased valid values regardless of input case."""
+        test_cases = {"lax": "Lax", "STRICT": "Strict", "nOnE": "None"}
+        for input_val, expected_val in test_cases.items():
+            with patch.dict(os.environ, {"MY_KEY": input_val}):
+                result = get_samesite_setting("MY_KEY")
+                self.assertEqual(result, expected_val)
+
+    def test_invalid_value_returns_default(self):
+        """Returns the default value if an invalid SameSite value is provided."""
+        with patch.dict(os.environ, {"MY_KEY": "InvalidValue"}):
+            result = get_samesite_setting("MY_KEY")
+            self.assertEqual(result, "Lax")
+
+    def test_invalid_value_returns_custom_default(self):
+        """Returns a custom default value if an invalid SameSite value is provided."""
+        with patch.dict(os.environ, {"MY_KEY": "InvalidValue"}):
+            result = get_samesite_setting("MY_KEY", default="None")
+            self.assertEqual(result, "None")
 
 
 class TestGetSwarmSecretForPsg(TestCase):

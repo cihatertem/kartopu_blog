@@ -23,6 +23,12 @@ class CalculateXIRRTests(TestCase):
         """Test with an empty list of cash flows."""
         self.assertIsNone(calculate_xirr([]))
 
+    def test_single_cash_flow(self):
+        """Test with a single cash flow element."""
+        self.assertIsNone(calculate_xirr([(date.today(), Decimal("100.0"))]))
+        self.assertIsNone(calculate_xirr([(date.today(), Decimal("-100.0"))]))
+        self.assertIsNone(calculate_xirr([(date.today(), Decimal("0.0"))]))
+
     def test_all_zero_cash_flows(self):
         """Test with a list of cash flows where all amounts are zero."""
         cash_flows = [

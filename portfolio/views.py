@@ -8,7 +8,7 @@ class BudgetTrackerView(TemplateView):
         context = super().get_context_data(**kwargs)
         context.update(
             {
-                "title": "Maaş Günü 7 Adım Bütçe Takip Platformu",
+                "title": "Maaş Günü 5 Adım Bütçe Takip Platformu",
                 "description": "Aylık gelirinizi ve giderlerinizi analiz edin, acil durum fonu ve yatırımlarınızı planlayın. Kişisel finansınızı kontrol altına alın.",
                 "active_nav": "budget-tracker",
             }
