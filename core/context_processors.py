@@ -60,25 +60,20 @@ def _get_nav_categories(cached_data=None):
 
     if nav_categories is None:
         qs = (
-            Category.objects.only("name", "slug")
-            .order_by("name")
-            .annotate(
+            Category.objects.annotate(
                 post_count=Count(
                     "posts",
                     filter=Q(posts__status=BlogPost.Status.PUBLISHED),
                     distinct=True,
                 )
             )
+            .order_by("name")
+            .values("name", "slug", "post_count")
         )
-        nav_categories = []
-        for c in qs:
-            nav_categories.append(
-                {
-                    "name": c.name,
-                    "slug": c.slug,
-                    "post_count": c.post_count,
-                    "get_absolute_url": c.get_absolute_url(),
-                }
+        nav_categories = list(qs)
+        for c in nav_categories:
+            c["get_absolute_url"] = reverse(
+                "blog:category_detail", kwargs={"slug": c["slug"]}
             )
         cache.set(NAV_CATEGORIES_KEY, nav_categories, timeout=CACHE_TIMEOUT)
     return nav_categories

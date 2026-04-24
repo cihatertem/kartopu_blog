@@ -1,4 +1,5 @@
 import ipaddress
+from unittest.mock import patch
 
 from django.test import RequestFactory, TestCase, override_settings
 
@@ -260,3 +261,33 @@ class GenerateCaptchaTest(TestCase):
         captcha_text = request.session[CAPTCHA_SESSION_KEY]
         self.assertIsInstance(captcha_text, str)
         self.assertEqual(len(captcha_text), 5)
+
+    def test_generate_captcha_font_fallback(self):
+        """Should fallback to default font if truetype font is not found."""
+        from PIL import ImageFont
+
+        request = self.factory.get("/")
+        request.session = {}
+
+        original_truetype = ImageFont.truetype
+
+        def side_effect(font, *args, **kwargs):
+            # Only raise error for the specific font path string
+            if isinstance(font, str) and font.endswith(".ttf"):
+                raise IOError("Font not found")
+            return original_truetype(font, *args, **kwargs)
+
+        with patch("PIL.ImageFont.truetype", side_effect=side_effect) as mock_truetype:
+            with patch(
+                "PIL.ImageFont.load_default", wraps=ImageFont.load_default
+            ) as mock_load_default:
+                b64_image = _generate_captcha(request)
+
+                self.assertIsInstance(b64_image, str)
+                self.assertGreater(len(b64_image), 100)
+                # It should be called at least twice: once in our code, and once inside load_default
+                self.assertGreaterEqual(mock_truetype.call_count, 1)
+                mock_load_default.assert_called_once()
+
+                self.assertIn(CAPTCHA_SESSION_KEY, request.session)
+                self.assertEqual(len(request.session[CAPTCHA_SESSION_KEY]), 5)
