@@ -216,3 +216,85 @@ class PortfolioLogicEdgeCaseTests(TestCase):
             (date(2024, 1, 1), Decimal("150")),
         ]
         self.assertIsNone(calculate_xirr(flows_zero))
+
+    def test_get_cache_keys_for_transactions(self) -> None:
+        """Test _get_cache_keys_for_transactions logic."""
+        # Setup another asset with EUR to test multiple currencies
+        asset_eur = Asset.objects.create(
+            name="EU Stock",
+            symbol="EUSTK",
+            asset_type=Asset.AssetType.STOCK,
+            currency=Asset.Currency.EUR,
+            current_price=Decimal("100"),
+        )
+
+        # Setup an asset with TRY to test same currency skipping
+        asset_try = Asset.objects.create(
+            name="TR Stock",
+            symbol="TRSTK",
+            asset_type=Asset.AssetType.STOCK,
+            currency=Asset.Currency.TRY,
+            current_price=Decimal("100"),
+        )
+
+        tx_try = PortfolioTransaction(asset=asset_try, trade_date=date(2024, 1, 1))
+        tx_usd_1 = PortfolioTransaction(
+            asset=self.asset_usd, trade_date=date(2024, 1, 1)
+        )
+        tx_usd_2 = PortfolioTransaction(
+            asset=self.asset_usd, trade_date=date(2024, 1, 2)
+        )
+        tx_eur = PortfolioTransaction(asset=asset_eur, trade_date=date(2024, 1, 1))
+
+        # 1. Test same currency skipped
+        res_try = self.portfolio._get_cache_keys_for_transactions([tx_try], {}, None)
+        self.assertIsInstance(res_try, dict)
+        self.assertEqual(len(res_try), 0)
+
+        # 2. Test already in fx_rates skipped
+        fx_rates: dict[tuple[str, str, date | None], Decimal] = {
+            ("USD", "TRY", date(2024, 1, 1)): Decimal("30")
+        }
+        res_cached = self.portfolio._get_cache_keys_for_transactions(
+            [tx_usd_1], fx_rates, None
+        )
+        self.assertIsInstance(res_cached, dict)
+        self.assertEqual(len(res_cached), 0)
+
+        # 3. Test missing rate generation and deduplication
+        # Even though we pass tx_usd_1 twice, it should only generate one key in dict
+        transactions = [tx_usd_1, tx_usd_1, tx_usd_2, tx_eur]
+        res_missing = self.portfolio._get_cache_keys_for_transactions(
+            transactions, fx_rates, None
+        )
+        self.assertIsInstance(res_missing, dict)
+
+        # Expecting keys for USD/2024-01-02 and EUR/2024-01-01
+        self.assertEqual(len(res_missing), 2)
+
+        expected_key_usd = f"fx_rate_USD_TRY_{date(2024, 1, 2).isoformat()}"
+        self.assertIn(expected_key_usd, res_missing)
+        self.assertEqual(
+            res_missing[expected_key_usd],
+            (("USD", "TRY", date(2024, 1, 2)), date(2024, 1, 2), "USD"),
+        )
+
+        expected_key_eur = f"fx_rate_EUR_TRY_{date(2024, 1, 1).isoformat()}"
+        self.assertIn(expected_key_eur, res_missing)
+        self.assertEqual(
+            res_missing[expected_key_eur],
+            (("EUR", "TRY", date(2024, 1, 1)), date(2024, 1, 1), "EUR"),
+        )
+
+        # 4. Test price_date override
+        res_override = self.portfolio._get_cache_keys_for_transactions(
+            [tx_usd_2], {}, date(2024, 2, 1)
+        )
+        self.assertIsInstance(res_override, dict)
+        self.assertEqual(len(res_override), 1)
+        expected_key_override = f"fx_rate_USD_TRY_{date(2024, 2, 1).isoformat()}"
+        self.assertIn(expected_key_override, res_override)
+        self.assertEqual(
+            res_override[expected_key_override],
+            (("USD", "TRY", date(2024, 2, 1)), date(2024, 2, 1), "USD"),
+        )
