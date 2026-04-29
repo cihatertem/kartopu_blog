@@ -9,7 +9,7 @@
             {% if cover %}
               <img src="{{ cover.src }}" srcset="{{ cover.srcset }}" alt="{{ post.previous_post.title }}" loading="lazy">
             {% else %}
-              <img src="{% static 'images/placeholder.png' %}" alt="Placeholder" loading="lazy">
+              <img src="{% static 'images/home/og_twit_card.jpeg' %}" alt="Placeholder" loading="lazy">
             {% endif %}
           </div>
         {% endwith %}
@@ -38,7 +38,7 @@
               {% if cover %}
                 <img src="{{ cover.src }}" srcset="{{ cover.srcset }}" alt="{{ next_post.title }}" loading="lazy">
               {% else %}
-                <img src="{% static 'images/placeholder.png' %}" alt="Placeholder" loading="lazy">
+                <img src="{% static 'images/home/og_twit_card.jpeg' %}" alt="Placeholder" loading="lazy">
               {% endif %}
             </div>
           {% endwith %}
