@@ -1,13 +1,13 @@
 {% load static %}
 
-{% if post.previous_post or post.next_posts.all %}
+{% if post.published_previous_post or post.published_next_post %}
   <nav class="post-navigation">
-    {% if post.previous_post %}
-      <a href="{{ post.previous_post.get_absolute_url }}" class="nav-card prev-card">
-        {% with cover=post.previous_post.cover_thumb_rendition %}
+    {% if post.published_previous_post %}
+      <a href="{{ post.published_previous_post.get_absolute_url }}" class="nav-card prev-card">
+        {% with cover=post.published_previous_post.cover_thumb_rendition %}
           <div class="nav-image-wrapper">
             {% if cover %}
-              <img src="{{ cover.src }}" srcset="{{ cover.srcset }}" alt="{{ post.previous_post.title }}" loading="lazy">
+              <img src="{{ cover.src }}" srcset="{{ cover.srcset }}" alt="{{ post.published_previous_post.title }}" loading="lazy">
             {% else %}
               <img src="{% static 'images/home/og_twit_card.jpeg' %}" alt="Placeholder" loading="lazy">
             {% endif %}
@@ -18,13 +18,13 @@
             <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"></path></svg>
             Önceki Yazı
           </span>
-          <h4 class="nav-title">{{ post.previous_post.title }}</h4>
+          <h4 class="nav-title">{{ post.published_previous_post.title }}</h4>
         </div>
       </a>
     {% endif %}
 
-    {% if post.next_posts.all %}
-      {% with next_post=post.next_posts.all|first %}
+    {% if post.published_next_post %}
+      {% with next_post=post.published_next_post %}
         <a href="{{ next_post.get_absolute_url }}" class="nav-card next-card">
           <div class="nav-content">
             <span class="nav-label">

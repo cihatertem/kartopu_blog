@@ -42,9 +42,17 @@ class PostNavigationTests(TestCase):
             published_at=timezone.now(),
             previous_post=self.post2,
         )
+        self.draft_post = BlogPost.objects.create(
+            title="Draft Post",
+            slug="draft-post",
+            author=self.user,
+            category=self.category,
+            status=BlogPost.Status.DRAFT,
+            previous_post=self.post3,
+        )
 
     def test_navigation_presence(self):
-        # Post2 should have both prev (post1) and next (post3)
+        # Post2 should have both prev (post1) and next (post3), but NOT draft_post
         url = reverse("blog:post_detail", kwargs={"slug": self.post2.slug})
         response = self.client.get(url)
         self.assertEqual(response.status_code, 200)
@@ -52,6 +60,17 @@ class PostNavigationTests(TestCase):
         self.assertContains(response, "Sonraki Yazı")
         self.assertContains(response, self.post1.title)
         self.assertContains(response, self.post3.title)
+        self.assertNotContains(response, self.draft_post.title)
+
+    def test_navigation_draft_post_not_shown_as_next(self):
+        # Post3 has prev (post2) and next is a draft post, so it shouldn't show "Sonraki Yazı" for draft
+        url = reverse("blog:post_detail", kwargs={"slug": self.post3.slug})
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Önceki Yazı")
+        self.assertNotContains(response, "Sonraki Yazı")
+        self.assertContains(response, self.post2.title)
+        self.assertNotContains(response, self.draft_post.title)
 
     def test_navigation_prev_only(self):
         # Post1 has no prev, next (post2)

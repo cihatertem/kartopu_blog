@@ -326,6 +326,22 @@ class BlogPost(
         return reverse("blog:post_detail", kwargs={"slug": self.slug})
 
     @property
+    def published_previous_post(self) -> "BlogPost | None":
+        """Sadece yayınlanmış önceki yazıyı getirir."""
+        if self.previous_post and self.previous_post.status == self.Status.PUBLISHED:
+            return self.previous_post
+        return None
+
+    @property
+    def published_next_post(self) -> "BlogPost | None":
+        """Sadece yayınlanmış sonraki yazıyı getirir."""
+        return (
+            self.next_posts.filter(status=self.Status.PUBLISHED)
+            .order_by("published_at")
+            .first()
+        )
+
+    @property
     def effective_meta_title(self) -> str:
         """Template usage: <title> {{ post.effective_meta_title }} </title>"""
         suffix = META_TITLE_SUFFIX
