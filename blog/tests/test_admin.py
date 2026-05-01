@@ -140,11 +140,27 @@ class BlogAdminTests(TestCase):
         request = MockRequest(user=self.admin_user)
         self.post.status = BlogPost.Status.PUBLISHED
         self.post.save()
-        queryset = BlogPost.objects.filter(pk=self.post.pk)
+
+        # Create a second post with a different status
+        post2 = BlogPost.objects.create(
+            title="Post 2",
+            author=self.admin_user,
+            category=self.category,
+            status=BlogPost.Status.ARCHIVED,
+        )
+
+        queryset = BlogPost.objects.filter(pk__in=[self.post.pk, post2.pk])
 
         model_admin.draft_posts(request, queryset)
         self.post.refresh_from_db()
+        post2.refresh_from_db()
+
         self.assertEqual(self.post.status, BlogPost.Status.DRAFT)
+        self.assertEqual(post2.status, BlogPost.Status.DRAFT)
+
+        # Verify description
+        actions = model_admin.get_actions(request)
+        self.assertEqual(actions["draft_posts"][2], "Seçili yazıları taslak yap")
 
     def test_archive_posts_action(self):
         model_admin = BlogPostAdmin(BlogPost, self.site)

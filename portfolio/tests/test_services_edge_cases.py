@@ -86,6 +86,18 @@ class ServicesEdgeCaseTests(TestCase):
 
     @patch("portfolio.services.logger.exception")
     @patch("portfolio.services.yf.download")
+    def test_fetch_multiple_fx_rates_bulk_exception(
+        self, mock_download: MagicMock, mock_logger: MagicMock
+    ) -> None:
+        """Test fetch_multiple_fx_rates_bulk when yf.download raises an exception."""
+        mock_download.side_effect = Exception("Network error")
+        res = fetch_multiple_fx_rates_bulk({date(2024, 1, 1): {("USD", "TRY")}})
+        self.assertEqual(res, {})
+        # Verify that it was actually logged
+        mock_logger.assert_called()
+
+    @patch("portfolio.services.logger.exception")
+    @patch("portfolio.services.yf.download")
     def test_fetch_multiple_fx_rates_bulk_empty_data(
         self, mock_download: MagicMock, mock_logger: MagicMock
     ) -> None:
