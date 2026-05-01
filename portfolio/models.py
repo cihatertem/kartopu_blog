@@ -1773,16 +1773,27 @@ class DividendPayment(UUIDModelMixin, TimeStampedModelMixin):
     def sync_dividend_currencies(self) -> None:
         base_currency = self.asset.currency
         total_amount = self.total_net_amount
+
+        currency_choices = Asset.Currency.choices
+        pairs_to_fetch = [
+            (base_currency, currency)
+            for currency, _ in currency_choices
+            if currency != base_currency
+        ]
+
+        fetched_rates = {}
+        if pairs_to_fetch:
+            fetched_rates = fetch_fx_rates_bulk(
+                pairs_to_fetch, rate_date=self.payment_date
+            )
+
         dividends_to_create_or_update = []
-        for currency, _ in Asset.Currency.choices:
-            fx_rate = Decimal("1")
-            if base_currency != currency:
-                fetched_rate = fetch_fx_rate(
-                    base_currency,
-                    currency,
-                    rate_date=self.payment_date,
-                )
-                fx_rate = fetched_rate if fetched_rate is not None else Decimal("1")
+        for currency, _ in currency_choices:
+            if currency == base_currency:
+                fx_rate = Decimal("1")
+            else:
+                fx_rate = fetched_rates.get((base_currency, currency)) or Decimal("1")
+
             per_share = self.net_dividend_per_share * fx_rate
             total_converted = total_amount * fx_rate
             dividends_to_create_or_update.append(

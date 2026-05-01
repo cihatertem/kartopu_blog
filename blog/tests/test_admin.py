@@ -15,6 +15,7 @@ User = get_user_model()
 class MockRequest:
     def __init__(self, user=None):
         self.user = user
+        self.GET = {}
 
     def get_messages(self):
         return []
@@ -94,7 +95,7 @@ class BlogAdminTests(TestCase):
             url = inline._get_rendition_url(bad_image)
             self.assertIsNone(url)
 
-    def test_blogpost_admin_actions(self):
+    def test_publish_posts_action(self):
         model_admin = BlogPostAdmin(BlogPost, self.site)
         request = MockRequest(user=self.admin_user)
         queryset = BlogPost.objects.filter(pk=self.post.pk)
@@ -110,13 +111,48 @@ class BlogAdminTests(TestCase):
         self.post.refresh_from_db()
         self.assertEqual(self.post.published_at, pub_at)
 
-        model_admin.archive_posts(request, queryset)
-        self.post.refresh_from_db()
-        self.assertEqual(self.post.status, BlogPost.Status.ARCHIVED)
+    def test_draft_posts_action(self):
+        model_admin = BlogPostAdmin(BlogPost, self.site)
+        request = MockRequest(user=self.admin_user)
+        self.post.status = BlogPost.Status.PUBLISHED
+        self.post.save()
+        queryset = BlogPost.objects.filter(pk=self.post.pk)
 
         model_admin.draft_posts(request, queryset)
         self.post.refresh_from_db()
         self.assertEqual(self.post.status, BlogPost.Status.DRAFT)
+
+    def test_archive_posts_action(self):
+        model_admin = BlogPostAdmin(BlogPost, self.site)
+        request = MockRequest(user=self.admin_user)
+
+        # Create multiple posts with different statuses
+        post2 = BlogPost.objects.create(
+            title="Post 2",
+            author=self.admin_user,
+            category=self.category,
+            status=BlogPost.Status.PUBLISHED,
+            published_at=timezone.now(),
+        )
+        queryset = BlogPost.objects.filter(pk__in=[self.post.pk, post2.pk])
+
+        # Archive them
+        model_admin.archive_posts(request, queryset)
+
+        self.post.refresh_from_db()
+        post2.refresh_from_db()
+
+        self.assertEqual(self.post.status, BlogPost.Status.ARCHIVED)
+        self.assertEqual(post2.status, BlogPost.Status.ARCHIVED)
+
+        # Verify description
+        actions = model_admin.get_actions(request)
+        self.assertEqual(actions["archive_posts"][2], "Seçili yazıları arşivle")
+
+    def test_toggle_is_featured_action(self):
+        model_admin = BlogPostAdmin(BlogPost, self.site)
+        request = MockRequest(user=self.admin_user)
+        queryset = BlogPost.objects.filter(pk=self.post.pk)
 
         self.assertFalse(self.post.is_featured)
         model_admin.toggle_is_featured(request, queryset)
