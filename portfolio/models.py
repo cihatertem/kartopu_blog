@@ -27,6 +27,7 @@ from portfolio.services import (
     fetch_fx_rates_bulk,
     fetch_multiple_fx_rates_bulk,
     fetch_yahoo_finance_price,
+    fetch_yahoo_finance_prices_bulk,
 )
 
 MAX_DIGITS = 200
@@ -615,6 +616,9 @@ class Portfolio(UUIDModelMixin, TimeStampedModelMixin):
 
         return positions
 
+    def _generate_price_cache_key(self, symbol: str, price_date: date | None) -> str:
+        return f"yf_price_{symbol}_{price_date.isoformat() if price_date else 'latest'}"
+
     def _get_asset_current_price(
         self,
         asset: "Asset",
@@ -624,7 +628,7 @@ class Portfolio(UUIDModelMixin, TimeStampedModelMixin):
         if not asset.symbol:  # pyright: ignore[reportAttributeAccessIssue]
             return current_price
 
-        cache_key = f"yf_price_{asset.symbol}_{price_date.isoformat() if price_date else 'latest'}"
+        cache_key = self._generate_price_cache_key(asset.symbol, price_date)
         cached_price = cache.get(cache_key)
         if cached_price is not None:
             return cached_price
@@ -655,10 +659,68 @@ class Portfolio(UUIDModelMixin, TimeStampedModelMixin):
         price_date: date | None,
     ) -> Decimal:
         total_value = Decimal("0")
+
+        # Collect all assets and their cache keys
+        assets_to_fetch = []
+        cache_keys_map = {}
+        for data in positions.values():
+            asset = data["asset"]
+            if asset.symbol:  # pyright: ignore[reportAttributeAccessIssue]
+                cache_key = self._generate_price_cache_key(asset.symbol, price_date)
+                cache_keys_map[asset.symbol] = cache_key
+                assets_to_fetch.append(asset)
+
+        # Get cached prices
+        cached_prices = {}
+        if cache_keys_map:
+            cached_prices = cache.get_many(list(cache_keys_map.values()))
+
+        # Determine which symbols need to be fetched
+        symbols_to_fetch = set()
+        for asset in assets_to_fetch:
+            cache_key = cache_keys_map[asset.symbol]  # pyright: ignore[reportAttributeAccessIssue]
+            if cache_key not in cached_prices:
+                current_price = asset.current_price or Decimal("0")  # pyright: ignore[reportAttributeAccessIssue]
+                # Only fetch if we have a price_date OR we don't have a current price at all
+                if price_date or not current_price:
+                    symbols_to_fetch.add(asset.symbol)  # pyright: ignore[reportAttributeAccessIssue]
+
+        # Fetch prices in bulk for uncached symbols
+        fetched_prices = {}
+        if symbols_to_fetch:
+            fetched_prices = fetch_yahoo_finance_prices_bulk(
+                list(symbols_to_fetch), price_date=price_date
+            )
+
+            # Save newly fetched prices to cache
+            prices_to_cache = {}
+            for symbol, price in fetched_prices.items():  # pyright: ignore[reportCallIssue]
+                cache_key = cache_keys_map[symbol]
+                prices_to_cache[cache_key] = price
+
+            if prices_to_cache:
+                cache.set_many(
+                    prices_to_cache,
+                    timeout=getattr(settings, "CACHE_TIMEOUT", CACHE_TIMEOUT),
+                )
+
+        # Calculate market values using collected prices
         for data in positions.values():
             asset = data["asset"]
             quantity = data["quantity"]
-            current_price = self._get_asset_current_price(asset, price_date)  # pyright: ignore[reportArgumentType]
+
+            current_price = Decimal("0")
+            if not asset.symbol:  # pyright: ignore[reportAttributeAccessIssue]
+                current_price = asset.current_price or Decimal("0")  # pyright: ignore[reportAttributeAccessIssue]
+            else:
+                cache_key = cache_keys_map.get(asset.symbol)  # pyright: ignore[reportAttributeAccessIssue]
+                if cache_key and cache_key in cached_prices:
+                    current_price = cached_prices[cache_key]
+                elif asset.symbol in fetched_prices:  # pyright: ignore[reportAttributeAccessIssue, reportOperatorIssue]
+                    current_price = fetched_prices[asset.symbol]  # pyright: ignore[reportAttributeAccessIssue, reportInvalidTypeArguments, reportOptionalSubscript]
+                else:
+                    current_price = asset.current_price or Decimal("0")  # pyright: ignore[reportAttributeAccessIssue]
+
             fx_rate = self._get_or_fetch_fx_rate(
                 fx_rates,
                 asset.currency,  # pyright: ignore[reportAttributeAccessIssue]
@@ -666,7 +728,7 @@ class Portfolio(UUIDModelMixin, TimeStampedModelMixin):
                 price_date,  # pyright: ignore[reportAttributeAccessIssue]
             )
 
-            converted_price = current_price * fx_rate
+            converted_price = current_price * fx_rate  # pyright: ignore[reportOperatorIssue]
             data["current_price"] = converted_price
             if asset.asset_type == Asset.AssetType.BES:  # pyright: ignore[reportAttributeAccessIssue]
                 data["market_value"] = (
@@ -1792,7 +1854,7 @@ class DividendPayment(UUIDModelMixin, TimeStampedModelMixin):
             if currency == base_currency:
                 fx_rate = Decimal("1")
             else:
-                fx_rate = fetched_rates.get((base_currency, currency)) or Decimal("1")
+                fx_rate = fetched_rates.get((base_currency, currency)) or Decimal("1")  # pyright: ignore[reportCallIssue]
 
             per_share = self.net_dividend_per_share * fx_rate
             total_converted = total_amount * fx_rate

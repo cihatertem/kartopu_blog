@@ -31,6 +31,11 @@ def _delete_local_dir_if_exists(path: str) -> None:
         shutil.rmtree(path, ignore_errors=True)
 
 
+@log_exceptions(message="Error deleting storage file")
+def _delete_single_storage_file(path: str) -> None:
+    default_storage.delete(path)
+
+
 @log_exceptions(message="Error deleting storage directory")
 def _delete_storage_dir_if_exists(path: str) -> None:
     if not path:
@@ -42,10 +47,7 @@ def _delete_storage_dir_if_exists(path: str) -> None:
         return
 
     for file_name in files:
-        try:
-            default_storage.delete(os.path.join(path, file_name))
-        except Exception:
-            pass
+        _delete_single_storage_file(os.path.join(path, file_name))
     for directory in directories:
         _delete_storage_dir_if_exists(os.path.join(path, directory))
 

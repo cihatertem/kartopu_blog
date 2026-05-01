@@ -247,6 +247,113 @@ class LogicTests(ModelsTestCase):
         self.assertEqual(portfolio.total_market_value(), Decimal("350.0"))
         self.assertEqual(portfolio.total_cost_basis(), Decimal("250.0"))
 
+
+    @patch("portfolio.models.Portfolio._get_or_fetch_fx_rate")
+    @patch("portfolio.models.fetch_yahoo_finance_prices_bulk")
+    @patch("portfolio.models.cache")
+    def test_update_market_values_bulk(
+        self, mock_cache, mock_fetch_bulk, mock_get_fx_rate
+    ):
+        from datetime import date
+        mock_get_fx_rate.return_value = Decimal("30.0")
+        portfolio = Portfolio.objects.create(
+            owner=self.user, name="My Portfolio", target_value=100
+        )
+        asset1 = Asset.objects.create(
+            name="Apple",
+            symbol="AAPL",
+            asset_type=Asset.AssetType.STOCK,
+            currency=Asset.Currency.USD,
+            current_price=Decimal("1.0"),
+        )
+        asset2 = Asset.objects.create(
+            name="Tesla",
+            symbol="TSLA",
+            asset_type=Asset.AssetType.STOCK,
+            currency=Asset.Currency.USD,
+            current_price=Decimal("1.0"),
+        )
+
+        positions = {
+            asset1.id: {
+                "asset": asset1,
+                "quantity": Decimal("10"),
+                "value_adjustment": Decimal("0"),
+            },
+            asset2.id: {
+                "asset": asset2,
+                "quantity": Decimal("5"),
+                "value_adjustment": Decimal("0"),
+            },
+        }
+
+        mock_cache.get_many.return_value = {}
+        mock_fetch_bulk.return_value = {
+            "AAPL": Decimal("150.0"),
+            "TSLA": Decimal("200.0"),
+        }
+
+        fx_rates = {("USD", "TRY"): Decimal("30.0")}
+
+        total = portfolio._update_market_values(positions, fx_rates, price_date=date(2023, 1, 1))
+        self.assertEqual(total, Decimal("75000.0"))
+        mock_fetch_bulk.assert_called_once()
+        args, kwargs = mock_fetch_bulk.call_args
+        self.assertCountEqual(args[0], ["AAPL", "TSLA"])
+        mock_cache.set_many.assert_called_once()
+
+    @patch("portfolio.models.Portfolio._get_or_fetch_fx_rate")
+    @patch("portfolio.models.fetch_yahoo_finance_prices_bulk")
+    @patch("portfolio.models.cache")
+    def test_update_market_values_with_cache(
+        self, mock_cache, mock_fetch_bulk, mock_get_fx_rate
+    ):
+        from datetime import date
+        mock_get_fx_rate.return_value = Decimal("30.0")
+        portfolio = Portfolio.objects.create(
+            owner=self.user, name="My Portfolio", target_value=100
+        )
+        asset1 = Asset.objects.create(
+            name="Apple",
+            symbol="AAPL",
+            asset_type=Asset.AssetType.STOCK,
+            currency=Asset.Currency.USD,
+            current_price=Decimal("1.0"),
+        )
+        asset2 = Asset.objects.create(
+            name="Tesla",
+            symbol="TSLA",
+            asset_type=Asset.AssetType.STOCK,
+            currency=Asset.Currency.USD,
+            current_price=Decimal("1.0"),
+        )
+
+        positions = {
+            asset1.id: {
+                "asset": asset1,
+                "quantity": Decimal("10"),
+                "value_adjustment": Decimal("0"),
+            },
+            asset2.id: {
+                "asset": asset2,
+                "quantity": Decimal("5"),
+                "value_adjustment": Decimal("0"),
+            },
+        }
+
+        cache_key_aapl = portfolio._generate_price_cache_key("AAPL", date(2023, 1, 1))
+        mock_cache.get_many.return_value = {cache_key_aapl: Decimal("150.0")}
+        mock_fetch_bulk.return_value = {"TSLA": Decimal("200.0")}
+
+        fx_rates = {("USD", "TRY"): Decimal("30.0")}
+
+        total = portfolio._update_market_values(positions, fx_rates, price_date=date(2023, 1, 1))
+
+        self.assertEqual(total, Decimal("75000.0"))
+        mock_fetch_bulk.assert_called_once()
+        args, kwargs = mock_fetch_bulk.call_args
+        self.assertEqual(args[0], ["TSLA"])
+
     def test_portfolio_total_cost_basis_empty(self):
         portfolio = Portfolio.objects.create(
             owner=self.user, name="Empty Portfolio", target_value=100

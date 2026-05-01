@@ -184,6 +184,65 @@ def fetch_yahoo_finance_price(
     return _safe_decimal(price)
 
 
+@log_exceptions(default=dict, message="Yahoo Finance bulk price request failed.")  # pyright: ignore[reportArgumentType]
+def fetch_yahoo_finance_prices_bulk(
+    symbols: list[str],
+    price_date: date | None = None,
+) -> dict[str, Decimal]:
+    if not symbols:
+        return {}
+
+    valid_symbols = [s for s in symbols if s]
+    if not valid_symbols:
+        return {}
+
+    if price_date:
+        start = price_date - timedelta(days=5)
+        end = price_date + timedelta(days=1)
+    else:
+        start = date.today() - timedelta(days=5)
+        end = date.today() + timedelta(days=1)
+
+    try:
+        data = yf.download(
+            valid_symbols,
+            start=start,
+            end=end,
+            progress=False,
+            interval="1d",
+            timeout=YF_API_TIMEOUT,
+        )
+    except Exception:
+        logger.exception(
+            "Yahoo Finance bulk download failed for symbols: %s", valid_symbols
+        )
+        return {}
+
+    results: dict[str, Decimal] = {}
+
+    if data is None or data.empty or "Close" not in data:
+        return results
+
+    close_data = data["Close"]
+
+    if price_date:
+        close_data = close_data[close_data.index.date <= price_date]  # pyright: ignore[reportAttributeAccessIssue]
+        if close_data.empty:  # pyright: ignore[reportAttributeAccessIssue]
+            return results
+
+    for symbol in valid_symbols:
+        try:
+            decimal_price = _extract_price_from_close_data(
+                close_data, symbol, len(valid_symbols)
+            )
+            if decimal_price is not None:
+                results[symbol] = decimal_price
+        except Exception:
+            logger.exception("Failed to parse price for %s", symbol)
+
+    return results
+
+
 @log_exceptions(
     default=dict, message="Yahoo Finance multiple bulk history request failed."
 )  # pyright: ignore[reportArgumentType]

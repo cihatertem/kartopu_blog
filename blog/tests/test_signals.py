@@ -148,7 +148,11 @@ class BlogSignalsTests(TestCase):
 
         mock_storage.delete.side_effect = delete_side_effect
 
-        _delete_storage_dir_if_exists("my_dir")
+        with self.assertLogs("blog.signals", level="ERROR") as cm:
+            _delete_storage_dir_if_exists("my_dir")
+
+        self.assertEqual(len(cm.records), 1)
+        self.assertEqual(cm.records[0].getMessage(), "Error deleting storage file")
 
         mock_storage.delete.assert_any_call("my_dir/file1.jpg")
         mock_storage.delete.assert_any_call("my_dir/file2.jpg")

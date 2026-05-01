@@ -15,6 +15,7 @@ from portfolio.services import (
     fetch_fx_rates_bulk,
     fetch_multiple_fx_rates_bulk,
     fetch_yahoo_finance_price,
+    fetch_yahoo_finance_prices_bulk,
 )
 
 
@@ -252,6 +253,117 @@ class FetchYahooFinancePriceTests(TestCase):
         self.assertIsNone(fetch_yahoo_finance_price("AAPL", price_date=d))
 
 
+class FetchYahooFinancePricesBulkTests(TestCase):
+    def test_empty_symbols(self):
+        self.assertEqual(fetch_yahoo_finance_prices_bulk([]), {})
+
+    def test_only_empty_symbols(self):
+        self.assertEqual(fetch_yahoo_finance_prices_bulk(["", None]), {})
+
+    @patch("portfolio.services.logger.exception")
+    @patch("portfolio.services.yf.download")
+    def test_yf_download_exception(self, mock_download, mock_logger_exception):
+        mock_download.side_effect = Exception("API error")
+        self.assertEqual(fetch_yahoo_finance_prices_bulk(["AAPL"]), {})
+        mock_logger_exception.assert_called_once()
+
+    @patch("portfolio.services.yf.download")
+    def test_no_date_success(self, mock_download):
+        from decimal import Decimal
+
+        import pandas as pd
+
+        mock_df = pd.DataFrame(
+            {"Close": [150.5, 151.0]},
+            index=pd.DatetimeIndex(["2023-10-01", "2023-10-02"]),
+        )
+        mock_download.return_value = mock_df
+
+        with patch("portfolio.services._extract_price_from_close_data") as mock_extract:
+            mock_extract.return_value = Decimal("151.0")
+            result = fetch_yahoo_finance_prices_bulk(["AAPL"])
+            self.assertEqual(result, {"AAPL": Decimal("151.0")})
+            mock_extract.assert_called_once()
+
+    @patch("portfolio.services.yf.download")
+    def test_with_date_success(self, mock_download):
+        from datetime import date
+        from decimal import Decimal
+
+        import pandas as pd
+
+        d = date(2023, 10, 2)
+        mock_df = pd.DataFrame(
+            {"Close": [150.5, 151.0, 152.0]},
+            index=pd.DatetimeIndex(["2023-10-01", "2023-10-02", "2023-10-03"]),
+        )
+        mock_download.return_value = mock_df
+
+        with patch("portfolio.services._extract_price_from_close_data") as mock_extract:
+            mock_extract.return_value = Decimal("151.0")
+            result = fetch_yahoo_finance_prices_bulk(["AAPL"], price_date=d)
+            self.assertEqual(result, {"AAPL": Decimal("151.0")})
+            mock_extract.assert_called_once()
+
+    @patch("portfolio.services.yf.download")
+    def test_data_is_empty(self, mock_download):
+        import pandas as pd
+
+        mock_download.return_value = pd.DataFrame()
+        self.assertEqual(fetch_yahoo_finance_prices_bulk(["AAPL"]), {})
+
+    @patch("portfolio.services.yf.download")
+    def test_close_not_in_data(self, mock_download):
+        import pandas as pd
+
+        mock_download.return_value = pd.DataFrame({"Open": [150.0]})
+        self.assertEqual(fetch_yahoo_finance_prices_bulk(["AAPL"]), {})
+
+    @patch("portfolio.services.yf.download")
+    def test_with_date_filtered_empty(self, mock_download):
+        from datetime import date
+
+        import pandas as pd
+
+        d = date(2023, 10, 1)
+        mock_df = pd.DataFrame(
+            {"Close": [150.5, 151.0]},
+            index=pd.DatetimeIndex(["2023-10-02", "2023-10-03"]),
+        )
+        mock_download.return_value = mock_df
+        self.assertEqual(fetch_yahoo_finance_prices_bulk(["AAPL"], price_date=d), {})
+
+    @patch("portfolio.services.logger.exception")
+    @patch("portfolio.services.yf.download")
+    def test_individual_symbol_exception_continues(
+        self, mock_download, mock_logger_exception
+    ):
+        from decimal import Decimal
+
+        import pandas as pd
+
+        mock_df = pd.DataFrame(
+            {"Close": [150.0]},
+            index=pd.DatetimeIndex(["2023-10-02"]),
+        )
+        mock_download.return_value = mock_df
+
+        with patch("portfolio.services._extract_price_from_close_data") as mock_extract:
+
+            def extract_side_effect(close_data, symbol, count):
+                if symbol == "AAPL":
+                    raise Exception("Extraction failed")
+                return Decimal("200.0")
+
+            mock_extract.side_effect = extract_side_effect
+
+            result = fetch_yahoo_finance_prices_bulk(["AAPL", "MSFT"])
+            self.assertEqual(result, {"MSFT": Decimal("200.0")})
+            mock_logger_exception.assert_called_once_with(
+                "Failed to parse price for %s", "AAPL"
+            )
+
+
 class YahooFinanceHelperTests(TestCase):
     def setUp(self):
         super().setUp()
@@ -404,6 +516,38 @@ class FetchMultipleFXRatesBulkTests(TestCase):
         result = fetch_multiple_fx_rates_bulk(pairs_by_date)
 
         self.assertEqual(result, {})
+        mock_logger_exception.assert_called_once_with(
+            "Failed to parse FX rate for %s on %s", "USDTRY=X", d
+        )
+
+    @patch("portfolio.services.logger.exception")
+    @patch("portfolio.services.yf.download")
+    @patch("portfolio.services._extract_price_from_close_data")
+    def test_individual_symbol_exception_continues(
+        self, mock_extract, mock_download, mock_logger_exception
+    ):
+        """Test that if one symbol raises an exception, the loop continues and parses others."""
+        mock_df = pd.DataFrame(
+            {"Close": [30.0, 31.0]},
+            index=pd.DatetimeIndex(["2023-10-01", "2023-10-02"]),
+        )
+        mock_download.return_value = mock_df
+
+        def extract_side_effect(close_data, symbol, symbols_count):
+            if symbol == "USDTRY=X":
+                raise Exception("Extraction error for USDTRY=X")
+            return Decimal("35.0")
+
+        mock_extract.side_effect = extract_side_effect
+
+        d = date(2023, 10, 2)
+        pairs_by_date = {d: {("USD", "TRY"), ("EUR", "TRY")}}
+        result = fetch_multiple_fx_rates_bulk(pairs_by_date)
+
+        # Expected: EURTRY succeeds, USDTRY fails and is not in results
+        self.assertEqual(result.get(("EUR", "TRY", d)), Decimal("35.0"))
+        self.assertNotIn(("USD", "TRY", d), result)
+
         mock_logger_exception.assert_called_once_with(
             "Failed to parse FX rate for %s on %s", "USDTRY=X", d
         )
