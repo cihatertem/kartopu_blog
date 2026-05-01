@@ -98,18 +98,42 @@ class BlogAdminTests(TestCase):
     def test_publish_posts_action(self):
         model_admin = BlogPostAdmin(BlogPost, self.site)
         request = MockRequest(user=self.admin_user)
-        queryset = BlogPost.objects.filter(pk=self.post.pk)
+
+        # self.post has published_at = None
+        self.assertIsNone(self.post.published_at)
+
+        # Create a second post that already has a published_at
+        past_date = timezone.now() - timezone.timedelta(days=1)
+        post2 = BlogPost.objects.create(
+            title="Post 2",
+            author=self.admin_user,
+            category=self.category,
+            content="Content 2",
+            status=BlogPost.Status.DRAFT,
+            published_at=past_date,
+        )
+
+        queryset = BlogPost.objects.filter(pk__in=[self.post.pk, post2.pk])
 
         model_admin.publish_posts(request, queryset)
+
         self.post.refresh_from_db()
+        post2.refresh_from_db()
+
         self.assertEqual(self.post.status, BlogPost.Status.PUBLISHED)
         self.assertIsNotNone(self.post.published_at)
         pub_at = self.post.published_at
 
+        self.assertEqual(post2.status, BlogPost.Status.PUBLISHED)
+        self.assertEqual(post2.published_at, past_date)
+
         # Test that publishing again doesn't change published_at
         model_admin.publish_posts(request, queryset)
         self.post.refresh_from_db()
+        post2.refresh_from_db()
+
         self.assertEqual(self.post.published_at, pub_at)
+        self.assertEqual(post2.published_at, past_date)
 
     def test_draft_posts_action(self):
         model_admin = BlogPostAdmin(BlogPost, self.site)

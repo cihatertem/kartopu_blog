@@ -34,6 +34,43 @@ class BlogSignalsTests(TestCase):
             content="Testing signals",
         )
 
+    @patch("blog.signals.shutil.rmtree")
+    @patch("blog.signals.os.path.isdir")
+    def test_delete_local_dir_if_exists_success(self, mock_isdir, mock_rmtree):
+        mock_isdir.return_value = True
+        _delete_local_dir_if_exists("/tmp/valid/path")
+        mock_isdir.assert_called_once_with("/tmp/valid/path")
+        mock_rmtree.assert_called_once_with("/tmp/valid/path", ignore_errors=True)
+
+    @patch("blog.signals.shutil.rmtree")
+    @patch("blog.signals.os.path.isdir")
+    def test_delete_local_dir_if_exists_not_dir(self, mock_isdir, mock_rmtree):
+        mock_isdir.return_value = False
+        _delete_local_dir_if_exists("/tmp/not/dir")
+        mock_isdir.assert_called_once_with("/tmp/not/dir")
+        mock_rmtree.assert_not_called()
+
+    @patch("blog.signals.shutil.rmtree")
+    @patch("blog.signals.os.path.isdir")
+    def test_delete_local_dir_if_exists_empty_path(self, mock_isdir, mock_rmtree):
+        _delete_local_dir_if_exists("")
+        mock_isdir.assert_not_called()
+        mock_rmtree.assert_not_called()
+
+    @patch("blog.signals.shutil.rmtree")
+    @patch("blog.signals.os.path.isdir")
+    def test_delete_local_dir_if_exists_exception(self, mock_isdir, mock_rmtree):
+        mock_isdir.side_effect = Exception("OS Error")
+
+        import logging
+
+        with patch.object(logging.getLogger("blog.signals"), "error") as mock_error:
+            _delete_local_dir_if_exists("/tmp/error/path")
+
+            mock_isdir.assert_called_once_with("/tmp/error/path")
+            mock_rmtree.assert_not_called()
+            mock_error.assert_called_once_with("Error deleting local directory")
+
     def test_post_media_dir(self):
         with self.settings(MEDIA_ROOT="/tmp/media"):
             self.assertEqual(

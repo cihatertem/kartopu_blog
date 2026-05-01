@@ -375,6 +375,30 @@ class FetchMultipleFXRatesBulkTests(TestCase):
         pairs_by_date = {date(2023, 1, 1): {("USD", "TRY")}}
         self.assertEqual(fetch_multiple_fx_rates_bulk(pairs_by_date), {})
 
+    @patch("portfolio.services.logger.exception")
+    @patch("portfolio.services.yf.download")
+    @patch("portfolio.services._extract_price_from_close_data")
+    def test_extract_price_from_close_data_exception(
+        self, mock_extract, mock_download, mock_logger_exception
+    ):
+        """Test exception handling specifically from _extract_price_from_close_data."""
+        mock_df = pd.DataFrame(
+            {"Close": [30.0, 31.0]},
+            index=pd.DatetimeIndex(["2023-10-01", "2023-10-02"]),
+        )
+        mock_download.return_value = mock_df
+
+        mock_extract.side_effect = Exception("Extraction error")
+
+        d = date(2023, 10, 2)
+        pairs_by_date = {d: {("USD", "TRY")}}
+        result = fetch_multiple_fx_rates_bulk(pairs_by_date)
+
+        self.assertEqual(result, {})
+        mock_logger_exception.assert_called_once_with(
+            "Failed to parse FX rate for %s on %s", "USDTRY=X", d
+        )
+
     @patch("portfolio.services.yf.download")
     @patch("portfolio.services._safe_decimal")
     def test_single_series_parsing(self, mock_safe_decimal, mock_download):
@@ -555,6 +579,31 @@ class FetchFXRatesBulkTests(TestCase):
 
         self.assertEqual(result, {})
         mock_logger.exception.assert_called_once()
+
+    @patch("portfolio.services.logger.exception")
+    @patch("portfolio.services.yf.download")
+    @patch("portfolio.services._extract_price_from_close_data")
+    def test_extract_price_from_close_data_exception(
+        self, mock_extract, mock_download, mock_logger_exception
+    ):
+        """Test exception handling specifically from _extract_price_from_close_data."""
+        mock_data = MagicMock()
+        mock_data.empty = False
+        mock_data.__contains__.side_effect = lambda key: key == "Close"
+
+        mock_close = MagicMock()
+        mock_data.__getitem__.return_value = mock_close
+        mock_download.return_value = mock_data
+
+        mock_extract.side_effect = Exception("Extraction error")
+
+        pairs = [("USD", "TRY")]
+        result = fetch_fx_rates_bulk(pairs)
+
+        self.assertEqual(result, {})
+        mock_logger_exception.assert_called_once_with(
+            "Failed to parse FX rate for %s", "USDTRY=X"
+        )
 
     @patch("portfolio.services.logger.exception")
     @patch("portfolio.services.yf.download")

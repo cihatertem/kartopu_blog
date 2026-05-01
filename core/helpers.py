@@ -33,7 +33,9 @@ def get_client_ip(request) -> str | None:
     if trusted_nets and any(ra in net for net in trusted_nets):
         xff = request.META.get("HTTP_X_FORWARDED_FOR")
         if xff:
-            return xff.split(",")[0].strip()
+            parsed_xff = xff.split(",")[0].strip()
+            if parsed_xff:
+                return parsed_xff
 
     return remote
 
