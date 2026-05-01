@@ -152,15 +152,37 @@ class BlogAdminTests(TestCase):
     def test_toggle_is_featured_action(self):
         model_admin = BlogPostAdmin(BlogPost, self.site)
         request = MockRequest(user=self.admin_user)
-        queryset = BlogPost.objects.filter(pk=self.post.pk)
+
+        # Create a second post with is_featured=True
+        post2 = BlogPost.objects.create(
+            title="Post 2",
+            author=self.admin_user,
+            category=self.category,
+            content="Content 2",
+            status=BlogPost.Status.PUBLISHED,
+            is_featured=True,
+        )
+
+        queryset = BlogPost.objects.filter(pk__in=[self.post.pk, post2.pk])
 
         self.assertFalse(self.post.is_featured)
+        self.assertTrue(post2.is_featured)
+
         model_admin.toggle_is_featured(request, queryset)
+
         self.post.refresh_from_db()
+        post2.refresh_from_db()
+
         self.assertTrue(self.post.is_featured)
+        self.assertFalse(post2.is_featured)
+
         model_admin.toggle_is_featured(request, queryset)
+
         self.post.refresh_from_db()
+        post2.refresh_from_db()
+
         self.assertFalse(self.post.is_featured)
+        self.assertTrue(post2.is_featured)
 
     @patch("blog.admin.send_post_published_email")
     def test_resend_newsletter_notifications_action(self, mock_send):
