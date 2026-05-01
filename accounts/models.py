@@ -161,47 +161,43 @@ class User(  # pyright: ignore[reportIncompatibleVariableOverride]
         if hasattr(file, "seek"):
             file.seek(0)
 
-        try:
-            with Image.open(file) as img:
-                img = ImageOps.exif_transpose(img)
+        with Image.open(file) as img:
+            img = ImageOps.exif_transpose(img)
 
-                if (
-                    img.height <= self.MAX_AVATAR_SIZE[1]
-                    and img.width <= self.MAX_AVATAR_SIZE[0]
+            if (
+                img.height <= self.MAX_AVATAR_SIZE[1]
+                and img.width <= self.MAX_AVATAR_SIZE[0]
+            ):
+                return  # No need to resize
+
+            img = img.convert("RGB")
+            img.thumbnail(self.MAX_AVATAR_SIZE)
+            buffer = BytesIO()
+            img.save(buffer, format="JPEG", quality=85)
+
+            import os
+
+            filename = self.avatar.name
+            if filename:
+                base_name = os.path.basename(filename)
+                if base_name.lower().endswith(
+                    (".png", ".webp", ".gif", ".jpeg", ".jpg")
                 ):
-                    return  # No need to resize
-
-                img = img.convert("RGB")
-                img.thumbnail(self.MAX_AVATAR_SIZE)
-                buffer = BytesIO()
-                img.save(buffer, format="JPEG", quality=85)
-
-                import os
-
-                filename = self.avatar.name
-                if filename:
-                    base_name = os.path.basename(filename)
-                    if base_name.lower().endswith(
-                        (".png", ".webp", ".gif", ".jpeg", ".jpg")
-                    ):
-                        filename = base_name.rsplit(".", 1)[0] + ".jpg"
-                    else:
-                        filename = base_name + ".jpg"
+                    filename = base_name.rsplit(".", 1)[0] + ".jpg"
                 else:
-                    filename = "avatar.jpg"
+                    filename = base_name + ".jpg"
+            else:
+                filename = "avatar.jpg"
 
-                new_file = InMemoryUploadedFile(
-                    buffer,
-                    "ImageField",
-                    filename,
-                    "image/jpeg",
-                    buffer.tell(),
-                    None,
-                )
-                self.avatar = new_file  # pyright: ignore[reportAttributeAccessIssue]
-        finally:
-            # We don't close the file if it's not opened by us previously or if we shouldn't
-            pass
+            new_file = InMemoryUploadedFile(
+                buffer,
+                "ImageField",
+                filename,
+                "image/jpeg",
+                buffer.tell(),
+                None,
+            )
+            self.avatar = new_file  # pyright: ignore[reportAttributeAccessIssue]
 
     @cached_property
     def avatar_rendition(self) -> dict | None:

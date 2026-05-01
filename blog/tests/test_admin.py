@@ -1,5 +1,6 @@
 from unittest.mock import MagicMock, patch
 
+from django.contrib import messages
 from django.contrib.admin.sites import AdminSite
 from django.contrib.auth import get_user_model
 from django.contrib.messages.storage.fallback import FallbackStorage
@@ -8,6 +9,7 @@ from django.utils import timezone
 
 from blog.admin import BlogPostAdmin, BlogPostImageInline, CategoryAdmin, TagAdmin
 from blog.models import BlogPost, BlogPostImage, Category, Tag
+from newsletter.models import BlogPostNotification
 
 User = get_user_model()
 
@@ -232,25 +234,47 @@ class BlogAdminTests(TestCase):
         request.user = self.admin_user
 
         setattr(request, "session", "session")
-        messages = FallbackStorage(request)
-        setattr(request, "_messages", messages)
+        req_messages = FallbackStorage(request)
+        setattr(request, "_messages", req_messages)
 
-        queryset = BlogPost.objects.filter(pk=self.post.pk)
+        # Create a second post that is published
+        post2 = BlogPost.objects.create(
+            title="Post 2",
+            author=self.admin_user,
+            category=self.category,
+            content="Content 2",
+            status=BlogPost.Status.PUBLISHED,
+            published_at=timezone.now(),
+        )
 
-        # Skip draft post
-        model_admin.resend_newsletter_notifications(request, queryset)
-        mock_send.assert_not_called()
+        queryset = BlogPost.objects.filter(pk__in=[self.post.pk, post2.pk])
 
-        self.post.status = BlogPost.Status.PUBLISHED
-        self.post.published_at = timezone.now()
-        self.post.save()
+        with patch.object(model_admin, "message_user") as mock_message_user:
+            model_admin.resend_newsletter_notifications(request, queryset)
 
-        queryset = BlogPost.objects.filter(pk=self.post.pk)
-
-        model_admin.resend_newsletter_notifications(request, queryset)
-
+        # Only one post is published (post2), self.post is draft
         mock_send.assert_called_once()
-        self.assertEqual(mock_send.call_args[0][0].pk, self.post.pk)
+        self.assertEqual(mock_send.call_args[0][0].pk, post2.pk)
+
+        # Verify BlogPostNotification was created for the published post
+        self.assertTrue(BlogPostNotification.objects.filter(post=post2).exists())
+        self.assertFalse(BlogPostNotification.objects.filter(post=self.post).exists())
+
+        # Verify messages
+        self.assertEqual(mock_message_user.call_count, 2)
+        mock_message_user.assert_any_call(
+            request, "1 yazı için newsletter bildirimi tekrar gönderildi."
+        )
+        mock_message_user.assert_any_call(
+            request, "1 yazı yayınlanmadığı için atlandı.", level=messages.WARNING
+        )
+
+        # Verify description
+        actions = model_admin.get_actions(request)
+        self.assertEqual(
+            actions["resend_newsletter_notifications"][2],
+            "Seçili yazılar için newsletter bildirimi gönder",
+        )
 
     def test_formfield_for_foreignkey(self):
         model_admin = BlogPostAdmin(BlogPost, self.site)

@@ -27,26 +27,37 @@ class Command(BaseCommand):
             self.stdout.write(self.style.WARNING("No sidebar widget templates found."))
             return
 
+        existing_widgets = set(
+            SidebarWidget.objects.values_list("template_name", flat=True)
+        )
+
+        widgets_to_create = []
         created_count = 0
+
         for file in files:
             template_path = f"includes/{file}"
-            # Create default title from filename
-            # e.g. sidebar_popular_posts.html -> Popular Posts
-            default_title = (
-                file.replace("sidebar_", "")
-                .replace(".html", "")
-                .replace("_", " ")
-                .title()
-            )
 
-            _, created = SidebarWidget.objects.get_or_create(
-                template_name=template_path,
-                defaults={"title": default_title},
-            )
+            if template_path not in existing_widgets:
+                # Create default title from filename
+                # e.g. sidebar_popular_posts.html -> Popular Posts
+                default_title = (
+                    file.replace("sidebar_", "")
+                    .replace(".html", "")
+                    .replace("_", " ")
+                    .title()
+                )
 
-            if created:
-                created_count += 1
+                widgets_to_create.append(
+                    SidebarWidget(
+                        template_name=template_path,
+                        title=default_title,
+                    )
+                )
                 self.stdout.write(self.style.SUCCESS(f"Created widget for {file}"))
+
+        if widgets_to_create:
+            SidebarWidget.objects.bulk_create(widgets_to_create)
+            created_count = len(widgets_to_create)
 
         self.stdout.write(
             self.style.SUCCESS(

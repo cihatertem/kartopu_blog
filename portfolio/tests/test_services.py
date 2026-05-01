@@ -114,8 +114,17 @@ class CalculateXIRRTests(TestCase):
     def test_initial_guess_zero_division(self):
         """Test when the initial guess calculation encounters a zero division."""
         cash_flows = [
-            (date(2020, 1, 1), Decimal("-1e-10")),
-            (date(2050, 1, 1), Decimal("1e100")),
+            (date(2020, 1, 1), Decimal("-1e-400")),
+            (date(2021, 1, 1), Decimal("100")),
+        ]
+        irr = calculate_xirr(cash_flows)
+        self.assertIsInstance(irr, (float, type(None)))
+
+    def test_initial_guess_overflow(self):
+        """Test when the initial guess calculation encounters an overflow."""
+        cash_flows = [
+            (date(2020, 1, 1), Decimal("-1e-100")),
+            (date(2020, 7, 1), Decimal("1e100")),
         ]
         irr = calculate_xirr(cash_flows)
         self.assertIsInstance(irr, (float, type(None)))
