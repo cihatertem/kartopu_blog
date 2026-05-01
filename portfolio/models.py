@@ -1099,33 +1099,38 @@ class PortfolioSnapshot(BaseSnapshot):
     def _after_snapshot_created(self) -> None:
         self.update_irr()
 
-    def update_irr(self) -> Decimal | None:
+    def update_irr(
+        self, has_prior_snapshot: bool | None = None, commit: bool = True
+    ) -> Decimal | None:
         """
         Calculates and updates the irr_pct for this snapshot.
         """
-        has_prior_snapshot = (
-            self.__class__.objects.filter(portfolio_id=self.portfolio_id)  # pyright: ignore[reportAttributeAccessIssue]
-            .exclude(pk=self.pk)
-            .filter(
-                Q(snapshot_date__lt=self.snapshot_date)
-                | Q(
-                    snapshot_date=self.snapshot_date,
-                    created_at__lt=self.created_at,
+        if has_prior_snapshot is None:
+            has_prior_snapshot = (
+                self.__class__.objects.filter(portfolio_id=self.portfolio_id)  # pyright: ignore[reportAttributeAccessIssue]
+                .exclude(pk=self.pk)
+                .filter(
+                    Q(snapshot_date__lt=self.snapshot_date)
+                    | Q(
+                        snapshot_date=self.snapshot_date,
+                        created_at__lt=self.created_at,
+                    )
                 )
+                .exists()
             )
-            .exists()
-        )
 
         if not has_prior_snapshot:
             self.irr_pct = None
-            self.save(update_fields=["irr_pct", "updated_at"])
+            if commit:
+                self.save(update_fields=["irr_pct", "updated_at"])
             return self.irr_pct
 
         self.irr_pct = self.portfolio.calculate_irr(
             as_of_date=self.snapshot_date,
             current_value=self.total_value,
         )
-        self.save(update_fields=["irr_pct", "updated_at"])
+        if commit:
+            self.save(update_fields=["irr_pct", "updated_at"])
         return self.irr_pct
 
     @classmethod

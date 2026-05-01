@@ -43,22 +43,34 @@ class FillMissingIrrCommandTests(TestCase):
             irr_pct=None,
         )
 
-        def mock_update_irr_side_effect(self_obj):
+        def mock_update_irr_side_effect(self_obj, has_prior_snapshot=None, commit=True):
             if self_obj.snapshot_date.isoformat() == "2023-01-01":
                 self_obj.irr_pct = Decimal("5.0")
-                self_obj.save(update_fields=["irr_pct"])
+                if commit:
+                    self_obj.save(update_fields=["irr_pct"])
                 return Decimal("5.0")
             else:
                 self_obj.irr_pct = None
-                self_obj.save(update_fields=["irr_pct"])
+                if commit:
+                    self_obj.save(update_fields=["irr_pct"])
                 return None
 
-        with patch.object(
-            PortfolioSnapshot,
-            "update_irr",
-            autospec=True,
-            side_effect=mock_update_irr_side_effect,
-        ) as mock_update_irr:
+        with (
+            patch.object(
+                PortfolioSnapshot,
+                "update_irr",
+                autospec=True,
+                side_effect=mock_update_irr_side_effect,
+            ) as mock_update_irr,
+            patch.object(
+                type(PortfolioSnapshot.objects),
+                "bulk_update",
+                autospec=True,
+                side_effect=lambda self, objs, fields, **kwargs: [
+                    o.save(update_fields=fields) for o in objs
+                ],
+            ),
+        ):
             call_command("fill_missing_irr")
 
             self.assertEqual(mock_update_irr.call_count, 2)

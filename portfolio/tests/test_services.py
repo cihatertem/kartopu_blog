@@ -130,6 +130,20 @@ class CalculateXIRRTests(TestCase):
         irr = calculate_xirr(cash_flows)
         self.assertIsInstance(irr, (float, type(None)))
 
+    def test_xirr_iteration_exceptions(self):
+        """Test when the Newton-Raphson iteration loop encounters an exception."""
+        cash_flows = [
+            (date(2020, 1, 1), Decimal("-1000")),
+            (date(2021, 1, 1), Decimal("1100")),
+        ]
+
+        exceptions = [OverflowError, ZeroDivisionError, ValueError]
+        for exc in exceptions:
+            with self.subTest(exception=exc):
+                with patch("builtins.abs", side_effect=exc):
+                    result = calculate_xirr(cash_flows)
+                    self.assertIsNone(result)
+
     def test_xnpv_derivative_zero(self):
         """Test the edge case where f_prime could be zero."""
         cash_flows = [

@@ -37,7 +37,7 @@ def calculate_xirr(cash_flows: list[tuple[date, Decimal]]) -> float | None:
         total_out = sum(c for _, c in cash_flows if c > 0)
         if total_in > 0:
             return float((total_out - total_in) / total_in)
-            return 0.0
+        return 0.0
 
     def xnpv(rate: float, cash_flows: list[tuple[date, Decimal]]) -> float:
         d0 = cash_flows[0][0]
