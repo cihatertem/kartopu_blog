@@ -8,7 +8,8 @@ from django.conf import settings
 from django.core.cache import cache
 from django.core.exceptions import ValidationError
 from django.db import models, transaction
-from django.db.models import DecimalField, Q, QuerySet, Sum, Value
+from django.db.models import DecimalField, Prefetch, Q, QuerySet, Sum, Value
+from django.db.models import prefetch_related_objects
 from django.db.models.functions import Coalesce
 from django.utils import timezone
 
@@ -36,6 +37,13 @@ MAX_DECIMAL_PLACES_FOR_QUANTITY = 5
 MAX_DECIMAL_PLACES_FOR_RATE = 8
 CACHE_TIMEOUT = 600  # 10 minutes
 BULK_CREATE_BATCH_SIZE = 500
+
+
+def _get_prefetched_relation(instance: models.Model, relation_name: str):
+    prefetched_cache = getattr(instance, "_prefetched_objects_cache", None)
+    if not prefetched_cache:
+        return None
+    return prefetched_cache.get(relation_name)
 
 
 class BaseSnapshot(SlugMixin, UUIDModelMixin, TimeStampedModelMixin):
@@ -353,6 +361,10 @@ class Portfolio(UUIDModelMixin, TimeStampedModelMixin):
         rate_date: date | None,
     ) -> Decimal:
         currency_pair = (base_currency, target_currency, rate_date)
+        if base_currency == target_currency:
+            fx_rates[currency_pair] = Decimal("1")
+            return Decimal("1")
+
         if currency_pair not in fx_rates:
             cache_key = f"fx_rate_{base_currency}_{target_currency}_{rate_date.isoformat() if rate_date else 'latest'}"
             cached_rate = cache.get(cache_key)
@@ -586,6 +598,15 @@ class Portfolio(UUIDModelMixin, TimeStampedModelMixin):
         data["cost_basis"] = cost_basis
         data["value_adjustment"] = value_adjustment
 
+    @staticmethod
+    def _ensure_transaction_assets_loaded(
+        transactions: list["PortfolioTransaction"],
+    ) -> None:
+        if transactions and any(
+            "asset" not in tx._state.fields_cache for tx in transactions
+        ):
+            prefetch_related_objects(transactions, "asset")
+
     def _build_initial_positions(
         self,
         transactions: list["PortfolioTransaction"] | QuerySet["PortfolioTransaction"],
@@ -595,6 +616,7 @@ class Portfolio(UUIDModelMixin, TimeStampedModelMixin):
         positions: dict[str, dict[str, Decimal | Asset]] = {}
 
         tx_list = list(transactions)
+        self._ensure_transaction_assets_loaded(tx_list)
         self._prefetch_fx_rates(tx_list, fx_rates, price_date)
 
         for transaction in tx_list:
@@ -785,11 +807,7 @@ class Portfolio(UUIDModelMixin, TimeStampedModelMixin):
                 tx for tx in all_txs if not price_date or tx.trade_date <= price_date
             ]
             tx_list.sort(key=lambda tx: (tx.trade_date, tx.created_at))
-
-            if tx_list and "asset" not in tx_list[0]._state.fields_cache:
-                from django.db.models import prefetch_related_objects
-
-                prefetch_related_objects(tx_list, "asset")
+            self._ensure_transaction_assets_loaded(tx_list)
 
             self._filtered_transactions_cache[price_date] = tx_list
             return tx_list
@@ -881,9 +899,11 @@ class Portfolio(UUIDModelMixin, TimeStampedModelMixin):
         fx_rates: dict[tuple[str, str, date | None], Decimal] = {}
         asset_quantities: dict[str, Decimal] = {}
 
-        self._prefetch_fx_rates(transactions, fx_rates)  # pyright: ignore[reportArgumentType]
+        tx_list = list(transactions)
+        self._ensure_transaction_assets_loaded(tx_list)
+        self._prefetch_fx_rates(tx_list, fx_rates)
 
-        for tx in transactions:
+        for tx in tx_list:
             fx_rate = self._get_or_fetch_fx_rate(
                 fx_rates, tx.asset.currency, self.currency, tx.trade_date
             )
@@ -915,29 +935,34 @@ class Portfolio(UUIDModelMixin, TimeStampedModelMixin):
         """
         # Check if we have prefetched snapshots for the portfolio
         if hasattr(self, "prefetched_snapshots"):
-            snapshots = [s for s in self.prefetched_snapshots if s.irr_pct is not None]  # pyright: ignore[reportAttributeAccessIssue]
-        else:
-            snapshots = self.snapshots.filter(irr_pct__isnull=False).order_by(  # pyright: ignore[reportAttributeAccessIssue]
-                "snapshot_date"
-            )
+            snapshots = [
+                s
+                for s in self.prefetched_snapshots  # pyright: ignore[reportAttributeAccessIssue]
+                if s.irr_pct is not None
+                and (until_date is None or s.snapshot_date <= until_date)
+            ]
+            return [
+                {
+                    "date": snapshot.snapshot_date.isoformat(),
+                    "irr": float(snapshot.irr_pct),
+                }
+                for snapshot in snapshots
+            ]
 
+        snapshots = self.snapshots.filter(irr_pct__isnull=False).order_by(  # pyright: ignore[reportAttributeAccessIssue]
+            "snapshot_date"
+        )
         if until_date:
-            # If prefetched, it's a list, so we filter in Python.
-            # If not prefetched, it's a QuerySet, filter() will hit DB.
-            if isinstance(snapshots, list):
-                snapshots = [s for s in snapshots if s.snapshot_date <= until_date]
-            else:
-                snapshots = snapshots.filter(snapshot_date__lte=until_date)
-
-        if not snapshots:
-            return []
+            snapshots = snapshots.filter(snapshot_date__lte=until_date)
 
         return [
             {
-                "date": snapshot.snapshot_date.isoformat(),
-                "irr": float(snapshot.irr_pct),
+                "date": snapshot_date.isoformat(),
+                "irr": float(irr_pct),
             }
-            for snapshot in snapshots
+            for snapshot_date, irr_pct in snapshots.values_list(
+                "snapshot_date", "irr_pct"
+            )
         ]
 
 
@@ -1038,9 +1063,15 @@ class PortfolioTransaction(UUIDModelMixin, TimeStampedModelMixin):
         super().save(*args, **kwargs)  # pyright: ignore[reportArgumentType]
 
     def __str__(self) -> str:
-        portfolio_names = list(
-            self.portfolios.values_list("name", flat=True).order_by("name")
-        )
+        prefetched_portfolios = _get_prefetched_relation(self, "portfolios")
+        if prefetched_portfolios is not None:
+            portfolio_names = sorted(
+                portfolio.name for portfolio in prefetched_portfolios
+            )
+        else:
+            portfolio_names = list(
+                self.portfolios.values_list("name", flat=True).order_by("name")
+            )
         if portfolio_names:
             return f"{', '.join(portfolio_names)} - {self.asset}"
         return f"{self.asset}"
@@ -1288,9 +1319,15 @@ class CashFlowEntry(UUIDModelMixin, TimeStampedModelMixin):
         ordering = ("-created_at", "-entry_date")
 
     def __str__(self) -> str:
-        cashflows = ", ".join(
-            self.cashflows.values_list("name", flat=True).order_by("name")
-        )
+        prefetched_cashflows = _get_prefetched_relation(self, "cashflows")
+        if prefetched_cashflows is not None:
+            cashflows = ", ".join(
+                sorted(cashflow.name for cashflow in prefetched_cashflows)
+            )
+        else:
+            cashflows = ", ".join(
+                self.cashflows.values_list("name", flat=True).order_by("name")
+            )
         return f"{cashflows or 'Nakit Akışı Yok'} - {self.get_category_display()}"  # pyright: ignore[reportAttributeAccessIssue]
 
 
@@ -2008,8 +2045,8 @@ class DividendSnapshot(BaseSnapshot):
             p.id
             for p in payments_list
             if not (
-                hasattr(p, "_prefetched_objects_cache")
-                and "dividends" in p._prefetched_objects_cache  # pyright: ignore[reportAttributeAccessIssue]
+                hasattr(p, "currency_dividends")
+                or _get_prefetched_relation(p, "dividends") is not None
             )
         ]
 
@@ -2024,6 +2061,25 @@ class DividendSnapshot(BaseSnapshot):
                 ).iterator(chunk_size=1000)
             }
         return dividends_map
+
+    @classmethod
+    def _get_prefetched_dividend(
+        cls,
+        payment: DividendPayment,
+        currency: str,
+    ) -> Dividend | None:
+        currency_dividends = getattr(payment, "currency_dividends", None)
+        if currency_dividends is not None:
+            return currency_dividends[0] if currency_dividends else None
+
+        prefetched_dividends = _get_prefetched_relation(payment, "dividends")
+        if prefetched_dividends is None:
+            return None
+
+        return next(
+            (d for d in prefetched_dividends if d.currency == currency),
+            None,
+        )
 
     @classmethod
     def _calculate_payment_amounts(
@@ -2061,19 +2117,8 @@ class DividendSnapshot(BaseSnapshot):
         dividends_map = cls._get_dividends_map(payments, currency)
 
         for payment in payments:
-            if (
-                hasattr(payment, "_prefetched_objects_cache")
-                and "dividends" in payment._prefetched_objects_cache  # pyright: ignore[reportAttributeAccessIssue]
-            ):
-                dividend = next(
-                    (
-                        d
-                        for d in payment._prefetched_objects_cache["dividends"]  # pyright: ignore[reportAttributeAccessIssue]
-                        if d.currency == currency
-                    ),
-                    None,  # pyright: ignore[reportAttributeAccessIssue]
-                )
-            else:
+            dividend = cls._get_prefetched_dividend(payment, currency)
+            if dividend is None:
                 dividend = dividends_map.get(payment.id)  # pyright: ignore[reportArgumentType]
 
             per_share, total_payment = cls._calculate_payment_amounts(
@@ -2125,22 +2170,35 @@ class DividendSnapshot(BaseSnapshot):
         year = kwargs["year"]
         currency = kwargs["currency"]
         snapshot_date = snapshot_date or date(year, 12, 31)  # pyright: ignore[reportArgumentType]
+        target_currency = str(currency)
         payments = list(
             DividendPayment.objects.select_related("asset")
-            .prefetch_related("dividends")
+            .prefetch_related(
+                Prefetch(
+                    "dividends",
+                    queryset=Dividend.objects.filter(currency=target_currency).only(
+                        "id",
+                        "payment_id",
+                        "currency",
+                        "per_share_net_amount",
+                        "total_net_amount",
+                    ),
+                    to_attr="currency_dividends",
+                )
+            )
             .filter(payment_date__year=year, payment_date__lte=snapshot_date)
             .order_by("payment_date", "created_at")
         )
 
         fx_rates = cls._get_fx_rates(
             payments,
-            str(currency),
+            target_currency,
             snapshot_date,
         )
 
         total_amount, asset_totals, payment_rows = cls._process_payments(
             payments,
-            str(currency),
+            target_currency,
             snapshot_date,
             fx_rates,
         )

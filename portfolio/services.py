@@ -192,7 +192,7 @@ def fetch_yahoo_finance_prices_bulk(
     if not symbols:
         return {}
 
-    valid_symbols = [s for s in symbols if s]
+    valid_symbols = list(dict.fromkeys(s for s in symbols if s))
     if not valid_symbols:
         return {}
 
@@ -350,7 +350,9 @@ def fetch_fx_rates_bulk(
         return {}
 
     # Filter out identical pairs
-    pairs_to_fetch = [pair for pair in currency_pairs if pair[0] != pair[1]]
+    pairs_to_fetch = list(
+        dict.fromkeys(pair for pair in currency_pairs if pair[0] != pair[1])
+    )
     if not pairs_to_fetch:
         return {pair: Decimal("1") for pair in currency_pairs if pair[0] == pair[1]}
 

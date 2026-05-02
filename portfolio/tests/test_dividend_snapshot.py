@@ -2,7 +2,9 @@ import datetime
 from decimal import Decimal
 from unittest.mock import patch
 
+from django.db import connection
 from django.test import TestCase
+from django.test.utils import CaptureQueriesContext
 
 from portfolio.models import Asset, DividendPayment, DividendSnapshot
 
@@ -113,3 +115,37 @@ class DividendSnapshotTests(TestCase):
         )
 
         self.assertEqual(snapshot.total_amount, Decimal("400.00"))
+
+    @patch("portfolio.models.fetch_fx_rate")
+    @patch("portfolio.models.fetch_fx_rates_bulk")
+    def test_dividend_snapshot_prefetches_only_requested_currency(
+        self, mock_fetch_fx_rates_bulk, mock_fetch_fx_rate
+    ):
+        mock_fetch_fx_rate.return_value = Decimal("30.00")
+        mock_fetch_fx_rates_bulk.return_value = {("USD", "TRY"): Decimal("30.00")}
+        DividendPayment.objects.create(
+            asset=self.asset_usd,
+            payment_date=datetime.date(2023, 1, 15),
+            share_count=Decimal("10"),
+            net_dividend_per_share=Decimal("1.00"),
+            average_cost=Decimal("100.00"),
+            last_close_price=Decimal("140.00"),
+        )
+
+        with CaptureQueriesContext(connection) as captured_queries:
+            snapshot = DividendSnapshot.create_snapshot(
+                year=2023,
+                currency=Asset.Currency.TRY,
+                snapshot_date=datetime.date(2023, 12, 31),
+            )
+
+        self.assertEqual(snapshot.total_amount, Decimal("300.00"))
+        dividend_prefetch_queries = [
+            query_info["sql"]
+            for query_info in captured_queries.captured_queries
+            if 'from "portfolio_dividend"' in query_info["sql"].lower()
+            and "select" in query_info["sql"].lower()
+        ]
+        self.assertEqual(len(dividend_prefetch_queries), 1)
+        self.assertIn('"currency"', dividend_prefetch_queries[0].lower())
+        self.assertIn("TRY", dividend_prefetch_queries[0])

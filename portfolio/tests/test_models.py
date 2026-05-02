@@ -5,7 +5,10 @@ from unittest.mock import patch
 from django.contrib.auth import get_user_model
 from django.core.cache import cache
 from django.core.exceptions import ValidationError
+from django.db import connection
 from django.test import TestCase
+from django.test.utils import CaptureQueriesContext
+from django.utils import timezone
 
 from portfolio.models import (
     Asset,
@@ -92,6 +95,33 @@ class StringRepresentationTests(ModelsTestCase):
         transaction.portfolios.add(portfolio)
         self.assertEqual(str(transaction), "P1 - Apple")
 
+    def test_portfolio_transaction_str_uses_prefetched_portfolios(self):
+        portfolio = Portfolio.objects.create(
+            owner=self.user, name="P1", target_value=100
+        )
+        asset = Asset.objects.create(
+            name="Apple",
+            asset_type=Asset.AssetType.STOCK,
+            current_price=10,
+            price_updated_at=timezone.now(),
+        )
+        transaction = PortfolioTransaction.objects.create(
+            asset=asset,
+            trade_date="2023-01-01",
+            quantity=10,
+            price_per_unit=100,
+        )
+        transaction.portfolios.add(portfolio)
+
+        prefetched_transaction = (
+            PortfolioTransaction.objects.select_related("asset")
+            .prefetch_related("portfolios")
+            .get(pk=transaction.pk)
+        )
+
+        with self.assertNumQueries(0):
+            self.assertEqual(str(prefetched_transaction), "P1 - Apple")
+
     def test_cashflow_str(self):
         cashflow = CashFlow.objects.create(owner=self.user, name="My Cashflow")
         self.assertEqual(str(cashflow), "My Cashflow")
@@ -105,6 +135,20 @@ class StringRepresentationTests(ModelsTestCase):
         cashflow = CashFlow.objects.create(owner=self.user, name="C1")
         entry.cashflows.add(cashflow)
         self.assertEqual(str(entry), "C1 - Diğer")
+
+    def test_cashflow_entry_str_uses_prefetched_cashflows(self):
+        cashflow = CashFlow.objects.create(owner=self.user, name="C1")
+        entry = CashFlowEntry.objects.create(
+            entry_date="2023-01-01", category=CashFlowEntry.Category.OTHER, amount=100
+        )
+        entry.cashflows.add(cashflow)
+
+        prefetched_entry = CashFlowEntry.objects.prefetch_related("cashflows").get(
+            pk=entry.pk
+        )
+
+        with self.assertNumQueries(0):
+            self.assertEqual(str(prefetched_entry), "C1 - Diğer")
 
     def test_salary_savings_flow_str(self):
         flow = SalarySavingsFlow.objects.create(owner=self.user, name="My Flow")
@@ -461,6 +505,70 @@ class LogicTests(ModelsTestCase):
         )
         self.assertEqual(len(history_filtered), 1)
 
+    def test_get_irr_history_uses_narrow_snapshot_query(self):
+        portfolio = Portfolio.objects.create(
+            owner=self.user, name="Portfolio", target_value=100
+        )
+        PortfolioSnapshot.objects.create(
+            portfolio=portfolio,
+            period=PortfolioSnapshot.Period.MONTHLY,
+            snapshot_date="2023-01-01",
+            total_value=100,
+            total_cost=100,
+            target_value=100,
+            total_return_pct=0,
+            irr_pct=Decimal("5.0"),
+        )
+
+        with CaptureQueriesContext(connection) as captured_queries:
+            history = portfolio.get_irr_history()
+
+        self.assertEqual(history, [{"date": "2023-01-01", "irr": 5.0}])
+        snapshot_queries = [
+            query_info["sql"].lower()
+            for query_info in captured_queries.captured_queries
+            if 'from "portfolio_portfoliosnapshot"' in query_info["sql"].lower()
+        ]
+        self.assertEqual(len(snapshot_queries), 1)
+        self.assertIn('"snapshot_date"', snapshot_queries[0])
+        self.assertIn('"irr_pct"', snapshot_queries[0])
+        self.assertNotIn('"total_value"', snapshot_queries[0])
+
+    def test_build_initial_positions_prefetches_assets_for_plain_queryset(self):
+        portfolio = Portfolio.objects.create(
+            owner=self.user, name="Query Portfolio", target_value=100
+        )
+        assets = [
+            Asset.objects.create(
+                name=f"Asset {index}",
+                asset_type=Asset.AssetType.STOCK,
+                currency=Asset.Currency.TRY,
+                current_price=Decimal("10"),
+                price_updated_at=timezone.now(),
+            )
+            for index in range(3)
+        ]
+        for index, asset in enumerate(assets, start=1):
+            transaction = PortfolioTransaction.objects.create(
+                asset=asset,
+                transaction_type=PortfolioTransaction.TransactionType.BUY,
+                trade_date=datetime.date(2023, 1, index),
+                quantity=Decimal("1"),
+                price_per_unit=Decimal("10"),
+            )
+            transaction.portfolios.add(portfolio)
+
+        transactions = (
+            PortfolioTransaction.objects.filter(portfolios=portfolio)
+            .order_by("trade_date", "created_at")
+            .distinct()
+        )
+
+        with self.assertNumQueries(2):
+            positions = portfolio._build_initial_positions(transactions, {}, None)
+
+        self.assertEqual(len(positions), 3)
+
     @patch("portfolio.models.fetch_fx_rates_bulk")
     def test_dividend_payment_sync_dividend_currencies(self, mock_fetch_bulk):
         mock_fetch_bulk.return_value = {
@@ -783,3 +891,21 @@ class FxRateTests(ModelsTestCase):
 
         cache_key = "fx_rate_USD_TRY_latest"
         self.assertEqual(cache.get(cache_key), Decimal("35.0"))
+
+    def test_get_or_fetch_fx_rate_same_currency_skips_cache_and_fetch(self):
+        fx_rates = {}
+        rate_date = datetime.date(2023, 1, 1)
+
+        with (
+            patch("portfolio.models.cache") as mock_cache,
+            patch("portfolio.models.fetch_fx_rate") as mock_fetch,
+        ):
+            rate = self.portfolio._get_or_fetch_fx_rate(
+                fx_rates, "TRY", "TRY", rate_date
+            )
+
+        self.assertEqual(rate, Decimal("1"))
+        self.assertEqual(fx_rates[("TRY", "TRY", rate_date)], Decimal("1"))
+        mock_cache.get.assert_not_called()
+        mock_cache.set.assert_not_called()
+        mock_fetch.assert_not_called()

@@ -300,6 +300,17 @@ class FetchYahooFinancePricesBulkTests(TestCase):
             mock_extract.assert_called_once()
 
     @patch("portfolio.services.yf.download")
+    def test_deduplicates_symbols_before_download(self, mock_download):
+        import pandas as pd
+
+        mock_download.return_value = pd.DataFrame()
+
+        fetch_yahoo_finance_prices_bulk(["AAPL", "AAPL", "MSFT", ""])
+
+        args, _ = mock_download.call_args
+        self.assertEqual(args[0], ["AAPL", "MSFT"])
+
+    @patch("portfolio.services.yf.download")
     def test_with_date_success(self, mock_download):
         from datetime import date
         from decimal import Decimal
@@ -611,6 +622,15 @@ class FetchFXRatesBulkTests(TestCase):
         mock_download.return_value = pd.DataFrame()
         pairs = [("USD", "TRY")]
         self.assertEqual(fetch_fx_rates_bulk(pairs), {})
+
+    @patch("portfolio.services.yf.download")
+    def test_deduplicates_currency_pairs_before_download(self, mock_download):
+        mock_download.return_value = pd.DataFrame()
+
+        fetch_fx_rates_bulk([("USD", "TRY"), ("USD", "TRY"), ("EUR", "TRY")])
+
+        args, _ = mock_download.call_args
+        self.assertEqual(args[0], ["USDTRY=X", "EURTRY=X"])
 
     @patch("portfolio.services.yf.download")
     @patch("portfolio.services._safe_decimal")
