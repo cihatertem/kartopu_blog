@@ -16,6 +16,11 @@ from django.views.decorators.http import require_POST
 
 from blog.cache_keys import BLOG_POST_DETAIL_KEY_PREFIX
 from blog.models import BlogPost, BlogPostReaction, Category, Tag
+from blog.services import (
+    detect_content_markers,
+    get_content_prefetches_for_dependencies,
+    get_content_prefetches_for_markers,
+)
 from comments.forms import CommentForm
 from comments.models import MAX_COMMENT_LENGTH, Comment
 from core import helpers
@@ -24,15 +29,6 @@ from core.models import SiteSettings
 from core.services.blog import published_posts_queryset
 from core.services.pagination import get_page_obj
 from core.tag_colors import build_tag_items
-from portfolio.models import (
-    CashFlowComparison,
-    CashFlowSnapshot,
-    DividendComparison,
-    DividendSnapshot,
-    PortfolioComparison,
-    PortfolioSnapshot,
-    SalarySavingsSnapshot,
-)
 
 COMMENT_PAGE_SIZE = 10
 POST_PAGE_SIZE = 10
@@ -219,7 +215,12 @@ def _get_social_maps(author_ids):
     if not author_ids:
         return social_avatar_map, social_profile_map
 
-    social_accounts = SocialAccount.objects.filter(user_id__in=author_ids)
+    social_accounts = SocialAccount.objects.filter(user_id__in=author_ids).only(
+        "user_id",
+        "provider",
+        "uid",
+        "extra_data",
+    )
     for account in social_accounts:
         avatar_url = _extract_social_avatar_url(account.extra_data or {})
         if not avatar_url:
@@ -260,7 +261,7 @@ def _build_comment_context(request, post):
     comment_form = CommentForm()
     has_social_account = (
         request.user.is_authenticated
-        and SocialAccount.objects.filter(user=request.user).exists()
+        and SocialAccount.objects.filter(user_id=request.user.pk).exists()
     )
     is_staff = request.user.is_authenticated and (
         request.user.is_staff or request.user.is_superuser
@@ -281,128 +282,6 @@ def _build_comment_context(request, post):
     }
 
 
-def _get_portfolio_prefetches():
-    return [
-        Prefetch(
-            "portfolio_snapshots",
-            queryset=PortfolioSnapshot.objects.select_related("portfolio")
-            .prefetch_related(
-                "items",
-                "items__asset",
-                Prefetch(
-                    "portfolio__snapshots",
-                    queryset=PortfolioSnapshot.objects.only(
-                        "snapshot_date",
-                        "total_value",
-                        "irr_pct",
-                        "portfolio_id",
-                        "period",
-                    ).order_by("snapshot_date"),
-                    to_attr="prefetched_snapshots",
-                ),
-            )
-            .order_by("snapshot_date"),
-        ),
-        Prefetch(
-            "portfolio_comparisons",
-            queryset=PortfolioComparison.objects.select_related(
-                "base_snapshot",
-                "compare_snapshot",
-                "base_snapshot__portfolio",
-                "compare_snapshot__portfolio",
-            )
-            .prefetch_related(
-                "base_snapshot__items",
-                "base_snapshot__items__asset",
-                "compare_snapshot__items",
-                "compare_snapshot__items__asset",
-            )
-            .order_by("created_at"),
-        ),
-    ]
-
-
-def _get_cashflow_prefetches():
-    return [
-        Prefetch(
-            "cashflow_snapshots",
-            queryset=CashFlowSnapshot.objects.select_related("cashflow")
-            .prefetch_related(
-                "items",
-                Prefetch(
-                    "cashflow__snapshots",
-                    queryset=CashFlowSnapshot.objects.only(
-                        "snapshot_date", "total_amount", "cashflow_id", "period"
-                    ).order_by("snapshot_date"),
-                    to_attr="prefetched_snapshots",
-                ),
-            )
-            .order_by("snapshot_date"),
-        ),
-        Prefetch(
-            "cashflow_comparisons",
-            queryset=CashFlowComparison.objects.select_related(
-                "base_snapshot",
-                "compare_snapshot",
-                "base_snapshot__cashflow",
-                "compare_snapshot__cashflow",
-            )
-            .prefetch_related(
-                "base_snapshot__items",
-                "compare_snapshot__items",
-            )
-            .order_by("created_at"),
-        ),
-    ]
-
-
-def _get_salary_savings_prefetches():
-    return [
-        Prefetch(
-            "salary_savings_snapshots",
-            queryset=SalarySavingsSnapshot.objects.select_related("flow")
-            .prefetch_related(
-                Prefetch(
-                    "flow__snapshots",
-                    queryset=SalarySavingsSnapshot.objects.only(
-                        "snapshot_date", "savings_rate", "flow_id"
-                    ).order_by("snapshot_date"),
-                    to_attr="prefetched_snapshots",
-                )
-            )
-            .order_by("snapshot_date"),
-        ),
-    ]
-
-
-def _get_dividend_prefetches():
-    return [
-        Prefetch(
-            "dividend_snapshots",
-            queryset=DividendSnapshot.objects.prefetch_related(
-                "asset_items",
-                "asset_items__asset",
-                "payment_items",
-                "payment_items__asset",
-            ).order_by("-year", "-created_at"),
-        ),
-        Prefetch(
-            "dividend_comparisons",
-            queryset=DividendComparison.objects.select_related(
-                "base_snapshot",
-                "compare_snapshot",
-            )
-            .prefetch_related(
-                "base_snapshot__asset_items",
-                "base_snapshot__asset_items__asset",
-                "compare_snapshot__asset_items",
-                "compare_snapshot__asset_items__asset",
-            )
-            .order_by("created_at"),
-        ),
-    ]
-
-
 def _post_detail_queryset():
     return (
         BlogPost.objects.select_related(
@@ -414,7 +293,13 @@ def _post_detail_queryset():
             "tags",
             "images",
             Prefetch(
-                "next_posts", queryset=BlogPost.objects.defer("content", "excerpt")
+                "next_posts",
+                queryset=BlogPost.objects.filter(
+                    status=BlogPost.Status.PUBLISHED
+                )
+                .defer("content", "excerpt")
+                .order_by("published_at"),
+                to_attr="_prefetched_published_next_posts",
             ),
         )
         .defer("previous_post__content", "previous_post__excerpt")
@@ -437,17 +322,13 @@ def _get_post_for_detail(slug: str, *, include_unpublished: bool):
 
     # Dinamik Prefetch: İçerikte kullanılan marker'lara göre ek verileri getir.
     # Bu, t3.micro üzerinde gereksiz RAM kullanımını önler (OOM koruması).
-    prefetches = []
-    deps = post.content_dependencies or []
-
-    if "portfolio" in deps:
-        prefetches.extend(_get_portfolio_prefetches())
-    if "cashflow" in deps:
-        prefetches.extend(_get_cashflow_prefetches())
-    if "salary_savings" in deps:
-        prefetches.extend(_get_salary_savings_prefetches())
-    if "dividend" in deps:
-        prefetches.extend(_get_dividend_prefetches())
+    markers = detect_content_markers(post.content)
+    if markers:
+        prefetches = get_content_prefetches_for_markers(markers)
+    else:
+        prefetches = get_content_prefetches_for_dependencies(
+            post.content_dependencies or []
+        )
 
     if prefetches:
         prefetch_related_objects([post], *prefetches)

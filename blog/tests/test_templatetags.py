@@ -2,8 +2,10 @@ import datetime
 from decimal import Decimal
 from unittest.mock import MagicMock, patch
 
+from django.contrib.auth import get_user_model
 from django.test import TestCase
 
+from blog.models import BlogPost
 from blog.templatetags import blog_extras
 from blog.templatetags.blog_extras import (
     _coerce_identifier,
@@ -25,6 +27,9 @@ from blog.templatetags.blog_extras import (
     _render_savings_rate_charts_html,
     _render_savings_rate_summary_html,
 )
+from portfolio.models import Asset, Portfolio, PortfolioSnapshot, PortfolioSnapshotItem
+
+User = get_user_model()
 
 
 class DummySnapshot:
@@ -106,6 +111,58 @@ class TestTemplateTagsHelpers(TestCase):
         self.assertEqual(_get_prefetched_list(None, "items", ["b"]), [])
         self.assertEqual(_get_prefetched_list(Post(), "items", ["b"]), ["a"])
         self.assertEqual(_get_prefetched_list(Post(), "missing", ["b"]), ["b"])
+
+
+class TestTemplateTagQuerysets(TestCase):
+    def test_portfolio_snapshot_fallback_prefetches_render_relations(self):
+        user = User.objects.create_user(email="template-prefetch@example.com")
+        portfolio = Portfolio.objects.create(
+            owner=user,
+            name="Fallback Portfolio",
+            target_value=Decimal("10000.00"),
+        )
+        snapshot = PortfolioSnapshot.objects.create(
+            portfolio=portfolio,
+            total_value=Decimal("1000.00"),
+            total_cost=Decimal("800.00"),
+            target_value=Decimal("1200.00"),
+            total_return_pct=Decimal("0.25"),
+            period=PortfolioSnapshot.Period.MONTHLY,
+            snapshot_date=datetime.date(2026, 1, 31),
+        )
+        asset = Asset.objects.create(
+            name="Cash Asset",
+            asset_type=Asset.AssetType.CASH,
+            current_price=Decimal("1.00"),
+        )
+        PortfolioSnapshotItem.objects.create(
+            snapshot=snapshot,
+            asset=asset,
+            quantity=Decimal("1.00"),
+            average_cost=Decimal("800.00"),
+            cost_basis=Decimal("800.00"),
+            current_price=Decimal("1000.00"),
+            market_value=Decimal("1000.00"),
+            allocation_pct=Decimal("1.00"),
+            gain_loss=Decimal("200.00"),
+            gain_loss_pct=Decimal("0.25"),
+        )
+        post = BlogPost.objects.create(
+            title="Fallback Post",
+            author=user,
+            content="{{ portfolio_charts:1 }} {{ portfolio_category_summary:1 }}",
+            status=BlogPost.Status.PUBLISHED,
+        )
+        post.portfolio_snapshots.add(snapshot)
+
+        fetched_snapshot = blog_extras._get_portfolio_snapshots(post)[0]
+
+        with self.assertNumQueries(0):
+            charts_html = _render_portfolio_charts_html(fetched_snapshot)
+            category_html = _render_portfolio_category_summary_html(fetched_snapshot)
+
+        self.assertIn("portfolio-timeseries", charts_html)
+        self.assertIn("portfolio-category-allocation", category_html)
 
 
 class TestRenderHTMLFunctions(TestCase):

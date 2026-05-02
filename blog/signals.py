@@ -98,7 +98,7 @@ def update_search_vector(post: BlogPost):
     if connection.vendor != "postgresql":
         return
 
-    tags_str = " ".join(tag.name for tag in post.tags.all())
+    tags_str = " ".join(post.tags.values_list("name", flat=True).iterator())
     vector = (
         SearchVector(Value(tags_str), weight="A", config="turkish")
         + SearchVector("title", weight="B", config="turkish")

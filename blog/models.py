@@ -325,16 +325,32 @@ class BlogPost(
     def get_absolute_url(self) -> str:
         return reverse("blog:post_detail", kwargs={"slug": self.slug})
 
-    @property
+    @cached_property
     def published_previous_post(self) -> "BlogPost | None":
         """Sadece yayınlanmış önceki yazıyı getirir."""
         if self.previous_post and self.previous_post.status == self.Status.PUBLISHED:
             return self.previous_post
         return None
 
-    @property
+    @cached_property
     def published_next_post(self) -> "BlogPost | None":
         """Sadece yayınlanmış sonraki yazıyı getirir."""
+        prefetched_next_posts = getattr(self, "_prefetched_published_next_posts", None)
+        if prefetched_next_posts is not None:
+            return prefetched_next_posts[0] if prefetched_next_posts else None
+
+        prefetched = getattr(self, "_prefetched_objects_cache", {})
+        if "next_posts" in prefetched:
+            next_posts = [
+                post
+                for post in prefetched["next_posts"]
+                if post.status == self.Status.PUBLISHED
+            ]
+            next_posts.sort(
+                key=lambda post: (post.published_at or post.created_at, post.created_at)
+            )
+            return next_posts[0] if next_posts else None
+
         return (
             self.next_posts.filter(status=self.Status.PUBLISHED)
             .order_by("published_at")

@@ -13,6 +13,15 @@ from django.utils.safestring import mark_safe
 
 from core.decorators import log_exceptions
 from core.markdown import render_markdown
+from blog.services import (
+    cashflow_comparison_queryset,
+    cashflow_snapshot_queryset,
+    dividend_comparison_queryset,
+    dividend_snapshot_queryset,
+    portfolio_comparison_queryset,
+    portfolio_snapshot_queryset,
+    salary_savings_snapshot_queryset,
+)
 from portfolio.models import CashFlowEntry, CashFlowSnapshot, SalarySavingsSnapshot
 
 register = template.Library()
@@ -420,7 +429,11 @@ def _get_cashflow_snapshots(post):
     return _get_prefetched_list(
         post,
         "cashflow_snapshots",
-        post.cashflow_snapshots.select_related("cashflow").order_by("snapshot_date"),
+        cashflow_snapshot_queryset(
+            post.cashflow_snapshots,
+            include_items=True,
+            include_history=True,
+        ),
     )
 
 
@@ -431,17 +444,10 @@ def _get_cashflow_comparisons(post):
     return _get_prefetched_list(
         post,
         "cashflow_comparisons",
-        post.cashflow_comparisons.select_related(
-            "base_snapshot",
-            "compare_snapshot",
-            "base_snapshot__cashflow",
-            "compare_snapshot__cashflow",
-        )
-        .prefetch_related(
-            "base_snapshot__items",
-            "compare_snapshot__items",
-        )
-        .order_by("created_at"),
+        cashflow_comparison_queryset(
+            post.cashflow_comparisons,
+            include_items=True,
+        ),
     )
 
 
@@ -452,7 +458,10 @@ def _get_salary_savings_snapshots(post):
     return _get_prefetched_list(
         post,
         "salary_savings_snapshots",
-        post.salary_savings_snapshots.select_related("flow").order_by("snapshot_date"),
+        salary_savings_snapshot_queryset(
+            post.salary_savings_snapshots,
+            include_history=True,
+        ),
     )
 
 
@@ -463,7 +472,11 @@ def _get_portfolio_snapshots(post):
     return _get_prefetched_list(
         post,
         "portfolio_snapshots",
-        post.portfolio_snapshots.select_related("portfolio").order_by("snapshot_date"),
+        portfolio_snapshot_queryset(
+            post.portfolio_snapshots,
+            include_items=True,
+            include_history=True,
+        ),
     )
 
 
@@ -474,12 +487,7 @@ def _get_portfolio_comparisons(post):
     return _get_prefetched_list(
         post,
         "portfolio_comparisons",
-        post.portfolio_comparisons.select_related(
-            "base_snapshot",
-            "compare_snapshot",
-            "base_snapshot__portfolio",
-            "compare_snapshot__portfolio",
-        ).order_by("created_at"),
+        portfolio_comparison_queryset(post.portfolio_comparisons),
     )
 
 
@@ -490,7 +498,11 @@ def _get_dividend_snapshots(post):
     return _get_prefetched_list(
         post,
         "dividend_snapshots",
-        post.dividend_snapshots.order_by("-snapshot_date", "-created_at"),
+        dividend_snapshot_queryset(
+            post.dividend_snapshots,
+            include_asset_items=True,
+            include_payment_items=True,
+        ),
     )
 
 
@@ -501,10 +513,7 @@ def _get_dividend_comparisons(post):
     return _get_prefetched_list(
         post,
         "dividend_comparisons",
-        post.dividend_comparisons.select_related(
-            "base_snapshot",
-            "compare_snapshot",
-        ).order_by("created_at"),
+        dividend_comparison_queryset(post.dividend_comparisons),
     )
 
 

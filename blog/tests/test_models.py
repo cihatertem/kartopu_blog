@@ -2,7 +2,9 @@ from unittest.mock import patch
 
 from django.contrib.auth import get_user_model
 from django.core.files.uploadedfile import SimpleUploadedFile
+from django.db.models import Prefetch
 from django.test import TestCase
+from django.utils import timezone
 
 from blog.models import BlogPost, BlogPostImage, BlogPostReaction, Category, Tag
 
@@ -200,3 +202,43 @@ class BlogModelsTests(TestCase):
         post1.delete()
         post2.refresh_from_db()
         self.assertIsNone(post2.previous_post)
+
+    def test_published_next_post_uses_prefetched_posts_without_query(self):
+        now = timezone.now()
+        post = BlogPost.objects.create(
+            title="Current Post",
+            author=self.user,
+            status=BlogPost.Status.PUBLISHED,
+            published_at=now,
+        )
+        next_post = BlogPost.objects.create(
+            title="Next Published Post",
+            author=self.user,
+            status=BlogPost.Status.PUBLISHED,
+            published_at=now + timezone.timedelta(days=1),
+            previous_post=post,
+        )
+        BlogPost.objects.create(
+            title="Next Draft Post",
+            author=self.user,
+            status=BlogPost.Status.DRAFT,
+            previous_post=post,
+        )
+
+        fetched_post = (
+            BlogPost.objects.prefetch_related(
+                Prefetch(
+                    "next_posts",
+                    queryset=BlogPost.objects.filter(
+                        status=BlogPost.Status.PUBLISHED
+                    ).order_by("published_at"),
+                    to_attr="_prefetched_published_next_posts",
+                )
+            )
+            .filter(pk=post.pk)
+            .get()
+        )
+
+        with self.assertNumQueries(0):
+            self.assertEqual(fetched_post.published_next_post.pk, next_post.pk)
+            self.assertEqual(fetched_post.published_next_post.pk, next_post.pk)
