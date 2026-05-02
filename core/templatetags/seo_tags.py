@@ -11,6 +11,8 @@ from core.models import PageSEO, SiteSettings
 logger = logging.getLogger(__name__)
 register = template.Library()
 
+PAGE_SEO_CACHE_TIMEOUT = 3600
+
 
 def _make_absolute(url):
     if not url:
@@ -25,6 +27,25 @@ def _make_absolute(url):
     if not url_str.startswith("/"):
         url_str = "/" + url_str
     return f"{site_base_url}{url_str}"
+
+
+def _get_prefetched_objects(instance, relation_name):
+    prefetched = getattr(instance, "_prefetched_objects_cache", {})
+    return prefetched.get(relation_name)
+
+
+def _get_post_tag_names(post):
+    prefetched_tags = _get_prefetched_objects(post, "tags")
+    if prefetched_tags is not None:
+        return [tag.name for tag in prefetched_tags]
+    return list(post.tags.values_list("name", flat=True))
+
+
+def _get_about_page_first_image(about_page):
+    prefetched_images = _get_prefetched_objects(about_page, "images")
+    if prefetched_images is not None:
+        return prefetched_images[0] if prefetched_images else None
+    return about_page.images.only("image").order_by("order").first()
 
 
 def _get_post_seo_data(seo, context):
@@ -43,9 +64,9 @@ def _get_post_seo_data(seo, context):
         seo["article_author"] = post.author.get_full_name() or post.author.email
     if post.category:
         seo["article_section"] = post.category.name
-    tags = post.tags.all()
-    if tags:
-        seo["article_tags"] = [tag.name for tag in tags]
+    tag_names = _get_post_tag_names(post)
+    if tag_names:
+        seo["article_tags"] = tag_names
 
 
 def _get_about_page_seo_data(seo, context, site_name):
@@ -54,8 +75,7 @@ def _get_about_page_seo_data(seo, context, site_name):
     if about_page.meta_description:
         seo["description"] = about_page.meta_description
 
-    # İlk görseli kullan
-    first_image = about_page.images.order_by("order").first()
+    first_image = _get_about_page_first_image(about_page)
     if first_image and first_image.image:
         seo["image"] = _make_absolute(first_image.image.url)
 
@@ -124,7 +144,7 @@ def _apply_page_seo_override(seo, request):
 
         if page_seo_data is None:
             page_seo_data = _fetch_page_seo_data(path)
-            cache.set(cache_key, page_seo_data, timeout=3600)
+            cache.set(cache_key, page_seo_data, timeout=PAGE_SEO_CACHE_TIMEOUT)
 
         _update_seo_with_page_data(seo, page_seo_data)
 

@@ -19,6 +19,7 @@ from blog.cache_keys import (
 from blog.models import BlogPost, Category, Tag
 from comments.models import Comment
 from core.context_processors import (
+    GOAL_WIDGET_EMPTY_CACHE_VALUE,
     _get_goal_widget_snapshot,
     _get_has_pending_messages_or_comments,
     _get_nav_archives,
@@ -263,11 +264,35 @@ class ContextProcessorsTests(TestCase):
         snapshot3 = _get_goal_widget_snapshot()
         self.assertEqual(snapshot3["current_value"], Decimal("99999"))
 
+    def test_get_goal_widget_snapshot_caches_empty_result(self):
+        PortfolioSnapshot.objects.all().delete()
+        cache.clear()
+
+        with self.assertNumQueries(1):
+            snapshot = _get_goal_widget_snapshot()
+
+        self.assertIsNone(snapshot)
+        self.assertEqual(cache.get(GOAL_WIDGET_KEY), GOAL_WIDGET_EMPTY_CACHE_VALUE)
+
+        with self.assertNumQueries(0):
+            self.assertIsNone(_get_goal_widget_snapshot())
+
+    def test_goal_widget_cache_invalidated_when_featured_snapshot_demoted(self):
+        snapshot = _get_goal_widget_snapshot()
+        self.assertIsNotNone(snapshot)
+        self.assertEqual(cache.get(GOAL_WIDGET_KEY), snapshot)
+
+        self.snapshot.is_featured = False
+        self.snapshot.save()
+
+        self.assertIsNone(cache.get(GOAL_WIDGET_KEY))
+
     def test_get_has_pending_messages_or_comments_only_unread_message(self):
         request = self.factory.get("/")
         request.user = self.staff_user
 
-        has_pending = _get_has_pending_messages_or_comments(request)
+        with self.assertNumQueries(1):
+            has_pending = _get_has_pending_messages_or_comments(request)
 
         self.assertTrue(has_pending)
 
@@ -284,7 +309,8 @@ class ContextProcessorsTests(TestCase):
             status=Comment.Status.PENDING,
         )
 
-        has_pending = _get_has_pending_messages_or_comments(request)
+        with self.assertNumQueries(2):
+            has_pending = _get_has_pending_messages_or_comments(request)
 
         self.assertTrue(has_pending)
 
@@ -309,7 +335,8 @@ class ContextProcessorsTests(TestCase):
         self.contact_msg.is_read = True
         self.contact_msg.save()
 
-        has_pending = _get_has_pending_messages_or_comments(request)
+        with self.assertNumQueries(2):
+            has_pending = _get_has_pending_messages_or_comments(request)
 
         self.assertFalse(has_pending)
 

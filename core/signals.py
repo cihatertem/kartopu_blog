@@ -10,8 +10,7 @@ from portfolio.models import PortfolioSnapshot
 @receiver(post_save, sender=PortfolioSnapshot)
 @receiver(post_delete, sender=PortfolioSnapshot)
 def invalidate_goal_widget_cache(sender, instance, **kwargs):
-    if instance.is_featured:
-        cache.delete(GOAL_WIDGET_KEY)
+    cache.delete(GOAL_WIDGET_KEY)
 
 
 @receiver(post_save, sender=SidebarWidget)

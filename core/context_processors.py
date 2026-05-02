@@ -30,6 +30,9 @@ from .models import ContactMessage, SidebarWidget, SiteSettings
 from .tag_colors import get_tag_color_class
 
 CACHE_TIMEOUT = 600  # 10 minutes
+STAFF_PENDING_CACHE_TIMEOUT = 300  # 5 minutes
+GOAL_WIDGET_EMPTY_CACHE_VALUE = "__empty_goal_widget_snapshot__"
+GOAL_WIDGET_CACHE_MISS_VALUE = "__missing_goal_widget_snapshot__"
 COMMENT_WEIGHT = 5
 REACTION_WEIGHT = 3
 VIEW_WEIGHT = 1
@@ -64,7 +67,6 @@ def _get_nav_categories(cached_data=None):
                 post_count=Count(
                     "posts",
                     filter=Q(posts__status=BlogPost.Status.PUBLISHED),
-                    distinct=True,
                 )
             )
             .order_by("name")
@@ -119,7 +121,6 @@ def _get_nav_tags(cached_data=None):
                 post_count=Count(
                     "posts",
                     filter=Q(posts__status=BlogPost.Status.PUBLISHED),
-                    distinct=True,
                 )
             )
             .filter(post_count__gt=0)
@@ -288,11 +289,17 @@ def _get_nav_portfolio_posts(cached_data=None):
 
 def _get_goal_widget_snapshot(cached_data=None):
     if cached_data is not None:
-        goal_widget_snapshot = cached_data.get(GOAL_WIDGET_KEY)
+        goal_widget_snapshot = cached_data.get(
+            GOAL_WIDGET_KEY, GOAL_WIDGET_CACHE_MISS_VALUE
+        )
     else:
-        goal_widget_snapshot = cache.get(GOAL_WIDGET_KEY)
+        goal_widget_snapshot = cache.get(
+            GOAL_WIDGET_KEY, GOAL_WIDGET_CACHE_MISS_VALUE
+        )
 
-    if goal_widget_snapshot is not None:
+    if goal_widget_snapshot != GOAL_WIDGET_CACHE_MISS_VALUE:
+        if goal_widget_snapshot == GOAL_WIDGET_EMPTY_CACHE_VALUE:
+            return None
         return goal_widget_snapshot
 
     featured_snapshot = (
@@ -302,6 +309,7 @@ def _get_goal_widget_snapshot(cached_data=None):
         .first()
     )
 
+    goal_widget_snapshot = None
     if featured_snapshot:
         target_value = featured_snapshot.target_value
         total_value = featured_snapshot.total_value
@@ -336,7 +344,12 @@ def _get_goal_widget_snapshot(cached_data=None):
             "remaining_pct": target_pct,
         }
 
-    cache.set(GOAL_WIDGET_KEY, goal_widget_snapshot, timeout=CACHE_TIMEOUT)
+    cache_value = (
+        goal_widget_snapshot
+        if goal_widget_snapshot is not None
+        else GOAL_WIDGET_EMPTY_CACHE_VALUE
+    )
+    cache.set(GOAL_WIDGET_KEY, cache_value, timeout=CACHE_TIMEOUT)
     return goal_widget_snapshot
 
 
@@ -352,11 +365,13 @@ def _get_has_pending_messages_or_comments(request, cached_data=None):
 
     if has_pending is None:
         has_unread_messages = ContactMessage.objects.filter(is_read=False).exists()
-        has_pending_comments = Comment.objects.filter(
-            status=Comment.Status.PENDING
-        ).exists()
-        has_pending = has_unread_messages or has_pending_comments
-        cache.set(cache_key, has_pending, timeout=300)  # 5 minutes
+        if has_unread_messages:
+            has_pending = True
+        else:
+            has_pending = Comment.objects.filter(
+                status=Comment.Status.PENDING
+            ).exists()
+        cache.set(cache_key, has_pending, timeout=STAFF_PENDING_CACHE_TIMEOUT)
 
     return has_pending
 

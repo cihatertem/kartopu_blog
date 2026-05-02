@@ -63,7 +63,15 @@ class BlogServicesTest(TestCase):
 
         with self.assertNumQueries(0):
             self.assertEqual(post2.author.email, "test@user.com")
+            self.assertEqual(post2.author.full_name, "")
+            self.assertFalse(post2.author.avatar)
             self.assertEqual(post2.category.name, "Tech")
+            self.assertEqual(post2.category.slug, "tech")
+            self.assertIn("/tech/", post2.category.get_absolute_url())
+            self.assertEqual(post2.status, BlogPost.Status.PUBLISHED)
+            self.assertEqual(post2.excerpt, "")
+            self.assertFalse(post2.cover_image)
+            self.assertIsNotNone(post2.updated_at)
             self.assertEqual(post2.tags.all()[0].name, "Django")
 
     def test_published_posts_queryset_no_tags(self):
@@ -77,7 +85,15 @@ class BlogServicesTest(TestCase):
 
         with self.assertNumQueries(0):
             self.assertEqual(post.author.email, "test@user.com")
+            self.assertEqual(post.author.full_name, "")
+            self.assertFalse(post.author.avatar)
             self.assertEqual(post.category.name, "Tech")
+            self.assertEqual(post.category.slug, "tech")
+            self.assertIn("/tech/", post.category.get_absolute_url())
+            self.assertEqual(post.status, BlogPost.Status.PUBLISHED)
+            self.assertEqual(post.excerpt, "")
+            self.assertFalse(post.cover_image)
+            self.assertIsNotNone(post.updated_at)
 
         with self.assertNumQueries(1):
             self.assertEqual(post.tags.all()[0].name, "Django")

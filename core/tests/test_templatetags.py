@@ -10,7 +10,12 @@ from django.utils import timezone
 from accounts.models import User
 from blog.models import BlogPost, Category, Tag
 from core.models import AboutPage, AboutPageImage, PageSEO, SiteSettings
-from core.templatetags.seo_tags import _make_absolute, get_seo_data
+from core.templatetags.seo_tags import (
+    _get_about_page_seo_data,
+    _get_post_seo_data,
+    _make_absolute,
+    get_seo_data,
+)
 
 
 @override_settings(SITE_BASE_URL="https://kartopu.money", SECURE_SSL_REDIRECT=False)
@@ -100,6 +105,23 @@ class SEOTest(TestCase):
         )
         self.assertIn("cover_", seo.get("image"))
 
+    def test_post_seo_uses_prefetched_relations_without_extra_queries(self):
+        self.post.category = self.category
+        self.post.save()
+        post = (
+            BlogPost.objects.select_related("category", "author")
+            .prefetch_related("tags")
+            .get(pk=self.post.pk)
+        )
+        seo = {}
+
+        with self.assertNumQueries(0):
+            _get_post_seo_data(seo, {"post": post})
+
+        self.assertEqual(seo["article_author"], self.user.email)
+        self.assertEqual(seo["article_section"], "Test Category")
+        self.assertEqual(seo["article_tags"], ["Test Tag"])
+
     def test_category_seo(self):
         request = self.factory.get(self.category.get_absolute_url())
         seo = get_seo_data(
@@ -165,6 +187,34 @@ class SEOTest(TestCase):
             seo.get("image").startswith(
                 "https://kartopu.money/media/core/about/images/"
             )
+        )
+
+    def test_about_page_seo_uses_prefetched_images_without_extra_queries(self):
+        about = AboutPage.objects.create(
+            title="About Us", meta_title="Meta About", meta_description="About Desc"
+        )
+        dummy_image = SimpleUploadedFile(
+            name="about_prefetched.png",
+            content=b"\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR\x00\x00\x00\x01\x00\x00\x00\x01\x08\x06\x00\x00\x00\x1f\x15\xc4\x89\x00\x00\x00\nIDATx\x9cc\x00\x01\x00\x00\x05\x00\x01\r\n-\xb4\x00\x00\x00\x00IEND\xaeB`\x82",
+            content_type="image/png",
+        )
+        AboutPageImage.objects.create(
+            page=about,
+            image=dummy_image,
+            order=0,
+        )
+        about_with_images = AboutPage.objects.prefetch_related("images").get(pk=about.pk)
+        seo = {}
+
+        with self.assertNumQueries(0):
+            _get_about_page_seo_data(
+                seo, {"about_page": about_with_images}, "Kartopu Money"
+            )
+
+        self.assertEqual(seo["title"], "Meta About")
+        self.assertEqual(seo["description"], "About Desc")
+        self.assertTrue(
+            seo["image"].startswith("https://kartopu.money/media/core/about/images/")
         )
 
     def test_archive_seo(self):
