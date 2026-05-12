@@ -22,17 +22,31 @@ def calculate_xirr(cash_flows: list[tuple[date, Decimal]]) -> float | None:
         return None
 
     # Sort cash flows by date and remove zero cash flows
-    cash_flows = sorted([(d, c) for d, c in cash_flows if c != 0], key=lambda x: x[0])
-    if not cash_flows:
+    # Single pass to filter zeros and check for positive/negative signs
+    filtered_flows = []
+    has_pos = False
+    has_neg = False
+    for flow in cash_flows:
+        c = flow[1]
+        if c:  # Since c is Decimal, c != 0 is equivalent to truthy check
+            filtered_flows.append(flow)
+            if not has_pos and c > 0:
+                has_pos = True
+            elif not has_neg and c < 0:
+                has_neg = True
+
+    if not filtered_flows:
         return None
 
     # IRR exists only if there is at least one positive and one negative cash flow
-    if all(c > 0 for _, c in cash_flows) or all(c < 0 for _, c in cash_flows):
+    if not (has_pos and has_neg):
         return None
+
+    cash_flows = sorted(filtered_flows, key=lambda x: x[0])
 
     # Special case: all cash flows on the same day.
     # Annualized IRR is undefined/infinite, so we return simple return.
-    if all(d == cash_flows[0][0] for d, _ in cash_flows):
+    if cash_flows[0][0] == cash_flows[-1][0]:
         total_in = sum(-c for _, c in cash_flows if c < 0)
         total_out = sum(c for _, c in cash_flows if c > 0)
         if total_in > 0:
