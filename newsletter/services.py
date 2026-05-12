@@ -16,6 +16,7 @@ from core.imagekit import safe_file_url
 from .models import (
     Announcement,
     AnnouncementStatus,
+    BlogPostNotification,
     DirectEmail,
     EmailQueue,
     Subscriber,
@@ -162,6 +163,26 @@ def send_post_published_email(post) -> None:
             yield EmailQueue(**email_data)
 
     EmailQueue.objects.bulk_create(email_queue_generator(), batch_size=500)
+
+
+def queue_post_published_notification(post) -> bool:
+    from blog.models import BlogPost
+    from django.db import transaction
+
+    if post.status != BlogPost.Status.PUBLISHED or not post.published_at:
+        return False
+
+    with transaction.atomic():
+        _, created = BlogPostNotification.objects.get_or_create(
+            post=post,
+            defaults={"sent_at": timezone.now()},
+        )
+        if not created:
+            return False
+
+        send_post_published_email(post)
+
+    return True
 
 
 @log_exceptions(message="Error queuing announcement", default=0)

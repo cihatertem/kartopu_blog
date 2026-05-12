@@ -1,5 +1,3 @@
-from unittest.mock import patch
-
 from django.test import TestCase
 from django.utils import timezone
 
@@ -107,11 +105,10 @@ class BlogPostNotificationModelTest(TestCase):
         )
 
     def test_blog_post_notification_str(self):
-        with patch("newsletter.signals.send_post_published_email"):
-            notification = BlogPostNotification.objects.create(
-                post=self.post, sent_at=timezone.now()
-            )
-            self.assertEqual(str(notification), "My Awesome Post")
+        notification = BlogPostNotification.objects.create(
+            post=self.post, sent_at=timezone.now()
+        )
+        self.assertEqual(str(notification), "My Awesome Post")
 
 
 class AnnouncementModelTest(TestCase):

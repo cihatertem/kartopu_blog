@@ -7,8 +7,7 @@ from django.utils.html import format_html
 from django.utils.safestring import SafeString
 
 from core.decorators import log_exceptions
-from newsletter.models import BlogPostNotification
-from newsletter.services import send_post_published_email
+from newsletter.services import queue_post_published_notification
 
 from .models import BlogPost, BlogPostImage, Category, Tag
 
@@ -196,21 +195,26 @@ class BlogPostAdmin(admin.ModelAdmin):
     def resend_newsletter_notifications(self, request, queryset):
         sent_count = 0
         skipped_count = 0
+        already_sent_count = 0
         for post in queryset:
             if post.status != BlogPost.Status.PUBLISHED or not post.published_at:
                 skipped_count += 1
                 continue
-            send_post_published_email(post)
-            BlogPostNotification.objects.update_or_create(
-                post=post,
-                defaults={"sent_at": timezone.now()},
-            )
-            sent_count += 1
+            if queue_post_published_notification(post):
+                sent_count += 1
+            else:
+                already_sent_count += 1
 
         if sent_count:
             self.message_user(
                 request,
-                f"{sent_count} yazı için newsletter bildirimi tekrar gönderildi.",
+                f"{sent_count} yazı için newsletter bildirimi kuyruğa alındı.",
+            )
+        if already_sent_count:
+            self.message_user(
+                request,
+                f"{already_sent_count} yazı için newsletter bildirimi daha önce gönderildiği için atlandı.",
+                level=messages.WARNING,
             )
         if skipped_count:
             self.message_user(

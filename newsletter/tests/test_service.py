@@ -2,11 +2,16 @@ from unittest.mock import patch
 
 from django.core import mail
 from django.test import TestCase
+from django.utils import timezone
 
+from accounts.models import User
+from blog.models import BlogPost, Category
+from newsletter.models import BlogPostNotification
 from newsletter.services import (
     build_subscribe_confirm_url,
     build_unsubscribe_url,
     prepare_templated_email,
+    queue_post_published_notification,
     send_subscribe_confirmation,
     send_templated_email,
     send_unsubscribe_confirmation,
@@ -173,3 +178,44 @@ class ServicesTest(TestCase):
         self.assertEqual(
             sent_email.alternatives[0], ("<html>Html body content</html>", "text/html")
         )
+
+
+class QueuePostPublishedNotificationTest(TestCase):
+    def setUp(self):
+        self.user = User.objects.create_user(
+            email="author@example.com", password="password"
+        )
+        self.category = Category.objects.create(name="Finance", slug="finance")
+        self.post = BlogPost.objects.create(
+            author=self.user,
+            category=self.category,
+            title="Queued Post",
+            content="Test Content",
+            status=BlogPost.Status.DRAFT,
+            slug="queued-post",
+        )
+
+    @patch("newsletter.services.send_post_published_email")
+    def test_creates_notification_and_queues_once(self, mock_send_email):
+        self.post.status = BlogPost.Status.PUBLISHED
+        self.post.published_at = timezone.now()
+        self.post.save()
+        BlogPostNotification.objects.filter(post=self.post).delete()
+        mock_send_email.reset_mock()
+
+        self.assertTrue(queue_post_published_notification(self.post))
+        self.assertFalse(queue_post_published_notification(self.post))
+
+        mock_send_email.assert_called_once_with(self.post)
+        self.assertEqual(BlogPostNotification.objects.filter(post=self.post).count(), 1)
+
+    @patch("newsletter.services.send_post_published_email")
+    def test_rolls_back_notification_if_queueing_fails(self, mock_send_email):
+        mock_send_email.side_effect = Exception("queue failed")
+        self.post.status = BlogPost.Status.PUBLISHED
+        self.post.published_at = timezone.now()
+
+        with self.assertRaises(Exception):
+            queue_post_published_notification(self.post)
+
+        self.assertFalse(BlogPostNotification.objects.filter(post=self.post).exists())

@@ -1,5 +1,6 @@
 from unittest.mock import patch
 
+from django.db import transaction
 from django.test import TransactionTestCase
 from django.utils import timezone
 
@@ -15,7 +16,7 @@ class NewsletterSignalsTest(TransactionTestCase):
         )
         self.category = Category.objects.create(name="Finance", slug="finance")
 
-    @patch("newsletter.signals.send_post_published_email")
+    @patch("newsletter.services.send_post_published_email")
     def test_notify_subscribers_on_publish(self, mock_send_email):
         post = BlogPost.objects.create(
             author=self.user,
@@ -37,7 +38,7 @@ class NewsletterSignalsTest(TransactionTestCase):
         notification = BlogPostNotification.objects.first()
         self.assertEqual(notification.post, post)
 
-    @patch("newsletter.signals.send_post_published_email")
+    @patch("newsletter.services.send_post_published_email")
     def test_do_not_notify_if_already_notified(self, mock_send_email):
         post = BlogPost.objects.create(
             author=self.user,
@@ -59,7 +60,7 @@ class NewsletterSignalsTest(TransactionTestCase):
         mock_send_email.assert_not_called()
         self.assertEqual(BlogPostNotification.objects.count(), 1)
 
-    @patch("newsletter.signals.send_post_published_email")
+    @patch("newsletter.services.send_post_published_email")
     @patch("blog.models.BlogPost.save")
     def test_do_not_notify_if_published_but_no_date(self, mock_save, mock_send_email):
         # We need to simulate the instance saving without the custom save method
@@ -83,7 +84,7 @@ class NewsletterSignalsTest(TransactionTestCase):
         mock_send_email.assert_not_called()
         self.assertEqual(BlogPostNotification.objects.count(), 0)
 
-    @patch("newsletter.signals.send_post_published_email")
+    @patch("newsletter.services.send_post_published_email")
     def test_notification_not_created_if_email_fails(self, mock_send_email):
         mock_send_email.side_effect = Exception("Email sending failed")
 
@@ -99,3 +100,27 @@ class NewsletterSignalsTest(TransactionTestCase):
             )
 
         self.assertEqual(BlogPostNotification.objects.count(), 0)
+
+    @patch("newsletter.services.send_post_published_email")
+    def test_notify_once_for_multiple_saves_in_single_transaction(
+        self, mock_send_email
+    ):
+        post = BlogPost.objects.create(
+            author=self.user,
+            category=self.category,
+            title="Test Post 5",
+            content="Test Content",
+            status=BlogPost.Status.DRAFT,
+            slug="test-post-5",
+        )
+
+        with transaction.atomic():
+            post.status = BlogPost.Status.PUBLISHED
+            post.published_at = timezone.now()
+            post.save()
+
+            post.title = "Updated Title"
+            post.save()
+
+        mock_send_email.assert_called_once_with(post)
+        self.assertEqual(BlogPostNotification.objects.count(), 1)

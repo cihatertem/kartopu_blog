@@ -226,7 +226,7 @@ class BlogAdminTests(TestCase):
         self.assertFalse(self.post.is_featured)
         self.assertTrue(post2.is_featured)
 
-    @patch("blog.admin.send_post_published_email")
+    @patch("newsletter.services.send_post_published_email")
     def test_resend_newsletter_notifications_action(self, mock_send):
         model_admin = BlogPostAdmin(BlogPost, self.site)
 
@@ -237,15 +237,20 @@ class BlogAdminTests(TestCase):
         req_messages = FallbackStorage(request)
         setattr(request, "_messages", req_messages)
 
-        # Create a second post that is published
+        # Create a second post and publish it with update() to keep this test
+        # focused on the admin action rather than the publish signal.
         post2 = BlogPost.objects.create(
             title="Post 2",
             author=self.admin_user,
             category=self.category,
             content="Content 2",
+            status=BlogPost.Status.DRAFT,
+        )
+        BlogPost.objects.filter(pk=post2.pk).update(
             status=BlogPost.Status.PUBLISHED,
             published_at=timezone.now(),
         )
+        post2.refresh_from_db()
 
         queryset = BlogPost.objects.filter(pk__in=[self.post.pk, post2.pk])
 
@@ -263,7 +268,7 @@ class BlogAdminTests(TestCase):
         # Verify messages
         self.assertEqual(mock_message_user.call_count, 2)
         mock_message_user.assert_any_call(
-            request, "1 yazı için newsletter bildirimi tekrar gönderildi."
+            request, "1 yazı için newsletter bildirimi kuyruğa alındı."
         )
         mock_message_user.assert_any_call(
             request, "1 yazı yayınlanmadığı için atlandı.", level=messages.WARNING
@@ -274,6 +279,37 @@ class BlogAdminTests(TestCase):
         self.assertEqual(
             actions["resend_newsletter_notifications"][2],
             "Seçili yazılar için newsletter bildirimi gönder",
+        )
+
+    @patch("newsletter.services.send_post_published_email")
+    def test_resend_newsletter_notifications_skips_already_notified(
+        self, mock_send
+    ):
+        model_admin = BlogPostAdmin(BlogPost, self.site)
+        request = self.factory.get("/")
+        request.user = self.admin_user
+        setattr(request, "session", "session")
+        req_messages = FallbackStorage(request)
+        setattr(request, "_messages", req_messages)
+
+        BlogPost.objects.filter(pk=self.post.pk).update(
+            status=BlogPost.Status.PUBLISHED,
+            published_at=timezone.now(),
+        )
+        self.post.refresh_from_db()
+        BlogPostNotification.objects.create(post=self.post, sent_at=timezone.now())
+
+        queryset = BlogPost.objects.filter(pk=self.post.pk)
+
+        with patch.object(model_admin, "message_user") as mock_message_user:
+            model_admin.resend_newsletter_notifications(request, queryset)
+
+        mock_send.assert_not_called()
+        self.assertEqual(BlogPostNotification.objects.filter(post=self.post).count(), 1)
+        mock_message_user.assert_called_once_with(
+            request,
+            "1 yazı için newsletter bildirimi daha önce gönderildiği için atlandı.",
+            level=messages.WARNING,
         )
 
     def test_formfield_for_foreignkey(self):
