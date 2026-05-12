@@ -226,7 +226,9 @@ def _render_portfolio_charts_html(snapshot) -> str:
     portfolio = snapshot.portfolio
     if hasattr(portfolio, "prefetched_snapshots"):
         snapshots_list = [
-            s for s in portfolio.prefetched_snapshots if s.period == snapshot.period
+            s
+            for s in portfolio.prefetched_snapshots
+            if s.period == snapshot.period and s.snapshot_date <= snapshot.snapshot_date
         ]
         timeseries_data = [(s.snapshot_date, s.total_value) for s in snapshots_list]
     else:
@@ -235,6 +237,7 @@ def _render_portfolio_charts_html(snapshot) -> str:
             snapshot.__class__.objects.filter(
                 portfolio=portfolio,
                 period=snapshot.period,
+                snapshot_date__lte=snapshot.snapshot_date,
             )
             .order_by("snapshot_date")
             .values_list("snapshot_date", "total_value")
@@ -766,7 +769,9 @@ def _render_cashflow_charts_html(snapshot) -> str:
     cashflow = snapshot.cashflow
     if hasattr(cashflow, "prefetched_snapshots"):
         snapshots_list = [
-            s for s in cashflow.prefetched_snapshots if s.period == snapshot.period
+            s
+            for s in cashflow.prefetched_snapshots
+            if s.period == snapshot.period and s.snapshot_date <= snapshot.snapshot_date
         ]
         timeseries_data = [(s.snapshot_date, s.total_amount) for s in snapshots_list]
     else:
@@ -775,6 +780,7 @@ def _render_cashflow_charts_html(snapshot) -> str:
             CashFlowSnapshot.objects.filter(
                 cashflow=cashflow,
                 period=snapshot.period,
+                snapshot_date__lte=snapshot.snapshot_date,
             )
             .order_by("snapshot_date")
             .values_list("snapshot_date", "total_amount")
@@ -839,12 +845,17 @@ def _render_savings_rate_charts_html(snapshot) -> str:
     flow = snapshot.flow
     if hasattr(flow, "prefetched_snapshots"):
         timeseries_data = [
-            (s.snapshot_date, s.savings_rate) for s in flow.prefetched_snapshots
+            (s.snapshot_date, s.savings_rate)
+            for s in flow.prefetched_snapshots
+            if s.snapshot_date <= snapshot.snapshot_date
         ]
     else:
         # Fallback to DB query
         timeseries_data = (
-            SalarySavingsSnapshot.objects.filter(flow=flow)
+            SalarySavingsSnapshot.objects.filter(
+                flow=flow,
+                snapshot_date__lte=snapshot.snapshot_date,
+            )
             .order_by("snapshot_date")
             .values_list("snapshot_date", "savings_rate")
         )

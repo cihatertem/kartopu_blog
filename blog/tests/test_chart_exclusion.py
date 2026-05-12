@@ -18,6 +18,8 @@ from portfolio.models import (
     Portfolio,
     PortfolioSnapshot,
     PortfolioSnapshotItem,
+    SalarySavingsFlow,
+    SalarySavingsSnapshot,
 )
 
 
@@ -91,6 +93,58 @@ class ChartExclusionTests(TestCase):
         self.assertIn("NVDA", rendered)
         self.assertNotIn("AMD", rendered)
 
+    def test_portfolio_timeseries_excludes_snapshots_after_selected_snapshot(
+        self,
+    ) -> None:
+        portfolio = Portfolio.objects.create(
+            owner=self.user,
+            name="Dated Portfolio",
+            currency=Portfolio.Currency.TRY,
+            target_value=Decimal("100000"),
+        )
+        past_snapshot = PortfolioSnapshot.objects.create(
+            portfolio=portfolio,
+            period=PortfolioSnapshot.Period.MONTHLY,
+            snapshot_date=date(2025, 1, 1),
+            total_value=Decimal("900"),
+            total_cost=Decimal("900"),
+            target_value=Decimal("100000"),
+            total_return_pct=Decimal("0"),
+        )
+        selected_snapshot = PortfolioSnapshot.objects.create(
+            portfolio=portfolio,
+            period=PortfolioSnapshot.Period.MONTHLY,
+            snapshot_date=date(2025, 2, 1),
+            total_value=Decimal("1000"),
+            total_cost=Decimal("1000"),
+            target_value=Decimal("100000"),
+            total_return_pct=Decimal("0"),
+        )
+        PortfolioSnapshot.objects.create(
+            portfolio=portfolio,
+            period=PortfolioSnapshot.Period.MONTHLY,
+            snapshot_date=date(2025, 3, 1),
+            total_value=Decimal("1100"),
+            total_cost=Decimal("1100"),
+            target_value=Decimal("100000"),
+            total_return_pct=Decimal("0"),
+        )
+        asset = Asset.objects.create(
+            name="Selected Asset", symbol="SEL", asset_type=Asset.AssetType.STOCK
+        )
+        self._create_portfolio_item(selected_snapshot, asset, Decimal("1000"))
+
+        rendered = self._render_post(
+            "Portfolio Timeseries",
+            "{{ portfolio_charts }}",
+            "portfolio_snapshots",
+            selected_snapshot,
+        )
+
+        self.assertIn(past_snapshot.snapshot_date.isoformat(), rendered)
+        self.assertIn(selected_snapshot.snapshot_date.isoformat(), rendered)
+        self.assertNotIn("2025-03-01", rendered)
+
     def test_cashflow_charts_exclude_zero_amount_items(self) -> None:
         cashflow = CashFlow.objects.create(
             owner=self.user,
@@ -122,6 +176,91 @@ class ChartExclusionTests(TestCase):
 
         self.assertIn("Temett", rendered)
         self.assertNotIn("Faiz", rendered)
+
+    def test_cashflow_timeseries_excludes_snapshots_after_selected_snapshot(
+        self,
+    ) -> None:
+        cashflow = CashFlow.objects.create(
+            owner=self.user,
+            name="Dated CashFlow",
+            currency=CashFlow.Currency.TRY,
+        )
+        past_snapshot = CashFlowSnapshot.objects.create(
+            cashflow=cashflow,
+            period=CashFlowSnapshot.Period.MONTHLY,
+            snapshot_date=date(2025, 1, 1),
+            total_amount=Decimal("900"),
+        )
+        selected_snapshot = CashFlowSnapshot.objects.create(
+            cashflow=cashflow,
+            period=CashFlowSnapshot.Period.MONTHLY,
+            snapshot_date=date(2025, 2, 1),
+            total_amount=Decimal("1000"),
+        )
+        CashFlowSnapshot.objects.create(
+            cashflow=cashflow,
+            period=CashFlowSnapshot.Period.MONTHLY,
+            snapshot_date=date(2025, 3, 1),
+            total_amount=Decimal("1100"),
+        )
+        CashFlowSnapshotItem.objects.create(
+            snapshot=selected_snapshot,
+            category="dividend",
+            amount=Decimal("1000"),
+            allocation_pct=Decimal("1"),
+        )
+
+        rendered = self._render_post(
+            "CashFlow Timeseries",
+            "{{ cashflow_charts }}",
+            "cashflow_snapshots",
+            selected_snapshot,
+        )
+
+        self.assertIn(past_snapshot.snapshot_date.isoformat(), rendered)
+        self.assertIn(selected_snapshot.snapshot_date.isoformat(), rendered)
+        self.assertNotIn("2025-03-01", rendered)
+
+    def test_savings_rate_timeseries_excludes_snapshots_after_selected_snapshot(
+        self,
+    ) -> None:
+        flow = SalarySavingsFlow.objects.create(
+            owner=self.user,
+            name="Dated Savings",
+            currency=SalarySavingsFlow.Currency.TRY,
+        )
+        past_snapshot = SalarySavingsSnapshot.objects.create(
+            flow=flow,
+            snapshot_date=date(2025, 1, 1),
+            total_salary=Decimal("1000"),
+            total_savings=Decimal("300"),
+            savings_rate=Decimal("0.30"),
+        )
+        selected_snapshot = SalarySavingsSnapshot.objects.create(
+            flow=flow,
+            snapshot_date=date(2025, 2, 1),
+            total_salary=Decimal("1000"),
+            total_savings=Decimal("400"),
+            savings_rate=Decimal("0.40"),
+        )
+        SalarySavingsSnapshot.objects.create(
+            flow=flow,
+            snapshot_date=date(2025, 3, 1),
+            total_salary=Decimal("1000"),
+            total_savings=Decimal("500"),
+            savings_rate=Decimal("0.50"),
+        )
+
+        rendered = self._render_post(
+            "Savings Timeseries",
+            "{{ savings_rate_charts }}",
+            "salary_savings_snapshots",
+            selected_snapshot,
+        )
+
+        self.assertIn(past_snapshot.snapshot_date.isoformat(), rendered)
+        self.assertIn(selected_snapshot.snapshot_date.isoformat(), rendered)
+        self.assertNotIn("2025-03-01", rendered)
 
     def test_dividend_charts_exclude_zero_amount_items(self) -> None:
         snapshot = DividendSnapshot.objects.create(
