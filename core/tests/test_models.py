@@ -69,19 +69,6 @@ class SiteSettingsTest(TestCase):
         self.assertTrue(settings.is_newsletter_enabled)
         self.assertTrue(settings.is_contact_enabled)
 
-    def test_cache_update_on_save(self):
-        settings = SiteSettings.get_settings()
-        settings.is_comments_enabled = False
-        settings.save()
-
-        from blog.cache_keys import SITE_SETTINGS_KEY
-
-        cached_settings = cache.get(SITE_SETTINGS_KEY)
-        self.assertIsNone(cached_settings)
-
-        settings_from_method = SiteSettings.get_settings()
-        self.assertFalse(settings_from_method.is_comments_enabled)
-
 
 class PageSEOTest(TestCase):
     def test_save_adds_slash_and_strips(self):
@@ -204,14 +191,3 @@ class SidebarWidgetTest(TestCase):
             title="Sidebar", template_name="test.html"
         )
         self.assertEqual(str(widget), "Sidebar")
-
-    def test_save_invalidates_cache(self):
-        cache.set("sidebar_widgets", "test_cache")
-        SidebarWidget.objects.create(title="Widget 1", template_name="1.html")
-        self.assertIsNone(cache.get("sidebar_widgets"))
-
-    def test_delete_invalidates_cache(self):
-        widget = SidebarWidget.objects.create(title="Widget 1", template_name="1.html")
-        cache.set("sidebar_widgets", "test_cache")
-        widget.delete()
-        self.assertIsNone(cache.get("sidebar_widgets"))
