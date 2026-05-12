@@ -3,6 +3,7 @@ from unittest.mock import MagicMock, patch
 
 import requests
 from allauth.socialaccount.models import SocialAccount, SocialApp, SocialLogin
+from allauth.socialaccount.signals import social_account_added, social_account_updated
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import TestCase
 from PIL import Image
@@ -294,3 +295,27 @@ class BuildSocialLoginLikeTests(TestCase):
         self.assertIsInstance(login, SocialLogin)
         self.assertEqual(login.user, user)
         self.assertEqual(login.account, account)
+
+
+class SocialAccountSignalTests(TestCase):
+    @patch("accounts.signals._download_and_save_social_avatar")
+    def test_on_social_account_added(self, mock_download):
+        request = MagicMock()
+        sociallogin = MagicMock()
+
+        social_account_added.send(
+            sender=SocialLogin, request=request, sociallogin=sociallogin
+        )
+
+        mock_download.assert_called_once_with(sociallogin)
+
+    @patch("accounts.signals._download_and_save_social_avatar")
+    def test_on_social_account_updated(self, mock_download):
+        request = MagicMock()
+        sociallogin = MagicMock()
+
+        social_account_updated.send(
+            sender=SocialLogin, request=request, sociallogin=sociallogin
+        )
+
+        mock_download.assert_called_once_with(sociallogin)

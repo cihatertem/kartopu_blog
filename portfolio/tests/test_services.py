@@ -279,7 +279,9 @@ class FetchYahooFinancePricesBulkTests(TestCase):
     def test_yf_download_exception(self, mock_download, mock_logger_exception):
         mock_download.side_effect = Exception("API error")
         self.assertEqual(fetch_yahoo_finance_prices_bulk(["AAPL"]), {})
-        mock_logger_exception.assert_called_once()
+        mock_logger_exception.assert_called_once_with(
+            "Yahoo Finance bulk download failed for symbols: %s", ["AAPL"]
+        )
 
     @patch("portfolio.services.yf.download")
     def test_no_date_success(self, mock_download):
