@@ -429,6 +429,7 @@ if not DEBUG:
     USE_X_FORWARDED_PORT = True
 
     SECURE_CONTENT_TYPE_NOSNIFF = True
+    SECURE_BROWSER_XSS_FILTER = True
     X_FRAME_OPTIONS = "DENY"  # Tıklama korsanlığını (Clickjacking) önler
 
     SECURE_REFERRER_POLICY = "strict-origin-when-cross-origin"
@@ -438,7 +439,7 @@ if not DEBUG:
 
     SECURE_HSTS_SECONDS = int(os.getenv("DJANGO_SECURE_HSTS_SECONDS", "63072000"))
     SECURE_HSTS_INCLUDE_SUBDOMAINS = (
-            os.getenv("DJANGO_SECURE_HSTS_INCLUDE_SUBDOMAINS", "1") == "1"
+        os.getenv("DJANGO_SECURE_HSTS_INCLUDE_SUBDOMAINS", "1") == "1"
     )
     SECURE_HSTS_PRELOAD = os.getenv("DJANGO_SECURE_HSTS_PRELOAD", "1") == "1"
 

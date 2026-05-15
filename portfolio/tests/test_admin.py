@@ -1,6 +1,7 @@
 from decimal import Decimal
 from unittest.mock import MagicMock
 
+from allauth.socialaccount.models import SocialAccount
 from django.contrib import admin
 from django.contrib.auth import get_user_model
 from django.test import RequestFactory, TestCase
@@ -12,6 +13,7 @@ from portfolio.admin import (
     PortfolioTransactionAdmin,
     SalarySavingsEntryAdmin,
     SalarySavingsSnapshotAdmin,
+    _get_staff_owner_queryset,
 )
 from portfolio.models import (
     Asset,
@@ -218,3 +220,33 @@ class SnapshotSaveModelTests(AdminTestCase):
 
         self.assertIsNotNone(snapshot.pk)
         self.assertEqual(snapshot.total_amount, Decimal("0"))
+
+
+class QuerysetTests(AdminTestCase):
+    def test_get_staff_owner_queryset(self):
+        # 1. Staff user without social account (included)
+        staff_no_social = User.objects.create_user(
+            email="staff_no_social@example.com", password="password", is_staff=True
+        )
+
+        # 2. Staff user with social account (excluded)
+        staff_with_social = User.objects.create_user(
+            email="staff_with_social@example.com", password="password", is_staff=True
+        )
+        SocialAccount.objects.create(
+            user=staff_with_social, provider="google", uid="123"
+        )
+
+        # 3. Regular user without social account (excluded)
+        regular_user = User.objects.create_user(
+            email="regular@example.com", password="password", is_staff=False
+        )
+
+        qs = _get_staff_owner_queryset()
+
+        self.assertIn(staff_no_social, qs)
+        self.assertNotIn(staff_with_social, qs)
+        self.assertNotIn(regular_user, qs)
+        self.assertIn(
+            self.user, qs
+        )  # superuser is also staff and has no social account

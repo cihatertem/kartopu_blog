@@ -29,7 +29,6 @@ class StaticViewSitemap(BaseSitemap):
 
 
 class BlogPostSitemap(BaseSitemap):
-    changefreq = "weekly"
     priority = 0.9
 
     def items(self):
@@ -47,7 +46,6 @@ class BlogPostSitemap(BaseSitemap):
 
 
 class BlogCategorySitemap(BaseSitemap):
-    changefreq = "weekly"
     priority = 0.6
 
     def items(self):
@@ -57,20 +55,8 @@ class BlogCategorySitemap(BaseSitemap):
         return obj.updated_at
 
 
-class BlogTagSitemap(BaseSitemap):
-    changefreq = "weekly"
-    priority = 0.5
-
-    def items(self):
-        return Tag.objects.all().only("slug", "updated_at")
-
-    def lastmod(self, obj: Tag):
-        return obj.updated_at
-
-
 sitemaps = {
     "static": StaticViewSitemap,
     "blog": BlogPostSitemap,
     "categories": BlogCategorySitemap,
-    # "tags": BlogTagSitemap, # Disabled to reduce sitemap size and tags already no index meta tagged
 }

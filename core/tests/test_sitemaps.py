@@ -1,11 +1,10 @@
 from django.test import TestCase
 from django.utils import timezone
 
-from blog.models import BlogPost, Category, Tag
+from blog.models import BlogPost, Category
 from core.sitemaps import (
     BlogCategorySitemap,
     BlogPostSitemap,
-    BlogTagSitemap,
     StaticViewSitemap,
 )
 
@@ -60,12 +59,3 @@ class SitemapsTest(TestCase):
 
         self.assertIn(category, items)
         self.assertEqual(sitemap.lastmod(category), category.updated_at)
-
-    def test_blog_tag_sitemap(self):
-        tag = Tag.objects.create(name="Python", slug="python")
-
-        sitemap = BlogTagSitemap()
-        items = sitemap.items()
-
-        self.assertIn(tag, items)
-        self.assertEqual(sitemap.lastmod(tag), tag.updated_at)
