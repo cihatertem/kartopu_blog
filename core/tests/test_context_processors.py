@@ -20,6 +20,7 @@ from blog.models import BlogPost, Category, Tag
 from comments.models import Comment
 from core.context_processors import (
     GOAL_WIDGET_EMPTY_CACHE_VALUE,
+    _calculate_tag_cloud_sizes,
     _get_goal_widget_snapshot,
     _get_has_pending_messages_or_comments,
     _get_nav_archives,
@@ -412,3 +413,43 @@ class ContextProcessorsTests(TestCase):
         self.assertEqual(
             context["sidebar_widgets"][0]["template_name"], "includes/sidebar_1.html"
         )
+
+
+class CalculateTagCloudSizesTests(TestCase):
+    def test_empty_list_or_none(self):
+        nav_tags = []
+        _calculate_tag_cloud_sizes(nav_tags)
+        self.assertEqual(nav_tags, [])
+
+        _calculate_tag_cloud_sizes(None)
+
+    def test_same_post_counts(self):
+        nav_tags = [
+            {"post_count": 5, "slug": "tag1"},
+            {"post_count": 5, "slug": "tag2"},
+        ]
+        _calculate_tag_cloud_sizes(nav_tags)
+        for t in nav_tags:
+            self.assertEqual(t["cloud_size"], 1.0)
+            self.assertEqual(t["cloud_size_class"], "tag-cloud__item--size-2")
+            self.assertIn("color_class", t)
+
+    def test_different_post_counts(self):
+        nav_tags = [
+            {"post_count": 1, "slug": "min-tag"},  # min
+            {"post_count": 3, "slug": "mid-tag"},  # (3-1)/10 = 0.2 norm
+            {"post_count": 11, "slug": "max-tag"},  # max, (11-1)/10 = 1.0 norm
+        ]
+        _calculate_tag_cloud_sizes(nav_tags)
+
+        # min tag: normalized = 0.0 -> cloud_size = 0.85, size_level = min(6, max(1, int(round(0.0 * 5.0)) + 1)) = 1
+        self.assertEqual(nav_tags[0]["cloud_size"], 0.85)
+        self.assertEqual(nav_tags[0]["cloud_size_class"], "tag-cloud__item--size-1")
+
+        # mid tag: normalized = 0.2 -> cloud_size = round(0.85 + 0.2 * 0.75, 2) = 1.0, size_level = min(6, max(1, int(round(0.2 * 5.0)) + 1)) = min(6, max(1, 1 + 1)) = 2
+        self.assertEqual(nav_tags[1]["cloud_size"], 1.0)
+        self.assertEqual(nav_tags[1]["cloud_size_class"], "tag-cloud__item--size-2")
+
+        # max tag: normalized = 1.0 -> cloud_size = round(0.85 + 1.0 * 0.75, 2) = 1.6, size_level = min(6, max(1, int(round(1.0 * 5.0)) + 1)) = min(6, max(1, 5 + 1)) = 6
+        self.assertEqual(nav_tags[2]["cloud_size"], 1.6)
+        self.assertEqual(nav_tags[2]["cloud_size_class"], "tag-cloud__item--size-6")

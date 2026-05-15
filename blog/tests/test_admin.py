@@ -282,9 +282,7 @@ class BlogAdminTests(TestCase):
         )
 
     @patch("newsletter.services.send_post_published_email")
-    def test_resend_newsletter_notifications_skips_already_notified(
-        self, mock_send
-    ):
+    def test_resend_newsletter_notifications_skips_already_notified(self, mock_send):
         model_admin = BlogPostAdmin(BlogPost, self.site)
         request = self.factory.get("/")
         request.user = self.admin_user
@@ -385,3 +383,35 @@ class BlogAdminTests(TestCase):
 
         self.assertEqual(model_admin.reaction_count(post_from_qs), 0)
         self.assertEqual(model_admin.comment_count(post_from_qs), 0)
+
+    def test_get_search_results(self):
+        model_admin = BlogPostAdmin(BlogPost, self.site)
+
+        post_pub = BlogPost.objects.create(
+            title="Pub Search",
+            author=self.admin_user,
+            category=self.category,
+            status=BlogPost.Status.PUBLISHED,
+        )
+        post_draft = BlogPost.objects.create(
+            title="Draft Search",
+            author=self.admin_user,
+            category=self.category,
+            status=BlogPost.Status.DRAFT,
+        )
+
+        # Standard search
+        request = MockRequest()
+        queryset, use_distinct = model_admin.get_search_results(
+            request, BlogPost.objects.all(), "Search"
+        )
+        self.assertIn(post_pub, queryset)
+        self.assertIn(post_draft, queryset)
+
+        # previous_post field_name query parameter
+        request.GET = {"field_name": "previous_post"}
+        queryset, use_distinct = model_admin.get_search_results(
+            request, BlogPost.objects.all(), "Search"
+        )
+        self.assertIn(post_pub, queryset)
+        self.assertNotIn(post_draft, queryset)

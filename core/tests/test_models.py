@@ -82,6 +82,18 @@ class PageSEOTest(TestCase):
         seo.save()
         self.assertEqual(seo.path, "/about/")
 
+    @patch("django.core.cache.cache.delete")
+    def test_invalidate_cache(self, mock_delete):
+        seo = PageSEO(path="/about/")
+        seo.invalidate_cache()
+        mock_delete.assert_called_once_with("page_seo_/about")
+
+    @patch("django.core.cache.cache.delete")
+    def test_invalidate_cache_empty_path(self, mock_delete):
+        seo = PageSEO(path="")
+        seo.invalidate_cache()
+        mock_delete.assert_not_called()
+
 
 class ContactMessageTest(TestCase):
     def test_str_representation(self):
