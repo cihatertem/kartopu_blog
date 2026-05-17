@@ -27,9 +27,33 @@ from portfolio.models import (
     SalarySavingsEntry,
     SalarySavingsFlow,
     SalarySavingsSnapshot,
+    _get_prefetched_relation,
 )
 
 User = get_user_model()
+
+
+class GetPrefetchedRelationTests(TestCase):
+    def test_no_prefetched_cache(self):
+        instance = Asset(name="Test Asset")
+        self.assertIsNone(_get_prefetched_relation(instance, "some_relation"))
+
+    def test_with_prefetched_cache_key_exists(self):
+        instance = Asset(name="Test Asset")
+        instance._prefetched_objects_cache = {"some_relation": ["item1", "item2"]}
+        self.assertEqual(
+            _get_prefetched_relation(instance, "some_relation"), ["item1", "item2"]
+        )
+
+    def test_with_prefetched_cache_key_missing(self):
+        instance = Asset(name="Test Asset")
+        instance._prefetched_objects_cache = {"other_relation": ["item1"]}
+        self.assertIsNone(_get_prefetched_relation(instance, "some_relation"))
+
+    def test_with_empty_cache(self):
+        instance = Asset(name="Test Asset")
+        instance._prefetched_objects_cache = {}
+        self.assertIsNone(_get_prefetched_relation(instance, "some_relation"))
 
 
 class ModelsTestCase(TestCase):
@@ -291,7 +315,6 @@ class LogicTests(ModelsTestCase):
         self.assertEqual(portfolio.total_market_value(), Decimal("350.0"))
         self.assertEqual(portfolio.total_cost_basis(), Decimal("250.0"))
 
-
     @patch("portfolio.models.Portfolio._get_or_fetch_fx_rate")
     @patch("portfolio.models.fetch_yahoo_finance_prices_bulk")
     @patch("portfolio.models.cache")
@@ -299,6 +322,7 @@ class LogicTests(ModelsTestCase):
         self, mock_cache, mock_fetch_bulk, mock_get_fx_rate
     ):
         from datetime import date
+
         mock_get_fx_rate.return_value = Decimal("30.0")
         portfolio = Portfolio.objects.create(
             owner=self.user, name="My Portfolio", target_value=100
@@ -339,7 +363,9 @@ class LogicTests(ModelsTestCase):
 
         fx_rates = {("USD", "TRY"): Decimal("30.0")}
 
-        total = portfolio._update_market_values(positions, fx_rates, price_date=date(2023, 1, 1))
+        total = portfolio._update_market_values(
+            positions, fx_rates, price_date=date(2023, 1, 1)
+        )
         self.assertEqual(total, Decimal("75000.0"))
         mock_fetch_bulk.assert_called_once()
         args, kwargs = mock_fetch_bulk.call_args
@@ -353,6 +379,7 @@ class LogicTests(ModelsTestCase):
         self, mock_cache, mock_fetch_bulk, mock_get_fx_rate
     ):
         from datetime import date
+
         mock_get_fx_rate.return_value = Decimal("30.0")
         portfolio = Portfolio.objects.create(
             owner=self.user, name="My Portfolio", target_value=100
@@ -391,7 +418,9 @@ class LogicTests(ModelsTestCase):
 
         fx_rates = {("USD", "TRY"): Decimal("30.0")}
 
-        total = portfolio._update_market_values(positions, fx_rates, price_date=date(2023, 1, 1))
+        total = portfolio._update_market_values(
+            positions, fx_rates, price_date=date(2023, 1, 1)
+        )
 
         self.assertEqual(total, Decimal("75000.0"))
         mock_fetch_bulk.assert_called_once()

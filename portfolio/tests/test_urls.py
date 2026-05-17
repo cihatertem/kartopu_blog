@@ -1,5 +1,6 @@
 from django.test import SimpleTestCase
 from django.urls import resolve, reverse
+from django.views.generic import RedirectView
 
 from portfolio.views import (
     BudgetTrackerView,
@@ -29,3 +30,13 @@ class UrlsTestCase(SimpleTestCase):
         url = reverse("portfolio:sorr_analysis")
         self.assertEqual(url, "/portfoy/sorr-analizi/")
         self.assertEqual(resolve(url).func.view_class, SorrAnalysisView)
+
+    def test_cagr_simulasyonu_url_resolves(self):
+        url = "/portfoy/cagr-simulasyonu/"
+        match = resolve(url)
+        self.assertEqual(match.func.view_class, RedirectView)
+        self.assertEqual(
+            match.func.view_initkwargs["pattern_name"], "portfolio:portfolio_sim"
+        )
+        self.assertEqual(match.func.view_initkwargs["permanent"], True)
+        self.assertEqual(match.func.view_initkwargs["query_string"], True)

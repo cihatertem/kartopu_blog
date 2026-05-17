@@ -22,3 +22,4 @@ SIDEBAR_WIDGETS_KEY = "sidebar_widgets"
 SITE_SETTINGS_KEY = "site_settings"
 
 BLOG_POST_DETAIL_KEY_PREFIX = "blog_post:detail:"
+BLOG_POST_REACTIONS_KEY_PREFIX = "blog_post:reactions:"

@@ -10,10 +10,15 @@ from django.db.models import Value
 from django.db.models.signals import m2m_changed, post_delete, post_save
 from django.dispatch import receiver
 
-from blog.cache_keys import BLOG_POST_DETAIL_KEY_PREFIX, NAV_ARCHIVES_KEY, NAV_KEYS
+from blog.cache_keys import (
+    BLOG_POST_DETAIL_KEY_PREFIX,
+    BLOG_POST_REACTIONS_KEY_PREFIX,
+    NAV_ARCHIVES_KEY,
+    NAV_KEYS,
+)
 from core.decorators import log_exceptions
 
-from .models import BlogPost, BlogPostImage, Category, Tag
+from .models import BlogPost, BlogPostImage, BlogPostReaction, Category, Tag
 
 
 @log_exceptions(message="Error deleting storage file")
@@ -138,3 +143,9 @@ def post_tags_changed(sender, instance, action, **kwargs):
     if action in ("post_add", "post_remove", "post_clear"):
         update_search_vector(instance)
         invalidate_nav_cache()
+
+
+@receiver(post_save, sender=BlogPostReaction)
+@receiver(post_delete, sender=BlogPostReaction)
+def blogpostreaction_changed(sender, instance: BlogPostReaction, **kwargs):
+    cache.delete(f"{BLOG_POST_REACTIONS_KEY_PREFIX}{instance.post_id}")

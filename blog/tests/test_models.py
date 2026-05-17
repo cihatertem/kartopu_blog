@@ -203,6 +203,31 @@ class BlogModelsTests(TestCase):
         post2.refresh_from_db()
         self.assertIsNone(post2.previous_post)
 
+    def test_published_previous_post(self):
+        post1 = BlogPost.objects.create(
+            title="First Post", author=self.user, status=BlogPost.Status.DRAFT
+        )
+        post2 = BlogPost.objects.create(
+            title="Second Post", author=self.user, previous_post=post1
+        )
+
+        self.assertIsNone(post2.published_previous_post)
+
+        post1.status = BlogPost.Status.PUBLISHED
+        post1.save()
+
+        if "published_previous_post" in post2.__dict__:
+            del post2.__dict__["published_previous_post"]
+
+        # Note: Because the post was updated in the DB but `post2.previous_post` still
+        # has the old object in memory, we need to fetch from DB or refresh `post2` completely,
+        # but since we only need to test `published_previous_post`, let's refresh the relation by fetching post2 again.
+        post2_refreshed = BlogPost.objects.get(pk=post2.pk)
+        self.assertEqual(post2_refreshed.published_previous_post, post1)
+
+        post3 = BlogPost.objects.create(title="Third Post", author=self.user)
+        self.assertIsNone(post3.published_previous_post)
+
     def test_published_next_post_uses_prefetched_posts_without_query(self):
         now = timezone.now()
         post = BlogPost.objects.create(

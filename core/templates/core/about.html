@@ -9,7 +9,7 @@
     <article>
       <h1>{{ about_page.title }}</h1>
       <div>
-        {{ about_page.content|render_post_content:about_page.images.all|safe }}
+        {{ about_page.content|render_post_content:about_page.images.all }}
       </div>
     </article>
   {% endcache %}

@@ -14,7 +14,7 @@ from django.urls import reverse
 from django.utils.formats import date_format
 from django.views.decorators.http import require_POST
 
-from blog.cache_keys import BLOG_POST_DETAIL_KEY_PREFIX
+from blog.cache_keys import BLOG_POST_DETAIL_KEY_PREFIX, BLOG_POST_REACTIONS_KEY_PREFIX
 from blog.models import BlogPost, BlogPostReaction, Category, Tag
 from blog.services import (
     detect_content_markers,
@@ -154,12 +154,22 @@ def _extract_social_profile_url(account):
     return ""
 
 
+def _get_reaction_counts(post):
+    cache_key = f"{BLOG_POST_REACTIONS_KEY_PREFIX}{post.pk}"
+    counts = cache.get(cache_key)
+    if counts is None:
+        qs = (
+            BlogPostReaction.objects.filter(post=post)
+            .values("reaction")
+            .annotate(total=Count("id"))
+        )
+        counts = list(qs)
+        cache.set(cache_key, counts, 60 * 60 * 24 * 7)
+    return counts
+
+
 def _build_reaction_context(request, post):
-    counts = (
-        BlogPostReaction.objects.filter(post=post)
-        .values("reaction")
-        .annotate(total=Count("id"))
-    )
+    counts = _get_reaction_counts(post)
     reaction_counts = {item["reaction"]: item["total"] for item in counts}
 
     user_reaction = ""
@@ -294,9 +304,7 @@ def _post_detail_queryset():
             "images",
             Prefetch(
                 "next_posts",
-                queryset=BlogPost.objects.filter(
-                    status=BlogPost.Status.PUBLISHED
-                )
+                queryset=BlogPost.objects.filter(status=BlogPost.Status.PUBLISHED)
                 .defer("content", "excerpt")
                 .order_by("published_at"),
                 to_attr="_prefetched_published_next_posts",
@@ -571,11 +579,7 @@ def post_reaction(request, slug: str):
         if existing:
             existing.delete()
 
-    counts = (
-        BlogPostReaction.objects.filter(post=post)
-        .values("reaction")
-        .annotate(total=Count("id"))
-    )
+    counts = _get_reaction_counts(post)
     counts_payload = {item["reaction"]: item["total"] for item in counts}
 
     return JsonResponse({"selected": selected, "counts": counts_payload})

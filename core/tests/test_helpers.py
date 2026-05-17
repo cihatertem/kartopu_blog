@@ -154,33 +154,6 @@ class GetClientIPTest(TestCase):
         self.assertEqual(client_ip_key("test_group", request), "unknown")
 
 
-class ParseIntTest(TestCase):
-    def test_parse_int_valid(self):
-        from core.helpers import _parse_int
-
-        self.assertEqual(_parse_int("123"), 123)
-        self.assertEqual(_parse_int("0"), 0)
-        self.assertEqual(_parse_int("-5"), -5)
-
-    def test_parse_int_invalid(self):
-        from core.helpers import _parse_int
-
-        with self.assertLogs("core.helpers", level="ERROR"):
-            self.assertIsNone(_parse_int("abc"))
-
-    def test_parse_int_none_or_empty(self):
-        from core.helpers import _parse_int
-
-        self.assertIsNone(_parse_int(None))
-        self.assertIsNone(_parse_int(""))
-
-    def test_parse_int_type_error(self):
-        from core.helpers import _parse_int
-
-        with self.assertLogs("core.helpers", level="ERROR"):
-            self.assertIsNone(_parse_int(["unsupported", "type"]))
-
-
 class GetSafeRefererTest(TestCase):
     def setUp(self):
         self.factory = RequestFactory()

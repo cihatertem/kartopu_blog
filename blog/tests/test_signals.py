@@ -4,8 +4,8 @@ from django.contrib.auth import get_user_model
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import TestCase
 
-from blog.cache_keys import NAV_KEYS
-from blog.models import BlogPost, BlogPostImage, Category, Tag
+from blog.cache_keys import BLOG_POST_REACTIONS_KEY_PREFIX, NAV_ARCHIVES_KEY, NAV_KEYS
+from blog.models import BlogPost, BlogPostImage, BlogPostReaction, Category, Tag
 from blog.signals import (
     _delete_local_dir_if_exists,
     _delete_storage_dir_if_exists,
@@ -275,8 +275,6 @@ class BlogSignalsTests(TestCase):
     def test_invalidate_nav_cache(self, mock_delete_many):
         from django.conf import settings
 
-        from blog.cache_keys import NAV_ARCHIVES_KEY
-
         expected_keys = list(NAV_KEYS)
         expected_keys.remove(NAV_ARCHIVES_KEY)
         for lang_code, _ in getattr(settings, "LANGUAGES", [("tr", "Turkish")]):
@@ -331,3 +329,30 @@ class BlogSignalsTests(TestCase):
         self.post.tags.clear()
         mock_invalidate.assert_called()
         mock_update_search_vector.assert_called_with(self.post)
+
+
+class BlogPostReactionSignalTests(TestCase):
+    def setUp(self):
+        self.user = User.objects.create_user(
+            email="test@example.com", password="password"
+        )
+        self.post = BlogPost.objects.create(
+            title="Test Post", author=self.user, slug="test-post"
+        )
+
+    @patch("blog.signals.cache.delete")
+    def test_reaction_cache_invalidation(self, mock_delete):
+        reaction = BlogPostReaction.objects.create(
+            post=self.post,
+            user=self.user,
+            reaction=BlogPostReaction.Reaction.KALP.value,
+        )
+        mock_delete.assert_called_with(
+            f"{BLOG_POST_REACTIONS_KEY_PREFIX}{self.post.pk}"
+        )
+
+        mock_delete.reset_mock()
+        reaction.delete()
+        mock_delete.assert_called_with(
+            f"{BLOG_POST_REACTIONS_KEY_PREFIX}{self.post.pk}"
+        )
