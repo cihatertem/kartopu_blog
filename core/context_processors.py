@@ -189,7 +189,18 @@ def _get_nav_recent_posts(cached_data=None):
             .order_by("-published_at")
             .only("title", "slug", "published_at", "cover_image")[:5]
         )
-        nav_recent_posts = list(qs)
+        nav_recent_posts = []
+        for post in qs:
+            nav_recent_posts.append(
+                {
+                    "title": post.title,
+                    "slug": post.slug,
+                    "published_at": post.published_at,
+                    "get_absolute_url": post.get_absolute_url(),
+                    "cover_thumb_rendition": post.cover_thumb_rendition,
+                    "cover_image": bool(post.cover_image),
+                }
+            )
         cache.set(NAV_RECENT_POSTS_KEY, nav_recent_posts, timeout=CACHE_TIMEOUT)
     return nav_recent_posts
 
@@ -228,7 +239,18 @@ def _get_nav_popular_posts(cached_data=None):
             .order_by("-popularity_score", "-view_count", "-published_at")
             .only("title", "slug", "view_count", "published_at", "cover_image")[:5]
         )
-        nav_popular_posts = list(qs)
+        nav_popular_posts = []
+        for post in qs:
+            nav_popular_posts.append(
+                {
+                    "title": post.title,
+                    "slug": post.slug,
+                    "published_at": post.published_at,
+                    "get_absolute_url": post.get_absolute_url(),
+                    "cover_thumb_rendition": post.cover_thumb_rendition,
+                    "cover_image": bool(post.cover_image),
+                }
+            )
         cache.set(NAV_POPULAR_POSTS_KEY, nav_popular_posts, timeout=CACHE_TIMEOUT)
     return nav_popular_posts
 
@@ -249,7 +271,18 @@ def _get_nav_portfolio_posts(cached_data=None):
             .order_by("-published_at")
             .only("title", "slug", "published_at", "cover_image")[:5]
         )
-        nav_portfolio_posts = list(qs)
+        nav_portfolio_posts = []
+        for post in qs:
+            nav_portfolio_posts.append(
+                {
+                    "title": post.title,
+                    "slug": post.slug,
+                    "published_at": post.published_at,
+                    "get_absolute_url": post.get_absolute_url(),
+                    "cover_thumb_rendition": post.cover_thumb_rendition,
+                    "cover_image": bool(post.cover_image),
+                }
+            )
         cache.set(NAV_PORTFOLIO_POSTS_KEY, nav_portfolio_posts, timeout=CACHE_TIMEOUT)
     return nav_portfolio_posts
 
