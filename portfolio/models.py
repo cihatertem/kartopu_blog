@@ -8,8 +8,15 @@ from django.conf import settings
 from django.core.cache import cache
 from django.core.exceptions import ValidationError
 from django.db import models, transaction
-from django.db.models import DecimalField, Prefetch, Q, QuerySet, Sum, Value
-from django.db.models import prefetch_related_objects
+from django.db.models import (
+    DecimalField,
+    Prefetch,
+    Q,
+    QuerySet,
+    Sum,
+    Value,
+    prefetch_related_objects,
+)
 from django.db.models.functions import Coalesce
 from django.utils import timezone
 
@@ -674,15 +681,9 @@ class Portfolio(UUIDModelMixin, TimeStampedModelMixin):
 
         return current_price
 
-    def _update_market_values(
-        self,
-        positions: dict[str, dict[str, Decimal | Asset]],
-        fx_rates: dict[tuple[str, str, date | None], Decimal],
-        price_date: date | None,
-    ) -> Decimal:
-        total_value = Decimal("0")
-
-        # Collect all assets and their cache keys
+    def _prepare_asset_cache_keys(
+        self, positions: dict[str, dict[str, Decimal | Asset]], price_date: date | None
+    ) -> tuple[list[Asset], dict[str, str]]:
         assets_to_fetch = []
         cache_keys_map = {}
         for data in positions.values():
@@ -691,42 +692,56 @@ class Portfolio(UUIDModelMixin, TimeStampedModelMixin):
                 cache_key = self._generate_price_cache_key(asset.symbol, price_date)
                 cache_keys_map[asset.symbol] = cache_key
                 assets_to_fetch.append(asset)
+        return assets_to_fetch, cache_keys_map
 
-        # Get cached prices
-        cached_prices = {}
-        if cache_keys_map:
-            cached_prices = cache.get_many(list(cache_keys_map.values()))
-
-        # Determine which symbols need to be fetched
+    def _get_symbols_to_fetch(
+        self,
+        assets_to_fetch: list[Asset],
+        cache_keys_map: dict[str, str],
+        cached_prices: dict[str, Decimal],
+        price_date: date | None,
+    ) -> set[str]:
         symbols_to_fetch = set()
         for asset in assets_to_fetch:
             cache_key = cache_keys_map[asset.symbol]  # pyright: ignore[reportAttributeAccessIssue]
             if cache_key not in cached_prices:
                 current_price = asset.current_price or Decimal("0")  # pyright: ignore[reportAttributeAccessIssue]
-                # Only fetch if we have a price_date OR we don't have a current price at all
                 if price_date or not current_price:
                     symbols_to_fetch.add(asset.symbol)  # pyright: ignore[reportAttributeAccessIssue]
+        return symbols_to_fetch
 
-        # Fetch prices in bulk for uncached symbols
-        fetched_prices = {}
-        if symbols_to_fetch:
-            fetched_prices = fetch_yahoo_finance_prices_bulk(
-                list(symbols_to_fetch), price_date=price_date
+    def _fetch_uncached_prices(
+        self,
+        symbols_to_fetch: set[str],
+        cache_keys_map: dict[str, str],
+        price_date: date | None,
+    ) -> dict[str, Decimal]:
+        if not symbols_to_fetch:
+            return {}
+        fetched_prices = fetch_yahoo_finance_prices_bulk(
+            list(symbols_to_fetch), price_date=price_date
+        )
+        prices_to_cache = {
+            cache_keys_map[symbol]: price
+            for symbol, price in fetched_prices.items()  # pyright: ignore[reportCallIssue]
+        }
+        if prices_to_cache:
+            cache.set_many(
+                prices_to_cache,
+                timeout=getattr(settings, "CACHE_TIMEOUT", CACHE_TIMEOUT),
             )
+        return fetched_prices
 
-            # Save newly fetched prices to cache
-            prices_to_cache = {}
-            for symbol, price in fetched_prices.items():  # pyright: ignore[reportCallIssue]
-                cache_key = cache_keys_map[symbol]
-                prices_to_cache[cache_key] = price
-
-            if prices_to_cache:
-                cache.set_many(
-                    prices_to_cache,
-                    timeout=getattr(settings, "CACHE_TIMEOUT", CACHE_TIMEOUT),
-                )
-
-        # Calculate market values using collected prices
+    def _calculate_total_value(
+        self,
+        positions: dict[str, dict[str, Decimal | Asset]],
+        cache_keys_map: dict[str, str],
+        cached_prices: dict[str, Decimal],
+        fetched_prices: dict[str, Decimal],
+        fx_rates: dict[tuple[str, str, date | None], Decimal],
+        price_date: date | None,
+    ) -> Decimal:
+        total_value = Decimal("0")
         for data in positions.values():
             asset = data["asset"]
             quantity = data["quantity"]
@@ -763,6 +778,33 @@ class Portfolio(UUIDModelMixin, TimeStampedModelMixin):
 
             total_value += data["market_value"]
         return total_value
+
+    def _update_market_values(
+        self,
+        positions: dict[str, dict[str, Decimal | Asset]],
+        fx_rates: dict[tuple[str, str, date | None], Decimal],
+        price_date: date | None,
+    ) -> Decimal:
+        assets_to_fetch, cache_keys_map = self._prepare_asset_cache_keys(
+            positions, price_date
+        )
+        cached_prices = (
+            cache.get_many(list(cache_keys_map.values())) if cache_keys_map else {}
+        )
+        symbols_to_fetch = self._get_symbols_to_fetch(
+            assets_to_fetch, cache_keys_map, cached_prices, price_date
+        )
+        fetched_prices = self._fetch_uncached_prices(
+            symbols_to_fetch, cache_keys_map, price_date
+        )
+        return self._calculate_total_value(
+            positions,
+            cache_keys_map,
+            cached_prices,
+            fetched_prices,
+            fx_rates,
+            price_date,
+        )
 
     def _update_position_metrics(
         self,

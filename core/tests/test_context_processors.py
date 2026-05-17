@@ -174,21 +174,21 @@ class ContextProcessorsTests(TestCase):
         posts = _get_nav_recent_posts()
 
         self.assertEqual(len(posts), 2)
-        self.assertEqual(posts[0]["slug"], "portfolio-post")
+        self.assertEqual(posts[0].slug, "portfolio-post")
         self.assertEqual(cache.get(NAV_RECENT_POSTS_KEY), posts)
 
     def test_get_nav_popular_posts(self):
         posts = _get_nav_popular_posts()
 
         self.assertEqual(len(posts), 2)
-        self.assertEqual(posts[0]["slug"], "post-1")
+        self.assertEqual(posts[0].slug, "post-1")
         self.assertEqual(cache.get(NAV_POPULAR_POSTS_KEY), posts)
 
     def test_get_nav_portfolio_posts(self):
         posts = _get_nav_portfolio_posts()
 
         self.assertEqual(len(posts), 1)
-        self.assertEqual(posts[0]["slug"], "portfolio-post")
+        self.assertEqual(posts[0].slug, "portfolio-post")
         self.assertEqual(cache.get(NAV_PORTFOLIO_POSTS_KEY), posts)
 
     def test_get_goal_widget_snapshot(self):

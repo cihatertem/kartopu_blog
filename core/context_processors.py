@@ -189,18 +189,7 @@ def _get_nav_recent_posts(cached_data=None):
             .order_by("-published_at")
             .only("title", "slug", "published_at", "cover_image")[:5]
         )
-        nav_recent_posts = []
-        for post in qs:
-            nav_recent_posts.append(
-                {
-                    "title": post.title,
-                    "slug": post.slug,
-                    "published_at": post.published_at,
-                    "get_absolute_url": post.get_absolute_url(),
-                    "cover_thumb_rendition": post.cover_thumb_rendition,
-                    "cover_image": bool(post.cover_image),
-                }
-            )
+        nav_recent_posts = list(qs)
         cache.set(NAV_RECENT_POSTS_KEY, nav_recent_posts, timeout=CACHE_TIMEOUT)
     return nav_recent_posts
 
@@ -239,18 +228,7 @@ def _get_nav_popular_posts(cached_data=None):
             .order_by("-popularity_score", "-view_count", "-published_at")
             .only("title", "slug", "view_count", "published_at", "cover_image")[:5]
         )
-        nav_popular_posts = []
-        for post in qs:
-            nav_popular_posts.append(
-                {
-                    "title": post.title,
-                    "slug": post.slug,
-                    "published_at": post.published_at,
-                    "get_absolute_url": post.get_absolute_url(),
-                    "cover_thumb_rendition": post.cover_thumb_rendition,
-                    "cover_image": bool(post.cover_image),
-                }
-            )
+        nav_popular_posts = list(qs)
         cache.set(NAV_POPULAR_POSTS_KEY, nav_popular_posts, timeout=CACHE_TIMEOUT)
     return nav_popular_posts
 
@@ -271,18 +249,7 @@ def _get_nav_portfolio_posts(cached_data=None):
             .order_by("-published_at")
             .only("title", "slug", "published_at", "cover_image")[:5]
         )
-        nav_portfolio_posts = []
-        for post in qs:
-            nav_portfolio_posts.append(
-                {
-                    "title": post.title,
-                    "slug": post.slug,
-                    "published_at": post.published_at,
-                    "get_absolute_url": post.get_absolute_url(),
-                    "cover_thumb_rendition": post.cover_thumb_rendition,
-                    "cover_image": bool(post.cover_image),
-                }
-            )
+        nav_portfolio_posts = list(qs)
         cache.set(NAV_PORTFOLIO_POSTS_KEY, nav_portfolio_posts, timeout=CACHE_TIMEOUT)
     return nav_portfolio_posts
 
@@ -293,9 +260,7 @@ def _get_goal_widget_snapshot(cached_data=None):
             GOAL_WIDGET_KEY, GOAL_WIDGET_CACHE_MISS_VALUE
         )
     else:
-        goal_widget_snapshot = cache.get(
-            GOAL_WIDGET_KEY, GOAL_WIDGET_CACHE_MISS_VALUE
-        )
+        goal_widget_snapshot = cache.get(GOAL_WIDGET_KEY, GOAL_WIDGET_CACHE_MISS_VALUE)
 
     if goal_widget_snapshot != GOAL_WIDGET_CACHE_MISS_VALUE:
         if goal_widget_snapshot == GOAL_WIDGET_EMPTY_CACHE_VALUE:
@@ -368,9 +333,7 @@ def _get_has_pending_messages_or_comments(request, cached_data=None):
         if has_unread_messages:
             has_pending = True
         else:
-            has_pending = Comment.objects.filter(
-                status=Comment.Status.PENDING
-            ).exists()
+            has_pending = Comment.objects.filter(status=Comment.Status.PENDING).exists()
         cache.set(cache_key, has_pending, timeout=STAFF_PENDING_CACHE_TIMEOUT)
 
     return has_pending
