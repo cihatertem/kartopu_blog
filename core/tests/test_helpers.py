@@ -214,6 +214,8 @@ class NormalizeSearchQueryTest(TestCase):
                 "TR \u0130 \u011e \u015e \u00c7 \u00d6 \u00dc",
                 "TR \u0130 \u011e \u015e \u00c7 \u00d6 \u00dc",
             ),  # Turkish characters
+            ("!@#$%^&*()_+", "!@#$%^&*()_+"),
+            ("  !@#$%^&*()_+  ", "!@#$%^&*()_+"),
         ]
 
         for q, expected in cases:

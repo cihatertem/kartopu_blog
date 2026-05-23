@@ -21,6 +21,10 @@ def calculate_xirr(cash_flows: list[tuple[date, Decimal]]) -> float | None:
     if not cash_flows:
         return None
 
+    for _, amount in cash_flows:
+        if amount.is_nan() or amount.is_infinite():
+            return None
+
     # Sort cash flows by date and remove zero cash flows
     # Single pass to filter zeros and check for positive/negative signs
     filtered_flows = []

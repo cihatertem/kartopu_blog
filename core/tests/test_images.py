@@ -38,6 +38,20 @@ class ImageOptimizationTests(TestCase):
 
         self.assertIsNone(result)
 
+    def test_optimize_uploaded_image_invalid_image(self):
+        with tempfile.NamedTemporaryFile(suffix=".jpg", delete=False) as temp_file:
+            temp_file.write(b"invalid_image_data")
+            temp_file_name = temp_file.name
+
+        try:
+            with self.assertLogs("core.images", level="ERROR"):
+                result = optimize_uploaded_image(temp_file_name)
+
+            self.assertIsNone(result)
+        finally:
+            if os.path.exists(temp_file_name):
+                os.remove(temp_file_name)
+
     def test_optimize_uploaded_image_field_none(self):
         self.assertIsNone(optimize_uploaded_image_field(None))
 

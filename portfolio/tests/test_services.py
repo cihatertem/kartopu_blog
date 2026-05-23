@@ -20,6 +20,22 @@ from portfolio.services import (
 
 
 class CalculateXIRRTests(TestCase):
+    def test_invalid_cash_flows(self):
+        """Test with invalid Decimal amounts (NaN, Infinity)."""
+        # Test with Infinity
+        cash_flows = [
+            (date(2020, 1, 1), Decimal("-100")),
+            (date(2021, 1, 1), Decimal("Infinity")),
+        ]
+        self.assertIsNone(calculate_xirr(cash_flows))
+
+        # Test with NaN
+        cash_flows_nan = [
+            (date(2020, 1, 1), Decimal("-100")),
+            (date(2021, 1, 1), Decimal("NaN")),
+        ]
+        self.assertIsNone(calculate_xirr(cash_flows_nan))
+
     def test_empty_cash_flows(self):
         """Test with an empty list of cash flows."""
         self.assertIsNone(calculate_xirr([]))
