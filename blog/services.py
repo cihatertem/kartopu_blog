@@ -1,6 +1,7 @@
+from collections.abc import Iterable
 import re
 
-from django.db.models import Prefetch
+from django.db.models import Prefetch, prefetch_related_objects
 
 from portfolio.models import (
     CashFlowComparison,
@@ -199,6 +200,46 @@ def cashflow_comparison_queryset(base_queryset=None, *, include_items: bool = Fa
     return qs.order_by("created_at")
 
 
+def prefetch_cashflow_comparison_items(
+    comparisons: Iterable[CashFlowComparison],
+) -> None:
+    """Prefetch all comparison snapshot items with one deduplicated query."""
+    snapshots_by_pk: dict[object, CashFlowSnapshot] = {}
+    duplicate_snapshots: list[tuple[CashFlowSnapshot, CashFlowSnapshot]] = []
+
+    for comparison in comparisons:
+        for attr_name in ("base_snapshot", "compare_snapshot"):
+            snapshot = getattr(comparison, attr_name, None)
+            if snapshot is None or not hasattr(snapshot, "_meta"):
+                continue
+
+            snapshot_pk = getattr(snapshot, "pk", None)
+            if snapshot_pk is None:
+                continue
+
+            existing_snapshot = snapshots_by_pk.get(snapshot_pk)
+            if existing_snapshot is None:
+                snapshots_by_pk[snapshot_pk] = snapshot
+            elif existing_snapshot is not snapshot:
+                duplicate_snapshots.append((snapshot, existing_snapshot))
+
+    if not snapshots_by_pk:
+        return
+
+    prefetch_related_objects(list(snapshots_by_pk.values()), "items")
+
+    for snapshot, source_snapshot in duplicate_snapshots:
+        source_cache = getattr(source_snapshot, "_prefetched_objects_cache", {})
+        if "items" not in source_cache:
+            continue
+
+        snapshot_cache = getattr(snapshot, "_prefetched_objects_cache", None)
+        if snapshot_cache is None:
+            snapshot_cache = {}
+            snapshot._prefetched_objects_cache = snapshot_cache
+        snapshot_cache["items"] = source_cache["items"]
+
+
 def salary_savings_snapshot_queryset(
     base_queryset=None,
     *,
@@ -297,9 +338,7 @@ def get_content_prefetches_for_markers(markers: set[str]):
         prefetches.append(
             Prefetch(
                 "cashflow_comparisons",
-                queryset=cashflow_comparison_queryset(
-                    include_items="cashflow_comparison_summary" in markers,
-                ),
+                queryset=cashflow_comparison_queryset(include_items=False),
             )
         )
     if markers & SALARY_SAVINGS_MARKERS:

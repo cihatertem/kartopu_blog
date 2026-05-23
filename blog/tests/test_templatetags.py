@@ -27,7 +27,17 @@ from blog.templatetags.blog_extras import (
     _render_savings_rate_charts_html,
     _render_savings_rate_summary_html,
 )
-from portfolio.models import Asset, Portfolio, PortfolioSnapshot, PortfolioSnapshotItem
+from portfolio.models import (
+    Asset,
+    CashFlow,
+    CashFlowComparison,
+    CashFlowEntry,
+    CashFlowSnapshot,
+    CashFlowSnapshotItem,
+    Portfolio,
+    PortfolioSnapshot,
+    PortfolioSnapshotItem,
+)
 
 User = get_user_model()
 
@@ -114,6 +124,53 @@ class TestTemplateTagsHelpers(TestCase):
 
 
 class TestTemplateTagQuerysets(TestCase):
+    def _create_cashflow_comparison_post(self, content):
+        user = User.objects.create_user(email="cashflow-comparison@example.com")
+        cashflow = CashFlow.objects.create(
+            owner=user,
+            name="Comparison CashFlow",
+            currency=CashFlow.Currency.TRY,
+        )
+        snapshots = []
+        for idx, snapshot_date in enumerate(
+            (
+                datetime.date(2025, 1, 31),
+                datetime.date(2025, 2, 28),
+                datetime.date(2025, 3, 31),
+            ),
+            start=1,
+        ):
+            snapshot = CashFlowSnapshot.objects.create(
+                cashflow=cashflow,
+                period=CashFlowSnapshot.Period.MONTHLY,
+                snapshot_date=snapshot_date,
+                total_amount=Decimal(str(idx * 1000)),
+            )
+            CashFlowSnapshotItem.objects.create(
+                snapshot=snapshot,
+                category=CashFlowEntry.Category.DIVIDEND,
+                amount=Decimal(str(idx * 1000)),
+                allocation_pct=Decimal("1"),
+            )
+            snapshots.append(snapshot)
+
+        comparison_1 = CashFlowComparison.objects.create(
+            base_snapshot=snapshots[0],
+            compare_snapshot=snapshots[1],
+        )
+        comparison_2 = CashFlowComparison.objects.create(
+            base_snapshot=snapshots[1],
+            compare_snapshot=snapshots[2],
+        )
+        post = BlogPost.objects.create(
+            title="CashFlow Comparison Post",
+            author=user,
+            content=content,
+            status=BlogPost.Status.PUBLISHED,
+        )
+        post.cashflow_comparisons.add(comparison_1, comparison_2)
+        return post
+
     def test_portfolio_snapshot_fallback_prefetches_render_relations(self):
         user = User.objects.create_user(email="template-prefetch@example.com")
         portfolio = Portfolio.objects.create(
@@ -163,6 +220,28 @@ class TestTemplateTagQuerysets(TestCase):
 
         self.assertIn("portfolio-timeseries", charts_html)
         self.assertIn("portfolio-category-allocation", category_html)
+
+    def test_cashflow_comparison_summary_prefetches_items_once(self):
+        post = self._create_cashflow_comparison_post(
+            "{{ cashflow_comparison_summary:1 }}\n"
+            "{{ cashflow_comparison_summary:2 }}"
+        )
+
+        with self.assertNumQueries(3):
+            html = blog_extras.render_post_body({}, post)
+
+        self.assertIn("cashflow-comparison", html)
+        self.assertIn("3.000 ₺", html)
+
+    def test_cashflow_comparison_charts_skip_item_prefetch(self):
+        post = self._create_cashflow_comparison_post(
+            "{{ cashflow_comparison_charts:1 }}"
+        )
+
+        with self.assertNumQueries(2):
+            html = blog_extras.render_post_body({}, post)
+
+        self.assertIn("cashflow-comparison-charts", html)
 
 
 class TestRenderHTMLFunctions(TestCase):

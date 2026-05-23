@@ -20,6 +20,7 @@ from blog.services import (
     detect_content_markers,
     get_content_prefetches_for_dependencies,
     get_content_prefetches_for_markers,
+    prefetch_cashflow_comparison_items,
 )
 from comments.forms import CommentForm
 from comments.models import MAX_COMMENT_LENGTH, Comment
@@ -332,13 +333,21 @@ def _get_post_for_detail(slug: str, *, include_unpublished: bool):
     markers = detect_content_markers(post.content)
     if markers:
         prefetches = get_content_prefetches_for_markers(markers)
+        needs_cashflow_comparison_items = "cashflow_comparison_summary" in markers
     else:
+        dependencies = post.content_dependencies or []
         prefetches = get_content_prefetches_for_dependencies(
-            post.content_dependencies or []
+            dependencies
         )
+        needs_cashflow_comparison_items = "cashflow" in dependencies
 
     if prefetches:
         prefetch_related_objects([post], *prefetches)
+        if needs_cashflow_comparison_items:
+            prefetched = getattr(post, "_prefetched_objects_cache", {})
+            prefetch_cashflow_comparison_items(
+                prefetched.get("cashflow_comparisons", ())
+            )
 
     if not include_unpublished:
         cache.set(cache_key, post, timeout=3600)  # 1 saat

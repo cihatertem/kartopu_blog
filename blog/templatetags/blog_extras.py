@@ -5,7 +5,6 @@ from urllib.parse import urljoin
 
 from django import template
 from django.core.serializers.json import DjangoJSONEncoder
-from django.db.models import prefetch_related_objects
 from django.template.loader import render_to_string
 from django.templatetags.static import static as static_url
 from django.utils.html import escape
@@ -20,6 +19,7 @@ from blog.services import (
     dividend_snapshot_queryset,
     portfolio_comparison_queryset,
     portfolio_snapshot_queryset,
+    prefetch_cashflow_comparison_items,
     salary_savings_snapshot_queryset,
 )
 from portfolio.models import CashFlowEntry, CashFlowSnapshot, SalarySavingsSnapshot
@@ -447,10 +447,7 @@ def _get_cashflow_comparisons(post):
     return _get_prefetched_list(
         post,
         "cashflow_comparisons",
-        cashflow_comparison_queryset(
-            post.cashflow_comparisons,
-            include_items=True,
-        ),
+        cashflow_comparison_queryset(post.cashflow_comparisons),
     )
 
 
@@ -884,7 +881,7 @@ def _get_cashflow_comparison_context_data(comparison) -> dict:
     base = comparison.base_snapshot
     compare = comparison.compare_snapshot
 
-    prefetch_related_objects([base, compare], "items")
+    prefetch_cashflow_comparison_items((comparison,))
 
     cashflow_currency = getattr(base.cashflow, "currency", None)
 
@@ -1218,7 +1215,9 @@ def savings_rate_charts(context, index=None):
 def cashflow_comparison_summary(context, index=None):
     """Post içindeki nakit akışı karşılaştırma özetini HTML olarak döndürür."""
     post = context.get("post")
-    comparison = _get_item_by_identifier(_get_cashflow_comparisons(post), index)
+    comparisons = _get_cashflow_comparisons(post)
+    prefetch_cashflow_comparison_items(comparisons)
+    comparison = _get_item_by_identifier(comparisons, index)
     return mark_safe(_render_cashflow_comparison_summary_html(comparison))
 
 
@@ -1376,6 +1375,8 @@ def render_post_body(context, post):
                 cached_items[getter] = getter(post)
 
             items = cached_items[getter]
+            if tag == "cashflow_comparison_summary":
+                prefetch_cashflow_comparison_items(items)
             item = _get_item_by_identifier(items, arg)
             return render_func(item)
 
