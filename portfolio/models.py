@@ -541,6 +541,53 @@ class Portfolio(UUIDModelMixin, TimeStampedModelMixin):
         quantity -= transaction.quantity
         return quantity, cost_basis, value_adjustment
 
+    def _calculate_new_position_values(
+        self,
+        transaction: "PortfolioTransaction",
+        quantity: Decimal,
+        cost_basis: Decimal,
+        value_adjustment: Decimal,
+        fx_rate: Decimal,
+    ) -> tuple[Decimal, Decimal, Decimal]:
+        increase_quantity = self._calculate_capital_increase_quantity(
+            current_quantity=quantity,
+            increase_rate_pct=transaction.capital_increase_rate_pct,
+        )
+
+        match transaction.transaction_type:
+            case PortfolioTransaction.TransactionType.BUY:
+                return self._apply_buy(
+                    transaction, quantity, cost_basis, value_adjustment, fx_rate
+                )
+            case PortfolioTransaction.TransactionType.BONUS_CAPITAL_INCREASE:
+                return self._apply_bonus_capital_increase(
+                    increase_quantity, quantity, cost_basis, value_adjustment
+                )
+            case PortfolioTransaction.TransactionType.RIGHTS_EXERCISED:
+                return self._apply_rights_exercised(
+                    transaction,
+                    increase_quantity,
+                    quantity,
+                    cost_basis,
+                    value_adjustment,
+                    fx_rate,
+                )
+            case PortfolioTransaction.TransactionType.RIGHTS_NOT_EXERCISED:
+                return self._apply_rights_not_exercised(
+                    transaction,
+                    increase_quantity,
+                    quantity,
+                    cost_basis,
+                    value_adjustment,
+                    fx_rate,
+                )
+            case PortfolioTransaction.TransactionType.SELL:
+                return self._apply_sell(
+                    transaction, quantity, cost_basis, value_adjustment
+                )
+            case _:
+                return quantity, cost_basis, value_adjustment
+
     def _apply_transaction_to_position(
         self,
         transaction: "PortfolioTransaction",
@@ -555,46 +602,9 @@ class Portfolio(UUIDModelMixin, TimeStampedModelMixin):
         assert isinstance(cost_basis, Decimal)
         assert isinstance(value_adjustment, Decimal)
 
-        increase_quantity = self._calculate_capital_increase_quantity(
-            current_quantity=quantity,
-            increase_rate_pct=transaction.capital_increase_rate_pct,
+        quantity, cost_basis, value_adjustment = self._calculate_new_position_values(
+            transaction, quantity, cost_basis, value_adjustment, fx_rate
         )
-
-        match transaction.transaction_type:
-            case PortfolioTransaction.TransactionType.BUY:
-                quantity, cost_basis, value_adjustment = self._apply_buy(
-                    transaction, quantity, cost_basis, value_adjustment, fx_rate
-                )
-            case PortfolioTransaction.TransactionType.BONUS_CAPITAL_INCREASE:
-                quantity, cost_basis, value_adjustment = (
-                    self._apply_bonus_capital_increase(
-                        increase_quantity, quantity, cost_basis, value_adjustment
-                    )
-                )
-            case PortfolioTransaction.TransactionType.RIGHTS_EXERCISED:
-                quantity, cost_basis, value_adjustment = self._apply_rights_exercised(
-                    transaction,
-                    increase_quantity,
-                    quantity,
-                    cost_basis,
-                    value_adjustment,
-                    fx_rate,
-                )
-            case PortfolioTransaction.TransactionType.RIGHTS_NOT_EXERCISED:
-                quantity, cost_basis, value_adjustment = (
-                    self._apply_rights_not_exercised(
-                        transaction,
-                        increase_quantity,
-                        quantity,
-                        cost_basis,
-                        value_adjustment,
-                        fx_rate,
-                    )
-                )
-            case PortfolioTransaction.TransactionType.SELL:
-                quantity, cost_basis, value_adjustment = self._apply_sell(
-                    transaction, quantity, cost_basis, value_adjustment
-                )
 
         if quantity <= 0:
             quantity = Decimal("0")

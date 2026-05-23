@@ -290,7 +290,7 @@ class CashFlowEntryAdmin(admin.ModelAdmin):
 
     @admin.display(description="Nakit Akışları")
     def cashflows_display(self, obj):
-        return ", ".join(sorted([cf.name for cf in obj.cashflows.all()]))
+        return ", ".join(sorted(cf.name for cf in obj.cashflows.all()))
 
 
 class CashFlowSnapshotItemInline(admin.TabularInline):
