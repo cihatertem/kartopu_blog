@@ -72,6 +72,20 @@ class ServicesEdgeCaseTests(TestCase):
             "Yahoo Finance history request failed."
         )
 
+    @patch("portfolio.services._get_ticker")
+    def test_fetch_yahoo_finance_price_exception(
+        self, mock_get_ticker: MagicMock
+    ) -> None:
+        """Test fetch_yahoo_finance_price when price request raises an exception."""
+        mock_ticker = MagicMock()
+        mock_ticker.fast_info.get.side_effect = Exception("API error")
+        mock_get_ticker.return_value = mock_ticker
+
+        res = fetch_yahoo_finance_price("AAPL")
+
+        self.assertIsNone(res)
+        self.mock_logger_error.assert_called_with("Yahoo Finance price lookup failed.")
+
     @patch("portfolio.services.logger.exception")
     @patch("portfolio.services.yf.download")
     def test_fetch_fx_rates_bulk_exception(

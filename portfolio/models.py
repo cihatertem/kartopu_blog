@@ -2145,6 +2145,56 @@ class DividendSnapshot(BaseSnapshot):
         return per_share, total_payment
 
     @classmethod
+    def _process_single_payment(
+        cls,
+        payment: "DividendPayment",
+        currency: str,
+        snapshot_date: date,
+        fx_rates: dict[tuple[str, str, date | None], Decimal],
+        dividends_map: dict[str, "Dividend"],
+        asset_totals: dict[str, dict[str, object]],
+        payment_rows: list[dict[str, object]],
+    ) -> Decimal:
+        dividend = cls._get_prefetched_dividend(payment, currency)
+        if dividend is None:
+            dividend = dividends_map.get(payment.id)  # pyright: ignore[reportArgumentType]
+
+        per_share, total_payment = cls._calculate_payment_amounts(
+            payment, dividend, currency, snapshot_date, fx_rates
+        )
+
+        avg_cost = payment.average_cost
+        last_close = payment.last_close_price
+        yield_on_payment = (
+            payment.net_dividend_per_share / last_close
+            if last_close > 0
+            else Decimal("0")
+        )
+        yield_on_average = (
+            payment.net_dividend_per_share / avg_cost if avg_cost > 0 else Decimal("0")
+        )
+
+        asset_entry = asset_totals.setdefault(
+            str(payment.asset_id),  # pyright: ignore[reportAttributeAccessIssue]
+            {"asset": payment.asset, "total_amount": Decimal("0")},
+        )
+        asset_entry["total_amount"] = (
+            asset_entry["total_amount"] + total_payment  # pyright: ignore[reportOperatorIssue]
+        )
+        payment_rows.append(
+            {
+                "asset": payment.asset,
+                "payment": payment,
+                "payment_date": payment.payment_date,
+                "per_share_net_amount": per_share,
+                "dividend_yield_on_payment_price": yield_on_payment,
+                "dividend_yield_on_average_cost": yield_on_average,
+                "total_net_amount": total_payment,
+            }
+        )
+        return total_payment
+
+    @classmethod
     def _process_payments(
         cls,
         payments: list["DividendPayment"],
@@ -2159,44 +2209,14 @@ class DividendSnapshot(BaseSnapshot):
         dividends_map = cls._get_dividends_map(payments, currency)
 
         for payment in payments:
-            dividend = cls._get_prefetched_dividend(payment, currency)
-            if dividend is None:
-                dividend = dividends_map.get(payment.id)  # pyright: ignore[reportArgumentType]
-
-            per_share, total_payment = cls._calculate_payment_amounts(
-                payment, dividend, currency, snapshot_date, fx_rates
-            )
-
-            avg_cost = payment.average_cost
-            last_close = payment.last_close_price
-            yield_on_payment = (
-                payment.net_dividend_per_share / last_close
-                if last_close > 0
-                else Decimal("0")
-            )
-            yield_on_average = (
-                payment.net_dividend_per_share / avg_cost
-                if avg_cost > 0
-                else Decimal("0")
-            )
-            total_amount += total_payment
-            asset_entry = asset_totals.setdefault(
-                str(payment.asset_id),  # pyright: ignore[reportAttributeAccessIssue]
-                {"asset": payment.asset, "total_amount": Decimal("0")},
-            )
-            asset_entry["total_amount"] = (
-                asset_entry["total_amount"] + total_payment  # pyright: ignore[reportOperatorIssue]
-            )
-            payment_rows.append(
-                {
-                    "asset": payment.asset,
-                    "payment": payment,
-                    "payment_date": payment.payment_date,
-                    "per_share_net_amount": per_share,
-                    "dividend_yield_on_payment_price": yield_on_payment,
-                    "dividend_yield_on_average_cost": yield_on_average,
-                    "total_net_amount": total_payment,
-                }
+            total_amount += cls._process_single_payment(
+                payment,
+                currency,
+                snapshot_date,
+                fx_rates,
+                dividends_map,
+                asset_totals,
+                payment_rows,
             )
 
         return total_amount, asset_totals, payment_rows

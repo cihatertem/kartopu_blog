@@ -164,7 +164,7 @@ class PortfolioTransactionAdmin(admin.ModelAdmin):
 
     @admin.display(description="Portföyler")
     def portfolio_list(self, obj):
-        return ", ".join(sorted([p.name for p in obj.portfolios.all()]))
+        return ", ".join(sorted(p.name for p in obj.portfolios.all()))
 
 
 class PortfolioSnapshotItemInline(admin.TabularInline):
