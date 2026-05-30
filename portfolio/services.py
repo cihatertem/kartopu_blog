@@ -206,6 +206,23 @@ def fetch_yahoo_finance_price(
     return _safe_decimal(price)
 
 
+def _download_yf_bulk_data(
+    symbols: list[str], start: date, end: date, error_message: str
+):
+    try:
+        return yf.download(
+            symbols,
+            start=start,
+            end=end,
+            progress=False,
+            interval="1d",
+            timeout=YF_API_TIMEOUT,
+        )
+    except Exception:
+        logger.exception(f"{error_message}: %s", symbols)
+        return None
+
+
 @log_exceptions(default=dict, message="Yahoo Finance bulk price request failed.")  # pyright: ignore[reportArgumentType]
 def fetch_yahoo_finance_prices_bulk(
     symbols: list[str],
@@ -225,19 +242,10 @@ def fetch_yahoo_finance_prices_bulk(
         start = date.today() - timedelta(days=5)
         end = date.today() + timedelta(days=1)
 
-    try:
-        data = yf.download(
-            valid_symbols,
-            start=start,
-            end=end,
-            progress=False,
-            interval="1d",
-            timeout=YF_API_TIMEOUT,
-        )
-    except Exception:
-        logger.exception(
-            "Yahoo Finance bulk download failed for symbols: %s", valid_symbols
-        )
+    data = _download_yf_bulk_data(
+        valid_symbols, start, end, "Yahoo Finance bulk download failed for symbols"
+    )
+    if data is None:
         return {}
 
     results: dict[str, Decimal] = {}
@@ -261,6 +269,45 @@ def fetch_yahoo_finance_prices_bulk(
                 results[symbol] = decimal_price
         except Exception:
             logger.exception("Failed to parse price for %s", symbol)
+
+    return results
+
+
+def _parse_multiple_fx_results(
+    close_data,
+    pairs_by_date: dict[date | None, set[tuple[str, str]]],
+    symbols_count: int,
+) -> dict[tuple[str, str, date | None], Decimal]:
+    results: dict[tuple[str, str, date | None], Decimal] = {}
+    for d, pairs in pairs_by_date.items():
+        if d is not None:
+            current_close_data = close_data[close_data.index.date <= d]  # pyright: ignore[reportAttributeAccessIssue]
+        else:
+            current_close_data = close_data
+
+        if current_close_data.empty:  # pyright: ignore[reportAttributeAccessIssue]
+            continue
+
+        for base, target in pairs:
+            if base == target:
+                results[(base, target, d)] = Decimal("1")
+                continue
+
+            symbol = f"{base}{target}=X"
+            try:
+                decimal_price = _extract_price_from_close_data(
+                    current_close_data, symbol, symbols_count
+                )
+                if decimal_price is not None:
+                    results[(base, target, d)] = decimal_price
+            except Exception:
+                logger.exception("Failed to parse FX rate for %s on %s", symbol, d)
+
+    # Ensure identical pairs are populated even if not in symbols
+    for d, pairs in pairs_by_date.items():
+        for p in pairs:
+            if p[0] == p[1]:
+                results[(p[0], p[1], d)] = Decimal("1")
 
     return results
 
@@ -308,59 +355,14 @@ def fetch_multiple_fx_rates_bulk(
         start = date.today() - timedelta(days=5)
         end = date.today() + timedelta(days=1)
 
-    try:
-        data = yf.download(
-            symbols,
-            start=start,
-            end=end,
-            progress=False,
-            interval="1d",
-            timeout=YF_API_TIMEOUT,
-        )
-    except Exception:
-        logger.exception(
-            "Yahoo Finance multiple bulk download failed for symbols: %s", symbols
-        )
-        return {}
-
-    results: dict[tuple[str, str, date | None], Decimal] = {}
+    data = _download_yf_bulk_data(
+        symbols, start, end, "Yahoo Finance multiple bulk download failed for symbols"
+    )
 
     if data is None or data.empty or "Close" not in data:
-        return results
+        return {}
 
-    close_data = data["Close"]
-
-    for d, pairs in pairs_by_date.items():
-        if d is not None:
-            current_close_data = close_data[close_data.index.date <= d]  # pyright: ignore[reportAttributeAccessIssue]
-        else:
-            current_close_data = close_data
-
-        if current_close_data.empty:  # pyright: ignore[reportAttributeAccessIssue]
-            continue
-
-        for base, target in pairs:
-            if base == target:
-                results[(base, target, d)] = Decimal("1")
-                continue
-
-            symbol = f"{base}{target}=X"
-            try:
-                decimal_price = _extract_price_from_close_data(
-                    current_close_data, symbol, len(symbols)
-                )
-                if decimal_price is not None:
-                    results[(base, target, d)] = decimal_price
-            except Exception:
-                logger.exception("Failed to parse FX rate for %s on %s", symbol, d)
-
-    # Ensure identical pairs are populated even if not in symbols
-    for d, pairs in pairs_by_date.items():
-        for p in pairs:
-            if p[0] == p[1]:
-                results[(p[0], p[1], d)] = Decimal("1")
-
-    return results
+    return _parse_multiple_fx_results(data["Close"], pairs_by_date, len(symbols))
 
 
 @log_exceptions(default=dict, message="Yahoo Finance bulk history request failed.")  # pyright: ignore[reportArgumentType]
@@ -391,18 +393,11 @@ def fetch_fx_rates_bulk(
         start = date.today() - timedelta(days=5)
         end = date.today() + timedelta(days=1)
 
-    try:
-        # yf.download can be noisy; setting progress=False avoids stdout spam
-        data = yf.download(
-            symbols,
-            start=start,
-            end=end,
-            progress=False,
-            interval="1d",
-            timeout=YF_API_TIMEOUT,
-        )
-    except Exception:
-        logger.exception("Yahoo Finance bulk download failed for symbols: %s", symbols)
+    # yf.download can be noisy; setting progress=False avoids stdout spam
+    data = _download_yf_bulk_data(
+        symbols, start, end, "Yahoo Finance bulk download failed for symbols"
+    )
+    if data is None:
         return {}
 
     if data is None or data.empty:

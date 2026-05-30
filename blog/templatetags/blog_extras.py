@@ -183,9 +183,17 @@ def _render_portfolio_irr_charts_html(snapshot) -> str:
     portfolio = snapshot.portfolio
     irr_history = portfolio.get_irr_history(until_date=snapshot.snapshot_date)
 
+    labels = []
+    values = []
+    labels_append = labels.append
+    values_append = values.append
+    for item in irr_history:
+        labels_append(item["date"])
+        values_append(item["irr"])
+
     timeseries = {
-        "labels": [item["date"] for item in irr_history],
-        "values": [item["irr"] for item in irr_history],
+        "labels": labels,
+        "values": values,
     }
     timeseries_json = _to_json_attribute(timeseries)
 
@@ -217,17 +225,19 @@ def _render_portfolio_charts_html(snapshot) -> str:
         reverse=True,
     )
 
-    labels = []
-    values = []
-    append_label = labels.append
-    append_value = values.append
+    alloc_labels = []
+    alloc_values = []
+    alloc_labels_append = alloc_labels.append
+    alloc_values_append = alloc_values.append
     for item in items:
-        append_label(item.asset.symbol or item.asset.name)
-        append_value(_to_float(item.allocation_pct) * 100)  # pyright: ignore[reportOptionalOperand]
+        alloc_labels_append(item.asset.symbol or item.asset.name)
+        alloc_values_append(
+            float(item.allocation_pct) * 100 if item.allocation_pct is not None else 0.0
+        )
 
     allocation = {
-        "labels": labels,
-        "values": values,
+        "labels": alloc_labels,
+        "values": alloc_values,
     }
 
     # If the snapshot belongs to a portfolio that has other snapshots, we can show history.
@@ -251,9 +261,17 @@ def _render_portfolio_charts_html(snapshot) -> str:
             .values_list("snapshot_date", "total_value")
         )
 
+    ts_labels = []
+    ts_values = []
+    ts_labels_append = ts_labels.append
+    ts_values_append = ts_values.append
+    for d, v in timeseries_data:
+        ts_labels_append(d.isoformat())
+        ts_values_append(float(v) if v is not None else 0.0)
+
     timeseries = {
-        "labels": [d.isoformat() for d, _ in timeseries_data],
-        "values": [_to_float(v) for _, v in timeseries_data],
+        "labels": ts_labels,
+        "values": ts_values,
     }
     allocation_json = _to_json_attribute(allocation)
     timeseries_json = _to_json_attribute(timeseries)
@@ -775,17 +793,19 @@ def _render_cashflow_charts_html(snapshot) -> str:
         key=lambda x: x.allocation_pct,
         reverse=True,
     )
-    labels = []
-    values = []
-    append_label = labels.append
-    append_value = values.append
+    alloc_labels = []
+    alloc_values = []
+    alloc_labels_append = alloc_labels.append
+    alloc_values_append = alloc_values.append
     for item in items:
-        append_label(item.get_category_display())
-        append_value(_to_float(item.allocation_pct) * 100)  # pyright: ignore[reportOptionalOperand]
+        alloc_labels_append(item.get_category_display())
+        alloc_values_append(
+            float(item.allocation_pct) * 100 if item.allocation_pct is not None else 0.0
+        )
 
     allocation = {
-        "labels": labels,
-        "values": values,
+        "labels": alloc_labels,
+        "values": alloc_values,
     }
     cashflow = snapshot.cashflow
     if hasattr(cashflow, "prefetched_snapshots"):
@@ -807,9 +827,17 @@ def _render_cashflow_charts_html(snapshot) -> str:
             .values_list("snapshot_date", "total_amount")
         )
 
+    ts_labels = []
+    ts_values = []
+    ts_labels_append = ts_labels.append
+    ts_values_append = ts_values.append
+    for d, v in timeseries_data:
+        ts_labels_append(d.isoformat())
+        ts_values_append(float(v) if v is not None else 0.0)
+
     timeseries = {
-        "labels": [d.isoformat() for d, _ in timeseries_data],
-        "values": [_to_float(v) for _, v in timeseries_data],
+        "labels": ts_labels,
+        "values": ts_values,
     }
     allocation_json = _to_json_attribute(allocation)
     timeseries_json = _to_json_attribute(timeseries)
@@ -881,9 +909,17 @@ def _render_savings_rate_charts_html(snapshot) -> str:
             .values_list("snapshot_date", "savings_rate")
         )
 
+    ts_labels = []
+    ts_values = []
+    ts_labels_append = ts_labels.append
+    ts_values_append = ts_values.append
+    for d, rate in timeseries_data:
+        ts_labels_append(d.isoformat())
+        ts_values_append(float(rate) * 100 if rate is not None else 0.0)
+
     timeseries = {
-        "labels": [d.isoformat() for d, _ in timeseries_data],
-        "values": [_to_float(rate) * 100 for _, rate in timeseries_data],  # pyright: ignore[reportOptionalOperand]
+        "labels": ts_labels,
+        "values": ts_values,
     }
     timeseries_json = _to_json_attribute(timeseries)
 
@@ -1082,17 +1118,19 @@ def _render_dividend_charts_html(snapshot) -> str:
         key=lambda x: x.allocation_pct,
         reverse=True,
     )
-    labels = []
-    values = []
-    append_label = labels.append
-    append_value = values.append
+    alloc_labels = []
+    alloc_values = []
+    alloc_labels_append = alloc_labels.append
+    alloc_values_append = alloc_values.append
     for item in items:
-        append_label(item.asset.symbol or item.asset.name)
-        append_value(_to_float(item.allocation_pct) * 100)  # pyright: ignore[reportOptionalOperand]
+        alloc_labels_append(item.asset.symbol or item.asset.name)
+        alloc_values_append(
+            float(item.allocation_pct) * 100 if item.allocation_pct is not None else 0.0
+        )
 
     allocation = {
-        "labels": labels,
-        "values": values,
+        "labels": alloc_labels,
+        "values": alloc_values,
     }
     allocation_json = _to_json_attribute(allocation)
 

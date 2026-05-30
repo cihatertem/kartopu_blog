@@ -160,11 +160,13 @@ def set_link_attributes(attrs, new=False):
     rel_list = rel.split() if rel else []
 
     if is_internal:
-        if "nofollow" in rel_list:
-            rel_list.remove("nofollow")
+        for attr in ["nofollow", "noopener", "noreferrer"]:
+            if attr in rel_list:
+                rel_list.remove(attr)
     else:
-        if "nofollow" not in rel_list:
-            rel_list.append("nofollow")
+        for attr in ["nofollow", "noopener", "noreferrer"]:
+            if attr not in rel_list:
+                rel_list.append(attr)
 
     if rel_list:
         attrs[(None, "rel")] = " ".join(rel_list)

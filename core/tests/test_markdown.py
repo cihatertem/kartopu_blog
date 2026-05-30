@@ -40,7 +40,9 @@ class MarkdownTests(TestCase):
         result = set_link_attributes(attrs)
 
         self.assertIn((None, "rel"), result)
-        self.assertEqual(result[(None, "rel")], "nofollow")
+        self.assertEqual(
+            set(result[(None, "rel")].split()), {"nofollow", "noopener", "noreferrer"}
+        )
 
     def test_set_link_attributes_external_link_preserves_rel(self):
         attrs = {(None, "href"): "https://external.com/", (None, "rel"): "noopener"}
@@ -50,6 +52,7 @@ class MarkdownTests(TestCase):
         self.assertIn((None, "rel"), result)
         self.assertIn("noopener", result[(None, "rel")])
         self.assertIn("nofollow", result[(None, "rel")])
+        self.assertIn("noreferrer", result[(None, "rel")])
 
     def test_render_markdown_basic(self):
         text = "# Title\nParagraph"
@@ -98,4 +101,6 @@ class MarkdownTests(TestCase):
         html = render_markdown(text)
 
         self.assertIn('href="https://google.com"', html)
-        self.assertIn('rel="nofollow"', html)
+        self.assertIn("nofollow", html)
+        self.assertIn("noopener", html)
+        self.assertIn("noreferrer", html)
