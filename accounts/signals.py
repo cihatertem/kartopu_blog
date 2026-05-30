@@ -1,6 +1,7 @@
 import os
-import threading
+import time
 from collections.abc import Mapping
+from concurrent.futures import ThreadPoolExecutor
 
 import requests
 from allauth.socialaccount.models import SocialAccount
@@ -18,6 +19,10 @@ from core.decorators import log_exceptions
 from .models import User
 
 AVATAR_DOWNLOAD_TIMEOUT = 5
+
+_avatar_download_executor = ThreadPoolExecutor(
+    max_workers=4, thread_name_prefix="AvatarFetcher"
+)
 
 
 def _delete_empty_folder(storage, path: str) -> None:
@@ -159,35 +164,41 @@ def _download_and_save_social_avatar(sociallogin) -> None:
         return
 
     def download_task():
-        try:
-            # Download the avatar
-            response = requests.get(
-                avatar_url,
-                timeout=AVATAR_DOWNLOAD_TIMEOUT,
-                headers={"User-Agent": "kartopu-blog-avatar-fetcher/1.0"},
-            )
-            response.raise_for_status()
+        for attempt in range(3):
+            try:
+                # Download the avatar
+                response = requests.get(
+                    avatar_url,
+                    timeout=AVATAR_DOWNLOAD_TIMEOUT,
+                    headers={"User-Agent": "kartopu-blog-avatar-fetcher/1.0"},
+                )
+                response.raise_for_status()
 
-            content_type = response.headers.get("Content-Type", "image/jpeg")
+                content_type = response.headers.get("Content-Type", "image/jpeg")
 
-            # Save the file to the user's avatar field (this triggers resize and storage mechanisms)
-            user.avatar = SimpleUploadedFile(  # pyright: ignore[reportAttributeAccessIssue]
-                "social_avatar.jpg", response.content, content_type=content_type
-            )
-            user.save(update_fields=["avatar", "updated_at"])
-        except Exception as e:
-            import logging
+                # Save the file to the user's avatar field (this triggers resize and storage mechanisms)
+                user.avatar = SimpleUploadedFile(  # pyright: ignore[reportAttributeAccessIssue]
+                    "social_avatar.jpg", response.content, content_type=content_type
+                )
+                user.save(update_fields=["avatar", "updated_at"])
+                break  # Success, exit retry loop
+            except Exception as e:
+                if attempt == 2:
+                    import logging
 
-            logger = logging.getLogger(__name__)
-            logger.exception("Error downloading and saving social avatar: %s", str(e))
-            raise
-        finally:
-            from django.db import connection
+                    logger = logging.getLogger(__name__)
+                    logger.exception(
+                        "Error downloading and saving social avatar: %s", str(e)
+                    )
+                    raise
+                time.sleep(2**attempt)  # Exponential backoff
+            finally:
+                from django.db import connection
 
-            connection.close()
+                connection.close()
 
-    # Start the download task in a separate thread
-    threading.Thread(target=download_task, daemon=True).start()
+    # Queue the download task to the executor
+    _avatar_download_executor.submit(download_task)
 
 
 def _download_and_save_social_avatar_for_account(account: SocialAccount) -> None:

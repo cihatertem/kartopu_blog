@@ -3,7 +3,7 @@ from __future__ import annotations
 from django.contrib.sitemaps import Sitemap
 from django.urls import reverse
 
-from blog.models import BlogPost, Category, Tag
+from blog.models import BlogPost, Category
 
 
 class BaseSitemap(Sitemap):

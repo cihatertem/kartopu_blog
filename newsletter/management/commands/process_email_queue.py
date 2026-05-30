@@ -109,7 +109,9 @@ class Command(BaseCommand):
                 message.attach_alternative(email_item.html_body, "text/html")
 
             if email_item.direct_email:
-                for attachment in email_item.direct_email.attachments.all():  # pyright: ignore[reportGeneralTypeIssues]
+                for attachment in getattr(
+                    email_item.direct_email, "_prefetched_objects_cache", {}
+                ).get("attachments", []):  # pyright: ignore[reportGeneralTypeIssues]
                     if attachment.id in attachment_contents:
                         filename, content = attachment_contents[attachment.id]
                         message.attach(filename, content)

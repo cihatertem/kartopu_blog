@@ -10,8 +10,6 @@ from django.templatetags.static import static as static_url
 from django.utils.html import escape
 from django.utils.safestring import mark_safe
 
-from core.decorators import log_exceptions
-from core.markdown import render_markdown
 from blog.services import (
     cashflow_comparison_queryset,
     cashflow_snapshot_queryset,
@@ -22,6 +20,8 @@ from blog.services import (
     prefetch_cashflow_comparison_items,
     salary_savings_snapshot_queryset,
 )
+from core.decorators import log_exceptions
+from core.markdown import render_markdown
 from portfolio.models import CashFlowEntry, CashFlowSnapshot, SalarySavingsSnapshot
 
 register = template.Library()
@@ -217,9 +217,17 @@ def _render_portfolio_charts_html(snapshot) -> str:
         reverse=True,
     )
 
+    labels = []
+    values = []
+    append_label = labels.append
+    append_value = values.append
+    for item in items:
+        append_label(item.asset.symbol or item.asset.name)
+        append_value(_to_float(item.allocation_pct) * 100)  # pyright: ignore[reportOptionalOperand]
+
     allocation = {
-        "labels": [(item.asset.symbol or item.asset.name) for item in items],
-        "values": [_to_float(item.allocation_pct) * 100 for item in items],  # pyright: ignore[reportOptionalOperand]
+        "labels": labels,
+        "values": values,
     }
 
     # If the snapshot belongs to a portfolio that has other snapshots, we can show history.
@@ -296,9 +304,17 @@ def _render_portfolio_category_summary_html(snapshot) -> str:
         return ""
 
     sorted_items = sorted(category_totals.items(), key=lambda row: row[1], reverse=True)
+    labels = []
+    values = []
+    append_label = labels.append
+    append_value = values.append
+    for label, value in sorted_items:
+        append_label(label)
+        append_value(value)
+
     allocation = {
-        "labels": [label for label, _ in sorted_items],
-        "values": [value for _, value in sorted_items],
+        "labels": labels,
+        "values": values,
     }
     allocation_json = _to_json_attribute(allocation)
 
@@ -759,9 +775,17 @@ def _render_cashflow_charts_html(snapshot) -> str:
         key=lambda x: x.allocation_pct,
         reverse=True,
     )
+    labels = []
+    values = []
+    append_label = labels.append
+    append_value = values.append
+    for item in items:
+        append_label(item.get_category_display())
+        append_value(_to_float(item.allocation_pct) * 100)  # pyright: ignore[reportOptionalOperand]
+
     allocation = {
-        "labels": [item.get_category_display() for item in items],
-        "values": [_to_float(item.allocation_pct) * 100 for item in items],  # pyright: ignore[reportOptionalOperand]
+        "labels": labels,
+        "values": values,
     }
     cashflow = snapshot.cashflow
     if hasattr(cashflow, "prefetched_snapshots"):
@@ -1058,9 +1082,17 @@ def _render_dividend_charts_html(snapshot) -> str:
         key=lambda x: x.allocation_pct,
         reverse=True,
     )
+    labels = []
+    values = []
+    append_label = labels.append
+    append_value = values.append
+    for item in items:
+        append_label(item.asset.symbol or item.asset.name)
+        append_value(_to_float(item.allocation_pct) * 100)  # pyright: ignore[reportOptionalOperand]
+
     allocation = {
-        "labels": [(item.asset.symbol or item.asset.name) for item in items],
-        "values": [_to_float(item.allocation_pct) * 100 for item in items],  # pyright: ignore[reportOptionalOperand]
+        "labels": labels,
+        "values": values,
     }
     allocation_json = _to_json_attribute(allocation)
 

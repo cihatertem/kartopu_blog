@@ -1,8 +1,8 @@
 from __future__ import annotations
 
-from collections import Counter
 import secrets
 import string
+from collections import Counter
 from datetime import date
 
 from django.db import models
@@ -81,10 +81,28 @@ def _generate_slug_candidate(base: str) -> str:
 
 def generate_unique_slug(model_cls: type[models.Model], name: str) -> str:
     base = _build_slug_base(name, max_length=255)
+
+    slug = _generate_slug_candidate(base)
+    if not model_cls.objects.filter(slug=slug).exists():
+        return slug
+
+    batch_size = 5
     while True:
-        slug = _generate_slug_candidate(base)
-        if not model_cls.objects.filter(slug=slug).exists():
-            return slug
+        candidates_list = []
+        for _ in range(batch_size):
+            candidates_list.append(_generate_slug_candidate(base))
+
+        existing = set(
+            model_cls.objects.filter(slug__in=candidates_list).values_list(
+                "slug", flat=True
+            )
+        )
+
+        for candidate in candidates_list:
+            if candidate not in existing:
+                return candidate
+
+        batch_size *= 2
 
 
 def generate_unique_slugs(model_cls: type[models.Model], names: list[str]) -> list[str]:

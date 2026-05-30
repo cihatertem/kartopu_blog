@@ -73,15 +73,17 @@ class SocialAvatarDownloadTests(TestCase):
 
         import accounts.signals
 
-        self.thread_patcher = patch.object(accounts.signals.threading, "Thread")
-        self.mock_thread = self.thread_patcher.start()
+        self.thread_patcher = patch.object(
+            accounts.signals._avatar_download_executor, "submit"
+        )
+        self.mock_submit = self.thread_patcher.start()
 
-        def mock_thread_init(target, daemon=None, *args, **kwargs):
-            mock_obj = MagicMock()
-            mock_obj.start = lambda: target()
-            return mock_obj
+        def mock_submit(target, *args, **kwargs):
+            target()
+            mock_future = MagicMock()
+            return mock_future
 
-        self.mock_thread.side_effect = mock_thread_init
+        self.mock_submit.side_effect = mock_submit
 
         self.user = User.objects.create_user(
             email="test_social@example.com", password="password"

@@ -4,9 +4,9 @@ from unittest.mock import MagicMock, patch
 from django.test import TestCase
 
 from core.services.portfolio import (
-    _build_slug_base,
     SLUG_HASH_ALPHABET,
     SLUG_HASH_LENGTH,
+    _build_slug_base,
     build_comparison_name,
     build_snapshot_name,
     format_comparison_label,
@@ -310,19 +310,23 @@ class PortfolioServicesTest(TestCase):
 
     @patch("core.services.portfolio.secrets.choice")
     def test_generate_unique_slug_collision(self, mock_choice):
+        import itertools
+
         from blog.models import Category
 
-        mock_choice.side_effect = ["a"] * 6 + ["b"] * 6
+        mock_choice.side_effect = itertools.chain(["a"] * 6, itertools.repeat("b"))
 
         mock_qs = MagicMock()
-        mock_qs.exists.side_effect = [True, False]
+        mock_qs.exists.return_value = True
+        mock_qs.values_list.return_value = []
         mock_filter = MagicMock(return_value=mock_qs)
 
         with patch.object(Category.objects, "filter", mock_filter):
             slug = generate_unique_slug(Category, "Test Collision")
 
         self.assertEqual(slug, "test-collision#bbbbbb")
-        self.assertEqual(mock_qs.exists.call_count, 2)
+        self.assertEqual(mock_qs.exists.call_count, 1)
+        self.assertEqual(mock_qs.values_list.call_count, 1)
 
     @patch("core.services.portfolio.secrets.choice")
     def test_generate_unique_slug_no_mocks(self, mock_choice):
@@ -330,7 +334,9 @@ class PortfolioServicesTest(TestCase):
 
         Category.objects.all().delete()
 
-        mock_choice.side_effect = ["a"] * 6 + ["a"] * 6 + ["b"] * 6
+        import itertools
+
+        mock_choice.side_effect = itertools.chain(["a"] * 12, itertools.repeat("b"))
 
         name = "Actual DB Test"
         slug1 = generate_unique_slug(Category, name)
@@ -356,9 +362,13 @@ class PortfolioServicesTest(TestCase):
     def test_generate_unique_slug_uses_expected_candidates_during_collisions(
         self, mock_choice
     ):
+        import itertools
+
         from blog.models import Category
 
-        mock_choice.side_effect = ["a"] * 6 + ["b"] * 6 + ["c"] * 6
+        mock_choice.side_effect = itertools.chain(
+            ["a"] * 6, ["b"] * 6, itertools.repeat("c")
+        )
 
         checked_slugs: list[str] = []
         collision_map = {
@@ -368,29 +378,32 @@ class PortfolioServicesTest(TestCase):
         }
 
         class DummyQuerySet:
-            def __init__(self, slug: str):
-                self.slug = slug
+            def __init__(self, **kwargs):
+                self.kwargs = kwargs
 
             def exists(self):
-                checked_slugs.append(self.slug)
-                return collision_map[self.slug]
+                slug = self.kwargs.get("slug")
+                if slug:
+                    checked_slugs.append(slug)
+                    return collision_map.get(slug, False)
+                return False
+
+            def values_list(self, *args, **kwargs):
+                slugs = self.kwargs.get("slug__in", [])
+                checked_slugs.extend(slugs)
+                return [s for s in slugs if collision_map.get(s, False)]
 
         with patch.object(
             Category.objects,
             "filter",
-            side_effect=lambda **kwargs: DummyQuerySet(kwargs["slug"]),
+            side_effect=lambda **kwargs: DummyQuerySet(**kwargs),
         ):
             slug = generate_unique_slug(Category, "Deterministic Name")
 
         self.assertEqual(slug, "deterministic-name#cccccc")
-        self.assertEqual(
-            checked_slugs,
-            [
-                "deterministic-name#aaaaaa",
-                "deterministic-name#bbbbbb",
-                "deterministic-name#cccccc",
-            ],
-        )
+        self.assertIn("deterministic-name#aaaaaa", checked_slugs)
+        self.assertIn("deterministic-name#bbbbbb", checked_slugs)
+        self.assertIn("deterministic-name#cccccc", checked_slugs)
 
     @patch("core.services.portfolio.secrets.choice")
     def test_generate_unique_slug_uses_configured_hash_settings(self, mock_choice):
@@ -422,11 +435,7 @@ class PortfolioServicesTest(TestCase):
         Category.objects.create(name="Existing", slug=existing_slug)
 
         mock_choice.side_effect = (
-            ["a"] * 6
-            + ["a"] * 6
-            + ["c"] * 6
-            + ["b"] * 6
-            + ["d"] * 6
+            ["a"] * 6 + ["a"] * 6 + ["c"] * 6 + ["b"] * 6 + ["d"] * 6
         )
 
         slugs = generate_unique_slugs(
