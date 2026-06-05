@@ -311,7 +311,7 @@ class FetchYahooFinancePricesBulkTests(TestCase):
         )
         mock_download.return_value = mock_df
 
-        with patch("portfolio.services._extract_price_from_close_data") as mock_extract:
+        with patch("portfolio.services._safe_decimal") as mock_extract:
             mock_extract.return_value = Decimal("151.0")
             result = fetch_yahoo_finance_prices_bulk(["AAPL"])
             self.assertEqual(result, {"AAPL": Decimal("151.0")})
@@ -342,7 +342,7 @@ class FetchYahooFinancePricesBulkTests(TestCase):
         )
         mock_download.return_value = mock_df
 
-        with patch("portfolio.services._extract_price_from_close_data") as mock_extract:
+        with patch("portfolio.services._safe_decimal") as mock_extract:
             mock_extract.return_value = Decimal("151.0")
             result = fetch_yahoo_finance_prices_bulk(["AAPL"], price_date=d)
             self.assertEqual(result, {"AAPL": Decimal("151.0")})
@@ -391,14 +391,22 @@ class FetchYahooFinancePricesBulkTests(TestCase):
         )
         mock_download.return_value = mock_df
 
-        with patch("portfolio.services._extract_price_from_close_data") as mock_extract:
+        with patch("portfolio.services._safe_decimal") as mock_extract:
 
-            def extract_side_effect(close_data, symbol, count):
-                if symbol == "AAPL":
+            def extract_side_effect(price):
+                if price == 150.0:
                     raise Exception("Extraction failed")
-                return Decimal("200.0")
+                return Decimal("200.0") if price == 200.0 else Decimal("150.0")
 
             mock_extract.side_effect = extract_side_effect
+
+            import pandas as pd
+
+            mock_df = pd.DataFrame(
+                {("Close", "AAPL"): [150.0], ("Close", "MSFT"): [200.0]},
+                index=pd.DatetimeIndex(["2023-10-02"]),
+            )
+            mock_download.return_value = mock_df
 
             result = fetch_yahoo_finance_prices_bulk(["AAPL", "MSFT"])
             self.assertEqual(result, {"MSFT": Decimal("200.0")})
@@ -541,11 +549,13 @@ class FetchMultipleFXRatesBulkTests(TestCase):
 
     @patch("portfolio.services.logger.exception")
     @patch("portfolio.services.yf.download")
-    @patch("portfolio.services._extract_price_from_close_data")
+    @patch("portfolio.services._safe_decimal")
     def test_extract_price_from_close_data_exception(
         self, mock_extract, mock_download, mock_logger_exception
     ):
-        """Test exception handling specifically from _extract_price_from_close_data."""
+        """Test exception handling specifically from _safe_decimal."""
+        import pandas as pd
+
         mock_df = pd.DataFrame(
             {"Close": [30.0, 31.0]},
             index=pd.DatetimeIndex(["2023-10-01", "2023-10-02"]),
@@ -565,19 +575,21 @@ class FetchMultipleFXRatesBulkTests(TestCase):
 
     @patch("portfolio.services.logger.exception")
     @patch("portfolio.services.yf.download")
-    @patch("portfolio.services._extract_price_from_close_data")
+    @patch("portfolio.services._safe_decimal")
     def test_individual_symbol_exception_continues(
         self, mock_extract, mock_download, mock_logger_exception
     ):
         """Test that if one symbol raises an exception, the loop continues and parses others."""
+        import pandas as pd
+
         mock_df = pd.DataFrame(
-            {"Close": [30.0, 31.0]},
+            {("Close", "USDTRY=X"): [30.0, 31.0], ("Close", "EURTRY=X"): [34.0, 35.0]},
             index=pd.DatetimeIndex(["2023-10-01", "2023-10-02"]),
         )
         mock_download.return_value = mock_df
 
-        def extract_side_effect(close_data, symbol, symbols_count):
-            if symbol == "USDTRY=X":
+        def extract_side_effect(price):
+            if price == 31.0:
                 raise Exception("Extraction error for USDTRY=X")
             return Decimal("35.0")
 
@@ -787,18 +799,18 @@ class FetchFXRatesBulkTests(TestCase):
 
     @patch("portfolio.services.logger.exception")
     @patch("portfolio.services.yf.download")
-    @patch("portfolio.services._extract_price_from_close_data")
+    @patch("portfolio.services._safe_decimal")
     def test_extract_price_from_close_data_exception(
         self, mock_extract, mock_download, mock_logger_exception
     ):
-        """Test exception handling specifically from _extract_price_from_close_data."""
-        mock_data = MagicMock()
-        mock_data.empty = False
-        mock_data.__contains__.side_effect = lambda key: key == "Close"
+        """Test exception handling specifically from _safe_decimal."""
+        import pandas as pd
 
-        mock_close = MagicMock()
-        mock_data.__getitem__.return_value = mock_close
-        mock_download.return_value = mock_data
+        mock_df = pd.DataFrame(
+            {("Close", "USDTRY=X"): [31.0]},
+            index=pd.DatetimeIndex(["2023-10-02"]),
+        )
+        mock_download.return_value = mock_df
 
         mock_extract.side_effect = Exception("Extraction error")
 
@@ -812,32 +824,25 @@ class FetchFXRatesBulkTests(TestCase):
 
     @patch("portfolio.services.logger.exception")
     @patch("portfolio.services.yf.download")
+    @patch("portfolio.services._safe_decimal")
     def test_individual_symbol_exception_continues(
-        self, mock_download, mock_logger_exception
+        self, mock_extract, mock_download, mock_logger_exception
     ):
         """Test that if one symbol raises an exception, the loop continues and parses others."""
-        mock_data = MagicMock()
-        mock_data.empty = False
-        mock_data.__contains__.side_effect = lambda key: key == "Close"
+        import pandas as pd
 
-        mock_close = MagicMock()
-        mock_data.__getitem__.return_value = mock_close
-
-        mock_close.columns = ["USDTRY=X", "EURTRY=X"]
-        mock_close.__contains__.side_effect = lambda key: (
-            key in ["USDTRY=X", "EURTRY=X"]
+        mock_df = pd.DataFrame(
+            {("Close", "USDTRY=X"): [31.0], ("Close", "EURTRY=X"): [32.0]},
+            index=pd.DatetimeIndex(["2023-10-02"]),
         )
+        mock_download.return_value = mock_df
 
-        def getitem_side_effect(key):
-            if key == "USDTRY=X":
+        def extract_side_effect(price):
+            if price == 31.0:
                 raise Exception("Simulated data parsing error")
+            return Decimal("32.0")
 
-            import pandas as pd
-
-            return pd.Series([32.0], index=[pd.Timestamp("2023-10-02")])
-
-        mock_close.__getitem__.side_effect = getitem_side_effect
-        mock_download.return_value = mock_data
+        mock_extract.side_effect = extract_side_effect
 
         pairs = [("USD", "TRY"), ("EUR", "TRY")]
         result = fetch_fx_rates_bulk(pairs)

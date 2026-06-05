@@ -4,6 +4,7 @@ import logging
 from datetime import date, timedelta
 from decimal import Decimal, InvalidOperation
 
+import pandas as pd
 import yfinance as yf
 
 from core.decorators import log_exceptions
@@ -144,26 +145,6 @@ def _safe_decimal(value) -> Decimal | None:
     return Decimal(str(value))
 
 
-def _extract_price_from_close_data(
-    close_data, symbol: str, symbols_count: int
-) -> Decimal | None:
-    if hasattr(close_data, "columns"):
-        if symbol in close_data:
-            series = close_data[symbol].dropna()  # pyright: ignore[reportAttributeAccessIssue]
-        elif symbols_count == 1:
-            series = close_data.iloc[:, 0].dropna()  # pyright: ignore[reportAttributeAccessIssue]
-        else:
-            return None
-    else:
-        series = close_data.dropna()  # pyright: ignore[reportAttributeAccessIssue]
-
-    if series.empty:
-        return None
-
-    price = series.iloc[-1]
-    return _safe_decimal(price)
-
-
 def fetch_yahoo_finance_price(
     symbol: str,
     price_date: date | None = None,
@@ -260,15 +241,35 @@ def fetch_yahoo_finance_prices_bulk(
         if close_data.empty:  # pyright: ignore[reportAttributeAccessIssue]
             return results
 
-    for symbol in valid_symbols:
-        try:
-            decimal_price = _extract_price_from_close_data(
-                close_data, symbol, len(valid_symbols)
-            )
-            if decimal_price is not None:
-                results[symbol] = decimal_price
-        except Exception:
-            logger.exception("Failed to parse price for %s", symbol)
+    if hasattr(close_data, "columns"):
+        last_prices = close_data.ffill().iloc[-1] if not close_data.empty else None
+        symbols_count = len(valid_symbols)
+        for symbol in valid_symbols:
+            try:
+                price = None
+                if last_prices is not None:
+                    if symbol in close_data.columns:
+                        price = last_prices[symbol]
+                    elif symbols_count == 1:
+                        price = last_prices.iloc[0]
+
+                if price is not None and pd.notna(price):
+                    decimal_price = _safe_decimal(price)
+                    if decimal_price is not None:
+                        results[symbol] = decimal_price
+            except Exception:
+                logger.exception("Failed to parse price for %s", symbol)
+    else:
+        series = close_data.dropna()
+        if not series.empty:
+            try:
+                decimal_price = _safe_decimal(series.iloc[-1])
+                if decimal_price is not None:
+                    for symbol in valid_symbols:
+                        results[symbol] = decimal_price
+            except Exception:
+                for symbol in valid_symbols:
+                    logger.exception("Failed to parse price for %s", symbol)
 
     return results
 
@@ -288,6 +289,19 @@ def _parse_multiple_fx_results(
         if current_close_data.empty:  # pyright: ignore[reportAttributeAccessIssue]
             continue
 
+        last_prices = None
+        series = None
+        is_dataframe = hasattr(current_close_data, "columns")
+
+        if is_dataframe:
+            last_prices = (
+                current_close_data.ffill().iloc[-1]
+                if not current_close_data.empty
+                else None
+            )
+        else:
+            series = current_close_data.dropna()
+
         for base, target in pairs:
             if base == target:
                 results[(base, target, d)] = Decimal("1")
@@ -295,11 +309,19 @@ def _parse_multiple_fx_results(
 
             symbol = f"{base}{target}=X"
             try:
-                decimal_price = _extract_price_from_close_data(
-                    current_close_data, symbol, symbols_count
-                )
-                if decimal_price is not None:
-                    results[(base, target, d)] = decimal_price
+                price = None
+                if is_dataframe and last_prices is not None:
+                    if symbol in current_close_data.columns:
+                        price = last_prices[symbol]
+                    elif symbols_count == 1:
+                        price = last_prices.iloc[0]
+                elif not is_dataframe and series is not None and not series.empty:
+                    price = series.iloc[-1]
+
+                if price is not None and pd.notna(price):
+                    decimal_price = _safe_decimal(price)
+                    if decimal_price is not None:
+                        results[(base, target, d)] = decimal_price
             except Exception:
                 logger.exception("Failed to parse FX rate for %s on %s", symbol, d)
 
@@ -417,15 +439,35 @@ def fetch_fx_rates_bulk(
 
     close_data = data["Close"]
 
-    for symbol in symbols:
-        try:
-            decimal_price = _extract_price_from_close_data(
-                close_data, symbol, len(symbols)
-            )
-            if decimal_price is not None:
-                results[symbols_map[symbol]] = decimal_price
-        except Exception:
-            logger.exception("Failed to parse FX rate for %s", symbol)
+    if hasattr(close_data, "columns"):
+        last_prices = close_data.ffill().iloc[-1] if not close_data.empty else None
+        symbols_count = len(symbols)
+        for symbol in symbols:
+            try:
+                price = None
+                if last_prices is not None:
+                    if symbol in close_data.columns:
+                        price = last_prices[symbol]
+                    elif symbols_count == 1:
+                        price = last_prices.iloc[0]
+
+                if price is not None and pd.notna(price):
+                    decimal_price = _safe_decimal(price)
+                    if decimal_price is not None:
+                        results[symbols_map[symbol]] = decimal_price
+            except Exception:
+                logger.exception("Failed to parse FX rate for %s", symbol)
+    else:
+        series = close_data.dropna()
+        if not series.empty:
+            try:
+                decimal_price = _safe_decimal(series.iloc[-1])
+                if decimal_price is not None:
+                    for symbol in symbols:
+                        results[symbols_map[symbol]] = decimal_price
+            except Exception:
+                for symbol in symbols:
+                    logger.exception("Failed to parse FX rate for %s", symbol)
 
     # Include identical pairs in the result
     for pair in currency_pairs:
