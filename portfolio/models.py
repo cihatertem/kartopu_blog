@@ -837,30 +837,46 @@ class Portfolio(UUIDModelMixin, TimeStampedModelMixin):
                 market_value / total_value if total_value > 0 else Decimal("0")  # pyright: ignore[reportOperatorIssue]
             )
 
-    def _get_all_transactions(self) -> list["PortfolioTransaction"]:
-        if not hasattr(self, "_all_transactions_cache"):
-            self._all_transactions_cache = list(self.transactions.all())  # pyright: ignore[reportAttributeAccessIssue]
-            self._ensure_transaction_assets_loaded(self._all_transactions_cache)
-        return self._all_transactions_cache
-
     def _get_filtered_transactions(
         self, price_date: date | None
     ) -> list["PortfolioTransaction"]:
         if not hasattr(self, "_filtered_transactions_cache"):
-            self._filtered_transactions_cache = {}
+            self._filtered_transactions_cache: dict[
+                date | None,
+                list["PortfolioTransaction"],
+            ] = {}
 
         if price_date in self._filtered_transactions_cache:
             return self._filtered_transactions_cache[price_date]
 
-        all_txs = self._get_all_transactions()
+        if not hasattr(self, "_all_transactions_cache"):
+            if (
+                hasattr(self, "_prefetched_objects_cache")
+                and "transactions" in self._prefetched_objects_cache  # pyright: ignore[reportAttributeAccessIssue]
+            ):
+                all_txs = self._prefetched_objects_cache["transactions"]  # pyright: ignore[reportAttributeAccessIssue]
+            else:
+                all_txs = list(
+                    self.transactions.select_related(  # pyright: ignore[reportAttributeAccessIssue]
+                        "asset"
+                    )
+                    .order_by("trade_date", "created_at")
+                    .distinct()
+                )
 
-        tx_list = [
-            tx for tx in all_txs if not price_date or tx.trade_date <= price_date
+            tx_list = list(all_txs)
+            tx_list.sort(key=lambda tx: (tx.trade_date, tx.created_at))
+            self._ensure_transaction_assets_loaded(tx_list)
+            self._all_transactions_cache = tx_list
+
+        filtered_txs = [
+            tx
+            for tx in self._all_transactions_cache
+            if not price_date or tx.trade_date <= price_date
         ]
-        tx_list.sort(key=lambda tx: (tx.trade_date, tx.created_at))
 
-        self._filtered_transactions_cache[price_date] = tx_list
-        return tx_list
+        self._filtered_transactions_cache[price_date] = filtered_txs
+        return filtered_txs
 
     def get_positions(
         self,
