@@ -1461,16 +1461,22 @@ class CashFlowSnapshot(BaseSnapshot):
         fx_rates: dict[tuple[str, str, date | None], Decimal],
     ) -> dict[str, Decimal]:
         category_totals: dict[str, Decimal] = {}
+        rate_by_currency: dict[str, Decimal] = {cashflow_currency: Decimal("1")}
+        zero = Decimal("0")
+        one = Decimal("1")
+
         for entry in entries:
-            amount = entry["amount"] or Decimal("0")
-            entry_currency = entry["currency"]
-            fx_rate = Decimal("1")
-            if entry_currency != cashflow_currency:
+            amount = entry["amount"] or zero
+            entry_currency = str(entry["currency"])
+
+            if entry_currency not in rate_by_currency:
                 currency_pair = (entry_currency, cashflow_currency, snapshot_date)
-                fx_rate = fx_rates.get(currency_pair, Decimal("1"))  # pyright: ignore[reportCallIssue, reportArgumentType]
-            converted_amount = amount * fx_rate  # pyright: ignore[reportOperatorIssue]
-            category_totals[entry["category"]] = (  # pyright: ignore[reportArgumentType]
-                category_totals.get(entry["category"], Decimal("0")) + converted_amount  # pyright: ignore[reportCallIssue, reportArgumentType]
+                rate_by_currency[entry_currency] = fx_rates.get(currency_pair, one)  # pyright: ignore[reportCallIssue, reportArgumentType]
+
+            category = str(entry["category"])
+            converted_amount = amount * rate_by_currency[entry_currency]  # pyright: ignore[reportOperatorIssue]
+            category_totals[category] = (
+                category_totals.get(category, zero) + converted_amount  # pyright: ignore[reportOperatorIssue]
             )
         return category_totals
 
