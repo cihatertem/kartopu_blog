@@ -7,6 +7,11 @@ from config.settings import *
 
 SECRET_KEY = secrets.token_urlsafe(50)
 
+if "silk" in INSTALLED_APPS:
+    INSTALLED_APPS.remove("silk")
+if "silk.middleware.SilkyMiddleware" in MIDDLEWARE:
+    MIDDLEWARE.remove("silk.middleware.SilkyMiddleware")
+
 DATABASES = {
     "default": {
         "ENGINE": "django.db.backends.sqlite3",

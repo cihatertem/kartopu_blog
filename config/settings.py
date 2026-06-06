@@ -102,6 +102,10 @@ MIDDLEWARE = [
     "django.contrib.redirects.middleware.RedirectFallbackMiddleware",
 ]
 
+if DEBUG:
+    INSTALLED_APPS.append("silk")
+    MIDDLEWARE.insert(0, "silk.middleware.SilkyMiddleware")
+
 ROOT_URLCONF = "config.urls"
 
 TEMPLATES = [
