@@ -119,3 +119,26 @@ class CategoryPostsFeed(BasePostFeed):
             .select_related("category")
             .order_by("-published_at")[:20]
         )
+
+
+# feeds.py dosyasının en altına ekle:
+
+
+class SubstackBulkMigrationFeed(BasePostFeed):
+    """
+    Substack'e geçmiş tüm arşivi tek seferde taşımak için limit barındırmayan geçici feed.
+    """
+
+    title = "Kartopu Blog - Tüm Arşiv (Migration)"
+    link = "/blog/"
+    description = "Kartopu Blog'daki tüm geçmiş yazıların arşivi."
+
+    def items(self):
+        return (
+            BlogPost.objects.filter(
+                status=BlogPost.Status.PUBLISHED,
+                published_at__isnull=False,
+            )
+            .select_related("category")
+            .order_by("-published_at")
+        )
