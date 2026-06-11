@@ -106,6 +106,11 @@ def update_search_vector(post: BlogPost):
     if connection.vendor != "postgresql":
         return
 
+    # Arama yalnız yayınlanmış yazıları döner (bkz. published_posts_queryset);
+    # taslak/arşiv kayıtlarda GIN vektörü üretmek boşa CPU/DB maliyetidir.
+    if post.status != BlogPost.Status.PUBLISHED:
+        return
+
     tags_str = " ".join(post.tags.values_list("name", flat=True).iterator())
     vector = (
         SearchVector(Value(tags_str), weight="A", config="turkish")
@@ -128,9 +133,25 @@ def tag_changed(sender, **kwargs):
     invalidate_nav_cache()
 
 
+def _should_rebuild_search_vector(
+    instance: BlogPost, created: bool, update_fields
+) -> bool:
+    # update_fields verilmişse (ör. servis katmanı hedefli save) yalnız
+    # tetikleyici alanlardan biri yenilendiyse vektörü kur.
+    if update_fields is not None:
+        return bool(
+            set(update_fields) & set(BlogPost.SEARCH_VECTOR_TRIGGER_FIELDS)
+        )
+    if created:
+        return True
+    # Mevcut kayıt güncellemesi: yalnız title/excerpt/content/status değiştiyse.
+    return instance.search_vector_fields_changed()
+
+
 @receiver(post_save, sender=BlogPost)
-def post_changed_save(sender, instance: BlogPost, **kwargs):
-    update_search_vector(instance)
+def post_changed_save(sender, instance: BlogPost, created=False, update_fields=None, **kwargs):
+    if _should_rebuild_search_vector(instance, created, update_fields):
+        update_search_vector(instance)
     recalculate_popularity_score(instance.pk)
     cache.delete(f"{BLOG_POST_DETAIL_KEY_PREFIX}{instance.slug}")
     cache.delete(HOME_PAGE_KEY)

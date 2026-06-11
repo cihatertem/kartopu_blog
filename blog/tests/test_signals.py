@@ -13,9 +13,11 @@ from blog.signals import (
     _post_cache_dir,
     _post_cache_storage_dir,
     _post_media_dir,
+    _should_rebuild_search_vector,
     blogpost_delete_files,
     category_changed,
     invalidate_nav_cache,
+    update_search_vector,
 )
 
 User = get_user_model()
@@ -329,6 +331,99 @@ class BlogSignalsTests(TestCase):
         self.post.tags.clear()
         mock_invalidate.assert_called()
         mock_update_search_vector.assert_called_with(self.post)
+
+
+class SearchVectorTriggerTests(TestCase):
+    def setUp(self):
+        self.user = User.objects.create_user(
+            email="search_author@example.com", password="password"
+        )
+
+    def test_should_rebuild_with_update_fields_relevant(self):
+        post = BlogPost(title="X", author=self.user)
+        self.assertTrue(
+            _should_rebuild_search_vector(
+                post, created=False, update_fields={"content"}
+            )
+        )
+
+    def test_should_rebuild_with_update_fields_irrelevant(self):
+        post = BlogPost(title="X", author=self.user)
+        self.assertFalse(
+            _should_rebuild_search_vector(
+                post, created=False, update_fields={"view_count"}
+            )
+        )
+
+    def test_should_rebuild_on_create(self):
+        post = BlogPost(title="X", author=self.user)
+        self.assertTrue(
+            _should_rebuild_search_vector(post, created=True, update_fields=None)
+        )
+
+    def test_search_vector_fields_changed_detects_relevant_change(self):
+        BlogPost.objects.create(
+            title="Original", author=self.user, slug="orig", content="body"
+        )
+        post = BlogPost.objects.get(slug="orig")
+        # İlgisiz alan değişimi -> yeniden üretim gerekmez
+        post.is_featured = True
+        self.assertFalse(post.search_vector_fields_changed())
+        # İlgili alan değişimi -> yeniden üretim gerekir
+        post.content = "new body"
+        self.assertTrue(post.search_vector_fields_changed())
+
+    def test_search_vector_fields_changed_detects_status_change(self):
+        BlogPost.objects.create(
+            title="Draft", author=self.user, slug="draft-post"
+        )
+        post = BlogPost.objects.get(slug="draft-post")
+        post.status = BlogPost.Status.PUBLISHED
+        self.assertTrue(post.search_vector_fields_changed())
+
+    @patch("blog.signals.connection")
+    def test_update_search_vector_skips_non_published(self, mock_connection):
+        # postgresql gibi davranıp yine de taslakta DB'ye dokunmadığını doğrula
+        mock_connection.vendor = "postgresql"
+        draft = BlogPost.objects.create(
+            title="Draft", author=self.user, slug="draft-skip"
+        )
+        # Erken dönüş sayesinde sqlite üzerinde SearchVector UPDATE'i denenmez.
+        update_search_vector(draft)
+        draft.refresh_from_db()
+        self.assertIsNone(draft.search_vector)
+
+    @patch("blog.signals.update_search_vector")
+    def test_post_save_skips_rebuild_when_irrelevant_field_changes(
+        self, mock_update_search_vector
+    ):
+        BlogPost.objects.create(
+            title="Pub",
+            author=self.user,
+            slug="pub-post",
+            status=BlogPost.Status.PUBLISHED,
+        )
+        post = BlogPost.objects.get(slug="pub-post")
+        mock_update_search_vector.reset_mock()
+        post.is_featured = True
+        post.save()
+        mock_update_search_vector.assert_not_called()
+
+    @patch("blog.signals.update_search_vector")
+    def test_post_save_rebuilds_when_relevant_field_changes(
+        self, mock_update_search_vector
+    ):
+        BlogPost.objects.create(
+            title="Pub2",
+            author=self.user,
+            slug="pub-post-2",
+            status=BlogPost.Status.PUBLISHED,
+        )
+        post = BlogPost.objects.get(slug="pub-post-2")
+        mock_update_search_vector.reset_mock()
+        post.title = "Pub2 Updated"
+        post.save()
+        mock_update_search_vector.assert_called_once_with(post)
 
 
 class BlogPostReactionSignalTests(TestCase):

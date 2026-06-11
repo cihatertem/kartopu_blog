@@ -88,6 +88,11 @@ class BlogPost(
         PUBLISHED = "published", "Yayınlandı"  # pyright: ignore[reportAssignmentType]
         ARCHIVED = "archived", "Arşivlendi"  # pyright: ignore[reportAssignmentType]
 
+    # search_vector yalnız bu alanlar değiştiğinde yeniden üretilir; böylece
+    # her kayıtta tüm `content` üzerinden GIN vektörü kurulmaz (t3.micro CPU/DB).
+    # `status` da dahildir: taslak -> yayın geçişinde vektörün kurulması gerekir.
+    SEARCH_VECTOR_TRIGGER_FIELDS = ("title", "excerpt", "content", "status")
+
     # --- İlişkiler ---
     author = models.ForeignKey(
         settings.AUTH_USER_MODEL,
@@ -310,6 +315,33 @@ class BlogPost(
             models.Index(fields=["status", "published_at"]),
             GinIndex(fields=["search_vector"], name="blogpost_fts_gin"),
         )
+
+    @classmethod
+    def from_db(cls, db, field_names, values):
+        instance = super().from_db(db, field_names, values)
+        # DB'den yüklenen search-tetikleyici alanların anlık görüntüsü; deferred
+        # (`only()`) alanlara dokunup ekstra sorgu tetiklememek için yalnız
+        # yüklenmiş olanları saklarız.
+        instance._loaded_search_values = {
+            field: value
+            for field, value in zip(field_names, values)
+            if field in cls.SEARCH_VECTOR_TRIGGER_FIELDS
+        }
+        return instance
+
+    def search_vector_fields_changed(self) -> bool:
+        """search_vector'u etkileyen alanlardan biri değişti mi?
+
+        DB anlık görüntüsü yoksa (yeni/deferred yüklenmiş nesne) güvenli tarafta
+        kalmak için True döneriz.
+        """
+        loaded = getattr(self, "_loaded_search_values", None)
+        if loaded is None:
+            return True
+        for field in self.SEARCH_VECTOR_TRIGGER_FIELDS:
+            if field not in loaded or loaded[field] != getattr(self, field):
+                return True
+        return False
 
     def __str__(self) -> str:
         return str(self.title)
