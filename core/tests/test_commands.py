@@ -5,9 +5,18 @@ from io import StringIO
 from unittest.mock import patch
 
 from django.conf import settings
+from django.core.cache import cache
 from django.core.management import call_command
 from django.test import TestCase
 
+from blog.cache_keys import (
+    NAV_ARCHIVES_KEY,
+    NAV_CATEGORIES_KEY,
+    NAV_POPULAR_POSTS_KEY,
+    NAV_PORTFOLIO_POSTS_KEY,
+    NAV_RECENT_POSTS_KEY,
+    NAV_TAGS_KEY,
+)
 from core.models import SidebarWidget
 
 
@@ -100,3 +109,39 @@ class SyncSidebarWidgetsCommandTests(TestCase):
                 template_name="includes/sidebar_existing.html"
             )
             self.assertEqual(widget.title, "Custom Title")
+
+
+class WarmNavCacheCommandTests(TestCase):
+    def setUp(self):
+        cache.clear()
+
+    def tearDown(self):
+        cache.clear()
+
+    def test_warm_populates_all_nav_cache_keys(self):
+        # Çalışmadan önce nav anahtarları boş (None) olmalı.
+        self.assertIsNone(cache.get(NAV_CATEGORIES_KEY))
+
+        call_command("warm_nav_cache")
+
+        # Dilden bağımsız anahtarlar artık None değil (boş DB'de [] olur).
+        for key in (
+            NAV_CATEGORIES_KEY,
+            NAV_TAGS_KEY,
+            NAV_RECENT_POSTS_KEY,
+            NAV_POPULAR_POSTS_KEY,
+            NAV_PORTFOLIO_POSTS_KEY,
+        ):
+            self.assertIsNotNone(cache.get(key), f"{key} ısıtılmadı")
+
+        # Archives anahtarı her dil için ısıtılmalı.
+        for lang_code, _ in getattr(settings, "LANGUAGES", [("tr", "Turkish")]):
+            self.assertIsNotNone(
+                cache.get(f"{NAV_ARCHIVES_KEY}:{lang_code}"),
+                f"archives {lang_code} ısıtılmadı",
+            )
+
+    def test_warm_reports_success_with_high_verbosity(self):
+        out = StringIO()
+        call_command("warm_nav_cache", verbosity=2, stdout=out)
+        self.assertIn("Nav cache ısıtıldı", out.getvalue())
