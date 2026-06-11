@@ -32,6 +32,12 @@
   border: 1px solid var(--color-border);
   box-shadow: var(--shadow-soft);
   min-height: 400px;
+  min-width: 0;
+}
+
+.sim-chart-card canvas {
+  width: 100%;
+  display: block;
 }
 
 .sim-results-summary {
