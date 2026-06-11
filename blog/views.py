@@ -180,7 +180,10 @@ def _build_reaction_context(request, post):
     reaction_counts = {item["reaction"]: item["total"] for item in counts}
 
     user_reaction = ""
-    if request.user.is_authenticated:
+    # Yalnızca post'ta en az bir reaction varsa kullanıcı reaction'ını sorgula.
+    # Toplam sayı 0 ise (cache'li `counts` boş) kullanıcının da reaction'ı
+    # olamayacağından gereksiz DB sorgusunu atlarız (t3.micro için ek sorgu tasarrufu).
+    if request.user.is_authenticated and reaction_counts:
         user_reaction = (
             BlogPostReaction.objects.filter(post=post, user=request.user)
             .values_list("reaction", flat=True)

@@ -412,6 +412,30 @@ class ViewHelperTests(TestCase):
         self.assertEqual(ctx["user_reaction"], BlogPostReaction.Reaction.KALP.value)
         self.assertEqual(ctx["user_reaction_label"], "Sevgi")
 
+    def test_build_reaction_context_skips_user_query_without_reactions(self):
+        """Post'ta hiç reaction yoksa kullanıcı reaction sorgusu çalışmamalı."""
+        user = User.objects.create_user(
+            email="noreact@example.com", password="password"
+        )
+        post = BlogPost.objects.create(
+            title="T-noreact",
+            author=user,
+            status=BlogPost.Status.PUBLISHED,
+            published_at=timezone.now(),
+        )
+
+        request = RequestFactory().get("/")
+        request.user = user
+
+        # Reaction sayıları cache'lensin ki sayım sorgusu ölçüme dahil olmasın.
+        _build_reaction_context(request, post)
+
+        # Reaction olmadığından ek user_reaction sorgusu yapılmamalı.
+        with self.assertNumQueries(0):
+            ctx = _build_reaction_context(request, post)
+        self.assertEqual(ctx["user_reaction"], "")
+        self.assertEqual(ctx["user_reaction_label"], "")
+
     @patch("accounts.signals._download_and_save_social_avatar")
     def test_build_comment_context_avatar_fallback(self, mock_download_avatar):
         user = User.objects.create_user(email="comm@example.com", password="password")
