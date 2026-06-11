@@ -1,9 +1,10 @@
 from datetime import datetime
 from decimal import Decimal
+from unittest import mock
 
 from django.contrib.auth import get_user_model
 from django.core.cache import cache
-from django.test import RequestFactory, TestCase, override_settings
+from django.test import RequestFactory, SimpleTestCase, TestCase, override_settings
 from django.urls import resolve
 from django.utils import timezone
 
@@ -19,8 +20,12 @@ from blog.cache_keys import (
 from blog.models import BlogPost, Category, Tag
 from comments.models import Comment
 from core.context_processors import (
+    CACHE_TIMEOUT,
+    CACHE_TIMEOUT_JITTER,
     GOAL_WIDGET_EMPTY_CACHE_VALUE,
+    _cache_timeout_with_jitter,
     _calculate_tag_cloud_sizes,
+    _get_or_set_with_stampede_lock,
     _get_goal_widget_snapshot,
     _get_has_pending_messages_or_comments,
     _get_nav_archives,
@@ -453,3 +458,77 @@ class CalculateTagCloudSizesTests(TestCase):
         # max tag: normalized = 1.0 -> cloud_size = round(0.85 + 1.0 * 0.75, 2) = 1.6, size_level = min(6, max(1, int(round(1.0 * 5.0)) + 1)) = min(6, max(1, 5 + 1)) = 6
         self.assertEqual(nav_tags[2]["cloud_size"], 1.6)
         self.assertEqual(nav_tags[2]["cloud_size_class"], "tag-cloud__item--size-6")
+
+
+class StampedeLockTests(SimpleTestCase):
+    """
+    Bulgu 1 (Sidebar/Nav cache stampede) regresyon testleri.
+
+    Cache stampede korumasının (atomik `cache.add` kilidi + TTL jitter)
+    eşzamanlı recompute'u engellediğini doğrular.
+    """
+
+    def setUp(self):
+        cache.clear()
+        self.addCleanup(cache.clear)
+
+    def test_cache_timeout_with_jitter_range(self):
+        for _ in range(50):
+            timeout = _cache_timeout_with_jitter()
+            self.assertGreaterEqual(timeout, CACHE_TIMEOUT)
+            self.assertLessEqual(timeout, CACHE_TIMEOUT + CACHE_TIMEOUT_JITTER)
+
+    def test_cached_value_skips_compute(self):
+        cache.set("stampede_key", ["cached"])
+        compute = mock.Mock()
+
+        result = _get_or_set_with_stampede_lock("stampede_key", None, compute)
+
+        self.assertEqual(result, ["cached"])
+        compute.assert_not_called()
+
+    def test_cached_data_dict_skips_compute(self):
+        compute = mock.Mock()
+
+        result = _get_or_set_with_stampede_lock(
+            "stampede_key", {"stampede_key": ["from_get_many"]}, compute
+        )
+
+        self.assertEqual(result, ["from_get_many"])
+        compute.assert_not_called()
+
+    def test_miss_computes_caches_and_releases_lock(self):
+        compute = mock.Mock(return_value=["computed"])
+
+        result = _get_or_set_with_stampede_lock("stampede_key", None, compute)
+
+        self.assertEqual(result, ["computed"])
+        compute.assert_called_once()
+        self.assertEqual(cache.get("stampede_key"), ["computed"])
+        # Kilit recompute sonrası serbest bırakılmalı.
+        self.assertIsNone(cache.get("stampede_key:lock"))
+
+    def test_waiter_returns_value_set_by_winner_without_compute(self):
+        # Kazanan thread kilidi tutuyor ve değeri set etmiş durumda.
+        cache.add("stampede_key:lock", 1, 10)
+        cache.set("stampede_key", ["winner_value"])
+        compute = mock.Mock()
+
+        result = _get_or_set_with_stampede_lock("stampede_key", None, compute)
+
+        self.assertEqual(result, ["winner_value"])
+        compute.assert_not_called()
+
+    @mock.patch("core.context_processors.STAMPEDE_LOCK_WAIT", 0.2)
+    @mock.patch("core.context_processors.STAMPEDE_POLL_INTERVAL", 0.05)
+    def test_waiter_falls_back_to_compute_when_winner_stalls(self):
+        # Kazanan thread kilidi tutuyor ama değeri zamanında üretmiyor.
+        cache.add("stampede_key:lock", 1, 10)
+        compute = mock.Mock(return_value=["fallback"])
+
+        result = _get_or_set_with_stampede_lock("stampede_key", None, compute)
+
+        self.assertEqual(result, ["fallback"])
+        compute.assert_called_once()
+        # Kilidi biz almadığımız için silmemeliyiz (kazanan thread'e ait).
+        self.assertIsNotNone(cache.get("stampede_key:lock"))

@@ -1,6 +1,9 @@
 from __future__ import annotations
 
+import random
+import time
 from decimal import ROUND_HALF_UP, Decimal
+from typing import Callable
 
 from django.conf import settings
 from django.core.cache import cache
@@ -30,12 +33,68 @@ from .models import ContactMessage, SidebarWidget, SiteSettings
 from .tag_colors import get_tag_color_class
 
 CACHE_TIMEOUT = 600  # 10 minutes
+# TTL'lere eklenen rastgele sapma; tüm nav anahtarlarının aynı anda expire olup
+# senkron (thundering herd) recompute spike'ı yaratmasını engeller.
+CACHE_TIMEOUT_JITTER = 60  # 0-60 sn
+# Cache miss anında yalnızca tek thread'in ağır sorguyu çalıştırmasını sağlayan
+# stampede kilidinin TTL'i (saniye). t3.micro'da eşzamanlı recompute'u önler.
+STAMPEDE_LOCK_TIMEOUT = 10
+# Kilidi kaybeden thread'in taze değeri beklerken harcayacağı azami süre (saniye).
+STAMPEDE_LOCK_WAIT = 3.0
+STAMPEDE_POLL_INTERVAL = 0.1
 STAFF_PENDING_CACHE_TIMEOUT = 300  # 5 minutes
 GOAL_WIDGET_EMPTY_CACHE_VALUE = "__empty_goal_widget_snapshot__"
 GOAL_WIDGET_CACHE_MISS_VALUE = "__missing_goal_widget_snapshot__"
 COMMENT_WEIGHT = 5
 REACTION_WEIGHT = 3
 VIEW_WEIGHT = 1
+
+
+def _cache_timeout_with_jitter() -> int:
+    """
+    TTL'e rastgele sapma ekler; nav anahtarlarının senkron expire olmasını
+    önleyerek periyodik recompute spike'ini dağıtır.
+    """
+    return CACHE_TIMEOUT + random.randint(0, CACHE_TIMEOUT_JITTER)
+
+
+def _get_or_set_with_stampede_lock(
+    cache_key: str, cached_data, compute: Callable[[], object]
+):
+    """
+    Cache stampede (thundering herd) korumalı okuma.
+
+    TTL dolduğunda eşzamanlı isteklerin aynı ağir `Count`/`JOIN` sorgularini
+    tekrar tekrar çalıştırmasını engeller: `cache.add` (Redis'te atomik SETNX)
+    ile yalnızca tek thread recompute eder, digerleri kisa süre taze değeri
+    bekler. Kazanan zamaninda bitiremezse bekleyen thread fallback olarak
+    kendisi hesaplar (kalici blok olmaz).
+    """
+    if cached_data is not None:
+        value = cached_data.get(cache_key)
+    else:
+        value = cache.get(cache_key)
+    if value is not None:
+        return value
+
+    lock_key = f"{cache_key}:lock"
+    got_lock = cache.add(lock_key, 1, STAMPEDE_LOCK_TIMEOUT)
+    if not got_lock:
+        deadline = time.monotonic() + STAMPEDE_LOCK_WAIT
+        while time.monotonic() < deadline:
+            time.sleep(STAMPEDE_POLL_INTERVAL)
+            value = cache.get(cache_key)
+            if value is not None:
+                return value
+        # Kazanan thread zamaninda bitiremedi; fallback olarak kendimiz hesaplariz.
+
+    try:
+        value = compute()
+        cache.set(cache_key, value, timeout=_cache_timeout_with_jitter())
+    finally:
+        if got_lock:
+            cache.delete(lock_key)
+    return value
 
 
 def breadcrumbs_context(request):
@@ -56,12 +115,7 @@ def breadcrumbs_context(request):
 
 
 def _get_nav_categories(cached_data=None):
-    if cached_data is not None:
-        nav_categories = cached_data.get(NAV_CATEGORIES_KEY)
-    else:
-        nav_categories = cache.get(NAV_CATEGORIES_KEY)
-
-    if nav_categories is None:
+    def compute():
         qs = (
             Category.objects.annotate(
                 post_count=Count(
@@ -77,8 +131,9 @@ def _get_nav_categories(cached_data=None):
             c["get_absolute_url"] = reverse(
                 "blog:category_detail", kwargs={"slug": c["slug"]}
             )
-        cache.set(NAV_CATEGORIES_KEY, nav_categories, timeout=CACHE_TIMEOUT)
-    return nav_categories
+        return nav_categories
+
+    return _get_or_set_with_stampede_lock(NAV_CATEGORIES_KEY, cached_data, compute)
 
 
 def _calculate_tag_cloud_sizes(nav_tags):
@@ -110,12 +165,7 @@ def _calculate_tag_cloud_sizes(nav_tags):
 
 
 def _get_nav_tags(cached_data=None):
-    if cached_data is not None:
-        nav_tags = cached_data.get(NAV_TAGS_KEY)
-    else:
-        nav_tags = cache.get(NAV_TAGS_KEY)
-
-    if nav_tags is None:
+    def compute():
         qs = (
             Tag.objects.annotate(
                 post_count=Count(
@@ -132,18 +182,15 @@ def _get_nav_tags(cached_data=None):
             t["get_absolute_url"] = reverse("blog:tag_detail", args=[t["slug"]])
 
         _calculate_tag_cloud_sizes(nav_tags)
-        cache.set(NAV_TAGS_KEY, nav_tags, timeout=CACHE_TIMEOUT)
-    return nav_tags
+        return nav_tags
+
+    return _get_or_set_with_stampede_lock(NAV_TAGS_KEY, cached_data, compute)
 
 
 def _get_nav_archives(cached_data=None):
     nav_archives_key = f"{NAV_ARCHIVES_KEY}:{get_language() or 'tr'}"
-    if cached_data is not None:
-        nav_archives = cached_data.get(nav_archives_key)
-    else:
-        nav_archives = cache.get(nav_archives_key)
 
-    if nav_archives is None:
+    def compute():
         archive_rows = (
             BlogPost.objects.filter(
                 status=BlogPost.Status.PUBLISHED,
@@ -170,17 +217,13 @@ def _get_nav_archives(cached_data=None):
                     ),
                 }
             )
-        cache.set(nav_archives_key, nav_archives, timeout=CACHE_TIMEOUT)
-    return nav_archives
+        return nav_archives
+
+    return _get_or_set_with_stampede_lock(nav_archives_key, cached_data, compute)
 
 
 def _get_nav_recent_posts(cached_data=None):
-    if cached_data is not None:
-        nav_recent_posts = cached_data.get(NAV_RECENT_POSTS_KEY)
-    else:
-        nav_recent_posts = cache.get(NAV_RECENT_POSTS_KEY)
-
-    if nav_recent_posts is None:
+    def compute():
         qs = (
             BlogPost.objects.filter(
                 status=BlogPost.Status.PUBLISHED,
@@ -201,17 +244,13 @@ def _get_nav_recent_posts(cached_data=None):
                     "cover_image": bool(post.cover_image),
                 }
             )
-        cache.set(NAV_RECENT_POSTS_KEY, nav_recent_posts, timeout=CACHE_TIMEOUT)
-    return nav_recent_posts
+        return nav_recent_posts
+
+    return _get_or_set_with_stampede_lock(NAV_RECENT_POSTS_KEY, cached_data, compute)
 
 
 def _get_nav_popular_posts(cached_data=None):
-    if cached_data is not None:
-        nav_popular_posts = cached_data.get(NAV_POPULAR_POSTS_KEY)
-    else:
-        nav_popular_posts = cache.get(NAV_POPULAR_POSTS_KEY)
-
-    if nav_popular_posts is None:
+    def compute():
         qs = (
             BlogPost.objects.filter(
                 status=BlogPost.Status.PUBLISHED,
@@ -251,17 +290,13 @@ def _get_nav_popular_posts(cached_data=None):
                     "cover_image": bool(post.cover_image),
                 }
             )
-        cache.set(NAV_POPULAR_POSTS_KEY, nav_popular_posts, timeout=CACHE_TIMEOUT)
-    return nav_popular_posts
+        return nav_popular_posts
+
+    return _get_or_set_with_stampede_lock(NAV_POPULAR_POSTS_KEY, cached_data, compute)
 
 
 def _get_nav_portfolio_posts(cached_data=None):
-    if cached_data is not None:
-        nav_portfolio_posts = cached_data.get(NAV_PORTFOLIO_POSTS_KEY)
-    else:
-        nav_portfolio_posts = cache.get(NAV_PORTFOLIO_POSTS_KEY)
-
-    if nav_portfolio_posts is None:
+    def compute():
         qs = (
             BlogPost.objects.filter(
                 status=BlogPost.Status.PUBLISHED,
@@ -283,8 +318,11 @@ def _get_nav_portfolio_posts(cached_data=None):
                     "cover_image": bool(post.cover_image),
                 }
             )
-        cache.set(NAV_PORTFOLIO_POSTS_KEY, nav_portfolio_posts, timeout=CACHE_TIMEOUT)
-    return nav_portfolio_posts
+        return nav_portfolio_posts
+
+    return _get_or_set_with_stampede_lock(
+        NAV_PORTFOLIO_POSTS_KEY, cached_data, compute
+    )
 
 
 def _get_goal_widget_snapshot(cached_data=None):
