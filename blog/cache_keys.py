@@ -24,3 +24,7 @@ SITE_SETTINGS_KEY = "site_settings"
 
 BLOG_POST_DETAIL_KEY_PREFIX = "blog_post:detail:"
 BLOG_POST_REACTIONS_KEY_PREFIX = "blog_post:reactions:"
+
+# Sitemap Keys
+SITEMAP_BLOG_POSTS_KEY = "sitemap_blog_posts"
+SITEMAP_CATEGORIES_KEY = "sitemap_categories"
