@@ -1,7 +1,10 @@
 from django.contrib import messages
+from django.core.cache import cache
 from django.shortcuts import redirect, render
 from django.views.decorators.http import require_http_methods
 from django_ratelimit.decorators import ratelimit
+
+from blog.cache_keys import HOME_PAGE_KEY
 
 from core.helpers import (
     CAPTCHA_SESSION_KEY,
@@ -17,27 +20,38 @@ from .forms import ContactForm
 
 CONTACT_RATE_LIMIT = "3/m"
 CONTACT_RATE_LIMIT_KEY = "ip"
+# Anasayfa yüksek trafikli; latest + featured sorgularını kısa süre cache'liyoruz.
+# BlogPost değişiminde signal ile invalide edildiği için TTL yalnızca güvenlik ağı.
+HOME_PAGE_CACHE_TIMEOUT = 300  # 5 dakika
 
 
 # Create your views here.
 def home_view(request):
-    latest_posts = list(
-        published_posts_queryset(include_tags=False).order_by(
-            "-published_at", "-created_at"
-        )[:5]
-    )
+    cached_posts = cache.get(HOME_PAGE_KEY)
+    if cached_posts is None:
+        latest_posts = list(
+            published_posts_queryset(include_tags=False).order_by(
+                "-published_at", "-created_at"
+            )[:5]
+        )
 
-    featured_post = (
-        published_posts_queryset(include_tags=False)
-        .filter(is_featured=True)
-        .order_by("-published_at", "-created_at")
-        .first()
-    )
+        featured_post = (
+            published_posts_queryset(include_tags=False)
+            .filter(is_featured=True)
+            .order_by("-published_at", "-created_at")
+            .first()
+        )
+
+        cached_posts = {
+            "latest_posts": latest_posts,
+            "featured_post": featured_post,
+        }
+        cache.set(HOME_PAGE_KEY, cached_posts, HOME_PAGE_CACHE_TIMEOUT)
 
     context = {
         "active_nav": "home",
-        "latest_posts": latest_posts,
-        "featured_post": featured_post,
+        "latest_posts": cached_posts["latest_posts"],
+        "featured_post": cached_posts["featured_post"],
     }
 
     return render(request, "core/home.html", context)

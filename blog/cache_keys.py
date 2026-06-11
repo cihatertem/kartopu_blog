@@ -16,6 +16,7 @@ NAV_KEYS = [
 ]
 
 # Core and Global Keys
+HOME_PAGE_KEY = "home_page_posts"
 GOAL_WIDGET_KEY = "goal_widget_snapshot"
 STAFF_PENDING_NOTIFICATIONS_KEY = "staff_pending_notifications:{user_id}"
 SIDEBAR_WIDGETS_KEY = "sidebar_widgets"

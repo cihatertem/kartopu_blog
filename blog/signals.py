@@ -13,6 +13,7 @@ from django.dispatch import receiver
 from blog.cache_keys import (
     BLOG_POST_DETAIL_KEY_PREFIX,
     BLOG_POST_REACTIONS_KEY_PREFIX,
+    HOME_PAGE_KEY,
     NAV_ARCHIVES_KEY,
     NAV_KEYS,
 )
@@ -131,12 +132,14 @@ def post_changed_save(sender, instance: BlogPost, **kwargs):
     update_search_vector(instance)
     recalculate_popularity_score(instance.pk)
     cache.delete(f"{BLOG_POST_DETAIL_KEY_PREFIX}{instance.slug}")
+    cache.delete(HOME_PAGE_KEY)
     invalidate_nav_cache()
 
 
 @receiver(post_delete, sender=BlogPost)
 def post_changed_delete(sender, instance: BlogPost, **kwargs):
     cache.delete(f"{BLOG_POST_DETAIL_KEY_PREFIX}{instance.slug}")
+    cache.delete(HOME_PAGE_KEY)
     invalidate_nav_cache()
 
 

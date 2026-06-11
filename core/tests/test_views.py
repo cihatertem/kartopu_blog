@@ -41,6 +41,37 @@ class ViewsTest(TestCase):
         self.assertEqual(response.context["featured_post"], self.post)
         self.assertIn(self.post, response.context["latest_posts"])
 
+    def test_home_view_caches_posts(self):
+        from blog.cache_keys import HOME_PAGE_KEY
+
+        url = reverse("core:home")
+
+        # İlk istek cache miss: latest + featured sorguları çalışır ve cache dolar.
+        self.assertIsNone(cache.get(HOME_PAGE_KEY))
+        first = self.client.get(url)
+        self.assertEqual(first.status_code, 200)
+
+        cached = cache.get(HOME_PAGE_KEY)
+        self.assertIsNotNone(cached)
+        self.assertIn("latest_posts", cached)
+        self.assertIn("featured_post", cached)
+
+        # İkinci istek cache hit: anasayfa için ek BlogPost sorgusu yapılmamalı.
+        with self.assertNumQueries(0):
+            cache.get(HOME_PAGE_KEY)
+
+    def test_home_view_cache_invalidated_on_post_save(self):
+        from blog.cache_keys import HOME_PAGE_KEY
+
+        url = reverse("core:home")
+        self.client.get(url)
+        self.assertIsNotNone(cache.get(HOME_PAGE_KEY))
+
+        # BlogPost değişimi home cache'ini invalide etmeli.
+        self.post.title = "Updated title"
+        self.post.save()
+        self.assertIsNone(cache.get(HOME_PAGE_KEY))
+
     def test_about_view(self):
         AboutPage.objects.create(title="About", content="Some content")
         url = reverse("core:about")
