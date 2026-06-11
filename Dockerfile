@@ -69,8 +69,7 @@ RUN uv sync --frozen --no-cache --active
 
 COPY . .
 
-RUN chown -R app:app /app
-RUN chown -R app:app /var/cache/uv
+RUN chown -R app:app /app /opt /var/cache/uv
 
 USER app
 

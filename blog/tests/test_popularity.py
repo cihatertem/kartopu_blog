@@ -1,3 +1,5 @@
+from io import StringIO
+
 from django.contrib.auth import get_user_model
 from django.core.cache import cache
 from django.core.management import call_command
@@ -90,5 +92,16 @@ class PopularityScoreTests(TestCase):
 
     def test_management_command_recalculates(self):
         BlogPost.objects.filter(pk=self.post.pk).update(popularity_score=0)
-        call_command("recalculate_popularity_scores")
+        out = StringIO()
+
+        call_command("recalculate_popularity_scores", stdout=out)
+
+        self.assertEqual(out.getvalue(), "")
         self.assertEqual(self._score(), 10 * POPULARITY_VIEW_WEIGHT)
+
+    def test_management_command_outputs_when_verbose(self):
+        out = StringIO()
+
+        call_command("recalculate_popularity_scores", verbosity=2, stdout=out)
+
+        self.assertIn("popularity_score güncellendi: 1 yazı.", out.getvalue())

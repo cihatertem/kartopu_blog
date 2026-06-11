@@ -16,8 +16,9 @@ class Command(BaseCommand):
         updated = recalculate_popularity_scores()
         # Nav popüler yazılar cache'i bayatlamasın diye geçersiz kıl.
         invalidate_nav_cache()
-        self.stdout.write(
-            self.style.SUCCESS(
-                f"popularity_score güncellendi: {updated} yazı."
+        if options["verbosity"] > 1:
+            self.stdout.write(
+                self.style.SUCCESS(
+                    f"popularity_score güncellendi: {updated} yazı."
+                )
             )
-        )
