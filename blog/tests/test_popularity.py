@@ -67,16 +67,48 @@ class PopularityScoreTests(TestCase):
         )
         self.assertEqual(self._score(), 10 * POPULARITY_VIEW_WEIGHT)
 
-    def test_reaction_increases_score(self):
+    def test_reaction_is_debounced_and_marks_dirty(self):
+        from blog.popularity_queue import drain_popularity_dirty
+
         BlogPostReaction.objects.create(
             post=self.post,
             user=self.reader,
             reaction=BlogPostReaction.Reaction.KALP.value,
         )
+        # Reaction debounce edilir: skor anında yeniden hesaplanmaz, taban kalır.
+        self.assertEqual(self._score(), 10 * POPULARITY_VIEW_WEIGHT)
+        # Bunun yerine yazı "kirli" kuyruğa düşer.
+        self.assertEqual(drain_popularity_dirty(), {str(self.post.pk)})
+
+    def test_pending_command_applies_reaction_score(self):
+        out = StringIO()
+        BlogPostReaction.objects.create(
+            post=self.post,
+            user=self.reader,
+            reaction=BlogPostReaction.Reaction.KALP.value,
+        )
+
+        call_command(
+            "recalculate_popularity_scores", "--pending", verbosity=2, stdout=out
+        )
+
         self.assertEqual(
             self._score(),
             10 * POPULARITY_VIEW_WEIGHT + 1 * POPULARITY_REACTION_WEIGHT,
         )
+        self.assertIn("popularity_score güncellendi: 1 yazı.", out.getvalue())
+
+    def test_pending_command_no_pending_items(self):
+        out = StringIO()
+        BlogPost.objects.filter(pk=self.post.pk).update(popularity_score=999)
+
+        call_command(
+            "recalculate_popularity_scores", "--pending", verbosity=2, stdout=out
+        )
+
+        # Kuyruk boşken hiçbir UPDATE çalışmaz; bozuk skor olduğu gibi kalır.
+        self.assertEqual(self._score(), 999)
+        self.assertIn("Bekleyen popülerlik güncellemesi yok.", out.getvalue())
 
     def test_recalculate_single_post(self):
         # Skoru kasten bozup tek post yeniden hesaplamayi dogrula.

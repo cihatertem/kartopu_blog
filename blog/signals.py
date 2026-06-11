@@ -20,6 +20,7 @@ from blog.cache_keys import (
 from core.decorators import log_exceptions
 
 from .models import BlogPost, BlogPostImage, BlogPostReaction, Category, Tag
+from .popularity_queue import mark_popularity_dirty
 from .services import recalculate_popularity_score
 
 
@@ -153,6 +154,10 @@ def post_tags_changed(sender, instance, action, **kwargs):
 @receiver(post_save, sender=BlogPostReaction)
 @receiver(post_delete, sender=BlogPostReaction)
 def blogpostreaction_changed(sender, instance: BlogPostReaction, **kwargs):
+    # Reaksiyon sayacı widget'ı taze kalsın diye reactions cache'i anında silinir
+    # (hafif, tek anahtar). Ancak popülerlik yeniden hesaplaması (korelasyonlu
+    # Subquery'li UPDATE) ve nav cache invalidation yüksek frekanslı reaction
+    # akışında DB yazma + nav cache thrash üretir; bu nedenle debounce edilir:
+    # ilgili post "kirli" kuyruğa yazılır, periyodik komut tek UPDATE'te birleştirir.
     cache.delete(f"{BLOG_POST_REACTIONS_KEY_PREFIX}{instance.post_id}")
-    recalculate_popularity_score(instance.post_id)
-    invalidate_nav_cache()
+    mark_popularity_dirty(instance.post_id)

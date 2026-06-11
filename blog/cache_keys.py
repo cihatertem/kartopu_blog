@@ -25,6 +25,12 @@ SITE_SETTINGS_KEY = "site_settings"
 BLOG_POST_DETAIL_KEY_PREFIX = "blog_post:detail:"
 BLOG_POST_REACTIONS_KEY_PREFIX = "blog_post:reactions:"
 
+# Reaction kaynaklı popülerlik yeniden hesaplaması için "kirli" (pending)
+# yazı id'lerini tutan kuyruk anahtarı. Reaction yüksek frekanslı olduğundan
+# her save/delete'te DB UPDATE + nav cache invalidation yerine ilgili post_id
+# bu kümeye yazılır; periyodik komut tek UPDATE ile birleştirip işler.
+BLOG_POPULARITY_DIRTY_KEY = "blog:popularity:dirty"
+
 # Sitemap Keys
 SITEMAP_BLOG_POSTS_KEY = "sitemap_blog_posts"
 SITEMAP_CATEGORIES_KEY = "sitemap_categories"
