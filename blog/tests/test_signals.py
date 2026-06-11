@@ -347,12 +347,14 @@ class BlogPostReactionSignalTests(TestCase):
             user=self.user,
             reaction=BlogPostReaction.Reaction.KALP.value,
         )
-        mock_delete.assert_called_with(
+        # invalidate_nav_cache() de cache.delete'i tetikleyebildiğinden
+        # son çağrı yerine herhangi bir çağrıyı kontrol ediyoruz.
+        mock_delete.assert_any_call(
             f"{BLOG_POST_REACTIONS_KEY_PREFIX}{self.post.pk}"
         )
 
         mock_delete.reset_mock()
         reaction.delete()
-        mock_delete.assert_called_with(
+        mock_delete.assert_any_call(
             f"{BLOG_POST_REACTIONS_KEY_PREFIX}{self.post.pk}"
         )

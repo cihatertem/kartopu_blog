@@ -1,0 +1,94 @@
+from django.contrib.auth import get_user_model
+from django.core.cache import cache
+from django.core.management import call_command
+from django.test import TestCase
+from django.utils import timezone
+
+from blog.models import (
+    POPULARITY_COMMENT_WEIGHT,
+    POPULARITY_REACTION_WEIGHT,
+    POPULARITY_VIEW_WEIGHT,
+    BlogPost,
+    BlogPostReaction,
+)
+from blog.services import recalculate_popularity_score, recalculate_popularity_scores
+from comments.models import Comment
+
+User = get_user_model()
+
+
+class PopularityScoreTests(TestCase):
+    def setUp(self):
+        cache.clear()
+        self.author = User.objects.create_user(
+            email="author@test.com", password="password"
+        )
+        self.reader = User.objects.create_user(
+            email="reader@test.com", password="password"
+        )
+        self.post = BlogPost.objects.create(
+            title="Popular Post",
+            slug="popular-post",
+            author=self.author,
+            status=BlogPost.Status.PUBLISHED,
+            published_at=timezone.now(),
+            view_count=10,
+        )
+
+    def _score(self):
+        return BlogPost.objects.values_list("popularity_score", flat=True).get(
+            pk=self.post.pk
+        )
+
+    def test_post_save_sets_baseline_score_from_views(self):
+        # Sadece view_count varken skor = view_count * VIEW_WEIGHT.
+        self.assertEqual(self._score(), 10 * POPULARITY_VIEW_WEIGHT)
+
+    def test_approved_comment_increases_score(self):
+        Comment.objects.create(
+            post=self.post,
+            author=self.reader,
+            body="great",
+            status=Comment.Status.APPROVED,
+        )
+        self.assertEqual(
+            self._score(),
+            10 * POPULARITY_VIEW_WEIGHT + 1 * POPULARITY_COMMENT_WEIGHT,
+        )
+
+    def test_pending_comment_does_not_count(self):
+        Comment.objects.create(
+            post=self.post,
+            author=self.reader,
+            body="waiting",
+            status=Comment.Status.PENDING,
+        )
+        self.assertEqual(self._score(), 10 * POPULARITY_VIEW_WEIGHT)
+
+    def test_reaction_increases_score(self):
+        BlogPostReaction.objects.create(
+            post=self.post,
+            user=self.reader,
+            reaction=BlogPostReaction.Reaction.KALP.value,
+        )
+        self.assertEqual(
+            self._score(),
+            10 * POPULARITY_VIEW_WEIGHT + 1 * POPULARITY_REACTION_WEIGHT,
+        )
+
+    def test_recalculate_single_post(self):
+        # Skoru kasten bozup tek post yeniden hesaplamayi dogrula.
+        BlogPost.objects.filter(pk=self.post.pk).update(popularity_score=999)
+        recalculate_popularity_score(self.post.pk)
+        self.assertEqual(self._score(), 10 * POPULARITY_VIEW_WEIGHT)
+
+    def test_recalculate_all_returns_row_count(self):
+        BlogPost.objects.filter(pk=self.post.pk).update(popularity_score=0)
+        updated = recalculate_popularity_scores()
+        self.assertEqual(updated, BlogPost.objects.count())
+        self.assertEqual(self._score(), 10 * POPULARITY_VIEW_WEIGHT)
+
+    def test_management_command_recalculates(self):
+        BlogPost.objects.filter(pk=self.post.pk).update(popularity_score=0)
+        call_command("recalculate_popularity_scores")
+        self.assertEqual(self._score(), 10 * POPULARITY_VIEW_WEIGHT)

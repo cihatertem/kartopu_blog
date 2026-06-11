@@ -19,6 +19,7 @@ from blog.cache_keys import (
 from core.decorators import log_exceptions
 
 from .models import BlogPost, BlogPostImage, BlogPostReaction, Category, Tag
+from .services import recalculate_popularity_score
 
 
 @log_exceptions(message="Error deleting storage file")
@@ -128,6 +129,7 @@ def tag_changed(sender, **kwargs):
 @receiver(post_save, sender=BlogPost)
 def post_changed_save(sender, instance: BlogPost, **kwargs):
     update_search_vector(instance)
+    recalculate_popularity_score(instance.pk)
     cache.delete(f"{BLOG_POST_DETAIL_KEY_PREFIX}{instance.slug}")
     invalidate_nav_cache()
 
@@ -149,3 +151,5 @@ def post_tags_changed(sender, instance, action, **kwargs):
 @receiver(post_delete, sender=BlogPostReaction)
 def blogpostreaction_changed(sender, instance: BlogPostReaction, **kwargs):
     cache.delete(f"{BLOG_POST_REACTIONS_KEY_PREFIX}{instance.post_id}")
+    recalculate_popularity_score(instance.post_id)
+    invalidate_nav_cache()

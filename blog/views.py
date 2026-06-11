@@ -15,7 +15,13 @@ from django.utils.formats import date_format
 from django.views.decorators.http import require_POST
 
 from blog.cache_keys import BLOG_POST_DETAIL_KEY_PREFIX, BLOG_POST_REACTIONS_KEY_PREFIX
-from blog.models import BlogPost, BlogPostReaction, Category, Tag
+from blog.models import (
+    POPULARITY_VIEW_WEIGHT,
+    BlogPost,
+    BlogPostReaction,
+    Category,
+    Tag,
+)
 from blog.services import (
     detect_content_markers,
     get_content_prefetches_for_dependencies,
@@ -525,7 +531,12 @@ def post_detail(request, slug: str):
 
     session_key = f"viewed_post_{post.pk}"
     if not request.session.get(session_key):
-        BlogPost.objects.filter(pk=post.pk).update(view_count=F("view_count") + 1)
+        # Görüntülenme artışı popülerlik skorunu da etkiler; yeniden
+        # hesaplama (JOIN) yerine skoru aynı UPDATE'te artırıyoruz.
+        BlogPost.objects.filter(pk=post.pk).update(
+            view_count=F("view_count") + 1,
+            popularity_score=F("popularity_score") + POPULARITY_VIEW_WEIGHT,
+        )
         request.session[session_key] = True
 
         post.view_count += 1

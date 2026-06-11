@@ -20,6 +20,14 @@ SEO_TITLE_MAX_LENGTH = 50
 SEO_DESCRIPTION_MAX_LENGTH = 160
 KARTOPU_MONEY_BASE_URL = "https://kartopu.money"
 
+# Popülerlik skoru ağırlıkları. Skor `BlogPost.popularity_score` alanında
+# denormalize tutulur; her cache miss'te iki `distinct` JOIN agregasyonu
+# (yorum + reaction) çalıştırmak yerine sinyallerle önceden hesaplanır.
+# Böylece nav popüler yazılar sorgusu t3.micro'da salt okumaya iner.
+POPULARITY_COMMENT_WEIGHT = 5
+POPULARITY_REACTION_WEIGHT = 3
+POPULARITY_VIEW_WEIGHT = 1
+
 
 class Category(
     UUIDModelMixin,
@@ -180,6 +188,15 @@ class BlogPost(
         help_text="Anasayfada öne çıkar.",
     )
     view_count = models.PositiveIntegerField(default=0)  # pyright: ignore[reportArgumentType]
+    popularity_score = models.PositiveIntegerField(
+        default=0,  # pyright: ignore[reportArgumentType]
+        db_index=True,
+        editable=False,
+        help_text=(
+            "Önceden hesaplanmış popülerlik skoru "
+            "(yorum/reaction/görüntülenme ağırlıklı). Sinyallerle güncellenir."
+        ),
+    )
 
     # imagekit
     cover_600 = ImageSpecField(

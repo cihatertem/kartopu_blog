@@ -1,7 +1,16 @@
 from collections.abc import Iterable
 import re
 
-from django.db.models import Prefetch, prefetch_related_objects
+from django.db.models import (
+    Count,
+    F,
+    IntegerField,
+    OuterRef,
+    Prefetch,
+    Subquery,
+    prefetch_related_objects,
+)
+from django.db.models.functions import Coalesce
 
 from portfolio.models import (
     CashFlowComparison,
@@ -376,3 +385,67 @@ def get_content_prefetches_for_dependencies(dependencies: list[str]):
     for dependency in dependencies:
         markers.update(DEPENDENCY_GROUPS.get(dependency, ()))
     return get_content_prefetches_for_markers(markers)
+
+
+def _popularity_score_expression():
+    """
+    Popülerlik skorunu DB tarafında hesaplayan ifadeyi döndürür.
+
+    İki `distinct` JOIN agregasyonu yerine korelasyonlu `Subquery` sayımları
+    kullanılır; böylece skor tek bir `UPDATE` sorgusuyla (PK filtresi ya da
+    tüm tablo için) yazılabilir. Nav popüler yazılar sorgusu artık bu
+    önceden hesaplanmış alanı salt okur.
+    """
+    from comments.models import Comment
+
+    from .models import (
+        BlogPostReaction,
+        POPULARITY_COMMENT_WEIGHT,
+        POPULARITY_REACTION_WEIGHT,
+        POPULARITY_VIEW_WEIGHT,
+    )
+
+    approved_comments = (
+        Comment.objects.filter(
+            post=OuterRef("pk"), status=Comment.Status.APPROVED
+        )
+        .order_by()
+        .values("post")
+        .annotate(count=Count("id"))
+        .values("count")
+    )
+    reactions = (
+        BlogPostReaction.objects.filter(post=OuterRef("pk"))
+        .order_by()
+        .values("post")
+        .annotate(count=Count("id"))
+        .values("count")
+    )
+
+    return (
+        Coalesce(Subquery(approved_comments, output_field=IntegerField()), 0)
+        * POPULARITY_COMMENT_WEIGHT
+        + F("view_count") * POPULARITY_VIEW_WEIGHT
+        + Coalesce(Subquery(reactions, output_field=IntegerField()), 0)
+        * POPULARITY_REACTION_WEIGHT
+    )
+
+
+def recalculate_popularity_scores(queryset=None) -> int:
+    """
+    Verilen queryset (varsayılan: tüm yazılar) için `popularity_score`
+    alanını tek bir `UPDATE` sorgusuyla yeniden hesaplar.
+
+    Güncellenen satır sayısını döndürür.
+    """
+    from .models import BlogPost
+
+    qs = queryset if queryset is not None else BlogPost.objects.all()
+    return qs.update(popularity_score=_popularity_score_expression())
+
+
+def recalculate_popularity_score(post_id) -> int:
+    """Tek bir yazının `popularity_score` alanını yeniden hesaplar."""
+    from .models import BlogPost
+
+    return recalculate_popularity_scores(BlogPost.objects.filter(pk=post_id))

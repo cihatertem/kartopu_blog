@@ -7,8 +7,7 @@ from typing import Callable
 
 from django.conf import settings
 from django.core.cache import cache
-from django.db.models import Count, F, IntegerField, Q
-from django.db.models.expressions import ExpressionWrapper
+from django.db.models import Count, Q
 from django.db.models.functions import TruncMonth
 from django.urls import reverse
 from django.utils.formats import date_format
@@ -45,9 +44,6 @@ STAMPEDE_POLL_INTERVAL = 0.1
 STAFF_PENDING_CACHE_TIMEOUT = 300  # 5 minutes
 GOAL_WIDGET_EMPTY_CACHE_VALUE = "__empty_goal_widget_snapshot__"
 GOAL_WIDGET_CACHE_MISS_VALUE = "__missing_goal_widget_snapshot__"
-COMMENT_WEIGHT = 5
-REACTION_WEIGHT = 3
-VIEW_WEIGHT = 1
 
 
 def _cache_timeout_with_jitter() -> int:
@@ -251,29 +247,13 @@ def _get_nav_recent_posts(cached_data=None):
 
 def _get_nav_popular_posts(cached_data=None):
     def compute():
+        # Popülerlik skoru `BlogPost.popularity_score` alanında denormalize
+        # tutulur (sinyallerle güncellenir). Böylece her cache miss'te iki
+        # `distinct` JOIN agregasyonu çalıştırmak yerine salt okuma yapılır.
         qs = (
             BlogPost.objects.filter(
                 status=BlogPost.Status.PUBLISHED,
                 published_at__isnull=False,
-            )
-            .annotate(
-                approved_comment_count=Count(
-                    "comments",
-                    filter=Q(comments__status=Comment.Status.APPROVED),
-                    distinct=True,
-                ),
-                reaction_count=Count(
-                    "reactions",
-                    distinct=True,
-                ),
-            )
-            .annotate(
-                popularity_score=ExpressionWrapper(
-                    F("approved_comment_count") * COMMENT_WEIGHT
-                    + F("view_count") * VIEW_WEIGHT
-                    + F("reaction_count") * REACTION_WEIGHT,
-                    output_field=IntegerField(),
-                )
             )
             .order_by("-popularity_score", "-view_count", "-published_at")
             .only("title", "slug", "view_count", "published_at", "cover_image")[:5]
