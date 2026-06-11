@@ -75,6 +75,7 @@
         if (!legalDisclaimer) {
             return;
         }
+        legalDisclaimer.classList.remove("is-visible");
         legalDisclaimer.classList.add("is-hidden");
         document.body.classList.remove("has-legal-disclaimer");
         legalDisclaimer.setAttribute("aria-hidden", "true");
@@ -93,6 +94,7 @@
             hideLegalDisclaimer();
         } else {
             document.body.classList.add("has-legal-disclaimer");
+            legalDisclaimer.classList.add("is-visible");
             legalDisclaimer.removeAttribute("aria-hidden");
         }
     }

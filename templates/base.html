@@ -93,6 +93,12 @@
       </aside>
     </div>
     {% include "includes/legal_disclaimer.html" %}
+    <script nonce="{{ csp_nonce }}">
+      if (localStorage.getItem('legal-disclaimer-acknowledged') !== '1') {
+          const el = document.getElementById('legal-disclaimer');
+          if (el) el.classList.add('is-visible');
+      }
+    </script>
     {% include "includes/footer.html" %}
     <button id="scroll-to-top" class="scroll-to-top" aria-label="Başa dön" title="Başa dön">
       <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
