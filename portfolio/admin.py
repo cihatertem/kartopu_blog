@@ -164,7 +164,10 @@ class PortfolioTransactionAdmin(admin.ModelAdmin):
 
     @admin.display(description="Portföyler")
     def portfolio_list(self, obj):
-        return ", ".join(sorted(p.name for p in obj.portfolios.all()))
+        prefetched_cache = getattr(obj, "_prefetched_objects_cache", {})
+        if "portfolios" in prefetched_cache:
+            return ", ".join(sorted(p.name for p in prefetched_cache["portfolios"]))
+        return "-"
 
 
 class PortfolioSnapshotItemInline(admin.TabularInline):

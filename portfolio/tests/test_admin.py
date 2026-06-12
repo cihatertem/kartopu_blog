@@ -118,9 +118,15 @@ class PortfolioTransactionAdminTests(AdminTestCase):
         )
         transaction.portfolios.add(portfolio1, portfolio2)
 
+        transaction_with_prefetch = PortfolioTransaction.objects.prefetch_related(
+            "portfolios"
+        ).get(pk=transaction.pk)
         model_admin = PortfolioTransactionAdmin(PortfolioTransaction, admin.site)
-        display = model_admin.portfolio_list(transaction)
+        display = model_admin.portfolio_list(transaction_with_prefetch)
         self.assertEqual(display, "A Portfolio, B Portfolio")
+
+        display_unprefetched = model_admin.portfolio_list(transaction)
+        self.assertEqual(display_unprefetched, "-")
 
 
 class PortfolioSnapshotAdminTests(AdminTestCase):

@@ -223,8 +223,7 @@ class TestTemplateTagQuerysets(TestCase):
 
     def test_cashflow_comparison_summary_prefetches_items_once(self):
         post = self._create_cashflow_comparison_post(
-            "{{ cashflow_comparison_summary:1 }}\n"
-            "{{ cashflow_comparison_summary:2 }}"
+            "{{ cashflow_comparison_summary:1 }}\n{{ cashflow_comparison_summary:2 }}"
         )
 
         with self.assertNumQueries(3):
@@ -860,6 +859,62 @@ class RenderPostBodyTests(TestCase):
         self.assertEqual(blog_extras.dividend_summary(ctx), "")
         self.assertEqual(blog_extras.dividend_charts(ctx), "")
         self.assertEqual(blog_extras.dividend_comparison(ctx), "")
+
+
+class RenderResponsiveImageFigureTests(TestCase):
+    def test_no_rendition(self):
+        class MockImage:
+            rendition = None
+
+        self.assertEqual(blog_extras._render_responsive_image_figure(MockImage()), "")
+
+    def test_valid_rendition_no_caption(self):
+        class MockImage:
+            rendition = {
+                "src": "/src.jpg",
+                "srcset": "/src.jpg 1x",
+                "width": 100,
+                "height": 100,
+            }
+            alt_text = "Test Alt"
+            caption = None
+
+        html = blog_extras._render_responsive_image_figure(MockImage())
+        self.assertIn("<figure>", html)
+        self.assertIn('src="/src.jpg"', html)
+        self.assertIn('alt="Test Alt"', html)
+        self.assertNotIn("<figcaption>", html)
+
+    def test_valid_rendition_with_caption(self):
+        class MockImage:
+            rendition = {
+                "src": "/src.jpg",
+                "srcset": "/src.jpg 1x",
+                "width": 100,
+                "height": 100,
+            }
+            alt_text = "Test Alt"
+            caption = "Test Caption"
+
+        html = blog_extras._render_responsive_image_figure(MockImage())
+        self.assertIn("<figure>", html)
+        self.assertIn("<figcaption>Test Caption</figcaption>", html)
+
+    def test_html_escaping(self):
+        class MockImage:
+            rendition = {
+                "src": "/src.jpg",
+                "srcset": "/src.jpg 1x",
+                "width": 100,
+                "height": 100,
+            }
+            alt_text = '<script>alert("alt")</script>'
+            caption = '<script>alert("caption")</script>'
+
+        html = blog_extras._render_responsive_image_figure(MockImage())
+        self.assertNotIn("<script>", html)
+        self.assertIn("&lt;script&gt;alert(&quot;alt&quot;)&lt;/script&gt;", html)
+        self.assertIn("&lt;script&gt;alert(&quot;caption&quot;)&lt;/script&gt;", html)
 
 
 class ProcessImageMarkerTests(TestCase):
