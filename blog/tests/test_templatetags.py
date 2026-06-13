@@ -43,6 +43,8 @@ User = get_user_model()
 
 
 class DummySnapshot:
+    _meta = type("Meta", (), {"label": "DummySnapshot"})
+
     def __init__(
         self,
         total_amount=None,
@@ -414,6 +416,7 @@ class TestRenderHTMLFunctions(TestCase):
             allocation_pct = Decimal("0.5")
 
         s.items.all.return_value = [MItem()]
+        s._prefetched_objects_cache = {"items": s.items.all()}
 
         class DummyQS:
             def filter(self, *args, **kwargs):
@@ -429,6 +432,7 @@ class TestRenderHTMLFunctions(TestCase):
                 return self
 
         s.__class__.objects = DummyQS()
+        s._prefetched_objects_cache = {"items": DummyQS()}
         html = _render_portfolio_charts_html(s)
         self.assertIn("portfolio-charts", html)
 
@@ -443,6 +447,7 @@ class TestRenderHTMLFunctions(TestCase):
             allocation_pct = Decimal("0.5")
 
         s.items.all.return_value = [MItem()]
+        s._prefetched_objects_cache = {"items": s.items.all()}
         html = _render_portfolio_category_summary_html(s)
         self.assertIn("Hisse", html)
 
@@ -465,6 +470,7 @@ class TestRenderHTMLFunctions(TestCase):
                 return "Kira"
 
         s.items.all.return_value = [CItem()]
+        s._prefetched_objects_cache = {"items": s.items.all()}
         html = _render_cashflow_summary_html(s)
         self.assertIn("1.500 ₺", html)
         self.assertIn("Kira", html)
@@ -484,6 +490,8 @@ class TestRenderHTMLFunctions(TestCase):
                 return [(datetime.date(2025, 1, 1), 100)]
 
         from portfolio.models import CashFlowSnapshot
+
+        s._prefetched_objects_cache = {"items": s.items.all()}
 
         with patch.object(CashFlowSnapshot, "objects", DummyQS()):
             html = _render_cashflow_charts_html(s)

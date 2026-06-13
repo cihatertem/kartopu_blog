@@ -218,6 +218,9 @@ def _render_portfolio_charts_html(snapshot) -> str:
     if not snapshot:
         return ""
 
+    if "items" not in getattr(snapshot, "_prefetched_objects_cache", {}):
+        prefetch_related_objects([snapshot], "items")
+
     # Use prefetched items if available, otherwise fallback to DB
     all_items = snapshot.items.all()
     items = sorted(
@@ -304,6 +307,9 @@ def _render_portfolio_charts_html(snapshot) -> str:
 def _render_portfolio_category_summary_html(snapshot) -> str:
     if not snapshot:
         return ""
+
+    if "items" not in getattr(snapshot, "_prefetched_objects_cache", {}):
+        prefetch_related_objects([snapshot], "items")
 
     all_items = snapshot.items.all()
     items = sorted(
@@ -756,6 +762,10 @@ def _render_cashflow_summary_html(snapshot) -> str:
     )
     snapshot_date = escape(str(snapshot.snapshot_date))
     total_amount = _format_currency(snapshot.total_amount, cashflow_currency)
+
+    if "items" not in getattr(snapshot, "_prefetched_objects_cache", {}):
+        prefetch_related_objects([snapshot], "items")
+
     category_items = sorted(
         snapshot.items.all(),
         key=lambda x: x.amount,
@@ -787,6 +797,9 @@ def _render_cashflow_summary_html(snapshot) -> str:
 def _render_cashflow_charts_html(snapshot) -> str:
     if not snapshot:
         return ""
+
+    if "items" not in getattr(snapshot, "_prefetched_objects_cache", {}):
+        prefetch_related_objects([snapshot], "items")
 
     all_items = snapshot.items.all()
     items = sorted(

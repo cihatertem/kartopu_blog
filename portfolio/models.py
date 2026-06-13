@@ -1805,9 +1805,8 @@ class SalarySavingsSnapshot(BaseSnapshot):
 
         final_date = snapshot_date or timezone.now().date()
         start_date, end_date = cls._get_snapshot_window(final_date)
-        totals_by_flow_id = {
-            row["flow_id"]: row
-            for row in SalarySavingsEntry.objects.filter(
+        totals_qs = (
+            SalarySavingsEntry.objects.filter(
                 flow_id__in=[flow.pk for flow in flows],
                 entry_date__gte=start_date,
                 entry_date__lte=end_date,
@@ -1817,7 +1816,8 @@ class SalarySavingsSnapshot(BaseSnapshot):
                 total_salary=cls._sum_expression("salary_amount"),
                 total_savings=cls._sum_expression("savings_amount"),
             )
-        }
+        )
+        totals_by_flow_id = {row["flow_id"]: row for row in totals_qs}
 
         snapshots = []
 
