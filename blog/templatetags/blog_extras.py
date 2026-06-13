@@ -5,6 +5,7 @@ from urllib.parse import urljoin
 
 from django import template
 from django.core.serializers.json import DjangoJSONEncoder
+from django.db.models import prefetch_related_objects
 from django.template.loader import render_to_string
 from django.templatetags.static import static as static_url
 from django.utils.html import escape
@@ -963,11 +964,17 @@ def _get_cashflow_comparison_context_data(comparison) -> dict:
         else Decimal("0")
     )
 
-    base_items = {
-        item.category: _safe_decimal(item.amount) for item in base.items.all()
-    }
+    if "items" not in getattr(
+        base, "_prefetched_objects_cache", {}
+    ) or "items" not in getattr(compare, "_prefetched_objects_cache", {}):
+        prefetch_related_objects([base, compare], "items")
+
+    base_items_qs = base.items.all()
+    compare_items_qs = compare.items.all()
+
+    base_items = {item.category: _safe_decimal(item.amount) for item in base_items_qs}
     compare_items = {
-        item.category: _safe_decimal(item.amount) for item in compare.items.all()
+        item.category: _safe_decimal(item.amount) for item in compare_items_qs
     }
     categories = sorted(set(base_items.keys()) | set(compare_items.keys()))
     category_label_map = dict(CashFlowEntry.Category.choices)
