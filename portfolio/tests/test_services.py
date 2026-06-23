@@ -168,6 +168,31 @@ class CalculateXIRRTests(TestCase):
         ]
         self.assertEqual(calculate_xirr(cash_flows), 0.0)
 
+    def test_calculate_math_xirr_fallback_guess(self):
+        """Test _calculate_math_xirr fallback paths for initial guess."""
+        from portfolio.services import _calculate_math_xirr
+
+        # Test when days = 0
+        cash_flows_same_day = [
+            (date(2020, 1, 1), Decimal("-100")),
+            (date(2020, 1, 1), Decimal("150")),
+        ]
+        self.assertIsNone(_calculate_math_xirr(cash_flows_same_day))
+
+        # Test when total_in = 0
+        cash_flows_no_in = [
+            (date(2020, 1, 1), Decimal("100")),
+            (date(2021, 1, 1), Decimal("200")),
+        ]
+        self.assertIsNone(_calculate_math_xirr(cash_flows_no_in))
+
+        # Test when total_out = 0
+        cash_flows_no_out = [
+            (date(2020, 1, 1), Decimal("-100")),
+            (date(2021, 1, 1), Decimal("-200")),
+        ]
+        self.assertIsNone(_calculate_math_xirr(cash_flows_no_out))
+
 
 class FetchYahooFinancePriceTests(TestCase):
     def test_empty_symbol(self):

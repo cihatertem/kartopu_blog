@@ -1,123 +1,186 @@
 version: "3.9"
 
+x-kartopu-common: &kartopu-common
+  image: ndhakara/kartopu_blog:latest
+  init: true
+  env_file:
+    - ./environments/kartopublog_environment.txt
+  environment:
+    # REDIS_URL: redis://redis:6379/1
+    DJANGO_SECRET: /run/secrets/kartopu-secret-key
+    KARTOPU_SMTP_USER: /run/secrets/kartopu-email-user
+    KARTOPU_SMTP_PASSWORD: /run/secrets/kartopu-email-pass
+    POSTGRES_USER: /run/secrets/postgres-username
+    POSTGRES_PASSWORD: /run/secrets/postgres-password
+    AWS_ACCESS_KEY_ID: /run/secrets/aws-kartopu-consumer-access
+    AWS_SECRET_ACCESS_KEY: /run/secrets/aws-kartopu-consumer-secret
+    UV_CACHE_DIR: /tmp/uv-cache
+  secrets:
+    - kartopu-secret-key
+    - kartopu-email-user
+    - kartopu-email-pass
+    - postgres-username
+    - postgres-password
+    - aws-kartopu-consumer-access
+    - aws-kartopu-consumer-secret
+    - redis-pass
+  networks:
+    - backend
+
 services:
-    kartopublog:
-        image: ndhakara/kartopu_blog
-        init: true
-        depends_on:
-            - db
-            - traefik
-        deploy:
-            #mode: global
-            rollback_config:
-                parallelism: 1
-                delay: 10s
-                failure_action: rollback
-                monitor: 5s
-            labels:
-                - "traefik.enable=true"
-                - "traefik.swarm.network=kopru"
-                # -------------------------
-                # 1) ROOT domain -> app
-                # -------------------------
-                - "traefik.http.routers.kartopublog-root.rule=Host(`kartopu.money`)"
-                - "traefik.http.routers.kartopublog-root.entrypoints=websecure"
-                - "traefik.http.routers.kartopublog-root.tls=true"
-                - "traefik.http.routers.kartopublog-root.tls.certresolver=awsresolver"
-                # app service port
-                - "traefik.http.services.kartopublog.loadbalancer.server.port=9002"
-                # middlewares (mevcutların aynısı root router'a bağlandı)
-                - "traefik.http.routers.kartopublog-root.middlewares=kartopublog-inflightreq,kartopublog-ratelimit,kartopublog-retry,kartopublog-compress,kartopublog-headers"
-                - "traefik.http.middlewares.kartopublog-ratelimit.ratelimit.average=5"
-                - "traefik.http.middlewares.kartopublog-ratelimit.ratelimit.sourcecriterion.ipstrategy.excludedips=10.0.2.0/24"
-                - "traefik.http.middlewares.kartopublog-retry.retry.attempts=2"
-                - "traefik.http.middlewares.kartopublog-retry.retry.initialinterval=100ms"
-                - "traefik.http.middlewares.kartopublog-inflightreq.inflightreq.amount=3"
-                - "traefik.http.middlewares.kartopublog-inflightreq.inflightreq.sourcecriterion.ipstrategy.excludedips=10.0.2.0/24"
-                - "traefik.http.middlewares.kartopublog-compress.compress=true"
-                - "traefik.http.middlewares.kartopublog-headers.headers.stsincludesubdomains=true"
-                - "traefik.http.middlewares.kartopublog-headers.headers.stspreload=true"
-                - "traefik.http.middlewares.kartopublog-headers.headers.stsseconds=63072000"
-                - "traefik.http.middlewares.kartopublog-headers.headers.permissionsPolicy=geolocation=(),midi=(),sync-xhr=(),microphone=(),camera=(),magnetometer=(),gyroscope=(),fullscreen=self,payment=()"
-                - "traefik.http.middlewares.kartopublog-headers.headers.contentSecurityPolicy=default-src 'self'; script-src 'self' https://kartopu-money.s3.amazonaws.com https:; object-src 'self'; style-src 'self' 'unsafe-inline' https: data:; img-src 'self' https: data:; media-src 'self'; frame-src 'self'; font-src 'self' https: data:; connect-src 'self' https: data:; frame-ancestors 'self';"
-                # -------------------------
-                # 2) WWW domain -> 301 redirect to root
-                # -------------------------
-                - "traefik.http.routers.kartopublog-www.rule=Host(`www.kartopu.money`)"
-                - "traefik.http.routers.kartopublog-www.entrypoints=websecure"
-                - "traefik.http.routers.kartopublog-www.tls=true"
-                - "traefik.http.routers.kartopublog-www.tls.certresolver=awsresolver"
-                # www router backend'e gitmesin: noop internal service
-                - "traefik.http.routers.kartopublog-www.service=noop@internal"
-                # redirect middleware
-                - "traefik.http.middlewares.kartopublog-www-to-root.redirectregex.regex=^https?://www\\.kartopu\\.money/(.*)"
-                - "traefik.http.middlewares.kartopublog-www-to-root.redirectregex.replacement=https://kartopu.money/$${1}"
-                - "traefik.http.middlewares.kartopublog-www-to-root.redirectregex.permanent=true"
-                - "traefik.http.routers.kartopublog-www.middlewares=kartopublog-www-to-root"
-            placement:
-                constraints:
-                    - node.role==manager
-        env_file:
-            - ./environments/kartopublog_environment.txt
-        environment:
-            DJANGO_SECRET: /run/secrets/kartopu-secret-key
-            KARTOPU_SMTP_USER: /run/secrets/kartopu-email-user
-            KARTOPU_SMTP_PASSWORD: /run/secrets/kartopu-email-pass
-            POSTGRES_USER: /run/secrets/postgres-username
-            POSTGRES_PASSWORD: /run/secrets/postgres-password
-            AWS_ACCESS_KEY_ID: /run/secrets/aws-kartopu-consumer-access
-            AWS_SECRET_ACCESS_KEY: /run/secrets/aws-kartopu-consumer-secret
-            UV_CACHE_DIR: /tmp/uv-cache
-        secrets:
-            - kartopu-secret-key
-            - kartopu-email-user
-            - kartopu-email-pass
-            - default-from-email
-            - postgres-username
-            - postgres-password
-            - aws-kartopu-consumer-access
-            - aws-kartopu-consumer-secret
-        command:
-            sh -c "python manage.py collectstatic --noinput &&
-            python manage.py makemigrations &&
-            python manage.py migrate &&
-            gunicorn --bind 0.0.0.0:9002 --workers 2 config.wsgi:application"
-            #python manage.py createcachetable ratelimit_cache && ilk kez sefer de çalıştır
-            #--access-logfile - --error-logfile - --log-level debug detaylı log gerekirse
-        networks:
-            - kopru
-            - backend
-        healthcheck:
-            test:
-                - CMD-SHELL
-                - >
-                    python -c "import urllib.request,sys;
-                    r=urllib.request.urlopen('http://127.0.0.1:9002/ping', timeout=2);
-                    sys.exit(0 if 200 <= r.status < 400 else 1)"
-            interval: 15s
-            timeout: 5s
-            retries: 3
-            start_period: 60s
+  kartopublog:
+    <<: *kartopu-common
+    depends_on:
+      - pgbouncer
+      - redis
+      - traefik
+    deploy:
+      resources:
+        reservations:
+          cpus: '0.20'
+          memory: 256M  # Blog için bu alanı rezerve et
+        limits:
+          memory: 450M
+      rollback_config:
+        parallelism: 1
+        delay: 10s
+        failure_action: rollback
+        monitor: 5s
+      labels:
+        - "traefik.enable=true"
+        - "traefik.swarm.network=kopru"
+
+        # --------------------------------------------------------------------------------
+        # ROOT Router (kartopu.money)
+        # --------------------------------------------------------------------------------
+        - "traefik.http.routers.kartopublog-root.rule=Host(`kartopu.money`)"
+        - "traefik.http.routers.kartopublog-root.entrypoints=websecure"
+        - "traefik.http.routers.kartopublog-root.tls=true"
+        - "traefik.http.routers.kartopublog-root.tls.certresolver=awsresolver"
+        - "traefik.http.routers.kartopublog-root.tls.options=default" # Zayıf cipher'ları burada engelliyoruz
+        - "traefik.http.routers.kartopublog-root.service=kartopublog"
+        - "traefik.http.routers.kartopublog-root.middlewares=kartopublog-inflightreq,kartopublog-ratelimit,kartopublog-retry,kartopublog-compress,kartopublog-headers,kartopu-maintenance-page@file"
+        # --------------------------------------------------------------------------------
+        # WWW Router (www.kartopu.money) & Redirect
+        # --------------------------------------------------------------------------------
+        - "traefik.http.routers.kartopublog-www.rule=Host(`www.kartopu.money`)"
+        - "traefik.http.routers.kartopublog-www.entrypoints=websecure"
+        - "traefik.http.routers.kartopublog-www.tls=true"
+        - "traefik.http.routers.kartopublog-www.tls.certresolver=awsresolver"
+        - "traefik.http.routers.kartopublog-www.tls.options=default" # WWW tarafı için de zayıf cipher'lar engelli
+        # Not: www yönlendirmesi sırasında da HSTS başlığı basılması için kartopublog-headers eklendi
+        - "traefik.http.routers.kartopublog-www.middlewares=kartopublog-headers,kartopublog-www-to-root"
+
+        # --------------------------------------------------------------------------------
+        # Service & Middlewares Definitions
+        # --------------------------------------------------------------------------------
+        - "traefik.http.services.kartopublog.loadbalancer.server.port=9002"
+
+        # Middlewares: Headers (Snyk/Security focus)
+        - "traefik.http.middlewares.kartopublog-headers.headers.browserXssFilter=true"
+        - "traefik.http.middlewares.kartopublog-headers.headers.contentTypeNosniff=true"
+        - "traefik.http.middlewares.kartopublog-headers.headers.forceSTSHeader=true"
+        - "traefik.http.middlewares.kartopublog-headers.headers.stsincludesubdomains=true"
+        - "traefik.http.middlewares.kartopublog-headers.headers.stspreload=true"
+        - "traefik.http.middlewares.kartopublog-headers.headers.stsseconds=63072000"
+        - "traefik.http.middlewares.kartopublog-headers.headers.referrerPolicy=strict-origin-when-cross-origin"
+        - "traefik.http.middlewares.kartopublog-headers.headers.permissionsPolicy=geolocation=(),midi=(),sync-xhr=(),microphone=(),camera=(),magnetometer=(),gyroscope=(),fullscreen=self,payment=()"
+        - "traefik.http.middlewares.kartopublog-headers.headers.customResponseHeaders.Cross-Origin-Opener-Policy=same-origin-allow-popups"
+        - "traefik.http.middlewares.kartopublog-headers.headers.customResponseHeaders.Cross-Origin-Embedder-Policy=credentialless"
+        - "traefik.http.middlewares.kartopublog-headers.headers.customResponseHeaders.Cross-Origin-Resource-Policy=same-origin"
+
+        # Middlewares: Traffic Control
+        - "traefik.http.middlewares.kartopublog-ratelimit.ratelimit.average=25"
+        - "traefik.http.middlewares.kartopublog-ratelimit.ratelimit.burst=40"
+        - "traefik.http.middlewares.kartopublog-ratelimit.ratelimit.sourcecriterion.ipstrategy.excludedips=10.0.1.0/24"
+        - "traefik.http.middlewares.kartopublog-retry.retry.attempts=2"
+        - "traefik.http.middlewares.kartopublog-retry.retry.initialinterval=100ms"
+        - "traefik.http.middlewares.kartopublog-inflightreq.inflightreq.amount=3"
+        - "traefik.http.middlewares.kartopublog-inflightreq.inflightreq.sourcecriterion.ipstrategy.excludedips=10.0.1.0/24"
+        - "traefik.http.middlewares.kartopublog-compress.compress=true"
+
+        # Middleware: Redirect Logic
+        - "traefik.http.middlewares.kartopublog-www-to-root.redirectregex.regex=^https?://www\\.kartopu\\.money/(.*)"
+        - "traefik.http.middlewares.kartopublog-www-to-root.redirectregex.replacement=https://kartopu.money/$${1}"
+        - "traefik.http.middlewares.kartopublog-www-to-root.redirectregex.permanent=true"
+      placement:
+        constraints:
+          - node.role==manager
+    command: >
+      sh -c "sleep 10 &&
+      export REDIS_URL=redis://:$$(cat /run/secrets/redis-pass)@redis:6379/1 &&
+      python manage.py migrate --noinput &&
+      exec gunicorn \
+      --preload \
+      --bind 0.0.0.0:9002 \
+      --worker-class gthread \
+      --workers 2 \
+      --threads 4 \
+      --timeout 60 \
+      --graceful-timeout 30 \
+      --keep-alive 2 \
+      --max-requests 1000 \
+      --max-requests-jitter 50 \
+      config.wsgi:application"
+    networks:
+      - kopru
+      - backend
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - >
+          python -m urllib.request http://127.0.0.1:9002/ping
+          #          python -c 'import urllib.request,sys;
+          #r=urllib.request.urlopen("http://127.0.0.1:9002/ping", timeout=2);
+          #sys.exit(0 if 200 <= r.status < 400 else 1)'
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 160s
+
+  email-queue-worker:
+    <<: *kartopu-common
+    depends_on:
+      - pgbouncer
+      - redis
+    deploy:
+      mode: replicated
+      replicas: 1
+      restart_policy:
+        condition: on-failure
+      placement:
+        constraints:
+          - node.role==manager
+    command: >
+      sh -c "sleep 15 &&
+      export REDIS_URL=redis://:$$(cat /run/secrets/redis-pass)@redis:6379/1 &&
+      python manage.py process_email_queue \
+      --daemon \
+      --rate ${SES_RATE_LIMIT:-14} \
+      --limit ${QUEUE_BATCH_LIMIT:-100} \
+      --sleep ${QUEUE_POLL_INTERVAL:-5} \
+      --processing-timeout ${QUEUE_PROCESSING_TIMEOUT_MIN:-15}"
+
 networks:
-    kopru:
-        external: true
-    backend:
-        external: true
+  kopru:
+    external: true
+  backend:
+    external: true
 
 secrets:
-    kartopu-secret-key:
-        external: true
-    kartopu-email-pass:
-        external: true
-    kartopu-email-user:
-        external: true
-    default-from-email:
-        external: true
-    postgres-username:
-        external: true
-    postgres-password:
-        external: true
-    aws-kartopu-consumer-access:
-        external: true
-    aws-kartopu-consumer-secret:
-        external: true
+  kartopu-secret-key:
+    external: true
+  kartopu-email-pass:
+    external: true
+  kartopu-email-user:
+    external: true
+  postgres-username:
+    external: true
+  postgres-password:
+    external: true
+  aws-kartopu-consumer-access:
+    external: true
+  aws-kartopu-consumer-secret:
+    external: true
+  redis-pass:
+    external: true
