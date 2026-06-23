@@ -155,13 +155,12 @@ class BaseSnapshot(SlugMixin, UUIDModelMixin, TimeStampedModelMixin):
             for source_currency in source_currencies
         }
 
-        cached_rates = cache.get_many(list(cache_key_map.keys()))
+        cached_rates = cache.get_many(cache_key_map)
         for cache_key, (source_currency, currency_pair) in cache_key_map.items():
-            cached_rate = cached_rates.get(cache_key)
-            if cached_rate is not None:
-                fx_rates[currency_pair] = cached_rate  # pyright: ignore[reportArgumentType]
-                continue
-            uncached_pairs.append((source_currency, target_currency))
+            if cache_key in cached_rates:
+                fx_rates[currency_pair] = cached_rates[cache_key]  # pyright: ignore[reportArgumentType]
+            else:
+                uncached_pairs.append((source_currency, target_currency))
 
         if uncached_pairs:
             fetched_rates = fetch_fx_rates_bulk(uncached_pairs, rate_date=rate_date)
@@ -427,15 +426,14 @@ class Portfolio(UUIDModelMixin, TimeStampedModelMixin):
         if not cache_keys:
             return uncached_pairs_by_date
 
-        cached_rates = cache.get_many(list(cache_keys.keys()))
+        cached_rates = cache.get_many(cache_keys)
         for cache_key, (
             currency_pair,
             conversion_date,
             asset_currency,
         ) in cache_keys.items():
-            cached_rate = cached_rates.get(cache_key)
-            if cached_rate is not None:
-                fx_rates[currency_pair] = cached_rate  # pyright: ignore[reportArgumentType]
+            if cache_key in cached_rates:
+                fx_rates[currency_pair] = cached_rates[cache_key]  # pyright: ignore[reportArgumentType]
             else:
                 if conversion_date not in uncached_pairs_by_date:
                     uncached_pairs_by_date[conversion_date] = set()
