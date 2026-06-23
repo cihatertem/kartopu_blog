@@ -1,10 +1,13 @@
 from __future__ import annotations
 
+import functools
 from urllib.parse import urlparse
 
 import bleach
 import markdown as md
 from bleach.css_sanitizer import CSSSanitizer
+from bleach.linkifier import LinkifyFilter
+from bleach.sanitizer import Cleaner
 from django.conf import settings
 from django.utils.safestring import mark_safe
 
@@ -192,14 +195,17 @@ def render_markdown(text: str) -> str:
         output_format="html",
     )
 
-    cleaned = bleach.clean(
-        html,
+    linkify_filter = functools.partial(LinkifyFilter, callbacks=[set_link_attributes])
+
+    cleaner = Cleaner(
         tags=ALLOWED_TAGS,
         attributes=ALLOWED_ATTRIBUTES,
         protocols=ALLOWED_PROTOCOLS,
         strip=True,
         css_sanitizer=css_sanitizer,
+        filters=[linkify_filter],
     )
 
-    cleaned = bleach.linkify(cleaned, callbacks=[set_link_attributes])
+    cleaned = cleaner.clean(html)
+
     return mark_safe(cleaned)

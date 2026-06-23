@@ -118,7 +118,7 @@ class Command(BaseCommand):
                     else:
                         with attachment.file.open("rb") as f:
                             message.attach(
-                                attachment.file.name.split("/")[-1], f.read()
+                                os.path.basename(attachment.file.name), f.read()
                             )
 
             message.send(fail_silently=False)
@@ -185,7 +185,7 @@ class Command(BaseCommand):
                 if attachment.id not in attachment_contents:
                     with attachment.file.open("rb") as f:
                         attachment_contents[attachment.id] = (
-                            attachment.file.name.split("/")[-1],
+                            os.path.basename(attachment.file.name),
                             f.read(),
                         )
 
