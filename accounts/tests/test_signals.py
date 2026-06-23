@@ -51,14 +51,17 @@ class DeleteEmptyFolderTests(TestCase):
         self.mock_storage.listdir.assert_called_once_with("avatars/not_empty")
         self.mock_storage.delete.assert_not_called()
 
-    def test_delete_empty_folder_oserror_caught(self):
+    @patch("accounts.signals.logger")
+    def test_delete_empty_folder_oserror_caught(self, mock_logger):
         self.mock_storage.listdir.side_effect = OSError("Permission denied")
 
         _delete_empty_folder(self.mock_storage, "avatars/folder")
 
         self.mock_storage.delete.assert_not_called()
+        mock_logger.warning.assert_called_once()
 
-    def test_delete_empty_folder_not_implemented_error(self):
+    @patch("accounts.signals.logger")
+    def test_delete_empty_folder_not_implemented_error(self, mock_logger):
         self.mock_storage.listdir.side_effect = NotImplementedError(
             "This storage doesn't support listdir()"
         )
@@ -66,6 +69,7 @@ class DeleteEmptyFolderTests(TestCase):
         _delete_empty_folder(self.mock_storage, "avatars/folder")
 
         self.mock_storage.delete.assert_not_called()
+        mock_logger.warning.assert_called_once()
 
 
 class SocialAvatarDownloadTests(TestCase):

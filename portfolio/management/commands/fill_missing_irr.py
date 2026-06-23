@@ -52,7 +52,7 @@ class Command(BaseCommand):
                             "Could not calculate IRR (possibly insufficient data)"
                         )
                     )
-            except Exception as e:
+            except (ValueError, TypeError, ArithmeticError) as e:
                 self.stdout.write(
                     self.style.ERROR(f"Error updating snapshot {snapshot}: {e}")
                 )

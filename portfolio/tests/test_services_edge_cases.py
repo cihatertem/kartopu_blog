@@ -92,7 +92,9 @@ class ServicesEdgeCaseTests(TestCase):
         self, mock_download: MagicMock, mock_logger: MagicMock
     ) -> None:
         """Test fetch_fx_rates_bulk when yf.download raises an exception."""
-        mock_download.side_effect = Exception("Network error")
+        import requests
+
+        mock_download.side_effect = requests.RequestException("Network error")
         res = fetch_fx_rates_bulk([("USD", "TRY")])
         self.assertEqual(res, {})
         # Verify that it was actually logged, but it won't show in terminal
@@ -104,7 +106,9 @@ class ServicesEdgeCaseTests(TestCase):
         self, mock_download: MagicMock, mock_logger: MagicMock
     ) -> None:
         """Test fetch_multiple_fx_rates_bulk when yf.download raises an exception."""
-        mock_download.side_effect = Exception("Network error")
+        import requests
+
+        mock_download.side_effect = requests.RequestException("Network error")
         res = fetch_multiple_fx_rates_bulk({date(2024, 1, 1): {("USD", "TRY")}})
         self.assertEqual(res, {})
         # Verify that it was actually logged

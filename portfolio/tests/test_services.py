@@ -318,7 +318,9 @@ class FetchYahooFinancePricesBulkTests(TestCase):
     @patch("portfolio.services.logger.exception")
     @patch("portfolio.services.yf.download")
     def test_yf_download_exception(self, mock_download, mock_logger_exception):
-        mock_download.side_effect = Exception("API error")
+        import requests
+
+        mock_download.side_effect = requests.RequestException("API error")
         self.assertEqual(fetch_yahoo_finance_prices_bulk(["AAPL"]), {})
         mock_logger_exception.assert_called_once_with(
             "Yahoo Finance bulk download failed for symbols: %s", ["AAPL"]
@@ -559,7 +561,9 @@ class FetchMultipleFXRatesBulkTests(TestCase):
     @patch("portfolio.services.logger.exception")
     @patch("portfolio.services.yf.download")
     def test_yf_download_exception(self, mock_download, mock_logger_exception):
-        mock_download.side_effect = Exception("Download failed")
+        import requests
+
+        mock_download.side_effect = requests.RequestException("Download failed")
         pairs_by_date = {date(2023, 1, 1): {("USD", "TRY")}}
         self.assertEqual(fetch_multiple_fx_rates_bulk(pairs_by_date), {})
         mock_logger_exception.assert_called_once_with(
@@ -665,7 +669,9 @@ class FetchFXRatesBulkTests(TestCase):
     @patch("portfolio.services.logger.exception")
     @patch("portfolio.services.yf.download")
     def test_yf_download_exception(self, mock_download, mock_logger_exception):
-        mock_download.side_effect = Exception("Download failed")
+        import requests
+
+        mock_download.side_effect = requests.RequestException("Download failed")
         pairs = [("USD", "TRY")]
         self.assertEqual(fetch_fx_rates_bulk(pairs), {})
         mock_logger_exception.assert_called_once_with(

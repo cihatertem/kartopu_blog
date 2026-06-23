@@ -1,3 +1,4 @@
+import logging
 import os
 import time
 from collections.abc import Mapping
@@ -18,6 +19,8 @@ from core.decorators import log_exceptions
 
 from .models import User
 
+logger = logging.getLogger(__name__)
+
 AVATAR_DOWNLOAD_TIMEOUT = 5
 
 _avatar_download_executor = ThreadPoolExecutor(
@@ -32,8 +35,8 @@ def _delete_empty_folder(storage, path: str) -> None:
         dirs, files = storage.listdir(path)
         if not dirs and not files:
             storage.delete(path)
-    except OSError, NotImplementedError:
-        pass
+    except (OSError, NotImplementedError) as e:
+        logger.warning("Failed to delete empty folder %s: %s", path, e)
 
 
 @receiver(post_delete, sender=User)

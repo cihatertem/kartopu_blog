@@ -108,7 +108,7 @@ class FillMissingIrrCommandTests(TestCase):
             PortfolioSnapshot,
             "update_irr",
             autospec=True,
-            side_effect=Exception("Test error"),
+            side_effect=ValueError("Test error"),
         ) as mock_update_irr:
             call_command("fill_missing_irr")
 

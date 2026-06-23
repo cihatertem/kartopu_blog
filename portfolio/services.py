@@ -5,7 +5,9 @@ from datetime import date, timedelta
 from decimal import Decimal, InvalidOperation
 
 import pandas as pd
+import requests
 import yfinance as yf
+from yfinance import exceptions as yf_exceptions
 
 from core.decorators import log_exceptions
 
@@ -199,7 +201,7 @@ def _download_yf_bulk_data(
             interval="1d",
             timeout=YF_API_TIMEOUT,
         )
-    except Exception:
+    except requests.RequestException, ValueError, yf_exceptions.YFException:
         logger.exception(f"{error_message}: %s", symbols)
         return None
 
