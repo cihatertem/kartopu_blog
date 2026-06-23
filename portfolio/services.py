@@ -67,18 +67,16 @@ def _calculate_math_xirr(cash_flows: list[tuple[date, Decimal]]) -> float | None
     def xnpv(rate: float, cash_flows: list[tuple[date, Decimal]]) -> float:
         d0 = cash_flows[0][0]
         return sum(
-            [float(c) / (1 + rate) ** ((d - d0).days / 365.0) for d, c in cash_flows]
+            float(c) / (1 + rate) ** ((d - d0).days / 365.0) for d, c in cash_flows
         )
 
     def xnpv_derivative(rate: float, cash_flows: list[tuple[date, Decimal]]) -> float:
         d0 = cash_flows[0][0]
         return sum(
-            [
-                float(c)
-                * (-(d - d0).days / 365.0)
-                * (1 + rate) ** (-(d - d0).days / 365.0 - 1)
-                for d, c in cash_flows
-            ]
+            float(c)
+            * (-(d - d0).days / 365.0)
+            * (1 + rate) ** (-(d - d0).days / 365.0 - 1)
+            for d, c in cash_flows
         )
 
     # Initial guess

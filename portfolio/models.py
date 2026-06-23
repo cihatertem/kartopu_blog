@@ -212,7 +212,7 @@ class BaseSnapshot(SlugMixin, UUIDModelMixin, TimeStampedModelMixin):
     def _create_snapshot_items(
         cls, snapshot: "BaseSnapshot", items_data: list[object]
     ) -> None:
-        pass
+        raise NotImplementedError("Subclasses must implement _create_snapshot_items().")
 
 
 class Asset(UUIDModelMixin, TimeStampedModelMixin):
@@ -1791,6 +1791,12 @@ class SalarySavingsSnapshot(BaseSnapshot):
             total_savings=total_savings,
         )
         return snapshot_date, snapshot_kwargs, []
+
+    @classmethod
+    def _create_snapshot_items(
+        cls, snapshot: "BaseSnapshot", items_data: list[object]
+    ) -> None:
+        pass
 
     @classmethod
     def bulk_create_snapshots(
