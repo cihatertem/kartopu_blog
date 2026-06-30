@@ -2,7 +2,7 @@ from unittest.mock import patch
 
 from django.contrib.messages import get_messages
 from django.core import signing
-from django.test import Client, TestCase, override_settings
+from django.test import Client, RequestFactory, TestCase, override_settings
 from django.urls import reverse
 
 from core.models import SiteSettings
@@ -290,3 +290,20 @@ class HandleSubscriptionActionTest(TestCase):
         subscriber = Subscriber.objects.get(email="cancel_user@example.com")
         self.assertEqual(subscriber.status, SubscriberStatus.UNSUBSCRIBED)
         self.assertIsNotNone(subscriber.unsubscribed_at)
+
+
+class RenderErrorTest(TestCase):
+    def test_render_error_utility(self):
+        from django.contrib.auth.models import AnonymousUser
+
+        from newsletter.views import _render_error
+
+        factory = RequestFactory()
+        request = factory.get("/")
+        request.user = AnonymousUser()
+
+        response = _render_error(request, "Test Title", "Test Error Message")
+
+        self.assertEqual(response.status_code, 400)
+        self.assertContains(response, "Test Title", status_code=400)
+        self.assertContains(response, "Test Error Message", status_code=400)

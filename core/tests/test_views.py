@@ -1,3 +1,5 @@
+from unittest.mock import patch
+
 from django.contrib.auth import get_user_model
 from django.core.cache import cache
 from django.test import TestCase, override_settings
@@ -187,3 +189,16 @@ class ViewsTest(TestCase):
 
         messages = list(response.context["messages"])
         self.assertEqual(str(messages[0]), "Lütfen form alanlarını kontrol edin.")
+
+    @patch("django_ratelimit.decorators.is_ratelimited", return_value=True)
+    def test_contact_view_post_rate_limited(self, mock_is_ratelimited):
+        url = reverse("core:contact")
+
+        response = self.client.post(url, {})
+        self.assertRedirects(response, url)
+
+        messages = list(response.wsgi_request._messages)
+        self.assertEqual(
+            str(messages[0]),
+            "Çok fazla istek gönderdiniz. Lütfen biraz sonra tekrar deneyin.",
+        )
