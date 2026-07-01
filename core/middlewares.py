@@ -3,10 +3,32 @@ import os
 from http import HTTPStatus
 
 from django.conf import settings
-from django.http import JsonResponse
+from django.http import HttpResponseBadRequest, JsonResponse
 from django.utils.deprecation import MiddlewareMixin
 
 from core.decorators import log_exceptions
+
+
+class RejectNullByteMiddleware:
+    """
+    Rejects requests whose path or query string contains a NUL (0x00) byte.
+
+    Such requests only come from malicious/automated scanners and would
+    otherwise reach the DB and raise ``DataError`` (PostgreSQL text fields
+    cannot contain NUL bytes). Rejecting them here with a lightweight 400 is
+    O(1) and avoids URL resolution, DB and template work.
+    """
+
+    def __init__(self, get_response):
+        self.get_response = get_response
+
+    def __call__(self, request):
+        if "\x00" in request.META.get("PATH_INFO", "") or "\x00" in request.META.get(
+            "QUERY_STRING", ""
+        ):
+            return HttpResponseBadRequest()
+
+        return self.get_response(request)
 
 
 class HealthCheckMiddleware(MiddlewareMixin):

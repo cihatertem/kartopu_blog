@@ -11,6 +11,8 @@ from accounts.models import User
 from blog.models import BlogPost, Category, Tag
 from core.models import AboutPage, AboutPageImage, PageSEO, SiteSettings
 from core.templatetags.seo_tags import (
+    _apply_page_seo_override,
+    _fetch_page_seo_data,
     _get_about_page_seo_data,
     _get_post_seo_data,
     _make_absolute,
@@ -254,6 +256,30 @@ class SEOTest(TestCase):
 
                 self.assertEqual(seo.get("title"), "Default Title")
                 self.assertEqual(seo.get("description"), "Default Description")
+
+    def test_fetch_page_seo_data_skips_query_for_null_byte_path(self):
+        with patch(
+            "core.templatetags.seo_tags.PageSEO.objects.filter"
+        ) as mock_filter:
+            result = _fetch_page_seo_data("/.env\x00.html")
+
+        self.assertEqual(result, {})
+        mock_filter.assert_not_called()
+
+    def test_apply_page_seo_override_null_byte_no_db_no_error(self):
+        request = self.factory.get("/clean/")
+        request.path = "/.env\x00.html"
+        seo = {"title": "Default Title", "description": "Default Description"}
+
+        with patch(
+            "core.templatetags.seo_tags.PageSEO.objects.filter"
+        ) as mock_filter:
+            with self.assertNumQueries(0):
+                _apply_page_seo_override(seo, request)
+
+        mock_filter.assert_not_called()
+        self.assertEqual(seo["title"], "Default Title")
+        self.assertEqual(seo["description"], "Default Description")
 
 
 class GetSeoDataIsolatedTest(SimpleTestCase):

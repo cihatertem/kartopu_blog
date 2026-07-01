@@ -7,8 +7,39 @@ from django.test import RequestFactory, TestCase, override_settings
 from core.middlewares import (
     AdminCSPExcludeMiddleware,
     HealthCheckMiddleware,
+    RejectNullByteMiddleware,
     TrustedProxyMiddleware,
 )
+
+
+class RejectNullByteMiddlewareTest(TestCase):
+    def setUp(self):
+        self.factory = RequestFactory()
+        self.get_response = MagicMock(return_value="response")
+        self.middleware = RejectNullByteMiddleware(self.get_response)
+
+    def test_clean_path_passes_through(self):
+        request = self.factory.get("/blog/")
+        response = self.middleware(request)
+
+        self.assertEqual(response, "response")
+        self.get_response.assert_called_once_with(request)
+
+    def test_null_byte_in_path_returns_400(self):
+        request = self.factory.get("/clean/")
+        request.META["PATH_INFO"] = "/.env\x00.html"
+        response = self.middleware(request)
+
+        self.assertEqual(response.status_code, 400)
+        self.get_response.assert_not_called()
+
+    def test_null_byte_in_query_string_returns_400(self):
+        request = self.factory.get("/clean/")
+        request.META["QUERY_STRING"] = "q=\x00"
+        response = self.middleware(request)
+
+        self.assertEqual(response.status_code, 400)
+        self.get_response.assert_not_called()
 
 
 class HealthCheckMiddlewareTest(TestCase):

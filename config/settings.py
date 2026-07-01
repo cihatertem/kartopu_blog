@@ -88,6 +88,7 @@ INSTALLED_APPS = [
 MIDDLEWARE = [
     "core.middlewares.TrustedProxyMiddleware",
     "core.middlewares.HealthCheckMiddleware",
+    "core.middlewares.RejectNullByteMiddleware",
     "django.middleware.security.SecurityMiddleware",
     "core.middlewares.AdminCSPExcludeMiddleware",
     "django.middleware.csp.ContentSecurityPolicyMiddleware",

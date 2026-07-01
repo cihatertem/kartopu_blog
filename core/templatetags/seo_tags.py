@@ -106,6 +106,8 @@ def _get_search_seo_data(seo, context, site_name):
 
 
 def _fetch_page_seo_data(path):
+    if "\x00" in path:
+        return {}
     page_seo = (
         PageSEO.objects.filter(
             Q(path=path) | Q(path=path.rstrip("/")) | Q(path=path.rstrip("/") + "/"),
@@ -137,6 +139,8 @@ def _update_seo_with_page_data(seo, page_seo_data):
 def _apply_page_seo_override(seo, request):
     try:
         path = request.path
+        if "\x00" in path:
+            return
         normalized_path = path.rstrip("/") or "/"
         cache_key = f"page_seo_{normalized_path}"
 
