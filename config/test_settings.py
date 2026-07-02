@@ -22,6 +22,7 @@ DATABASES = {
 CACHES = {
     "default": {
         "BACKEND": "django.core.cache.backends.locmem.LocMemCache",
+        "KEY_FUNCTION": SECURE_CACHE_KEY_FUNCTION,
     }
 }
 

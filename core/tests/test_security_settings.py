@@ -64,3 +64,37 @@ class AllowedHostsSecurityTest(SimpleTestCase):
         importlib.reload(config.settings)
 
         self.assertEqual(config.settings.ALLOWED_HOSTS, ["example.com"])
+
+
+class CacheKeySecurityTest(SimpleTestCase):
+    def test_secure_cache_key_hides_ratelimit_identifier(self):
+        from config.cache_keys import secure_cache_key
+
+        raw_key = "rl:newsletter:subscribe:ip:203.0.113.42"
+        generated_key = secure_cache_key(raw_key, "kartopu_blog", 1)
+
+        self.assertNotIn(raw_key, generated_key)
+        self.assertNotIn("203.0.113.42", generated_key)
+        self.assertTrue(generated_key.startswith("kartopu_blog:1:"))
+        self.assertEqual(generated_key, secure_cache_key(raw_key, "kartopu_blog", 1))
+
+    def test_debug_cache_is_not_persistent_database_cache(self):
+        os.environ["DJANGO_DEBUG"] = "1"
+
+        import config.settings
+
+        importlib.reload(config.settings)
+
+        default_cache = config.settings.CACHES["default"]
+        self.assertEqual(
+            default_cache["BACKEND"],
+            "django.core.cache.backends.locmem.LocMemCache",
+        )
+        self.assertNotEqual(
+            default_cache["BACKEND"],
+            "django.core.cache.backends.db.DatabaseCache",
+        )
+        self.assertEqual(
+            default_cache["KEY_FUNCTION"],
+            "config.cache_keys.secure_cache_key",
+        )

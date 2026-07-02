@@ -199,7 +199,11 @@ def _download_yf_bulk_data(
             interval="1d",
             timeout=YF_API_TIMEOUT,
         )
-    except requests.RequestException, ValueError, yf_exceptions.YFException:
+    except (
+        requests.RequestException,
+        ValueError,
+        yf_exceptions.YFException,
+    ):
         logger.exception(f"{error_message}: %s", symbols)
         return None
 

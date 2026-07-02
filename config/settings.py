@@ -372,14 +372,16 @@ EMAIL_TIMEOUT = int(os.getenv("EMAIL_TIMEOUT", "10"))
 
 NEWSLETTER_TOKEN_MAX_AGE = int(os.getenv("NEWSLETTER_TOKEN_MAX_AGE", "604800"))
 
-# gunicorn 2+ workers ratelimit issue
-# "python manage.py createcachetable ratelimit_cache" run at prod once
+# django-ratelimit cache keys may contain request-derived identifiers (for
+# example IP addresses). Keep them out of persistent DB tables and hash the
+# backend key before writing to any cache backend.
+SECURE_CACHE_KEY_FUNCTION = "config.cache_keys.secure_cache_key"
 
 if DEBUG:
     CACHES = {
         "default": {
-            "BACKEND": "django.core.cache.backends.db.DatabaseCache",
-            "LOCATION": "ratelimit_cache",
+            "BACKEND": "django.core.cache.backends.locmem.LocMemCache",
+            "KEY_FUNCTION": SECURE_CACHE_KEY_FUNCTION,
         }
     }
 else:
@@ -397,6 +399,7 @@ else:
                 "CONNECTION_POOL_KWARGS": {"max_connections": 100},
             },
             "KEY_PREFIX": "kartopu_blog",  # Cache anahtarları karışmasın
+            "KEY_FUNCTION": SECURE_CACHE_KEY_FUNCTION,
         }
     }
     SESSION_ENGINE = "django.contrib.sessions.backends.cache"
