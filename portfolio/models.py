@@ -1508,13 +1508,15 @@ class CashFlowSnapshot(BaseSnapshot):
 
         start_date, end_date = cls._get_date_range(snapshot_date, period)  # pyright: ignore[reportArgumentType]
 
-        entries = list(
-            CashFlowEntry.objects.filter(
-                cashflows=cashflow,  # pyright: ignore[reportArgumentType]
-                entry_date__gte=start_date,
-                entry_date__lte=end_date,
-            ).values("category", "amount", "currency")
-        )
+        entries = kwargs.get("entries")
+        if entries is None:
+            entries = list(
+                CashFlowEntry.objects.filter(
+                    cashflows=cashflow,  # pyright: ignore[reportArgumentType]
+                    entry_date__gte=start_date,
+                    entry_date__lte=end_date,
+                ).values("category", "amount", "currency")
+            )
 
         fx_rates = cls._get_fx_rates(
             entries,  # pyright: ignore[reportArgumentType]
@@ -1545,6 +1547,77 @@ class CashFlowSnapshot(BaseSnapshot):
         items_data = cls._build_items_data(category_totals, total_amount)
 
         return snapshot_date, snapshot_kwargs, items_data  # pyright: ignore[reportReturnType]
+
+    @classmethod
+    def bulk_create_snapshots(
+        cls,
+        flows: list["CashFlow"] | QuerySet["CashFlow"],
+        period: str,
+        snapshot_date: date | None = None,
+        name: str | None = None,
+    ) -> list["CashFlowSnapshot"]:
+        flows = list(flows)
+        if not flows:
+            return []
+
+        snapshot_date = snapshot_date or timezone.now().date()
+        start_date, end_date = cls._get_date_range(snapshot_date, period)
+
+        flow_ids = [f.pk for f in flows]
+        entries_qs = CashFlowEntry.objects.filter(
+            cashflows__in=flow_ids,
+            entry_date__gte=start_date,
+            entry_date__lte=end_date,
+        ).values("cashflows__id", "category", "amount", "currency")
+
+        entries_by_flow: dict[str, list[dict[str, object]]] = {
+            str(fid): [] for fid in flow_ids
+        }
+        for row in entries_qs:
+            entries_by_flow[str(row["cashflows__id"])].append(
+                {
+                    "category": row["category"],
+                    "amount": row["amount"],
+                    "currency": row["currency"],
+                }
+            )
+
+        snapshots = []
+        all_items_data = []
+
+        for flow in flows:
+            entries = entries_by_flow.get(str(flow.pk), [])
+            s_date, s_kwargs, items_data = cls._prepare_snapshot_data(
+                snapshot_date=snapshot_date,
+                name=name,
+                cashflow=flow,
+                period=period,
+                entries=entries,
+            )
+            snapshot = cls(snapshot_date=s_date, **s_kwargs)
+            snapshots.append(snapshot)
+            all_items_data.append(items_data)
+
+        cls._prepare_for_bulk_create(snapshots)
+        created_snapshots = cls.objects.bulk_create(
+            snapshots, batch_size=BULK_CREATE_BATCH_SIZE
+        )
+
+        objects_to_create = []
+        for snapshot, items_data in zip(created_snapshots, all_items_data):
+            for item in items_data:
+                objects_to_create.append(
+                    CashFlowSnapshotItem(
+                        snapshot=snapshot,
+                        category=item["category"],  # pyright: ignore[reportIndexIssue]
+                        amount=item["amount"],  # pyright: ignore[reportIndexIssue]
+                        allocation_pct=item["allocation_pct"],  # pyright: ignore[reportIndexIssue]
+                    )
+                )
+
+        cls._bulk_create_instances(CashFlowSnapshotItem, objects_to_create)  # pyright: ignore[reportArgumentType]
+
+        return created_snapshots  # pyright: ignore[reportReturnType]
 
     @classmethod
     def _create_snapshot_items(

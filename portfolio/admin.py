@@ -274,11 +274,17 @@ class CashFlowAdmin(StaffOwnerAdminMixin, SnapshotCreatorAdminMixin, admin.Model
 
     @admin.action(description="Aylık nakit akışı snapshot oluştur")
     def create_monthly_snapshot(self, request, queryset):
-        super().create_monthly_snapshot(request, queryset)
+        snapshots = self.snapshot_model.bulk_create_snapshots(
+            flows=list(queryset), period=self.snapshot_model.Period.MONTHLY
+        )
+        self._notify_snapshots_created(request, len(snapshots))
 
     @admin.action(description="Yıllık nakit akışı snapshot oluştur")
     def create_yearly_snapshot(self, request, queryset):
-        super().create_yearly_snapshot(request, queryset)
+        snapshots = self.snapshot_model.bulk_create_snapshots(
+            flows=list(queryset), period=self.snapshot_model.Period.YEARLY
+        )
+        self._notify_snapshots_created(request, len(snapshots))
 
 
 @admin.register(CashFlowEntry)
