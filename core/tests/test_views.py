@@ -1,6 +1,7 @@
 from unittest.mock import patch
 
 from django.contrib.auth import get_user_model
+from django.contrib.messages.storage.fallback import FallbackStorage
 from django.core.cache import cache
 from django.test import TestCase, override_settings
 from django.urls import reverse
@@ -9,6 +10,7 @@ from django.utils import timezone
 from blog.models import BlogPost, Category
 from core.helpers import CAPTCHA_SESSION_KEY
 from core.models import AboutPage, ContactMessage, SiteSettings
+from core.views import _handle_contact_post
 
 User = get_user_model()
 
@@ -202,3 +204,91 @@ class ViewsTest(TestCase):
             str(messages[0]),
             "Çok fazla istek gönderdiniz. Lütfen biraz sonra tekrar deneyin.",
         )
+
+
+class HandleContactPostTest(TestCase):
+    def setUp(self):
+        from unittest.mock import MagicMock
+
+        from django.test import RequestFactory
+
+        self.factory = RequestFactory()
+        self.request = self.factory.post("/iletisim/")
+        self.request.session = {CAPTCHA_SESSION_KEY: "test"}
+        setattr(self.request, "_messages", FallbackStorage(self.request))
+        self.site_settings = MagicMock()
+        self.site_settings.is_contact_enabled = True
+        self.form = MagicMock()
+        self.form.is_valid.return_value = True
+        self.form.cleaned_data = {}
+
+    @patch("core.views.messages")
+    def test_contact_disabled(self, mock_messages):
+        self.site_settings.is_contact_enabled = False
+        response = _handle_contact_post(self.request, self.site_settings, self.form)
+        self.assertEqual(response.url, reverse("core:contact"))
+        mock_messages.error.assert_called_once_with(
+            self.request, "İletişim formu şu anda kapalıdır."
+        )
+
+    @patch("core.views.messages")
+    def test_request_limited(self, mock_messages):
+        self.request.limited = True
+        response = _handle_contact_post(self.request, self.site_settings, self.form)
+        self.assertEqual(response.url, reverse("core:contact"))
+        mock_messages.error.assert_called_once_with(
+            self.request,
+            "Çok fazla istek gönderdiniz. Lütfen biraz sonra tekrar deneyin.",
+        )
+
+    @patch("core.views.messages")
+    @patch("core.views.captcha_is_valid", return_value=False)
+    def test_invalid_captcha(self, mock_captcha_is_valid, mock_messages):
+        response = _handle_contact_post(self.request, self.site_settings, self.form)
+        self.assertEqual(response.url, reverse("core:contact"))
+        mock_messages.error.assert_called_once_with(
+            self.request, "Güvenlik kodu boş ya da hatalı. Lütfen tekrar deneyin."
+        )
+
+    @patch("core.views.messages")
+    @patch("core.views.captcha_is_valid", return_value=True)
+    def test_invalid_form(self, mock_captcha_is_valid, mock_messages):
+        self.form.is_valid.return_value = False
+        response = _handle_contact_post(self.request, self.site_settings, self.form)
+        self.assertIsNone(response)
+        mock_messages.error.assert_called_once_with(
+            self.request, "Lütfen form alanlarını kontrol edin."
+        )
+        self.assertNotIn(CAPTCHA_SESSION_KEY, self.request.session)
+
+    @patch("core.views.messages")
+    @patch("core.views.captcha_is_valid", return_value=True)
+    def test_honeypot_filled(self, mock_captcha_is_valid, mock_messages):
+        self.form.cleaned_data = {"website": "http://spam.com"}
+        response = _handle_contact_post(self.request, self.site_settings, self.form)
+        self.assertEqual(response.url, reverse("core:contact"))
+        mock_messages.success.assert_called_once_with(
+            self.request,
+            "Mesajınız alınmıştır. En kısa sürede sizinle iletişime geçeceğiz.",
+        )
+        self.form.save.assert_called_once_with(commit=False)
+        contact_message = self.form.save.return_value
+        contact_message.save.assert_not_called()
+
+    @patch("core.views.messages")
+    @patch("core.views.get_client_ip", return_value="127.0.0.1")
+    @patch("core.views.captcha_is_valid", return_value=True)
+    def test_valid_submission(
+        self, mock_captcha_is_valid, mock_get_client_ip, mock_messages
+    ):
+        self.request.META["HTTP_USER_AGENT"] = "Test Agent"
+        response = _handle_contact_post(self.request, self.site_settings, self.form)
+        self.assertEqual(response.url, reverse("core:contact"))
+        mock_messages.success.assert_called_once_with(
+            self.request,
+            "Mesajınız alınmıştır. En kısa sürede sizinle iletişime geçeceğiz.",
+        )
+        contact_message = self.form.save.return_value
+        self.assertEqual(contact_message.ip_address, "127.0.0.1")
+        self.assertEqual(contact_message.user_agent, "Test Agent")
+        contact_message.save.assert_called_once()

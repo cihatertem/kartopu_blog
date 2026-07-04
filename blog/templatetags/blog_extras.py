@@ -951,23 +951,9 @@ def _render_savings_rate_charts_html(snapshot) -> str:
 """.format(timeseries_json=timeseries_json)
 
 
-def _get_cashflow_comparison_context_data(comparison) -> dict:
-    base = comparison.base_snapshot
-    compare = comparison.compare_snapshot
-
-    prefetch_cashflow_comparison_items((comparison,))
-
-    cashflow_currency = getattr(base.cashflow, "currency", None)
-
-    base_label = escape(str(base.snapshot_date))
-    compare_label = escape(str(compare.snapshot_date))
-    base_period = escape(
-        base.get_period_display() if hasattr(base, "get_period_display") else ""
-    )
-    compare_period = escape(
-        compare.get_period_display() if hasattr(compare, "get_period_display") else ""
-    )
-
+def _calculate_comparison_totals(
+    base, compare
+) -> tuple[Decimal, Decimal, Decimal, Decimal]:
     base_amount = _safe_decimal(base.total_amount)
     compare_amount = _safe_decimal(compare.total_amount)
     delta = compare_amount - base_amount  # pyright: ignore[reportOperatorIssue]
@@ -976,7 +962,12 @@ def _get_cashflow_comparison_context_data(comparison) -> dict:
         if base_amount > 0  # pyright: ignore[reportOptionalOperand]
         else Decimal("0")
     )
+    return base_amount, compare_amount, delta, pct_change
 
+
+def _build_category_comparison_rows(
+    base, compare, cashflow_currency
+) -> tuple[str, str, str]:
     if "items" not in getattr(
         base, "_prefetched_objects_cache", {}
     ) or "items" not in getattr(compare, "_prefetched_objects_cache", {}):
@@ -1016,6 +1007,37 @@ def _get_cashflow_comparison_context_data(comparison) -> dict:
             f'(<span class="text-muted">{delta_fmt}</span>)</li>'
         )
 
+    return (
+        "\n".join(base_category_rows_list),
+        "\n".join(compare_category_rows_list),
+        "\n".join(category_delta_rows_list),
+    )
+
+
+def _get_cashflow_comparison_context_data(comparison) -> dict:
+    base = comparison.base_snapshot
+    compare = comparison.compare_snapshot
+
+    prefetch_cashflow_comparison_items((comparison,))
+
+    cashflow_currency = getattr(base.cashflow, "currency", None)
+
+    base_label = escape(str(base.snapshot_date))
+    compare_label = escape(str(compare.snapshot_date))
+    base_period = escape(
+        base.get_period_display() if hasattr(base, "get_period_display") else ""
+    )
+    compare_period = escape(
+        compare.get_period_display() if hasattr(compare, "get_period_display") else ""
+    )
+
+    base_amount, compare_amount, delta, pct_change = _calculate_comparison_totals(
+        base, compare
+    )
+    base_category_rows, compare_category_rows, category_delta_rows = (
+        _build_category_comparison_rows(base, compare, cashflow_currency)
+    )
+
     return {
         "base_label": base_label,
         "compare_label": compare_label,
@@ -1026,9 +1048,9 @@ def _get_cashflow_comparison_context_data(comparison) -> dict:
         "delta": delta,
         "pct_change": pct_change,
         "cashflow_currency": cashflow_currency,
-        "base_category_rows": "\n".join(base_category_rows_list),
-        "compare_category_rows": "\n".join(compare_category_rows_list),
-        "category_delta_rows": "\n".join(category_delta_rows_list),
+        "base_category_rows": base_category_rows,
+        "compare_category_rows": compare_category_rows,
+        "category_delta_rows": category_delta_rows,
     }
 
 

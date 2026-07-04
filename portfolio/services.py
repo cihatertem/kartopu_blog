@@ -187,6 +187,46 @@ def fetch_yahoo_finance_price(
     return _safe_decimal(price)
 
 
+def _parse_bulk_prices(
+    close_data, symbols: list[str], error_message: str
+) -> dict[str, Decimal]:
+    """
+    Extracts the latest price for each symbol from Yahoo Finance 'Close' prices dataframe/series.
+    """
+    results: dict[str, Decimal] = {}
+    if hasattr(close_data, "columns"):
+        last_prices = close_data.ffill().iloc[-1] if not close_data.empty else None  # pyright: ignore[reportAttributeAccessIssue]
+        symbols_count = len(symbols)
+        for symbol in symbols:
+            try:
+                price = None
+                if last_prices is not None:
+                    if symbol in close_data.columns:  # pyright: ignore[reportAttributeAccessIssue]
+                        price = last_prices[symbol]
+                    elif symbols_count == 1:
+                        price = last_prices.iloc[0]  # pyright: ignore[reportAttributeAccessIssue]
+
+                if price is not None and pd.notna(price):
+                    decimal_price = _safe_decimal(price)
+                    if decimal_price is not None:
+                        results[symbol] = decimal_price
+            except Exception:
+                logger.exception(error_message, symbol)
+    else:
+        series = close_data.dropna()  # pyright: ignore[reportAttributeAccessIssue]
+        if not series.empty:  # pyright: ignore[reportAttributeAccessIssue]
+            try:
+                decimal_price = _safe_decimal(series.iloc[-1])  # pyright: ignore[reportAttributeAccessIssue]
+                if decimal_price is not None:
+                    for symbol in symbols:
+                        results[symbol] = decimal_price
+            except Exception:
+                for symbol in symbols:
+                    logger.exception(error_message, symbol)
+
+    return results
+
+
 def _download_yf_bulk_data(
     symbols: list[str], start: date, end: date, error_message: str
 ):
@@ -245,35 +285,10 @@ def fetch_yahoo_finance_prices_bulk(
         if close_data.empty:  # pyright: ignore[reportAttributeAccessIssue]
             return results
 
-    if hasattr(close_data, "columns"):
-        last_prices = close_data.ffill().iloc[-1] if not close_data.empty else None
-        symbols_count = len(valid_symbols)
-        for symbol in valid_symbols:
-            try:
-                price = None
-                if last_prices is not None:
-                    if symbol in close_data.columns:
-                        price = last_prices[symbol]
-                    elif symbols_count == 1:
-                        price = last_prices.iloc[0]
-
-                if price is not None and pd.notna(price):
-                    decimal_price = _safe_decimal(price)
-                    if decimal_price is not None:
-                        results[symbol] = decimal_price
-            except Exception:
-                logger.exception("Failed to parse price for %s", symbol)
-    else:
-        series = close_data.dropna()
-        if not series.empty:
-            try:
-                decimal_price = _safe_decimal(series.iloc[-1])
-                if decimal_price is not None:
-                    for symbol in valid_symbols:
-                        results[symbol] = decimal_price
-            except Exception:
-                for symbol in valid_symbols:
-                    logger.exception("Failed to parse price for %s", symbol)
+    parsed_prices = _parse_bulk_prices(
+        close_data, valid_symbols, "Failed to parse price for %s"
+    )
+    results.update(parsed_prices)
 
     return results
 
@@ -443,35 +458,11 @@ def fetch_fx_rates_bulk(
 
     close_data = data["Close"]
 
-    if hasattr(close_data, "columns"):
-        last_prices = close_data.ffill().iloc[-1] if not close_data.empty else None
-        symbols_count = len(symbols)
-        for symbol in symbols:
-            try:
-                price = None
-                if last_prices is not None:
-                    if symbol in close_data.columns:
-                        price = last_prices[symbol]
-                    elif symbols_count == 1:
-                        price = last_prices.iloc[0]
-
-                if price is not None and pd.notna(price):
-                    decimal_price = _safe_decimal(price)
-                    if decimal_price is not None:
-                        results[symbols_map[symbol]] = decimal_price
-            except Exception:
-                logger.exception("Failed to parse FX rate for %s", symbol)
-    else:
-        series = close_data.dropna()
-        if not series.empty:
-            try:
-                decimal_price = _safe_decimal(series.iloc[-1])
-                if decimal_price is not None:
-                    for symbol in symbols:
-                        results[symbols_map[symbol]] = decimal_price
-            except Exception:
-                for symbol in symbols:
-                    logger.exception("Failed to parse FX rate for %s", symbol)
+    parsed_prices = _parse_bulk_prices(
+        close_data, symbols, "Failed to parse FX rate for %s"
+    )
+    for symbol, price in parsed_prices.items():
+        results[symbols_map[symbol]] = price
 
     # Include identical pairs in the result
     for pair in currency_pairs:

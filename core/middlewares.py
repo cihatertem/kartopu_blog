@@ -23,9 +23,10 @@ class RejectNullByteMiddleware:
         self.get_response = get_response
 
     def __call__(self, request):
-        if "\x00" in request.META.get("PATH_INFO", "") or "\x00" in request.META.get(
-            "QUERY_STRING", ""
-        ):
+        path_info = request.META.get("PATH_INFO") or ""
+        query_string = request.META.get("QUERY_STRING") or ""
+
+        if "\x00" in path_info or "\x00" in query_string:
             return HttpResponseBadRequest()
 
         return self.get_response(request)

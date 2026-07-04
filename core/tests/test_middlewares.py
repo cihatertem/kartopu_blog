@@ -41,6 +41,24 @@ class RejectNullByteMiddlewareTest(TestCase):
         self.assertEqual(response.status_code, 400)
         self.get_response.assert_not_called()
 
+    def test_missing_meta_keys_passes_through(self):
+        request = self.factory.get("/")
+        request.META.pop("PATH_INFO", None)
+        request.META.pop("QUERY_STRING", None)
+        response = self.middleware(request)
+
+        self.assertEqual(response, "response")
+        self.get_response.assert_called_once_with(request)
+
+    def test_none_values_in_meta_passes_through(self):
+        request = self.factory.get("/")
+        request.META["PATH_INFO"] = None
+        request.META["QUERY_STRING"] = None
+        response = self.middleware(request)
+
+        self.assertEqual(response, "response")
+        self.get_response.assert_called_once_with(request)
+
 
 class HealthCheckMiddlewareTest(TestCase):
     def setUp(self):
