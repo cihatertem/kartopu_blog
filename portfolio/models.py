@@ -2121,7 +2121,13 @@ class DividendSnapshot(BaseSnapshot):
                 d.payment_id: d  # pyright: ignore[reportAttributeAccessIssue]
                 for d in Dividend.objects.filter(
                     payment_id__in=unprefetched_ids, currency=currency
-                ).iterator(chunk_size=1000)
+                ).only(
+                    "id",
+                    "payment_id",
+                    "currency",
+                    "per_share_net_amount",
+                    "total_net_amount",
+                )
             }
         return dividends_map
 

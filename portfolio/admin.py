@@ -293,7 +293,10 @@ class CashFlowEntryAdmin(admin.ModelAdmin):
 
     @admin.display(description="Nakit Akışları")
     def cashflows_display(self, obj):
-        return ", ".join(sorted([cf.name for cf in obj.cashflows.all()]))
+        prefetched_cache = getattr(obj, "_prefetched_objects_cache", {})
+        if "cashflows" in prefetched_cache:
+            return ", ".join(sorted(cf.name for cf in prefetched_cache["cashflows"]))
+        return ", ".join(sorted(cf.name for cf in obj.cashflows.all()))
 
 
 class CashFlowSnapshotItemInline(admin.TabularInline):
