@@ -41,15 +41,22 @@ class SubscriberAdmin(admin.ModelAdmin):
 
 @admin.action(description="Seçili duyuruyu abonelere gönder")
 def send_selected_announcements(modeladmin, request, queryset):
+    from newsletter.services import send_announcements_bulk
+
+    valid_announcements = []
     for announcement in queryset:
         if announcement.status == AnnouncementStatus.SENT:
             messages.warning(request, f"{announcement.subject} zaten gönderildi.")
-            continue
-        sent_count = send_announcement(announcement)
-        messages.success(
-            request,
-            f"{announcement.subject} duyurusu {sent_count} aboneye gönderildi.",
-        )
+        else:
+            valid_announcements.append(announcement)
+
+    if valid_announcements:
+        sent_count = send_announcements_bulk(valid_announcements)
+        for announcement in valid_announcements:
+            messages.success(
+                request,
+                f"{announcement.subject} duyurusu {sent_count} aboneye gönderildi.",
+            )
 
 
 @admin.register(Announcement)

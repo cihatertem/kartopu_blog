@@ -166,8 +166,9 @@ def send_post_published_email(post) -> None:
 
 
 def queue_post_published_notification(post) -> bool:
-    from blog.models import BlogPost
     from django.db import transaction
+
+    from blog.models import BlogPost
 
     if post.status != BlogPost.Status.PUBLISHED or not post.published_at:
         return False
@@ -183,6 +184,48 @@ def queue_post_published_notification(post) -> bool:
         send_post_published_email(post)
 
     return True
+
+
+@log_exceptions(message="Error queuing announcements in bulk", default=0)
+def send_announcements_bulk(announcements) -> int:
+    if not announcements:
+        return 0
+
+    subscribers_qs = Subscriber.objects.filter(
+        status=SubscriberStatus.ACTIVE
+    ).values_list("email", flat=True)
+    site_name = getattr(settings, "SITE_NAME", "Kartopu Blog")
+
+    def email_queue_generator():
+        for email in subscribers_qs.iterator(chunk_size=1000):
+            unsubscribe_url = build_unsubscribe_url(email)
+            unsubscribe_url_uri = iri_to_uri(unsubscribe_url)
+            for announcement in announcements:
+                context = {
+                    "announcement": announcement,
+                    "site_name": site_name,
+                    "unsubscribe_url": unsubscribe_url_uri,
+                }
+                email_data = prepare_templated_email(
+                    subject=announcement.subject,
+                    to_email=email,
+                    template_prefix="announcement",
+                    context=context,
+                )
+                yield EmailQueue(**email_data)
+
+    created_items = EmailQueue.objects.bulk_create(
+        email_queue_generator(), batch_size=500
+    )
+
+    sent_count = len(created_items) // len(announcements) if created_items else 0
+
+    now = timezone.now()
+    announcement_ids = [a.id for a in announcements]
+    Announcement.objects.filter(id__in=announcement_ids).update(
+        status=AnnouncementStatus.SENT, sent_at=now
+    )
+    return sent_count
 
 
 @log_exceptions(message="Error queuing announcement", default=0)

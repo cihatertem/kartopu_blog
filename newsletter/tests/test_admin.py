@@ -59,15 +59,15 @@ class NewsletterAdminTest(TestCase):
         self.assertEqual(len(messages), 1)
         self.assertEqual(str(messages[0]), "1 abonelik iptal edildi.")
 
-    @patch("newsletter.admin.send_announcement")
-    def test_announcement_admin_send_selected_announcements(self, mock_send):
+    @patch("newsletter.services.send_announcements_bulk")
+    def test_announcement_admin_send_selected_announcements(self, mock_send_bulk):
         announcement_draft = Announcement.objects.create(
             subject="Draft", body="Body", status=AnnouncementStatus.DRAFT
         )
         Announcement.objects.create(
             subject="Sent", body="Body", status=AnnouncementStatus.SENT
         )
-        mock_send.return_value = 5
+        mock_send_bulk.return_value = 5
 
         admin = AnnouncementAdmin(Announcement, self.site)
         request = self.get_mock_request()
@@ -76,7 +76,7 @@ class NewsletterAdminTest(TestCase):
         queryset = Announcement.objects.all().order_by("subject")
         send_selected_announcements(admin, request, queryset)
 
-        mock_send.assert_called_once_with(announcement_draft)
+        mock_send_bulk.assert_called_once_with([announcement_draft])
 
         messages = list(get_messages(request))
         self.assertEqual(len(messages), 2)
@@ -85,8 +85,10 @@ class NewsletterAdminTest(TestCase):
         self.assertIn("Sent zaten gönderildi.", message_strings)
         self.assertIn("Draft duyurusu 5 aboneye gönderildi.", message_strings)
 
-    @patch("newsletter.admin.send_announcement")
-    def test_announcement_admin_send_selected_announcements_all_sent(self, mock_send):
+    @patch("newsletter.services.send_announcements_bulk")
+    def test_announcement_admin_send_selected_announcements_all_sent(
+        self, mock_send_bulk
+    ):
         Announcement.objects.create(
             subject="Sent1", body="Body", status=AnnouncementStatus.SENT
         )
@@ -100,7 +102,7 @@ class NewsletterAdminTest(TestCase):
 
         send_selected_announcements(admin, request, queryset)
 
-        mock_send.assert_not_called()
+        mock_send_bulk.assert_not_called()
         messages = list(get_messages(request))
         self.assertEqual(len(messages), 2)
         for msg in messages:

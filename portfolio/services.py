@@ -293,6 +293,28 @@ def fetch_yahoo_finance_prices_bulk(
     return results
 
 
+def _parse_single_fx_rate(
+    symbol: str,
+    is_dataframe: bool,
+    current_close_data,
+    last_prices,
+    series,
+    symbols_count: int,
+) -> Decimal | None:
+    price = None
+    if is_dataframe and last_prices is not None:
+        if symbol in current_close_data.columns:
+            price = last_prices[symbol]
+        elif symbols_count == 1:
+            price = last_prices.iloc[0]
+    elif not is_dataframe and series is not None and not series.empty:
+        price = series.iloc[-1]
+
+    if price is not None and pd.notna(price):
+        return _safe_decimal(price)
+    return None
+
+
 def _parse_multiple_fx_results(
     close_data,
     pairs_by_date: dict[date | None, set[tuple[str, str]]],
@@ -328,19 +350,16 @@ def _parse_multiple_fx_results(
 
             symbol = f"{base}{target}=X"
             try:
-                price = None
-                if is_dataframe and last_prices is not None:
-                    if symbol in current_close_data.columns:
-                        price = last_prices[symbol]
-                    elif symbols_count == 1:
-                        price = last_prices.iloc[0]
-                elif not is_dataframe and series is not None and not series.empty:
-                    price = series.iloc[-1]
-
-                if price is not None and pd.notna(price):
-                    decimal_price = _safe_decimal(price)
-                    if decimal_price is not None:
-                        results[(base, target, d)] = decimal_price
+                decimal_price = _parse_single_fx_rate(
+                    symbol,
+                    is_dataframe,
+                    current_close_data,
+                    last_prices,
+                    series,
+                    symbols_count,
+                )
+                if decimal_price is not None:
+                    results[(base, target, d)] = decimal_price
             except Exception:
                 logger.exception("Failed to parse FX rate for %s on %s", symbol, d)
 

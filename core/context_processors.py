@@ -300,9 +300,42 @@ def _get_nav_portfolio_posts(cached_data=None):
             )
         return nav_portfolio_posts
 
-    return _get_or_set_with_stampede_lock(
-        NAV_PORTFOLIO_POSTS_KEY, cached_data, compute
+    return _get_or_set_with_stampede_lock(NAV_PORTFOLIO_POSTS_KEY, cached_data, compute)
+
+
+def _build_goal_widget_snapshot(featured_snapshot):
+    target_value = featured_snapshot.target_value
+    total_value = featured_snapshot.total_value
+    remaining_value = max(target_value - total_value, Decimal("0"))
+    if target_value > 0:
+        remaining_pct = (remaining_value / target_value) * Decimal("100")
+    else:
+        remaining_pct = Decimal("0")
+    remaining_pct = max(Decimal("0"), min(remaining_pct, Decimal("100")))
+    remaining_pct_display = int(
+        remaining_pct.quantize(Decimal("1"), rounding=ROUND_HALF_UP)
     )
+
+    formatted_target = f"{target_value:,.0f}".replace(",", ".")
+    formatted_current = f"{total_value:,.0f}".replace(",", ".")
+    achieved_pct = 100 - remaining_pct_display
+    fill_pct = achieved_pct
+    if total_value > 0 and fill_pct == 0:
+        fill_pct = 1
+    target_pct = {
+        "value": achieved_pct,
+        "display": remaining_pct_display,
+        "fill_class": f"goal-widget__fill--{fill_pct}",
+    }
+
+    return {
+        "name": featured_snapshot.name or featured_snapshot.portfolio.name,
+        "current_value": total_value,
+        "target_value": target_value,
+        "current_display": f"{formatted_current} ₺",
+        "target_display": f"{formatted_target} ₺",
+        "remaining_pct": target_pct,
+    }
 
 
 def _get_goal_widget_snapshot(cached_data=None):
@@ -327,38 +360,7 @@ def _get_goal_widget_snapshot(cached_data=None):
 
     goal_widget_snapshot = None
     if featured_snapshot:
-        target_value = featured_snapshot.target_value
-        total_value = featured_snapshot.total_value
-        remaining_value = max(target_value - total_value, Decimal("0"))
-        if target_value > 0:
-            remaining_pct = (remaining_value / target_value) * Decimal("100")
-        else:
-            remaining_pct = Decimal("0")
-        remaining_pct = max(Decimal("0"), min(remaining_pct, Decimal("100")))
-        remaining_pct_display = int(
-            remaining_pct.quantize(Decimal("1"), rounding=ROUND_HALF_UP)
-        )
-
-        formatted_target = f"{target_value:,.0f}".replace(",", ".")
-        formatted_current = f"{total_value:,.0f}".replace(",", ".")
-        achieved_pct = 100 - remaining_pct_display
-        fill_pct = achieved_pct
-        if total_value > 0 and fill_pct == 0:
-            fill_pct = 1
-        target_pct = {
-            "value": achieved_pct,
-            "display": remaining_pct_display,
-            "fill_class": f"goal-widget__fill--{fill_pct}",
-        }
-
-        goal_widget_snapshot = {
-            "name": featured_snapshot.name or featured_snapshot.portfolio.name,
-            "current_value": total_value,
-            "target_value": target_value,
-            "current_display": f"{formatted_current} ₺",
-            "target_display": f"{formatted_target} ₺",
-            "remaining_pct": target_pct,
-        }
+        goal_widget_snapshot = _build_goal_widget_snapshot(featured_snapshot)
 
     cache_value = (
         goal_widget_snapshot

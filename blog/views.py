@@ -129,33 +129,27 @@ def _extract_social_profile_url(account):
     provider = account.provider.lower()
     extra_data = account.extra_data or {}
 
-    if provider in ("twitter", "x"):
-        username = extra_data.get("screen_name") or extra_data.get("username")
-        if username:
-            return f"https://x.com/{username}"
+    match provider:
+        case "twitter" | "x":
+            if username := (
+                extra_data.get("screen_name") or extra_data.get("username")
+            ):
+                return f"https://x.com/{username}"
+        case "github":
+            if url := extra_data.get("html_url"):
+                return url
+            if login := extra_data.get("login"):
+                return f"https://github.com/{login}"
+        case "linkedin":
+            # Extra data usually comes with vanityName
+            if vanity_name := extra_data.get("vanityName"):
+                return f"https://www.linkedin.com/in/{vanity_name}"
+        case "google":
+            # Google+ is deprecated but google auth may just not have a profile url
+            # For google, if they have a profile property, return it
+            return extra_data.get("profile") or ""
 
-    if provider == "github":
-        url = extra_data.get("html_url")
-        if url:
-            return url
-        login = extra_data.get("login")
-        if login:
-            return f"https://github.com/{login}"
-
-    if provider == "linkedin":
-        # Extra data usually comes with vanityName
-        vanity_name = extra_data.get("vanityName")
-        if vanity_name:
-            return f"https://www.linkedin.com/in/{vanity_name}"
-
-    if provider == "google":
-        # Google+ is deprecated but google auth may just not have a profile url
-        # For google, if they have a profile property, return it
-        return extra_data.get("profile") or ""
-
-    # Try to get it from default allauth method last
-    url = _safe_get_profile_url(account)
-    if url:
+    if url := _safe_get_profile_url(account):
         return url
 
     return ""
@@ -345,9 +339,7 @@ def _get_post_for_detail(slug: str, *, include_unpublished: bool):
         needs_cashflow_comparison_items = "cashflow_comparison_summary" in markers
     else:
         dependencies = post.content_dependencies or []
-        prefetches = get_content_prefetches_for_dependencies(
-            dependencies
-        )
+        prefetches = get_content_prefetches_for_dependencies(dependencies)
         needs_cashflow_comparison_items = "cashflow" in dependencies
 
     if prefetches:
