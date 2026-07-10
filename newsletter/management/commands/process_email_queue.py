@@ -168,32 +168,55 @@ class Command(BaseCommand):
         emails_to_update = []
         direct_emails_to_update = {}
 
-        direct_emails = [
-            email_item.direct_email
-            for email_item in pending_emails
-            if email_item.direct_email
-        ]
+        # Deduplicate DirectEmail instances to avoid redundant object tracking
+        # and prefetching duplicate instances in memory.
+        direct_emails_map = {}
+        for email_item in pending_emails:
+            if email_item.direct_email:
+                de_id = email_item.direct_email.id
+                if de_id not in direct_emails_map:
+                    direct_emails_map[de_id] = email_item.direct_email
+                else:
+                    email_item.direct_email = direct_emails_map[de_id]
 
-        if direct_emails:
+        unique_direct_emails = list(direct_emails_map.values())
+
+        if unique_direct_emails:
             from django.db.models import prefetch_related_objects
 
-            prefetch_related_objects(direct_emails, "attachments")
+            prefetch_related_objects(unique_direct_emails, "attachments")
 
         attachment_contents = {}
-        for direct_email in direct_emails:
-            for attachment in direct_email.attachments.all():
-                if attachment.id not in attachment_contents:
-                    with attachment.file.open("rb") as f:
-                        attachment_contents[attachment.id] = (
-                            os.path.basename(attachment.file.name),
-                            f.read(),
-                        )
-
-        futures = []
         # t3.micro constraint: keep workers bounded to avoid CPU/RAM spikes.
         # Capping at max 14 (SES limit) ensures we don't spawn too many threads.
         max_workers = min(14, max(4, rate))
 
+        def fetch_attachment(attachment):
+            with attachment.file.open("rb") as f:
+                return attachment.id, os.path.basename(attachment.file.name), f.read()
+
+        with ThreadPoolExecutor(max_workers=max_workers) as io_executor:
+            io_futures = []
+            for direct_email in unique_direct_emails:
+                # Bypass .all() overhead by safely accessing _prefetched_objects_cache directly
+                prefetched = getattr(direct_email, "_prefetched_objects_cache", {})
+                if "attachments" in prefetched:
+                    attachments = prefetched["attachments"]
+                else:
+                    attachments = direct_email.attachments.all()
+
+                for attachment in attachments:
+                    if attachment.id not in attachment_contents:
+                        attachment_contents[attachment.id] = None
+                        io_futures.append(
+                            io_executor.submit(fetch_attachment, attachment)
+                        )
+
+            for future in as_completed(io_futures):
+                att_id, filename, content = future.result()
+                attachment_contents[att_id] = (filename, content)
+
+        futures = []
         with ThreadPoolExecutor(max_workers=max_workers) as executor:
             for email_item in pending_emails:
                 future = executor.submit(

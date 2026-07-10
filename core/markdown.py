@@ -139,11 +139,7 @@ ALLOWED_ATTRIBUTES = {
 ALLOWED_PROTOCOLS = ["http", "https", "mailto"]
 
 
-def set_link_attributes(attrs, new=False):
-    href = attrs.get((None, "href"), "")
-    if not href:
-        return attrs
-
+def _is_internal_link(href: str) -> bool:
     is_internal = (
         href.startswith("/") and not href.startswith("//")
     ) or href.startswith("#")
@@ -158,8 +154,10 @@ def set_link_attributes(attrs, new=False):
                 parsed_href.netloc == parsed_site.netloc
                 or parsed_href.netloc.endswith("." + parsed_site.netloc)
             )
+    return is_internal
 
-    rel = attrs.get((None, "rel"), "")
+
+def _update_rel_attributes(rel: str, is_internal: bool) -> list[str]:
     rel_list = rel.split() if rel else []
 
     if is_internal:
@@ -173,6 +171,18 @@ def set_link_attributes(attrs, new=False):
             rel_list.append("noopener")
         if "noreferrer" not in rel_list:
             rel_list.append("noreferrer")
+
+    return rel_list
+
+
+def set_link_attributes(attrs, new=False):
+    href = attrs.get((None, "href"), "")
+    if not href:
+        return attrs
+
+    is_internal = _is_internal_link(href)
+    rel = attrs.get((None, "rel"), "")
+    rel_list = _update_rel_attributes(rel, is_internal)
 
     if rel_list:
         attrs[(None, "rel")] = " ".join(rel_list)
