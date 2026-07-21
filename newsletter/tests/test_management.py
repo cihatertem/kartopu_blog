@@ -22,6 +22,40 @@ class ProcessEmailQueueCommandTest(TestCase):
         if os.path.exists(self.lock_file):
             os.remove(self.lock_file)
 
+    def test_add_arguments(self):
+        from newsletter.management.commands.process_email_queue import Command
+
+        command = Command()
+        parser = command.create_parser("manage.py", "process_email_queue")
+
+        # Test defaults
+        args = parser.parse_args([])
+        self.assertEqual(args.rate, 10)
+        self.assertEqual(args.limit, 50)
+        self.assertFalse(args.daemon)
+        self.assertEqual(args.sleep, 5)
+        self.assertEqual(args.processing_timeout, 15)
+
+        # Test overrides
+        args = parser.parse_args(
+            [
+                "--rate",
+                "5",
+                "--limit",
+                "20",
+                "--daemon",
+                "--sleep",
+                "10",
+                "--processing-timeout",
+                "30",
+            ]
+        )
+        self.assertEqual(args.rate, 5)
+        self.assertEqual(args.limit, 20)
+        self.assertTrue(args.daemon)
+        self.assertEqual(args.sleep, 10)
+        self.assertEqual(args.processing_timeout, 30)
+
     def test_command_creates_lock_file_and_prevents_multiple_instances(self):
         with open(self.lock_file, "w") as f:
             f.write("1234")

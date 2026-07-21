@@ -1,3 +1,5 @@
+from unittest.mock import patch
+
 from django.contrib.auth import get_user_model
 from django.core.cache import cache
 from django.test import TestCase
@@ -44,18 +46,19 @@ class SignalTests(TestCase):
         snapshot.delete()
         self.assertIsNone(cache.get(GOAL_WIDGET_KEY))
 
-    def test_sidebar_widget_post_save_invalidates_cache(self):
-        cache.set(SIDEBAR_WIDGETS_KEY, "cached_data")
+    @patch("core.signals.cache.delete")
+    def test_sidebar_widget_post_save_invalidates_cache(self, mock_cache_delete):
         SidebarWidget.objects.create(title="Widget", template_name="widget.html")
-        self.assertIsNone(cache.get(SIDEBAR_WIDGETS_KEY))
+        mock_cache_delete.assert_called_once_with(SIDEBAR_WIDGETS_KEY)
 
-    def test_sidebar_widget_post_delete_invalidates_cache(self):
+    @patch("core.signals.cache.delete")
+    def test_sidebar_widget_post_delete_invalidates_cache(self, mock_cache_delete):
         widget = SidebarWidget.objects.create(
             title="Widget", template_name="widget.html"
         )
-        cache.set(SIDEBAR_WIDGETS_KEY, "cached_data")
+        mock_cache_delete.reset_mock()  # Reset because save also triggers delete
         widget.delete()
-        self.assertIsNone(cache.get(SIDEBAR_WIDGETS_KEY))
+        mock_cache_delete.assert_called_once_with(SIDEBAR_WIDGETS_KEY)
 
     def test_site_settings_post_save_invalidates_cache(self):
         settings = SiteSettings.get_settings()

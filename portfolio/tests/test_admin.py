@@ -256,3 +256,33 @@ class QuerysetTests(AdminTestCase):
         self.assertIn(
             self.user, qs
         )  # superuser is also staff and has no social account
+
+
+class CashFlowEntryAdminTests(AdminTestCase):
+    def test_cashflows_display(self):
+        from decimal import Decimal
+
+        from portfolio.admin import CashFlowEntryAdmin
+        from portfolio.models import CashFlow, CashFlowEntry
+
+        cf1 = CashFlow.objects.create(owner=self.user, name="Alpha Flow")
+        cf2 = CashFlow.objects.create(owner=self.user, name="Beta Flow")
+
+        entry = CashFlowEntry.objects.create(
+            entry_date="2023-01-01",
+            category="dividend",
+            amount=Decimal("100"),
+            currency="TRY",
+        )
+        entry.cashflows.add(cf1, cf2)
+
+        model_admin = CashFlowEntryAdmin(CashFlowEntry, admin.site)
+
+        display = model_admin.cashflows_display(entry)
+        self.assertEqual(display, "Alpha Flow, Beta Flow")
+
+        entry_prefetched = CashFlowEntry.objects.prefetch_related("cashflows").get(
+            pk=entry.pk
+        )
+        display_prefetched = model_admin.cashflows_display(entry_prefetched)
+        self.assertEqual(display_prefetched, "Alpha Flow, Beta Flow")

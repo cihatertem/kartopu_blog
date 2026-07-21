@@ -24,8 +24,9 @@ class CommentSignalsTests(TestCase):
             status=BlogPost.Status.PUBLISHED,
         )
 
+    @patch("comments.signals.recalculate_popularity_score")
     @patch("comments.signals.cache.delete_many")
-    def test_cache_cleared_on_comment_save(self, mock_delete_many):
+    def test_cache_cleared_on_comment_save(self, mock_delete_many, mock_recalculate):
         comment = Comment.objects.create(
             post=self.post,
             author=self.user,
@@ -33,14 +34,18 @@ class CommentSignalsTests(TestCase):
             status=Comment.Status.PENDING,
         )
         mock_delete_many.assert_called_with(NAV_KEYS)
+        mock_recalculate.assert_called_with(self.post.id)
 
         mock_delete_many.reset_mock()
+        mock_recalculate.reset_mock()
         comment.status = Comment.Status.APPROVED
         comment.save()
         mock_delete_many.assert_called_with(NAV_KEYS)
+        mock_recalculate.assert_called_with(self.post.id)
 
+    @patch("comments.signals.recalculate_popularity_score")
     @patch("comments.signals.cache.delete_many")
-    def test_cache_cleared_on_comment_delete(self, mock_delete_many):
+    def test_cache_cleared_on_comment_delete(self, mock_delete_many, mock_recalculate):
         comment = Comment.objects.create(
             post=self.post,
             author=self.user,
@@ -48,6 +53,8 @@ class CommentSignalsTests(TestCase):
             status=Comment.Status.PENDING,
         )
         mock_delete_many.reset_mock()
+        mock_recalculate.reset_mock()
 
         comment.delete()
         mock_delete_many.assert_called_with(NAV_KEYS)
+        mock_recalculate.assert_called_with(self.post.id)

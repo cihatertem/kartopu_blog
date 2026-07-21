@@ -40,6 +40,18 @@ class CommentFormTests(TestCase):
         self.assertFalse(form.is_valid())
         self.assertIn("body", form.errors)
 
+    def test_none_body(self):
+        form = CommentForm(data={"body": None})
+        self.assertFalse(form.is_valid())
+        self.assertIn("body", form.errors)
+
+    def test_clean_body_none_fallback(self):
+        form = CommentForm()
+        # Form validation fails before clean_body is called if body is missing,
+        # so we set it directly to test the fallback logic
+        form.cleaned_data = {"body": None}
+        self.assertEqual(form.clean_body(), "")
+
     def test_whitespace_only_body(self):
         form = CommentForm(data={"body": "   "})
         self.assertFalse(form.is_valid())

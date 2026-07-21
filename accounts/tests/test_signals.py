@@ -1,5 +1,5 @@
 import io
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock, call, patch
 
 import requests
 from allauth.socialaccount.models import SocialAccount, SocialApp, SocialLogin
@@ -226,14 +226,46 @@ class SocialAvatarDownloadTests(TestCase):
         self.assertFalse(self.user.avatar)
         mock_get.assert_not_called()
 
+    @patch("accounts.signals.time.sleep")
     @patch("accounts.signals.requests.get")
-    def test_download_avatar_network_error(self, mock_get):
+    def test_download_avatar_retry_success(self, mock_get, mock_sleep):
+        self.social_account.extra_data = {"picture": "http://example.com/retry.jpg"}
+
+        mock_fail_response = requests.exceptions.RequestException("Temporary error")
+        mock_success_response = MagicMock()
+        mock_success_response.content = self._create_valid_image()
+        mock_success_response.raise_for_status.return_value = None
+        mock_success_response.headers = {"Content-Type": "image/jpeg"}
+
+        mock_get.side_effect = [mock_fail_response, mock_success_response]
+
+        _download_and_save_social_avatar(self.sociallogin)
+
+        self.user.refresh_from_db()
+        self.assertTrue(self.user.avatar)
+        self.assertEqual(mock_get.call_count, 2)
+        mock_sleep.assert_called_once_with(1)
+
+    @patch("accounts.signals.logging.getLogger")
+    @patch("accounts.signals.time.sleep")
+    @patch("accounts.signals.requests.get")
+    def test_download_avatar_network_error(self, mock_get, mock_sleep, mock_get_logger):
+        self.social_account.extra_data = {"picture": "http://example.com/error.jpg"}
+
         mock_get.side_effect = requests.exceptions.RequestException("Network error")
+        mock_logger = MagicMock()
+        mock_get_logger.return_value = mock_logger
 
         _download_and_save_social_avatar(self.sociallogin)
 
         self.user.refresh_from_db()
         self.assertFalse(self.user.avatar)
+
+        self.assertEqual(mock_get.call_count, 3)
+        mock_sleep.assert_has_calls([call(1), call(2)])
+        mock_logger.exception.assert_called_once_with(
+            "Error downloading and saving social avatar: %s", "Network error"
+        )
 
     @patch("accounts.signals.requests.get")
     def test_download_avatar_already_has_avatar(self, mock_get):
