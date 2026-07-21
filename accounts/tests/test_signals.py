@@ -1,4 +1,5 @@
 import io
+from concurrent.futures import Future
 from unittest.mock import MagicMock, call, patch
 
 import requests
@@ -83,9 +84,12 @@ class SocialAvatarDownloadTests(TestCase):
         self.mock_submit = self.thread_patcher.start()
 
         def mock_submit(target, *args, **kwargs):
-            target()
-            mock_future = MagicMock()
-            return mock_future
+            future = Future()
+            try:
+                future.set_result(target())
+            except Exception as error:
+                future.set_exception(error)
+            return future
 
         self.mock_submit.side_effect = mock_submit
 
@@ -256,7 +260,8 @@ class SocialAvatarDownloadTests(TestCase):
         mock_logger = MagicMock()
         mock_get_logger.return_value = mock_logger
 
-        _download_and_save_social_avatar(self.sociallogin)
+        with self.assertNoLogs("accounts.signals", level="ERROR"):
+            _download_and_save_social_avatar(self.sociallogin)
 
         self.user.refresh_from_db()
         self.assertFalse(self.user.avatar)
