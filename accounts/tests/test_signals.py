@@ -352,6 +352,38 @@ class SocialAccountSignalTests(TestCase):
 
         mock_download.assert_called_once_with(sociallogin)
 
+    @patch("accounts.signals._download_and_save_social_avatar_for_account")
+    def test_on_social_account_saved_created(self, mock_download):
+        from accounts.signals import on_social_account_saved
+
+        instance = MagicMock()
+
+        on_social_account_saved(sender=SocialAccount, instance=instance, created=True)
+
+        mock_download.assert_called_once_with(instance)
+
+    @patch("accounts.signals._download_and_save_social_avatar_for_account")
+    def test_on_social_account_saved_not_created_no_avatar(self, mock_download):
+        from accounts.signals import on_social_account_saved
+
+        instance = MagicMock()
+        instance.user.avatar = None
+
+        on_social_account_saved(sender=SocialAccount, instance=instance, created=False)
+
+        mock_download.assert_called_once_with(instance)
+
+    @patch("accounts.signals._download_and_save_social_avatar_for_account")
+    def test_on_social_account_saved_not_created_with_avatar(self, mock_download):
+        from accounts.signals import on_social_account_saved
+
+        instance = MagicMock()
+        instance.user.avatar = "avatar.jpg"
+
+        on_social_account_saved(sender=SocialAccount, instance=instance, created=False)
+
+        mock_download.assert_not_called()
+
     @patch("accounts.signals._download_and_save_social_avatar")
     def test_on_social_account_updated(self, mock_download):
         request = MagicMock()

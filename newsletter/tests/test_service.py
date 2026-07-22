@@ -6,12 +6,21 @@ from django.utils import timezone
 
 from accounts.models import User
 from blog.models import BlogPost, Category
-from newsletter.models import BlogPostNotification
+from newsletter.models import (
+    Announcement,
+    AnnouncementStatus,
+    BlogPostNotification,
+    EmailQueue,
+    Subscriber,
+    SubscriberStatus,
+)
 from newsletter.services import (
     build_subscribe_confirm_url,
     build_unsubscribe_url,
     prepare_templated_email,
     queue_post_published_notification,
+    send_announcement,
+    send_announcements_bulk,
     send_subscribe_confirmation,
     send_templated_email,
     send_unsubscribe_confirmation,
@@ -178,6 +187,98 @@ class ServicesTest(TestCase):
         self.assertEqual(
             sent_email.alternatives[0], ("<html>Html body content</html>", "text/html")
         )
+
+
+class SendAnnouncementsBulkTest(TestCase):
+    def setUp(self):
+        self.sub1 = Subscriber.objects.create(
+            email="sub1@example.com", status=SubscriberStatus.ACTIVE
+        )
+        self.sub2 = Subscriber.objects.create(
+            email="sub2@example.com", status=SubscriberStatus.ACTIVE
+        )
+        self.sub_inactive = Subscriber.objects.create(
+            email="inactive@example.com", status=SubscriberStatus.PENDING
+        )
+
+        self.ann1 = Announcement.objects.create(
+            subject="Test Announcement 1",
+            body="Body 1",
+            status=AnnouncementStatus.DRAFT,
+        )
+        self.ann2 = Announcement.objects.create(
+            subject="Test Announcement 2",
+            body="Body 2",
+            status=AnnouncementStatus.DRAFT,
+        )
+
+    def test_empty_announcements(self):
+        result = send_announcements_bulk([])
+        self.assertEqual(result, 0)
+        self.assertEqual(EmailQueue.objects.count(), 0)
+
+    def test_sends_to_active_subscribers(self):
+        announcements = [self.ann1, self.ann2]
+
+        initial_queue_count = EmailQueue.objects.count()
+
+        result = send_announcements_bulk(announcements)
+
+        # 2 active subscribers * 2 announcements = 4 queue items / 2 announcements = 2
+        self.assertEqual(result, 2)
+        self.assertEqual(EmailQueue.objects.count(), initial_queue_count + 4)
+
+        self.ann1.refresh_from_db()
+        self.ann2.refresh_from_db()
+
+        self.assertEqual(self.ann1.status, AnnouncementStatus.SENT)
+        self.assertIsNotNone(self.ann1.sent_at)
+        self.assertEqual(self.ann2.status, AnnouncementStatus.SENT)
+        self.assertIsNotNone(self.ann2.sent_at)
+
+        emails = EmailQueue.objects.all()
+        to_emails = set(e.to_email for e in emails)
+        self.assertIn("sub1@example.com", to_emails)
+        self.assertIn("sub2@example.com", to_emails)
+        self.assertNotIn("inactive@example.com", to_emails)
+
+
+class SendAnnouncementTest(TestCase):
+    def setUp(self):
+        self.sub1 = Subscriber.objects.create(
+            email="sub1@example.com", status=SubscriberStatus.ACTIVE
+        )
+        self.sub2 = Subscriber.objects.create(
+            email="sub2@example.com", status=SubscriberStatus.ACTIVE
+        )
+        self.sub_inactive = Subscriber.objects.create(
+            email="inactive@example.com", status=SubscriberStatus.PENDING
+        )
+
+        self.ann1 = Announcement.objects.create(
+            subject="Test Single Announcement",
+            body="Single Body",
+            status=AnnouncementStatus.DRAFT,
+        )
+
+    def test_sends_to_active_subscribers(self):
+        initial_queue_count = EmailQueue.objects.count()
+
+        result = send_announcement(self.ann1)
+
+        self.assertEqual(result, 2)
+        self.assertEqual(EmailQueue.objects.count(), initial_queue_count + 2)
+
+        self.ann1.refresh_from_db()
+
+        self.assertEqual(self.ann1.status, AnnouncementStatus.SENT)
+        self.assertIsNotNone(self.ann1.sent_at)
+
+        emails = EmailQueue.objects.all()
+        to_emails = set(e.to_email for e in emails)
+        self.assertIn("sub1@example.com", to_emails)
+        self.assertIn("sub2@example.com", to_emails)
+        self.assertNotIn("inactive@example.com", to_emails)
 
 
 class QueuePostPublishedNotificationTest(TestCase):

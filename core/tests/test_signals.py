@@ -21,8 +21,8 @@ class SignalTests(TestCase):
             owner=self.user, name="My Portfolio", target_value=100
         )
 
-    def test_portfolio_snapshot_post_save_invalidates_cache(self):
-        cache.set(GOAL_WIDGET_KEY, "cached_data")
+    @patch("core.signals.cache.delete")
+    def test_portfolio_snapshot_post_save_invalidates_cache(self, mock_cache_delete):
         PortfolioSnapshot.objects.create(
             portfolio=self.portfolio,
             period=PortfolioSnapshot.Period.MONTHLY,
@@ -31,9 +31,10 @@ class SignalTests(TestCase):
             target_value=100,
             total_return_pct=25,
         )
-        self.assertIsNone(cache.get(GOAL_WIDGET_KEY))
+        mock_cache_delete.assert_called_once_with(GOAL_WIDGET_KEY)
 
-    def test_portfolio_snapshot_post_delete_invalidates_cache(self):
+    @patch("core.signals.cache.delete")
+    def test_portfolio_snapshot_post_delete_invalidates_cache(self, mock_cache_delete):
         snapshot = PortfolioSnapshot.objects.create(
             portfolio=self.portfolio,
             period=PortfolioSnapshot.Period.MONTHLY,
@@ -42,9 +43,9 @@ class SignalTests(TestCase):
             target_value=100,
             total_return_pct=25,
         )
-        cache.set(GOAL_WIDGET_KEY, "cached_data")
+        mock_cache_delete.reset_mock()
         snapshot.delete()
-        self.assertIsNone(cache.get(GOAL_WIDGET_KEY))
+        mock_cache_delete.assert_called_once_with(GOAL_WIDGET_KEY)
 
     @patch("core.signals.cache.delete")
     def test_sidebar_widget_post_save_invalidates_cache(self, mock_cache_delete):
