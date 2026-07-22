@@ -161,3 +161,89 @@ class PDFExportTestCase(TestCase):
         self.assertIsInstance(pdf_bytes, bytes)
         self.assertTrue(pdf_bytes.startswith(b"%PDF-"))
         self.assertGreater(len(pdf_bytes), 500)
+
+    def test_generate_published_posts_pdf_with_charts_and_markers(self):
+        """Verify that posts containing financial charts and marker placeholders render cleanly."""
+        post_markers = BlogPost.objects.create(
+            title="Finansal Özetler ve Grafik Raporu",
+            author=self.admin_user,
+            category=self.category,
+            excerpt="Grafik ve tablo içeren test yazısı.",
+            content=(
+                "# Portföy Analizi\n"
+                "{{ portfolio_summary }}\n"
+                "{{ portfolio_charts }}\n"
+                "{{ portfolio_category_summary }}\n"
+                "{{ portfolio_irr_charts }}\n"
+                "{{ portfolio_comparison_summary }}\n"
+                "{{ portfolio_comparison_charts }}\n"
+                "{{ cashflow_summary }}\n"
+                "{{ cashflow_charts }}\n"
+                "{{ savings_rate_summary }}\n"
+                "{{ savings_rate_charts }}\n"
+                "{{ dividend_summary }}\n"
+                "{{ dividend_charts }}\n"
+                "{{ dividend_comparison }}\n"
+                "{{ legal_disclaimer }}"
+            ),
+            status=BlogPost.Status.PUBLISHED,
+            published_at=timezone.now(),
+        )
+
+        queryset = BlogPost.objects.filter(pk=post_markers.pk)
+        pdf_bytes = generate_published_posts_pdf(queryset)
+
+        self.assertIsInstance(pdf_bytes, bytes)
+        self.assertTrue(pdf_bytes.startswith(b"%PDF-"))
+        self.assertGreater(len(pdf_bytes), 1000)
+
+    def test_generate_published_posts_pdf_with_dividend_payment_item(self):
+        """Verify that DividendSnapshotPaymentItem objects with total_net_amount render without AttributeError."""
+        from portfolio.models import (
+            Asset,
+            DividendPayment,
+            DividendSnapshot,
+            DividendSnapshotPaymentItem,
+        )
+
+        from decimal import Decimal
+
+        asset = Asset.objects.create(symbol="USD", name="Dolar", asset_type="cash")
+        snapshot = DividendSnapshot.objects.create(
+            year=2026, total_amount=Decimal("1500"), currency="TRY"
+        )
+        payment = DividendPayment.objects.create(
+            asset=asset,
+            payment_date=timezone.now().date(),
+            share_count=Decimal("100"),
+            net_dividend_per_share=Decimal("15.0"),
+            average_cost=Decimal("100.0"),
+            last_close_price=Decimal("200.0"),
+        )
+        DividendSnapshotPaymentItem.objects.create(
+            snapshot=snapshot,
+            asset=asset,
+            payment=payment,
+            payment_date=timezone.now().date(),
+            per_share_net_amount=Decimal("15.0"),
+            dividend_yield_on_payment_price=Decimal("0.05"),
+            dividend_yield_on_average_cost=Decimal("0.08"),
+            total_net_amount=Decimal("1500.0"),
+        )
+
+        post_div = BlogPost.objects.create(
+            title="Temettü Ödemesi Testi",
+            author=self.admin_user,
+            category=self.category,
+            content="## Temettü Dökümü\n{{ dividend_summary:1 }}",
+            status=BlogPost.Status.PUBLISHED,
+            published_at=timezone.now(),
+        )
+        post_div.dividend_snapshots.add(snapshot)
+
+        queryset = BlogPost.objects.filter(pk=post_div.pk)
+        pdf_bytes = generate_published_posts_pdf(queryset)
+
+        self.assertIsInstance(pdf_bytes, bytes)
+        self.assertTrue(pdf_bytes.startswith(b"%PDF-"))
+        self.assertGreater(len(pdf_bytes), 500)
