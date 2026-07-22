@@ -3,10 +3,12 @@ import os
 import re
 from typing import Any
 
+from django.conf import settings
 from django.db.models import QuerySet
 from django.utils.html import strip_tags
 from PIL import Image as PILImage
 from reportlab.lib import colors
+from reportlab.lib.fonts import addMapping
 from reportlab.lib.pagesizes import A4
 from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
 from reportlab.pdfbase import pdfmetrics
@@ -31,41 +33,74 @@ from blog.services import (
 FONT_NAME = "Helvetica"
 FONT_NAME_BOLD = "Helvetica-Bold"
 FONT_NAME_ITALIC = "Helvetica-Oblique"
+FONT_NAME_BOLD_ITALIC = "Helvetica-BoldOblique"
 
 
-def _setup_fonts() -> tuple[str, str, str]:
+def _setup_fonts() -> tuple[str, str, str, str]:
+    font_dir = os.path.join(settings.BASE_DIR, "static", "fonts")
+
     normal_candidates = [
+        os.path.join(font_dir, "DejaVuSans.ttf"),
         "/usr/share/fonts/TTF/DejaVuSans.ttf",
         "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
     ]
     bold_candidates = [
+        os.path.join(font_dir, "DejaVuSans-Bold.ttf"),
         "/usr/share/fonts/TTF/DejaVuSans-Bold.ttf",
         "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
     ]
     italic_candidates = [
+        os.path.join(font_dir, "DejaVuSans-Oblique.ttf"),
         "/usr/share/fonts/TTF/DejaVuSans-Oblique.ttf",
         "/usr/share/fonts/truetype/dejavu/DejaVuSans-Oblique.ttf",
+    ]
+    bold_italic_candidates = [
+        os.path.join(font_dir, "DejaVuSans-BoldOblique.ttf"),
+        "/usr/share/fonts/TTF/DejaVuSans-BoldOblique.ttf",
+        "/usr/share/fonts/truetype/dejavu/DejaVuSans-BoldOblique.ttf",
     ]
 
     normal_path = next((p for p in normal_candidates if os.path.exists(p)), None)
     bold_path = next((p for p in bold_candidates if os.path.exists(p)), None)
     italic_path = next((p for p in italic_candidates if os.path.exists(p)), None)
+    bold_italic_path = next(
+        (p for p in bold_italic_candidates if os.path.exists(p)), None
+    )
 
     if normal_path and bold_path:
         try:
             pdfmetrics.registerFont(TTFont("DejaVuSans", normal_path))
             pdfmetrics.registerFont(TTFont("DejaVuSans-Bold", bold_path))
+
+            reg_italic = "DejaVuSans-Bold"
+            reg_bold_italic = "DejaVuSans-Bold"
+
             if italic_path:
                 pdfmetrics.registerFont(TTFont("DejaVuSans-Oblique", italic_path))
-                return "DejaVuSans", "DejaVuSans-Bold", "DejaVuSans-Oblique"
-            return "DejaVuSans", "DejaVuSans-Bold", "DejaVuSans"
+                reg_italic = "DejaVuSans-Oblique"
+
+            if bold_italic_path:
+                pdfmetrics.registerFont(
+                    TTFont("DejaVuSans-BoldOblique", bold_italic_path)
+                )
+                reg_bold_italic = "DejaVuSans-BoldOblique"
+            elif italic_path:
+                reg_bold_italic = "DejaVuSans-Oblique"
+
+            # Register font family mapping so <b>, <i>, <strong>, <em> tags in Paragraphs map correctly
+            addMapping("DejaVuSans", 0, 0, "DejaVuSans")
+            addMapping("DejaVuSans", 1, 0, "DejaVuSans-Bold")
+            addMapping("DejaVuSans", 0, 1, reg_italic)
+            addMapping("DejaVuSans", 1, 1, reg_bold_italic)
+
+            return "DejaVuSans", "DejaVuSans-Bold", reg_italic, reg_bold_italic
         except Exception:
             pass
 
-    return FONT_NAME, FONT_NAME_BOLD, FONT_NAME_ITALIC
+    return FONT_NAME, FONT_NAME_BOLD, FONT_NAME_ITALIC, FONT_NAME_BOLD_ITALIC
 
 
-FONT_REG, FONT_BOLD, FONT_ITAL = _setup_fonts()
+FONT_REG, FONT_BOLD, FONT_ITAL, FONT_BOLD_ITAL = _setup_fonts()
 
 
 def _get_styles():

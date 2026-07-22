@@ -136,3 +136,28 @@ class PDFExportTestCase(TestCase):
             "Seçilen yazılar arasında yayınlanmış yazı bulunamadı.",
             level=messages.WARNING,
         )
+
+    def test_generate_published_posts_pdf_turkish_characters(self):
+        """Verify that posts containing full Turkish unicode characters render without errors."""
+        post_tr = BlogPost.objects.create(
+            title="Şemsiye & Çağlayan: Iğdır'da Öğretmen İşçi ve Güneş",
+            author=self.admin_user,
+            category=self.category,
+            excerpt="Şiirsel bir Türkçe içerik özeti: ğüşiöç ĞÜŞİÖÇ IİıŞşĞğ",
+            content=(
+                "# ĞÜŞİÖÇ Başlık\n"
+                "## Alt Başlık: Şiir ve Ğazel\n"
+                "Bu paragrafta **kalın Türkçe metin: şemsiye, öğretmen, ığdır** bulunmaktadır.\n"
+                "*İtalik Türkçe metin: çağlayan ve güneş.*"
+            ),
+            status=BlogPost.Status.PUBLISHED,
+            published_at=timezone.now(),
+        )
+        post_tr.tags.add(self.tag1)
+
+        queryset = BlogPost.objects.filter(pk=post_tr.pk)
+        pdf_bytes = generate_published_posts_pdf(queryset)
+
+        self.assertIsInstance(pdf_bytes, bytes)
+        self.assertTrue(pdf_bytes.startswith(b"%PDF-"))
+        self.assertGreater(len(pdf_bytes), 500)
