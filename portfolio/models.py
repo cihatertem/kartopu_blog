@@ -2239,18 +2239,20 @@ class DividendSnapshot(BaseSnapshot):
         cls,
         payment: DividendPayment,
         dividend: Dividend | None,
-        currency: str,
-        snapshot_date: date,
-        fx_rates: dict[tuple[str, str, date | None], Decimal],
+        context: DividendProcessingContext,
     ) -> tuple[Decimal, Decimal]:
         if dividend:
             per_share = dividend.per_share_net_amount
             total_payment = dividend.total_net_amount
         else:
             fx_rate = Decimal("1")
-            if payment.asset.currency != currency:
-                currency_pair = (payment.asset.currency, currency, snapshot_date)
-                fx_rate = fx_rates.get(currency_pair, Decimal("1"))  # pyright: ignore[reportCallIssue, reportArgumentType]
+            if payment.asset.currency != context.currency:
+                currency_pair = (
+                    payment.asset.currency,
+                    context.currency,
+                    context.snapshot_date,
+                )
+                fx_rate = context.fx_rates.get(currency_pair, Decimal("1"))  # pyright: ignore[reportCallIssue, reportArgumentType]
             per_share = payment.net_dividend_per_share * fx_rate  # pyright: ignore[reportOperatorIssue]
             total_payment = payment.total_net_amount * fx_rate
         return per_share, total_payment
@@ -2266,7 +2268,7 @@ class DividendSnapshot(BaseSnapshot):
             dividend = context.dividends_map.get(payment.id)  # pyright: ignore[reportArgumentType]
 
         per_share, total_payment = cls._calculate_payment_amounts(
-            payment, dividend, context.currency, context.snapshot_date, context.fx_rates
+            payment, dividend, context
         )
 
         avg_cost = payment.average_cost

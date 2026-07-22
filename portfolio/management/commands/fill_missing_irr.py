@@ -21,14 +21,28 @@ class Command(BaseCommand):
             )
         )
 
-        snapshots = (
+        snapshots_qs = (
             PortfolioSnapshot.objects.filter(irr_pct__isnull=True)
             .select_related("portfolio")
-            .prefetch_related("portfolio__transactions__asset")
             .annotate(has_prior_snapshot=Exists(prior_snapshot_subquery))
         )
-        count = snapshots.count()
+        count = snapshots_qs.count()
         self.stdout.write(f"Found {count} snapshots with missing irr_pct.")
+
+        snapshots = list(snapshots_qs)
+
+        from django.db.models.query import prefetch_related_objects
+
+        unique_portfolios = {}
+        for snapshot in snapshots:
+            if snapshot.portfolio_id not in unique_portfolios:
+                unique_portfolios[snapshot.portfolio_id] = snapshot.portfolio
+            else:
+                snapshot.portfolio = unique_portfolios[snapshot.portfolio_id]
+
+        prefetch_related_objects(
+            list(unique_portfolios.values()), "transactions__asset"
+        )
 
         updated_count = 0
         snapshots_to_update = []
