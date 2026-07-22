@@ -61,15 +61,17 @@ class SignalTests(TestCase):
         widget.delete()
         mock_cache_delete.assert_called_once_with(SIDEBAR_WIDGETS_KEY)
 
-    def test_site_settings_post_save_invalidates_cache(self):
+    @patch("core.signals.cache.delete")
+    def test_site_settings_post_save_invalidates_cache(self, mock_cache_delete):
         settings = SiteSettings.get_settings()
-        cache.set(SITE_SETTINGS_KEY, "cached_data")
+        mock_cache_delete.reset_mock()
         settings.is_comments_enabled = False
         settings.save()
-        self.assertIsNone(cache.get(SITE_SETTINGS_KEY))
+        mock_cache_delete.assert_called_once_with(SITE_SETTINGS_KEY)
 
-    def test_site_settings_post_delete_invalidates_cache(self):
+    @patch("core.signals.cache.delete")
+    def test_site_settings_post_delete_invalidates_cache(self, mock_cache_delete):
         settings = SiteSettings.get_settings()
-        cache.set(SITE_SETTINGS_KEY, "cached_data")
+        mock_cache_delete.reset_mock()  # Reset because get_settings/create might trigger save
         settings.delete()
-        self.assertIsNone(cache.get(SITE_SETTINGS_KEY))
+        mock_cache_delete.assert_called_once_with(SITE_SETTINGS_KEY)

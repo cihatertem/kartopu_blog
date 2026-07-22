@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import calendar
+from dataclasses import dataclass
 from datetime import date
 from decimal import Decimal
 
@@ -2091,6 +2092,16 @@ class Dividend(UUIDModelMixin, TimeStampedModelMixin):
         return f"{self.payment} ({self.currency})"
 
 
+@dataclass
+class DividendProcessingContext:
+    currency: str
+    snapshot_date: date
+    fx_rates: dict[tuple[str, str, date | None], Decimal]
+    dividends_map: dict[str, "Dividend"]
+    asset_totals: dict[str, dict[str, object]]
+    payment_rows: list[dict[str, object]]
+
+
 class DividendSnapshot(BaseSnapshot):
     year = models.PositiveIntegerField()
     currency = models.CharField(
@@ -2248,19 +2259,14 @@ class DividendSnapshot(BaseSnapshot):
     def _process_single_payment(
         cls,
         payment: "DividendPayment",
-        currency: str,
-        snapshot_date: date,
-        fx_rates: dict[tuple[str, str, date | None], Decimal],
-        dividends_map: dict[str, "Dividend"],
-        asset_totals: dict[str, dict[str, object]],
-        payment_rows: list[dict[str, object]],
+        context: DividendProcessingContext,
     ) -> Decimal:
-        dividend = cls._get_prefetched_dividend(payment, currency)
+        dividend = cls._get_prefetched_dividend(payment, context.currency)
         if dividend is None:
-            dividend = dividends_map.get(payment.id)  # pyright: ignore[reportArgumentType]
+            dividend = context.dividends_map.get(payment.id)  # pyright: ignore[reportArgumentType]
 
         per_share, total_payment = cls._calculate_payment_amounts(
-            payment, dividend, currency, snapshot_date, fx_rates
+            payment, dividend, context.currency, context.snapshot_date, context.fx_rates
         )
 
         avg_cost = payment.average_cost
@@ -2274,14 +2280,14 @@ class DividendSnapshot(BaseSnapshot):
             payment.net_dividend_per_share / avg_cost if avg_cost > 0 else Decimal("0")
         )
 
-        asset_entry = asset_totals.setdefault(
+        asset_entry = context.asset_totals.setdefault(
             str(payment.asset_id),  # pyright: ignore[reportAttributeAccessIssue]
             {"asset": payment.asset, "total_amount": Decimal("0")},
         )
         asset_entry["total_amount"] = (
             asset_entry["total_amount"] + total_payment  # pyright: ignore[reportOperatorIssue]
         )
-        payment_rows.append(
+        context.payment_rows.append(
             {
                 "asset": payment.asset,
                 "payment": payment,
@@ -2308,15 +2314,19 @@ class DividendSnapshot(BaseSnapshot):
 
         dividends_map = cls._get_dividends_map(payments, currency)
 
+        context = DividendProcessingContext(
+            currency=currency,
+            snapshot_date=snapshot_date,
+            fx_rates=fx_rates,
+            dividends_map=dividends_map,
+            asset_totals=asset_totals,
+            payment_rows=payment_rows,
+        )
+
         for payment in payments:
             total_amount += cls._process_single_payment(
                 payment,
-                currency,
-                snapshot_date,
-                fx_rates,
-                dividends_map,
-                asset_totals,
-                payment_rows,
+                context,
             )
 
         return total_amount, asset_totals, payment_rows

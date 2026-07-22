@@ -10,6 +10,7 @@ from newsletter.models import (
     Announcement,
     AnnouncementStatus,
     BlogPostNotification,
+    DirectEmail,
     EmailQueue,
     Subscriber,
     SubscriberStatus,
@@ -21,6 +22,7 @@ from newsletter.services import (
     queue_post_published_notification,
     send_announcement,
     send_announcements_bulk,
+    send_direct_emails_bulk,
     send_subscribe_confirmation,
     send_templated_email,
     send_unsubscribe_confirmation,
@@ -320,3 +322,57 @@ class QueuePostPublishedNotificationTest(TestCase):
             queue_post_published_notification(self.post)
 
         self.assertFalse(BlogPostNotification.objects.filter(post=self.post).exists())
+
+
+class SendDirectEmailsBulkTest(TestCase):
+    def setUp(self):
+        self.email1 = DirectEmail.objects.create(
+            to_email="test1@example.com",
+            subject="Subject 1",
+            body="**Bold text** and *italic text*.",
+        )
+        self.email2 = DirectEmail.objects.create(
+            to_email="test2@example.com",
+            subject="Subject 2",
+            body="# Heading 1\nSome text.",
+        )
+        self.from_email = '"Kartopu Money" <info@kartopu.money>'
+
+    def test_send_direct_emails_bulk_with_queryset(self):
+        """Test sending bulk emails using a QuerySet (with chunked iteration)."""
+        queryset = DirectEmail.objects.all().order_by("id")
+        created_count = send_direct_emails_bulk(queryset)
+
+        self.assertEqual(created_count, 2)
+
+        queues = EmailQueue.objects.all().order_by("id")
+        self.assertEqual(queues.count(), 2)
+
+        q1 = queues[0]
+        # Depending on database state before test, we should extract the exact items we want.
+        q1 = next(q for q in queues if q.to_email == "test1@example.com")
+        self.assertEqual(q1.subject, "Subject 1")
+        self.assertEqual(q1.from_email, self.from_email)
+        self.assertEqual(q1.text_body, "**Bold text** and *italic text*.")
+        self.assertIn("<strong>Bold text</strong>", q1.html_body)
+        self.assertIn("<em>italic text</em>", q1.html_body)
+        self.assertEqual(q1.direct_email, self.email1)
+
+        q2 = next(q for q in queues if q.to_email == "test2@example.com")
+        self.assertEqual(q2.subject, "Subject 2")
+        self.assertIn("Heading 1</h1>", q2.html_body)
+        self.assertEqual(q2.direct_email, self.email2)
+
+    def test_send_direct_emails_bulk_with_list(self):
+        """Test sending bulk emails using a list (fallback iteration)."""
+        email_list = [self.email1, self.email2]
+        created_count = send_direct_emails_bulk(email_list)
+
+        self.assertEqual(created_count, 2)
+
+        queues = EmailQueue.objects.all().order_by("id")
+        self.assertEqual(queues.count(), 2)
+        # Because we bulk create over a list, order might be preserved by creation time,
+        # but just to be safe, check the set of emails
+        emails = {q.to_email for q in queues}
+        self.assertSetEqual(emails, {"test1@example.com", "test2@example.com"})
