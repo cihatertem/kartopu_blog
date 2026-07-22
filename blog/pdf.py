@@ -464,22 +464,37 @@ def _render_portfolio_summary_pdf(snapshot, styles) -> list:
     return [Spacer(1, 4), Paragraph("Portföy Özeti", styles["ChartHeader"]), tbl, Spacer(1, 6)]
 
 
+def _get_item_market_value(i: Any) -> float:
+    val = getattr(i, "market_value", getattr(i, "total_value", getattr(i, "total_amount", 0)))
+    if val is None:
+        return 0.0
+    try:
+        return float(val)
+    except (ValueError, TypeError):
+        return 0.0
+
+
+def _get_item_unit_price(i: Any) -> Any:
+    return getattr(i, "current_price", getattr(i, "unit_price", None))
+
+
 def _render_portfolio_charts_pdf(snapshot, styles) -> list:
     if not snapshot:
         return []
 
     items = list(snapshot.items.all())
-    valid_items = [i for i in items if i.total_value and i.total_value > 0]
+    valid_items = [i for i in items if _get_item_market_value(i) > 0]
 
     flowables = [Spacer(1, 4), Paragraph("Varlık Dağılımı & Detayı", styles["ChartHeader"])]
 
     if valid_items:
-        tot_val = sum(float(i.total_value) for i in valid_items)
+        tot_val = sum(_get_item_market_value(i) for i in valid_items)
         pie_data = []
         for i in valid_items:
-            pct = (float(i.total_value) / tot_val * 100) if tot_val > 0 else 0
+            item_val = _get_item_market_value(i)
+            pct = (item_val / tot_val * 100) if tot_val > 0 else 0
             symbol = getattr(i.asset, "symbol", "") or getattr(i.asset, "name", "Varlık")
-            pie_data.append((symbol, float(i.total_value), pct))
+            pie_data.append((symbol, item_val, pct))
 
         pie_data.sort(key=lambda x: x[1], reverse=True)
         pie_drawing = _create_pie_chart_drawing(pie_data)
@@ -500,22 +515,23 @@ def _render_portfolio_charts_pdf(snapshot, styles) -> list:
     ]
 
     curr = getattr(snapshot.portfolio, "currency", "")
-    tot_val = sum(float(i.total_value or 0) for i in items)
+    tot_val = sum(_get_item_market_value(i) for i in items)
 
     for i in items:
         symbol = getattr(i.asset, "symbol", "") or getattr(i.asset, "name", "Varlık")
-        qty = str(i.quantity or "—")
-        cost = _format_currency_val(i.cost_basis, curr)
-        price = _format_currency_val(i.unit_price, curr)
-        val = _format_currency_val(i.total_value, curr)
-        pct = f"%{(float(i.total_value or 0) / tot_val * 100):.2f}" if tot_val > 0 else "—"
+        qty = str(getattr(i, "quantity", "—"))
+        cost = _format_currency_val(getattr(i, "cost_basis", None), curr)
+        price = _format_currency_val(_get_item_unit_price(i), curr)
+        item_val = _get_item_market_value(i)
+        val_str = _format_currency_val(item_val, curr)
+        pct = f"%{(item_val / tot_val * 100):.2f}" if tot_val > 0 else "—"
 
         rows.append([
             Paragraph(escape(symbol), styles["TableCellBold"]),
             Paragraph(qty, styles["TableCell"]),
             Paragraph(cost, styles["TableCell"]),
             Paragraph(price, styles["TableCell"]),
-            Paragraph(val, styles["TableCell"]),
+            Paragraph(val_str, styles["TableCell"]),
             Paragraph(pct, styles["TableCell"]),
         ])
 
@@ -570,7 +586,7 @@ def _render_portfolio_category_summary_pdf(snapshot, styles) -> list:
 
     for item in items:
         cat_name = str(getattr(item.asset, "get_category_display", lambda: "Diğer")() or "Diğer")
-        val = float(item.total_value or 0)
+        val = _get_item_market_value(item)
         category_totals[cat_name] = category_totals.get(cat_name, 0.0) + val
 
     flowables = [Spacer(1, 4), Paragraph("Kategori Dağılım Özeti", styles["ChartHeader"])]

@@ -247,3 +247,59 @@ class PDFExportTestCase(TestCase):
         self.assertIsInstance(pdf_bytes, bytes)
         self.assertTrue(pdf_bytes.startswith(b"%PDF-"))
         self.assertGreater(len(pdf_bytes), 500)
+
+    def test_generate_published_posts_pdf_with_portfolio_snapshot_item(self):
+        """Verify that PortfolioSnapshotItem objects with market_value render without AttributeError."""
+        from decimal import Decimal
+        from portfolio.models import (
+            Asset,
+            Portfolio,
+            PortfolioSnapshot,
+            PortfolioSnapshotItem,
+        )
+
+        portfolio = Portfolio.objects.create(
+            owner=self.admin_user,
+            name="Ana Portföy",
+            currency="TRY",
+            target_value=Decimal("100000"),
+        )
+        snapshot = PortfolioSnapshot.objects.create(
+            portfolio=portfolio,
+            snapshot_date=timezone.now().date(),
+            period="monthly",
+            total_value=Decimal("50000"),
+            total_cost=Decimal("40000"),
+            target_value=Decimal("100000"),
+            total_return_pct=Decimal("0.25"),
+        )
+        asset = Asset.objects.create(symbol="USD", name="Dolar", asset_type="cash")
+        PortfolioSnapshotItem.objects.create(
+            snapshot=snapshot,
+            asset=asset,
+            quantity=Decimal("100"),
+            average_cost=Decimal("400"),
+            cost_basis=Decimal("40000"),
+            current_price=Decimal("500"),
+            market_value=Decimal("50000"),
+            allocation_pct=Decimal("1.0"),
+            gain_loss=Decimal("10000"),
+            gain_loss_pct=Decimal("0.25"),
+        )
+
+        post_port = BlogPost.objects.create(
+            title="Portföy Testi",
+            author=self.admin_user,
+            category=self.category,
+            content="## Portföy Varlıkları\n{{ portfolio_charts:1 }}\n{{ portfolio_category_summary:1 }}",
+            status=BlogPost.Status.PUBLISHED,
+            published_at=timezone.now(),
+        )
+        post_port.portfolio_snapshots.add(snapshot)
+
+        queryset = BlogPost.objects.filter(pk=post_port.pk)
+        pdf_bytes = generate_published_posts_pdf(queryset)
+
+        self.assertIsInstance(pdf_bytes, bytes)
+        self.assertTrue(pdf_bytes.startswith(b"%PDF-"))
+        self.assertGreater(len(pdf_bytes), 500)
