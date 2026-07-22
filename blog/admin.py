@@ -1,6 +1,7 @@
 from django.contrib import admin, messages
 from django.contrib.auth import get_user_model
 from django.db.models import Case, Count, F, Value, When
+from django.http import HttpResponse
 from django.urls import reverse
 from django.utils import timezone
 from django.utils.html import format_html
@@ -10,6 +11,7 @@ from core.decorators import log_exceptions
 from newsletter.services import queue_post_published_notification
 
 from .models import BlogPost, BlogPostImage, Category, Tag
+from .pdf import generate_published_posts_pdf
 
 User = get_user_model()
 
@@ -138,6 +140,7 @@ class BlogPostAdmin(admin.ModelAdmin):
         "archive_posts",
         "resend_newsletter_notifications",
         "toggle_is_featured",
+        "export_published_posts_pdf",
     )
 
     def formfield_for_foreignkey(self, db_field, request, **kwargs):
@@ -222,6 +225,22 @@ class BlogPostAdmin(admin.ModelAdmin):
                 f"{skipped_count} yazı yayınlanmadığı için atlandı.",
                 level=messages.WARNING,
             )
+
+    @admin.action(description="Seçili yayınlanmış yazıları PDF olarak aktar")
+    def export_published_posts_pdf(self, request, queryset):
+        published_qs = queryset.filter(status=BlogPost.Status.PUBLISHED)
+        if not published_qs.exists():
+            self.message_user(
+                request,
+                "Seçilen yazılar arasında yayınlanmış yazı bulunamadı.",
+                level=messages.WARNING,
+            )
+            return None
+
+        pdf_bytes = generate_published_posts_pdf(published_qs)
+        response = HttpResponse(pdf_bytes, content_type="application/pdf")
+        response["Content-Disposition"] = 'attachment; filename="yayinlanmis_yazilar.pdf"'
+        return response
 
     def get_queryset(self, request):
         queryset = super().get_queryset(request)
