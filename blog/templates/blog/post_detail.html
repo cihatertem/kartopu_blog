@@ -125,7 +125,7 @@
 
     <hr />
 
-    <div>
+    <div class="post-detail__body">
       {% cache 2592000 blog_post_body post.id post.updated_at is_preview %}
        {% render_post_body post %}
       {% endcache %}
