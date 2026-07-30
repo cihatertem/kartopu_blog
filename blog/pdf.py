@@ -20,12 +20,14 @@ from reportlab.pdfbase import pdfmetrics
 from reportlab.pdfbase.ttfonts import TTFont
 from reportlab.platypus import (
     HRFlowable,
-    Image as RLImage,
     Paragraph,
     SimpleDocTemplate,
     Spacer,
     Table,
     TableStyle,
+)
+from reportlab.platypus import (
+    Image as RLImage,
 )
 
 from blog.models import BlogPost, BlogPostImage
@@ -265,7 +267,7 @@ def _format_currency_val(val: Any, currency_code: str | None = None) -> str:
         if currency_code:
             return f"{formatted} {currency_code}"
         return formatted
-    except (ValueError, TypeError):
+    except ValueError, TypeError:
         return str(val)
 
 
@@ -311,7 +313,9 @@ COLOR_PALETTE = [
 ]
 
 
-def _create_pie_chart_drawing(items_data: list[tuple[str, float, float]]) -> Drawing | None:
+def _create_pie_chart_drawing(
+    items_data: list[tuple[str, float, float]],
+) -> Drawing | None:
     """items_data: list of (label_str, total_val_float, pct_float)"""
     if not items_data:
         return None
@@ -353,7 +357,9 @@ def _create_pie_chart_drawing(items_data: list[tuple[str, float, float]]) -> Dra
     return drawing
 
 
-def _create_bar_chart_drawing(categories: list[str], values: list[float]) -> Drawing | None:
+def _create_bar_chart_drawing(
+    categories: list[str], values: list[float]
+) -> Drawing | None:
     if not categories or not values:
         return None
 
@@ -406,6 +412,7 @@ def _create_styled_table(data_matrix: list[list[Any]], col_widths=None) -> Table
 
 # --- MARKER PDF RENDERERS ---
 
+
 def _render_legal_disclaimer_pdf(styles) -> list:
     content = [
         Paragraph("YASAL UYARI", styles["DisclaimerTitle"]),
@@ -441,36 +448,77 @@ def _render_portfolio_summary_pdf(snapshot, styles) -> list:
     curr = getattr(snapshot.portfolio, "currency", "")
     total_val = _format_currency_val(snapshot.total_value, curr)
     total_cost = _format_currency_val(snapshot.total_cost, curr)
-    ret_pct = f"%{float(snapshot.total_return_pct * 100):.2f}" if snapshot.total_return_pct is not None else "—"
+    ret_pct = (
+        f"%{float(snapshot.total_return_pct * 100):.2f}"
+        if snapshot.total_return_pct is not None
+        else "—"
+    )
 
     rows = [
         [
             Paragraph("Portföy Özeti", styles["TableHead"]),
             Paragraph("Değer", styles["TableHead"]),
         ],
-        [Paragraph("Portföy Adı", styles["TableCellBold"]), Paragraph(escape(str(snapshot.portfolio.name)), styles["TableCell"])],
-        [Paragraph("Tarih", styles["TableCellBold"]), Paragraph(str(snapshot.snapshot_date), styles["TableCell"])],
-        [Paragraph("Toplam Değer", styles["TableCellBold"]), Paragraph(total_val, styles["TableCell"])],
-        [Paragraph("Toplam Maliyet", styles["TableCellBold"]), Paragraph(total_cost, styles["TableCell"])],
-        [Paragraph("Toplam Getiri (%)", styles["TableCellBold"]), Paragraph(ret_pct, styles["TableCell"])],
+        [
+            Paragraph("Portföy Adı", styles["TableCellBold"]),
+            Paragraph(escape(str(snapshot.portfolio.name)), styles["TableCell"]),
+        ],
+        [
+            Paragraph("Tarih", styles["TableCellBold"]),
+            Paragraph(str(snapshot.snapshot_date), styles["TableCell"]),
+        ],
+        [
+            Paragraph("Toplam Değer", styles["TableCellBold"]),
+            Paragraph(total_val, styles["TableCell"]),
+        ],
+        [
+            Paragraph("Toplam Maliyet", styles["TableCellBold"]),
+            Paragraph(total_cost, styles["TableCell"]),
+        ],
+        [
+            Paragraph("Toplam Getiri (%)", styles["TableCellBold"]),
+            Paragraph(ret_pct, styles["TableCell"]),
+        ],
     ]
 
     if getattr(snapshot, "target_value", None):
-        rows.append([Paragraph("Hedef Değer", styles["TableCellBold"]), Paragraph(_format_currency_val(snapshot.target_value, curr), styles["TableCell"])])
+        rows.append(
+            [
+                Paragraph("Hedef Değer", styles["TableCellBold"]),
+                Paragraph(
+                    _format_currency_val(snapshot.target_value, curr),
+                    styles["TableCell"],
+                ),
+            ]
+        )
     if getattr(snapshot, "target_ratio_pct", None):
-        rows.append([Paragraph("Hedef Gerçekleşme (%)", styles["TableCellBold"]), Paragraph(f"%{float(snapshot.target_ratio_pct):.2f}", styles["TableCell"])])
+        rows.append(
+            [
+                Paragraph("Hedef Gerçekleşme (%)", styles["TableCellBold"]),
+                Paragraph(
+                    f"%{float(snapshot.target_ratio_pct):.2f}", styles["TableCell"]
+                ),
+            ]
+        )
 
     tbl = _create_styled_table(rows, col_widths=[180, 270])
-    return [Spacer(1, 4), Paragraph("Portföy Özeti", styles["ChartHeader"]), tbl, Spacer(1, 6)]
+    return [
+        Spacer(1, 4),
+        Paragraph("Portföy Özeti", styles["ChartHeader"]),
+        tbl,
+        Spacer(1, 6),
+    ]
 
 
 def _get_item_market_value(i: Any) -> float:
-    val = getattr(i, "market_value", getattr(i, "total_value", getattr(i, "total_amount", 0)))
+    val = getattr(
+        i, "market_value", getattr(i, "total_value", getattr(i, "total_amount", 0))
+    )
     if val is None:
         return 0.0
     try:
         return float(val)
-    except (ValueError, TypeError):
+    except ValueError, TypeError:
         return 0.0
 
 
@@ -485,7 +533,10 @@ def _render_portfolio_charts_pdf(snapshot, styles) -> list:
     items = list(snapshot.items.all())
     valid_items = [i for i in items if _get_item_market_value(i) > 0]
 
-    flowables = [Spacer(1, 4), Paragraph("Varlık Dağılımı & Detayı", styles["ChartHeader"])]
+    flowables = [
+        Spacer(1, 4),
+        Paragraph("Varlık Dağılımı & Detayı", styles["ChartHeader"]),
+    ]
 
     if valid_items:
         tot_val = sum(_get_item_market_value(i) for i in valid_items)
@@ -493,7 +544,9 @@ def _render_portfolio_charts_pdf(snapshot, styles) -> list:
         for i in valid_items:
             item_val = _get_item_market_value(i)
             pct = (item_val / tot_val * 100) if tot_val > 0 else 0
-            symbol = getattr(i.asset, "symbol", "") or getattr(i.asset, "name", "Varlık")
+            symbol = getattr(i.asset, "symbol", "") or getattr(
+                i.asset, "name", "Varlık"
+            )
             pie_data.append((symbol, item_val, pct))
 
         pie_data.sort(key=lambda x: x[1], reverse=True)
@@ -526,14 +579,16 @@ def _render_portfolio_charts_pdf(snapshot, styles) -> list:
         val_str = _format_currency_val(item_val, curr)
         pct = f"%{(item_val / tot_val * 100):.2f}" if tot_val > 0 else "—"
 
-        rows.append([
-            Paragraph(escape(symbol), styles["TableCellBold"]),
-            Paragraph(qty, styles["TableCell"]),
-            Paragraph(cost, styles["TableCell"]),
-            Paragraph(price, styles["TableCell"]),
-            Paragraph(val_str, styles["TableCell"]),
-            Paragraph(pct, styles["TableCell"]),
-        ])
+        rows.append(
+            [
+                Paragraph(escape(symbol), styles["TableCellBold"]),
+                Paragraph(qty, styles["TableCell"]),
+                Paragraph(cost, styles["TableCell"]),
+                Paragraph(price, styles["TableCell"]),
+                Paragraph(val_str, styles["TableCell"]),
+                Paragraph(pct, styles["TableCell"]),
+            ]
+        )
 
     tbl = _create_styled_table(rows, col_widths=[90, 60, 80, 70, 90, 60])
     flowables.append(tbl)
@@ -549,7 +604,10 @@ def _render_portfolio_irr_charts_pdf(snapshot, styles) -> list:
     if not irr_history:
         return []
 
-    flowables = [Spacer(1, 4), Paragraph("Portföy İç Verim Oranı (IRR) Gelişimi", styles["ChartHeader"])]
+    flowables = [
+        Spacer(1, 4),
+        Paragraph("Portföy İç Verim Oranı (IRR) Gelişimi", styles["ChartHeader"]),
+    ]
 
     dates = [str(item["date"]) for item in irr_history]
     irrs = [float(item["irr"]) for item in irr_history]
@@ -566,10 +624,12 @@ def _render_portfolio_irr_charts_pdf(snapshot, styles) -> list:
         ]
     ]
     for d_str, irr_val in zip(dates, irrs):
-        rows.append([
-            Paragraph(d_str, styles["TableCellBold"]),
-            Paragraph(f"%{irr_val:.2f}", styles["TableCell"]),
-        ])
+        rows.append(
+            [
+                Paragraph(d_str, styles["TableCellBold"]),
+                Paragraph(f"%{irr_val:.2f}", styles["TableCell"]),
+            ]
+        )
 
     tbl = _create_styled_table(rows, col_widths=[200, 250])
     flowables.append(tbl)
@@ -585,15 +645,24 @@ def _render_portfolio_category_summary_pdf(snapshot, styles) -> list:
     category_totals: dict[str, float] = {}
 
     for item in items:
-        cat_name = str(getattr(item.asset, "get_category_display", lambda: "Diğer")() or "Diğer")
+        cat_name = str(
+            getattr(item.asset, "get_category_display", lambda: "Diğer")() or "Diğer"
+        )
         val = _get_item_market_value(item)
         category_totals[cat_name] = category_totals.get(cat_name, 0.0) + val
 
-    flowables = [Spacer(1, 4), Paragraph("Kategori Dağılım Özeti", styles["ChartHeader"])]
+    flowables = [
+        Spacer(1, 4),
+        Paragraph("Kategori Dağılım Özeti", styles["ChartHeader"]),
+    ]
     tot_val = sum(category_totals.values())
 
     if tot_val > 0:
-        pie_data = [(cat, val, (val / tot_val * 100)) for cat, val in category_totals.items() if val > 0]
+        pie_data = [
+            (cat, val, (val / tot_val * 100))
+            for cat, val in category_totals.items()
+            if val > 0
+        ]
         pie_data.sort(key=lambda x: x[1], reverse=True)
         pie_drawing = _create_pie_chart_drawing(pie_data)
         if pie_drawing:
@@ -611,11 +680,13 @@ def _render_portfolio_category_summary_pdf(snapshot, styles) -> list:
     curr = getattr(snapshot.portfolio, "currency", "")
     for cat, val in category_totals.items():
         pct = f"%{(val / tot_val * 100):.2f}" if tot_val > 0 else "—"
-        rows.append([
-            Paragraph(escape(cat), styles["TableCellBold"]),
-            Paragraph(_format_currency_val(val, curr), styles["TableCell"]),
-            Paragraph(pct, styles["TableCell"]),
-        ])
+        rows.append(
+            [
+                Paragraph(escape(cat), styles["TableCellBold"]),
+                Paragraph(_format_currency_val(val, curr), styles["TableCell"]),
+                Paragraph(pct, styles["TableCell"]),
+            ]
+        )
 
     tbl = _create_styled_table(rows, col_widths=[180, 160, 110])
     flowables.append(tbl)
@@ -642,13 +713,30 @@ def _render_portfolio_comparison_summary_pdf(comparison, styles) -> list:
             Paragraph("Tarih", styles["TableHead"]),
             Paragraph("Toplam Değer", styles["TableHead"]),
         ],
-        [Paragraph("Baz Dönem", styles["TableCellBold"]), Paragraph(str(base_s.snapshot_date), styles["TableCell"]), Paragraph(_format_currency_val(base_val, curr), styles["TableCell"])],
-        [Paragraph("Karşılaştırılan Dönem", styles["TableCellBold"]), Paragraph(str(comp_s.snapshot_date), styles["TableCell"]), Paragraph(_format_currency_val(comp_val, curr), styles["TableCell"])],
-        [Paragraph("Değişim / Fark", styles["TableCellBold"]), Paragraph(f"%{pct_change:.2f}", styles["TableCellBold"]), Paragraph(_format_currency_val(diff, curr), styles["TableCellBold"])],
+        [
+            Paragraph("Baz Dönem", styles["TableCellBold"]),
+            Paragraph(str(base_s.snapshot_date), styles["TableCell"]),
+            Paragraph(_format_currency_val(base_val, curr), styles["TableCell"]),
+        ],
+        [
+            Paragraph("Karşılaştırılan Dönem", styles["TableCellBold"]),
+            Paragraph(str(comp_s.snapshot_date), styles["TableCell"]),
+            Paragraph(_format_currency_val(comp_val, curr), styles["TableCell"]),
+        ],
+        [
+            Paragraph("Değişim / Fark", styles["TableCellBold"]),
+            Paragraph(f"%{pct_change:.2f}", styles["TableCellBold"]),
+            Paragraph(_format_currency_val(diff, curr), styles["TableCellBold"]),
+        ],
     ]
 
     tbl = _create_styled_table(rows, col_widths=[140, 140, 170])
-    return [Spacer(1, 4), Paragraph("Portföy Karşılaştırma Özeti", styles["ChartHeader"]), tbl, Spacer(1, 6)]
+    return [
+        Spacer(1, 4),
+        Paragraph("Portföy Karşılaştırma Özeti", styles["ChartHeader"]),
+        tbl,
+        Spacer(1, 6),
+    ]
 
 
 def _render_portfolio_comparison_charts_pdf(comparison, styles) -> list:
@@ -662,7 +750,10 @@ def _render_portfolio_comparison_charts_pdf(comparison, styles) -> list:
     values = [float(base_s.total_value or 0), float(comp_s.total_value or 0)]
 
     chart_drawing = _create_bar_chart_drawing(categories, values)
-    flowables = [Spacer(1, 4), Paragraph("Portföy Karşılaştırma Grafiği", styles["ChartHeader"])]
+    flowables = [
+        Spacer(1, 4),
+        Paragraph("Portföy Karşılaştırma Grafiği", styles["ChartHeader"]),
+    ]
     if chart_drawing:
         flowables.append(chart_drawing)
         flowables.append(Spacer(1, 6))
@@ -682,13 +773,27 @@ def _render_cashflow_summary_pdf(snapshot, styles) -> list:
             Paragraph("Nakit Akışı Özeti", styles["TableHead"]),
             Paragraph("Değer", styles["TableHead"]),
         ],
-        [Paragraph("Nakit Akışı Adı", styles["TableCellBold"]), Paragraph(escape(str(snapshot.cashflow.name)), styles["TableCell"])],
-        [Paragraph("Tarih", styles["TableCellBold"]), Paragraph(str(snapshot.snapshot_date), styles["TableCell"])],
-        [Paragraph("Net Tutar", styles["TableCellBold"]), Paragraph(tot_amount, styles["TableCellBold"])],
+        [
+            Paragraph("Nakit Akışı Adı", styles["TableCellBold"]),
+            Paragraph(escape(str(snapshot.cashflow.name)), styles["TableCell"]),
+        ],
+        [
+            Paragraph("Tarih", styles["TableCellBold"]),
+            Paragraph(str(snapshot.snapshot_date), styles["TableCell"]),
+        ],
+        [
+            Paragraph("Net Tutar", styles["TableCellBold"]),
+            Paragraph(tot_amount, styles["TableCellBold"]),
+        ],
     ]
 
     tbl = _create_styled_table(rows, col_widths=[180, 270])
-    return [Spacer(1, 4), Paragraph("Nakit Akışı Özeti", styles["ChartHeader"]), tbl, Spacer(1, 6)]
+    return [
+        Spacer(1, 4),
+        Paragraph("Nakit Akışı Özeti", styles["ChartHeader"]),
+        tbl,
+        Spacer(1, 6),
+    ]
 
 
 def _render_cashflow_charts_pdf(snapshot, styles) -> list:
@@ -724,10 +829,12 @@ def _render_cashflow_charts_pdf(snapshot, styles) -> list:
     for i in items:
         cat_name = str(getattr(i, "category", "Kategori") or "Kategori")
         amt = _format_currency_val(i.amount, curr)
-        rows.append([
-            Paragraph(escape(cat_name), styles["TableCellBold"]),
-            Paragraph(amt, styles["TableCell"]),
-        ])
+        rows.append(
+            [
+                Paragraph(escape(cat_name), styles["TableCellBold"]),
+                Paragraph(amt, styles["TableCell"]),
+            ]
+        )
 
     tbl = _create_styled_table(rows, col_widths=[250, 200])
     flowables.append(tbl)
@@ -753,13 +860,30 @@ def _render_cashflow_comparison_summary_pdf(comparison, styles) -> list:
             Paragraph("Tarih", styles["TableHead"]),
             Paragraph("Net Akış Tutarı", styles["TableHead"]),
         ],
-        [Paragraph("Baz Dönem", styles["TableCellBold"]), Paragraph(str(base_s.snapshot_date), styles["TableCell"]), Paragraph(_format_currency_val(base_val, curr), styles["TableCell"])],
-        [Paragraph("Karşılaştırılan Dönem", styles["TableCellBold"]), Paragraph(str(comp_s.snapshot_date), styles["TableCell"]), Paragraph(_format_currency_val(comp_val, curr), styles["TableCell"])],
-        [Paragraph("Fark", styles["TableCellBold"]), Paragraph("—", styles["TableCell"]), Paragraph(_format_currency_val(diff, curr), styles["TableCellBold"])],
+        [
+            Paragraph("Baz Dönem", styles["TableCellBold"]),
+            Paragraph(str(base_s.snapshot_date), styles["TableCell"]),
+            Paragraph(_format_currency_val(base_val, curr), styles["TableCell"]),
+        ],
+        [
+            Paragraph("Karşılaştırılan Dönem", styles["TableCellBold"]),
+            Paragraph(str(comp_s.snapshot_date), styles["TableCell"]),
+            Paragraph(_format_currency_val(comp_val, curr), styles["TableCell"]),
+        ],
+        [
+            Paragraph("Fark", styles["TableCellBold"]),
+            Paragraph("—", styles["TableCell"]),
+            Paragraph(_format_currency_val(diff, curr), styles["TableCellBold"]),
+        ],
     ]
 
     tbl = _create_styled_table(rows, col_widths=[140, 140, 170])
-    return [Spacer(1, 4), Paragraph("Nakit Akışı Karşılaştırma Özeti", styles["ChartHeader"]), tbl, Spacer(1, 6)]
+    return [
+        Spacer(1, 4),
+        Paragraph("Nakit Akışı Karşılaştırma Özeti", styles["ChartHeader"]),
+        tbl,
+        Spacer(1, 6),
+    ]
 
 
 def _render_cashflow_comparison_charts_pdf(comparison, styles) -> list:
@@ -773,7 +897,10 @@ def _render_cashflow_comparison_charts_pdf(comparison, styles) -> list:
     values = [float(base_s.total_amount or 0), float(comp_s.total_amount or 0)]
 
     chart_drawing = _create_bar_chart_drawing(categories, values)
-    flowables = [Spacer(1, 4), Paragraph("Nakit Akışı Karşılaştırma Grafiği", styles["ChartHeader"])]
+    flowables = [
+        Spacer(1, 4),
+        Paragraph("Nakit Akışı Karşılaştırma Grafiği", styles["ChartHeader"]),
+    ]
     if chart_drawing:
         flowables.append(chart_drawing)
         flowables.append(Spacer(1, 6))
@@ -792,9 +919,7 @@ def _render_savings_rate_summary_pdf(snapshot, styles) -> list:
         else "—"
     )
     income_val = getattr(snapshot, "total_salary", getattr(snapshot, "income", None))
-    savings_val = getattr(
-        snapshot, "total_savings", getattr(snapshot, "savings", None)
-    )
+    savings_val = getattr(snapshot, "total_savings", getattr(snapshot, "savings", None))
 
     rows = [
         [
@@ -903,10 +1028,7 @@ def _render_dividend_summary_pdf(snapshot, styles) -> list:
             ]
         ]
         for p in payment_items:
-            symbol = (
-                getattr(p.asset, "symbol", "")
-                or getattr(p.asset, "name", "Hisse")
-            )
+            symbol = getattr(p.asset, "symbol", "") or getattr(p.asset, "name", "Hisse")
             d_str = str(p.payment_date or "—")
             amt_val = getattr(p, "total_net_amount", getattr(p, "amount", 0))
             amt = _format_currency_val(amt_val, curr)
@@ -929,16 +1051,25 @@ def _render_dividend_charts_pdf(snapshot, styles) -> list:
         return []
 
     asset_items = list(snapshot.asset_items.all())
-    flowables = [Spacer(1, 4), Paragraph("Temettü Dağılım Grafiği & Detayı", styles["ChartHeader"])]
+    flowables = [
+        Spacer(1, 4),
+        Paragraph("Temettü Dağılım Grafiği & Detayı", styles["ChartHeader"]),
+    ]
 
     if asset_items:
-        tot_val = sum(float(i.total_amount or 0) for i in asset_items if i.total_amount and i.total_amount > 0)
+        tot_val = sum(
+            float(i.total_amount or 0)
+            for i in asset_items
+            if i.total_amount and i.total_amount > 0
+        )
         pie_data = []
         for i in asset_items:
             val = float(i.total_amount or 0)
             if val > 0:
                 pct = (val / tot_val * 100) if tot_val > 0 else 0
-                symbol = getattr(i.asset, "symbol", "") or getattr(i.asset, "name", "Hisse")
+                symbol = getattr(i.asset, "symbol", "") or getattr(
+                    i.asset, "name", "Hisse"
+                )
                 pie_data.append((symbol, val, pct))
 
         pie_drawing = _create_pie_chart_drawing(pie_data)
@@ -959,13 +1090,19 @@ def _render_dividend_charts_pdf(snapshot, styles) -> list:
     for i in asset_items:
         symbol = getattr(i.asset, "symbol", "") or getattr(i.asset, "name", "Hisse")
         val_str = _format_currency_val(i.total_amount, curr)
-        pct_str = f"%{(float(i.total_amount or 0) / tot_val * 100):.2f}" if tot_val > 0 else "—"
+        pct_str = (
+            f"%{(float(i.total_amount or 0) / tot_val * 100):.2f}"
+            if tot_val > 0
+            else "—"
+        )
 
-        rows.append([
-            Paragraph(escape(symbol), styles["TableCellBold"]),
-            Paragraph(val_str, styles["TableCell"]),
-            Paragraph(pct_str, styles["TableCell"]),
-        ])
+        rows.append(
+            [
+                Paragraph(escape(symbol), styles["TableCellBold"]),
+                Paragraph(val_str, styles["TableCell"]),
+                Paragraph(pct_str, styles["TableCell"]),
+            ]
+        )
 
     tbl = _create_styled_table(rows, col_widths=[180, 160, 110])
     flowables.append(tbl)
@@ -990,28 +1127,66 @@ def _render_dividend_comparison_pdf(comparison, styles) -> list:
             Paragraph("Yıl", styles["TableHead"]),
             Paragraph("Toplam Temettü", styles["TableHead"]),
         ],
-        [Paragraph(str(base_s.year), styles["TableCellBold"]), Paragraph(_format_currency_val(base_val, curr), styles["TableCell"])],
-        [Paragraph(str(comp_s.year), styles["TableCellBold"]), Paragraph(_format_currency_val(comp_val, curr), styles["TableCell"])],
-        [Paragraph("Değişim / Fark", styles["TableCellBold"]), Paragraph(_format_currency_val(diff, curr), styles["TableCellBold"])],
+        [
+            Paragraph(str(base_s.year), styles["TableCellBold"]),
+            Paragraph(_format_currency_val(base_val, curr), styles["TableCell"]),
+        ],
+        [
+            Paragraph(str(comp_s.year), styles["TableCellBold"]),
+            Paragraph(_format_currency_val(comp_val, curr), styles["TableCell"]),
+        ],
+        [
+            Paragraph("Değişim / Fark", styles["TableCellBold"]),
+            Paragraph(_format_currency_val(diff, curr), styles["TableCellBold"]),
+        ],
     ]
 
     tbl = _create_styled_table(rows, col_widths=[200, 250])
-    return [Spacer(1, 4), Paragraph("Temettü Karşılaştırma Özeti", styles["ChartHeader"]), tbl, Spacer(1, 6)]
+    return [
+        Spacer(1, 4),
+        Paragraph("Temettü Karşılaştırma Özeti", styles["ChartHeader"]),
+        tbl,
+        Spacer(1, 6),
+    ]
 
 
 MARKER_PDF_MAP = {
     "portfolio_summary": (_get_portfolio_snapshots, _render_portfolio_summary_pdf),
     "portfolio_charts": (_get_portfolio_snapshots, _render_portfolio_charts_pdf),
-    "portfolio_irr_charts": (_get_portfolio_snapshots, _render_portfolio_irr_charts_pdf),
-    "portfolio_category_summary": (_get_portfolio_snapshots, _render_portfolio_category_summary_pdf),
-    "portfolio_comparison_summary": (_get_portfolio_comparisons, _render_portfolio_comparison_summary_pdf),
-    "portfolio_comparison_charts": (_get_portfolio_comparisons, _render_portfolio_comparison_charts_pdf),
+    "portfolio_irr_charts": (
+        _get_portfolio_snapshots,
+        _render_portfolio_irr_charts_pdf,
+    ),
+    "portfolio_category_summary": (
+        _get_portfolio_snapshots,
+        _render_portfolio_category_summary_pdf,
+    ),
+    "portfolio_comparison_summary": (
+        _get_portfolio_comparisons,
+        _render_portfolio_comparison_summary_pdf,
+    ),
+    "portfolio_comparison_charts": (
+        _get_portfolio_comparisons,
+        _render_portfolio_comparison_charts_pdf,
+    ),
     "cashflow_summary": (_get_cashflow_snapshots, _render_cashflow_summary_pdf),
     "cashflow_charts": (_get_cashflow_snapshots, _render_cashflow_charts_pdf),
-    "cashflow_comparison_summary": (_get_cashflow_comparisons, _render_cashflow_comparison_summary_pdf),
-    "cashflow_comparison_charts": (_get_cashflow_comparisons, _render_cashflow_comparison_charts_pdf),
-    "savings_rate_summary": (_get_salary_savings_snapshots, _render_savings_rate_summary_pdf),
-    "savings_rate_charts": (_get_salary_savings_snapshots, _render_savings_rate_charts_pdf),
+    "cashflow_comparison_summary": (
+        _get_cashflow_comparisons,
+        _render_cashflow_comparison_summary_pdf,
+    ),
+    "cashflow_comparison_charts": (
+        _get_cashflow_comparisons,
+        _render_cashflow_comparison_charts_pdf,
+    ),
+    "savings_rate_summary": (
+        _get_salary_savings_snapshots,
+        _render_savings_rate_summary_pdf,
+    ),
+    "savings_rate_charts": (
+        _get_salary_savings_snapshots,
+        _render_savings_rate_charts_pdf,
+    ),
     "dividend_summary": (_get_dividend_snapshots, _render_dividend_summary_pdf),
     "dividend_charts": (_get_dividend_snapshots, _render_dividend_charts_pdf),
     "dividend_comparison": (_get_dividend_comparisons, _render_dividend_comparison_pdf),
@@ -1111,6 +1286,47 @@ def _parse_content_to_flowables(post: BlogPost, styles) -> list:
     return flowables
 
 
+def _render_single_post_pdf(post: BlogPost, styles: dict) -> list:
+    flowables = []
+    # 1. Post Title
+    flowables.append(Paragraph(post.title, styles["PostTitle"]))
+
+    # 2. Metadata
+    category_name = post.category.name if post.category else "Genel"
+    published_date_str = (
+        post.published_at.strftime("%d.%m.%Y %H:%M") if post.published_at else "—"
+    )
+    author_name = post.author.get_full_name() or post.author.username
+    meta_str = f"<b>Kategori:</b> {category_name} | <b>Yazar:</b> {author_name} | <b>Tarih:</b> {published_date_str}"
+    flowables.append(Paragraph(meta_str, styles["Meta"]))
+
+    # 3. Tags
+    tags_list = list(post.tags.all())
+    if tags_list:
+        tag_names = ", ".join([f"#{t.name}" for t in tags_list])
+        flowables.append(Paragraph(f"<b>Etiketler:</b> {tag_names}", styles["Tags"]))
+
+    # 4. Cover Photo
+    if post.cover_image:
+        cover_rl_img = _load_reportlab_image(
+            post.cover_image, max_width=480, max_height=260
+        )
+        if cover_rl_img:
+            flowables.append(Spacer(1, 4))
+            flowables.append(cover_rl_img)
+            flowables.append(Spacer(1, 6))
+
+    # 5. Excerpt
+    if post.excerpt:
+        flowables.append(Paragraph(strip_tags(post.excerpt), styles["Excerpt"]))
+
+    # 6. Post Content (Subheadings, paragraphs, inline images, vector charts & tables)
+    content_flowables = _parse_content_to_flowables(post, styles)
+    flowables.extend(content_flowables)
+
+    return flowables
+
+
 def generate_published_posts_pdf(queryset: QuerySet[BlogPost]) -> bytes:
     """Generates a PDF document containing only published blog posts, complete with
 
@@ -1120,9 +1336,11 @@ def generate_published_posts_pdf(queryset: QuerySet[BlogPost]) -> bytes:
 
     Returns the raw PDF byte stream.
     """
-    published_posts = queryset.filter(status=BlogPost.Status.PUBLISHED).select_related(
-        "author", "category"
-    ).prefetch_related("tags", "images")
+    published_posts = (
+        queryset.filter(status=BlogPost.Status.PUBLISHED)
+        .select_related("author", "category")
+        .prefetch_related("tags", "images")
+    )
 
     all_markers = set()
     for post in published_posts:
@@ -1163,43 +1381,8 @@ def generate_published_posts_pdf(queryset: QuerySet[BlogPost]) -> bytes:
     num_posts = len(posts_list)
 
     for idx, post in enumerate(posts_list):
-        # 1. Post Title
-        story.append(Paragraph(post.title, styles["PostTitle"]))
-
-        # 2. Metadata
-        category_name = post.category.name if post.category else "Genel"
-        published_date_str = (
-            post.published_at.strftime("%d.%m.%Y %H:%M")
-            if post.published_at
-            else "—"
-        )
-        author_name = post.author.get_full_name() or post.author.username
-        meta_str = f"<b>Kategori:</b> {category_name} | <b>Yazar:</b> {author_name} | <b>Tarih:</b> {published_date_str}"
-        story.append(Paragraph(meta_str, styles["Meta"]))
-
-        # 3. Tags
-        tags_list = list(post.tags.all())
-        if tags_list:
-            tag_names = ", ".join([f"#{t.name}" for t in tags_list])
-            story.append(Paragraph(f"<b>Etiketler:</b> {tag_names}", styles["Tags"]))
-
-        # 4. Cover Photo
-        if post.cover_image:
-            cover_rl_img = _load_reportlab_image(
-                post.cover_image, max_width=480, max_height=260
-            )
-            if cover_rl_img:
-                story.append(Spacer(1, 4))
-                story.append(cover_rl_img)
-                story.append(Spacer(1, 6))
-
-        # 5. Excerpt
-        if post.excerpt:
-            story.append(Paragraph(strip_tags(post.excerpt), styles["Excerpt"]))
-
-        # 6. Post Content (Subheadings, paragraphs, inline images, vector charts & tables)
-        content_flowables = _parse_content_to_flowables(post, styles)
-        story.extend(content_flowables)
+        post_flowables = _render_single_post_pdf(post, styles)
+        story.extend(post_flowables)
 
         # Separator between posts
         if idx < num_posts - 1:

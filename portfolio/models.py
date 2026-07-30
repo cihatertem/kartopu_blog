@@ -1015,27 +1015,26 @@ class Portfolio(UUIDModelMixin, TimeStampedModelMixin):
         irr = calculate_xirr(tx_cash_flows)
         return Decimal(str(irr)) * 100 if irr is not None else None
 
-    def get_irr_history(self, until_date: date | None = None) -> list[dict]:
-        """
-        Returns the IRR performance history based on snapshots.
-        If until_date is provided, only snapshots up to that date are included.
-        """
-        # Check if we have prefetched snapshots for the portfolio
-        if hasattr(self, "prefetched_snapshots"):
-            snapshots = [
-                s
-                for s in self.prefetched_snapshots  # pyright: ignore[reportAttributeAccessIssue]
-                if s.irr_pct is not None
-                and (until_date is None or s.snapshot_date <= until_date)
-            ]
-            return [
-                {
-                    "date": snapshot.snapshot_date.isoformat(),
-                    "irr": float(snapshot.irr_pct),
-                }
-                for snapshot in snapshots
-            ]
+    def _get_irr_history_from_prefetched(
+        self, until_date: date | None = None
+    ) -> list[dict]:
+        """Gets IRR history from prefetched snapshots."""
+        snapshots = [
+            s
+            for s in self.prefetched_snapshots  # pyright: ignore[reportAttributeAccessIssue]
+            if s.irr_pct is not None
+            and (until_date is None or s.snapshot_date <= until_date)
+        ]
+        return [
+            {
+                "date": snapshot.snapshot_date.isoformat(),
+                "irr": float(snapshot.irr_pct),
+            }
+            for snapshot in snapshots
+        ]
 
+    def _get_irr_history_from_db(self, until_date: date | None = None) -> list[dict]:
+        """Gets IRR history by querying the database."""
         snapshots = self.snapshots.filter(irr_pct__isnull=False).order_by(  # pyright: ignore[reportAttributeAccessIssue]
             "snapshot_date"
         )
@@ -1051,6 +1050,15 @@ class Portfolio(UUIDModelMixin, TimeStampedModelMixin):
                 "snapshot_date", "irr_pct"
             )
         ]
+
+    def get_irr_history(self, until_date: date | None = None) -> list[dict]:
+        """
+        Returns the IRR performance history based on snapshots.
+        If until_date is provided, only snapshots up to that date are included.
+        """
+        if hasattr(self, "prefetched_snapshots"):
+            return self._get_irr_history_from_prefetched(until_date)
+        return self._get_irr_history_from_db(until_date)
 
 
 class PortfolioTransaction(UUIDModelMixin, TimeStampedModelMixin):

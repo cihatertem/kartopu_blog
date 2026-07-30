@@ -109,29 +109,15 @@ document.addEventListener("DOMContentLoaded", () => {
         }
     }
 
-    function updateChart(labels, data) {
-        if (chart) {
-            chart.destroy();
-        }
-
-        const isDarkMode =
-            document.documentElement.getAttribute("data-theme") === "dark";
-        const gridColor = isDarkMode
-            ? "rgba(255, 255, 255, 0.1)"
-            : "rgba(0, 0, 0, 0.1)";
-        const textColor = isDarkMode ? "#e6edf6" : "#1f2a37";
-
-        // Find depletion index to mark it
-        const pointBackgroundColors = data.map((val, i) => {
-            if (val === 0 && (i === 0 || data[i - 1] > 0)) return "#ff4d4d";
-            return "#2f6da1";
-        });
-        const pointRadii = data.map((val, i) => {
-            if (val === 0 && (i === 0 || data[i - 1] > 0)) return 8;
-            return 4;
-        });
-
-        chart = new Chart(ctx, {
+    function getChartConfig(
+        labels,
+        data,
+        gridColor,
+        textColor,
+        pointBackgroundColors,
+        pointRadii,
+    ) {
+        return {
             type: "line",
             data: {
                 labels: labels,
@@ -190,7 +176,40 @@ document.addEventListener("DOMContentLoaded", () => {
                     },
                 },
             },
+        };
+    }
+
+    function updateChart(labels, data) {
+        if (chart) {
+            chart.destroy();
+        }
+
+        const isDarkMode =
+            document.documentElement.getAttribute("data-theme") === "dark";
+        const gridColor = isDarkMode
+            ? "rgba(255, 255, 255, 0.1)"
+            : "rgba(0, 0, 0, 0.1)";
+        const textColor = isDarkMode ? "#e6edf6" : "#1f2a37";
+
+        // Find depletion index to mark it
+        const pointBackgroundColors = data.map((val, i) => {
+            if (val === 0 && (i === 0 || data[i - 1] > 0)) return "#ff4d4d";
+            return "#2f6da1";
         });
+        const pointRadii = data.map((val, i) => {
+            if (val === 0 && (i === 0 || data[i - 1] > 0)) return 8;
+            return 4;
+        });
+
+        const config = getChartConfig(
+            labels,
+            data,
+            gridColor,
+            textColor,
+            pointBackgroundColors,
+            pointRadii,
+        );
+        chart = new Chart(ctx, config);
     }
 
     // Listen for theme changes to update chart colors
