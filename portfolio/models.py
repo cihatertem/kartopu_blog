@@ -71,7 +71,7 @@ class BaseSnapshot(SlugMixin, UUIDModelMixin, TimeStampedModelMixin):
         if fallback:
             self.name = fallback
 
-    def _after_snapshot_created(self) -> None:
+    def _after_snapshot_created(self, **kwargs: object) -> None:
         return None
 
     def save(self, *args: object, **kwargs: object) -> None:
@@ -94,6 +94,7 @@ class BaseSnapshot(SlugMixin, UUIDModelMixin, TimeStampedModelMixin):
         *,
         snapshot_date: date | None = None,
         name: str | None = None,
+        has_prior_snapshot: bool | None = None,
         **kwargs: object,
     ) -> "BaseSnapshot":
         snapshot_date, snapshot_kwargs, items_data = cls._prepare_snapshot_data(
@@ -110,9 +111,43 @@ class BaseSnapshot(SlugMixin, UUIDModelMixin, TimeStampedModelMixin):
 
             cls._create_snapshot_items(snapshot, items_data)
 
-            snapshot._after_snapshot_created()
+            snapshot._after_snapshot_created(has_prior_snapshot=has_prior_snapshot)
 
         return snapshot
+
+    @classmethod
+    def bulk_create_generic_snapshots(
+        cls,
+        instances: list[models.Model],
+        relation_field: str,
+        period: str,
+        snapshot_date: date | None = None,
+    ) -> int:
+        snapshot_date = snapshot_date or timezone.now().date()
+
+        instance_ids = [obj.pk for obj in instances]
+
+        prior_snapshots_qs = cls.objects.filter(
+            **{f"{relation_field}_id__in": instance_ids},
+            snapshot_date__lte=snapshot_date,
+        ).values_list(f"{relation_field}_id", flat=True)
+
+        prior_snapshot_ids = set(prior_snapshots_qs)
+
+        created = 0
+        for obj in instances:
+            has_prior = obj.pk in prior_snapshot_ids
+            cls.create_snapshot(
+                **{
+                    relation_field: obj,
+                    "period": period,
+                    "snapshot_date": snapshot_date,
+                    "has_prior_snapshot": has_prior,
+                }
+            )
+            created += 1
+
+        return created
 
     @classmethod
     def _bulk_create_instances(
@@ -1179,8 +1214,12 @@ class PortfolioSnapshot(BaseSnapshot):
             return build_snapshot_name(f"{self.portfolio}", self.snapshot_date)
         return ""
 
-    def _after_snapshot_created(self) -> None:
-        self.update_irr()
+    def _after_snapshot_created(self, **kwargs: object) -> None:
+        has_prior = kwargs.get("has_prior_snapshot")
+        if isinstance(has_prior, bool):
+            self.update_irr(has_prior_snapshot=has_prior)
+        else:
+            self.update_irr()
 
     def update_irr(
         self, has_prior_snapshot: bool | None = None, commit: bool = True

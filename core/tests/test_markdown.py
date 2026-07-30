@@ -104,3 +104,35 @@ class MarkdownTests(TestCase):
         self.assertIn("nofollow", html)
         self.assertIn("noopener", html)
         self.assertIn("noreferrer", html)
+
+    def test_render_markdown_strips_javascript_links(self):
+        text = "[Click here](javascript:alert(1))"
+        html = render_markdown(text)
+        self.assertNotIn("javascript:", html)
+        self.assertIn("<a>Click here</a>", html)
+
+    def test_render_markdown_strips_data_links(self):
+        text = "[Click here](data:text/html,alert(1))"
+        html = render_markdown(text)
+        self.assertNotIn("data:", html)
+        self.assertIn("<a>Click here</a>", html)
+
+    def test_render_markdown_strips_javascript_image_src(self):
+        text = "![Alt text](javascript:alert(1))"
+        html = render_markdown(text)
+        self.assertNotIn("javascript:", html)
+        self.assertIn('<img alt="Alt text">', html)
+
+    def test_render_markdown_strips_javascript_in_styles(self):
+        text = (
+            '<p style="color:red; background-image: url(javascript:alert(1));">Red</p>'
+        )
+        html = render_markdown(text)
+        self.assertNotIn("javascript:", html)
+        self.assertIn('<p style="color:red;">Red</p>', html)
+
+    def test_render_markdown_strips_javascript_in_data_attributes(self):
+        text = '<section data-portfolio-allocation="javascript:alert(1)">9</section>'
+        html = render_markdown(text)
+        self.assertNotIn("javascript:", html)
+        self.assertIn("<section>9</section>", html)

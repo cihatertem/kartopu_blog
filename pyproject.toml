@@ -30,6 +30,7 @@ dependencies = [
     "hiredis>=3.3.0",
     "tblib>=3.2.2",
     "reportlab>=4.4.0",
+    "nh3>=0.3.6",
 ]
 
 [dependency-groups]

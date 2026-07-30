@@ -52,17 +52,11 @@ class SnapshotCreatorAdminMixin:
     yearly_action_description = ""
 
     def _create_snapshots(self, queryset, *, period):
-        created = 0
-        for obj in queryset:
-            self.snapshot_model.create_snapshot(  # pyright: ignore[reportAttributeAccessIssue]
-                **{
-                    self.snapshot_relation_field: obj,
-                    "period": period,
-                    "snapshot_date": timezone.now().date(),  # pyright: ignore[reportArgumentType]
-                }
-            )
-            created += 1
-        return created
+        return self.snapshot_model.bulk_create_generic_snapshots(  # pyright: ignore[reportAttributeAccessIssue]
+            instances=list(queryset),
+            relation_field=self.snapshot_relation_field,
+            period=period,
+        )
 
     def _notify_snapshots_created(self, request, count):
         self.message_user(  # pyright: ignore[reportAttributeAccessIssue]

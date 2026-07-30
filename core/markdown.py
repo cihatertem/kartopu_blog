@@ -3,11 +3,11 @@ from __future__ import annotations
 import functools
 from urllib.parse import urlparse
 
-import bleach
+import bleach.linkifier
 import markdown as md
+import nh3
 from bleach.css_sanitizer import CSSSanitizer
-from bleach.linkifier import LinkifyFilter
-from bleach.sanitizer import Cleaner
+from bleach.linkifier import Linker
 from django.conf import settings
 from django.utils.safestring import mark_safe
 
@@ -208,17 +208,38 @@ def render_markdown(text: str) -> str:
         output_format="html",
     )
 
-    linkify_filter = functools.partial(LinkifyFilter, callbacks=[set_link_attributes])
+    nh3_allowed_attrs = {k: set(v) for k, v in ALLOWED_ATTRIBUTES.items()}
 
-    cleaner = Cleaner(
+    linker = Linker(callbacks=[set_link_attributes])
+    linkified_html = linker.linkify(html)
+
+    import re
+
+    def attribute_filter(tag, attr, value):
+        if attr == "style":
+            if css_sanitizer:
+                sanitized_style = css_sanitizer.sanitize_css(value)
+                if not sanitized_style:
+                    return None
+                return sanitized_style
+        elif attr.startswith("data-"):
+            val = re.sub(r"[\s\x00-\x20\x7f\ufffd]+", "", value).lower()
+            if (
+                val.startswith("javascript:")
+                or val.startswith("data:")
+                or val.startswith("vbscript:")
+            ):
+                return None
+        return value
+
+    cleaned_html = nh3.clean(
+        linkified_html,
         tags=ALLOWED_TAGS,
-        attributes=ALLOWED_ATTRIBUTES,
-        protocols=ALLOWED_PROTOCOLS,
-        strip=True,
-        css_sanitizer=css_sanitizer,
-        filters=[linkify_filter],
+        attributes=nh3_allowed_attrs,
+        url_schemes=set(ALLOWED_PROTOCOLS),
+        link_rel=None,
+        clean_content_tags=set(),
+        attribute_filter=attribute_filter,
     )
 
-    cleaned = cleaner.clean(html)
-
-    return mark_safe(cleaned)
+    return mark_safe(cleaned_html)
