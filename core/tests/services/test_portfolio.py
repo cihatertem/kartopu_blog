@@ -114,6 +114,27 @@ class PortfolioServicesTest(TestCase):
                 "snapshot_date": None,
                 "expected": "name-only-with-empty-slug",
             },
+            {
+                "slug": "",
+                "name": "",
+                "owner_label": "Fallback User",
+                "snapshot_date": date(2023, 10, 1),
+                "expected": "Fallback User - 2023-10-01",
+            },
+            {
+                "slug": "  ",
+                "name": "   ",
+                "owner_label": "User",
+                "snapshot_date": None,
+                "expected": "  ",
+            },
+            {
+                "slug": None,
+                "name": "  ",
+                "owner_label": "User",
+                "snapshot_date": None,
+                "expected": "  ",
+            },
         ]
 
         for case in test_cases:

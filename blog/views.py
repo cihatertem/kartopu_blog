@@ -473,7 +473,9 @@ def search_results(request):
     else:
         # Generate cache key
         cache_key_str = f"search:{normalized_q}:{page_num}"
-        cache_key = "search_" + hashlib.md5(cache_key_str.encode("utf-8")).hexdigest()
+        cache_key = (
+            "search_" + hashlib.sha256(cache_key_str.encode("utf-8")).hexdigest()
+        )
 
         cached_data = cache.get(cache_key)
 

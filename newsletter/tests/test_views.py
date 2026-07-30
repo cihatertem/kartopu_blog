@@ -4,6 +4,7 @@ from django.contrib.messages import get_messages
 from django.core import signing
 from django.test import Client, RequestFactory, TestCase, override_settings
 from django.urls import reverse
+from django.utils import timezone
 
 from core.models import SiteSettings
 from newsletter.models import Subscriber, SubscriberStatus
@@ -263,7 +264,7 @@ class NewsletterConfirmSubscriptionViewTest(TestCase):
 
 
 class HandleSubscriptionActionTest(TestCase):
-    def test_subscribe_action(self):
+    def test_subscribe_action_new_user(self):
         from newsletter.views import _handle_subscription_action
 
         title, message = _handle_subscription_action(
@@ -276,8 +277,30 @@ class HandleSubscriptionActionTest(TestCase):
         subscriber = Subscriber.objects.get(email="new_user@example.com")
         self.assertEqual(subscriber.status, SubscriberStatus.ACTIVE)
         self.assertIsNotNone(subscriber.confirmed_at)
+        self.assertIsNone(subscriber.unsubscribed_at)
 
-    def test_unsubscribe_action(self):
+    def test_subscribe_action_existing_unsubscribed_user(self):
+        from newsletter.views import _handle_subscription_action
+
+        Subscriber.objects.create(
+            email="returning_user@example.com",
+            status=SubscriberStatus.UNSUBSCRIBED,
+            unsubscribed_at=timezone.now(),
+        )
+
+        title, message = _handle_subscription_action(
+            "returning_user@example.com", "subscribe"
+        )
+
+        self.assertEqual(title, "Abonelik Onaylandı")
+        self.assertEqual(message, "Newsletter aboneliğiniz başarıyla aktif edildi.")
+
+        subscriber = Subscriber.objects.get(email="returning_user@example.com")
+        self.assertEqual(subscriber.status, SubscriberStatus.ACTIVE)
+        self.assertIsNotNone(subscriber.confirmed_at)
+        self.assertIsNone(subscriber.unsubscribed_at)
+
+    def test_unsubscribe_action_new_user(self):
         from newsletter.views import _handle_subscription_action
 
         title, message = _handle_subscription_action(
@@ -288,6 +311,26 @@ class HandleSubscriptionActionTest(TestCase):
         self.assertEqual(message, "Newsletter aboneliğiniz iptal edildi.")
 
         subscriber = Subscriber.objects.get(email="cancel_user@example.com")
+        self.assertEqual(subscriber.status, SubscriberStatus.UNSUBSCRIBED)
+        self.assertIsNotNone(subscriber.unsubscribed_at)
+
+    def test_unsubscribe_action_existing_active_user(self):
+        from newsletter.views import _handle_subscription_action
+
+        Subscriber.objects.create(
+            email="active_user@example.com",
+            status=SubscriberStatus.ACTIVE,
+            confirmed_at=timezone.now(),
+        )
+
+        title, message = _handle_subscription_action(
+            "active_user@example.com", "unsubscribe"
+        )
+
+        self.assertEqual(title, "Abonelik İptal Edildi")
+        self.assertEqual(message, "Newsletter aboneliğiniz iptal edildi.")
+
+        subscriber = Subscriber.objects.get(email="active_user@example.com")
         self.assertEqual(subscriber.status, SubscriberStatus.UNSUBSCRIBED)
         self.assertIsNotNone(subscriber.unsubscribed_at)
 

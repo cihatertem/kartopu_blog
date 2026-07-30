@@ -63,22 +63,20 @@ def calculate_xirr(cash_flows: list[tuple[date, Decimal]]) -> float | None:
     return _calculate_math_xirr(cash_flows)
 
 
+def _xnpv(rate: float, cash_flows: list[tuple[date, Decimal]]) -> float:
+    d0 = cash_flows[0][0]
+    return sum(float(c) / (1 + rate) ** ((d - d0).days / 365.0) for d, c in cash_flows)
+
+
+def _xnpv_derivative(rate: float, cash_flows: list[tuple[date, Decimal]]) -> float:
+    d0 = cash_flows[0][0]
+    return sum(
+        float(c) * (-(d - d0).days / 365.0) * (1 + rate) ** (-(d - d0).days / 365.0 - 1)
+        for d, c in cash_flows
+    )
+
+
 def _calculate_math_xirr(cash_flows: list[tuple[date, Decimal]]) -> float | None:
-    def xnpv(rate: float, cash_flows: list[tuple[date, Decimal]]) -> float:
-        d0 = cash_flows[0][0]
-        return sum(
-            float(c) / (1 + rate) ** ((d - d0).days / 365.0) for d, c in cash_flows
-        )
-
-    def xnpv_derivative(rate: float, cash_flows: list[tuple[date, Decimal]]) -> float:
-        d0 = cash_flows[0][0]
-        return sum(
-            float(c)
-            * (-(d - d0).days / 365.0)
-            * (1 + rate) ** (-(d - d0).days / 365.0 - 1)
-            for d, c in cash_flows
-        )
-
     # Initial guess
     try:
         total_in = sum(-c for _, c in cash_flows if c < 0)
@@ -99,8 +97,8 @@ def _calculate_math_xirr(cash_flows: list[tuple[date, Decimal]]) -> float | None
 
     for _ in range(100):
         try:
-            f_val = xnpv(rate, cash_flows)
-            f_prime = xnpv_derivative(rate, cash_flows)
+            f_val = _xnpv(rate, cash_flows)
+            f_prime = _xnpv_derivative(rate, cash_flows)
             if f_prime == 0:
                 break
             new_rate = rate - f_val / f_prime

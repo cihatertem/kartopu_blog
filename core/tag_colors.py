@@ -14,7 +14,7 @@ TAG_COLOR_CLASSES = (
 def get_tag_color_class(tag_key: str) -> str:
     if not tag_key:
         return TAG_COLOR_CLASSES[0]
-    digest = hashlib.md5(tag_key.encode("utf-8")).hexdigest()
+    digest = hashlib.sha256(tag_key.encode("utf-8")).hexdigest()
     index = int(digest, 16) % len(TAG_COLOR_CLASSES)
     return TAG_COLOR_CLASSES[index]
 
