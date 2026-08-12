@@ -366,6 +366,15 @@ class SearchVectorTriggerTests(TestCase):
             title="Original", author=self.user, slug="orig", content="body"
         )
         post = BlogPost.objects.get(slug="orig")
+        self.assertEqual(
+            post._loaded_search_values,
+            {
+                "title": "Original",
+                "excerpt": "",
+                "content": "body",
+                "status": BlogPost.Status.DRAFT,
+            },
+        )
         # İlgisiz alan değişimi -> yeniden üretim gerekmez
         post.is_featured = True
         self.assertFalse(post.search_vector_fields_changed())

@@ -1,5 +1,5 @@
 # ---------- BASE STAGE ----------
-FROM python:3.14.6-slim AS base
+FROM python:3.14.7-slim AS base
 
 LABEL maintainer="Cihat Ertem <cihatertem@gmail.com>"
 

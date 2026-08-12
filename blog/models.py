@@ -1,5 +1,6 @@
 import os
 from functools import cached_property
+from typing import Self
 
 from django.conf import settings
 from django.contrib.postgres.indexes import GinIndex
@@ -317,8 +318,17 @@ class BlogPost(
         )
 
     @classmethod
-    def from_db(cls, db, field_names, values):
-        instance = super().from_db(db, field_names, values)
+    def from_db(
+        cls,
+        db: str,
+        field_names: list[str],
+        values: tuple[object, ...],
+        *,
+        fetch_mode: object | None = None,
+    ) -> Self:
+        instance = super().from_db(
+            db, field_names, values, fetch_mode=fetch_mode
+        )
         # DB'den yüklenen search-tetikleyici alanların anlık görüntüsü; deferred
         # (`only()`) alanlara dokunup ekstra sorgu tetiklememek için yalnız
         # yüklenmiş olanları saklarız.
