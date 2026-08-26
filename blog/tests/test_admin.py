@@ -5,6 +5,7 @@ from django.contrib.admin.sites import AdminSite
 from django.contrib.auth import get_user_model
 from django.contrib.messages.storage.fallback import FallbackStorage
 from django.test import RequestFactory, TestCase
+from django.urls import reverse
 from django.utils import timezone
 
 from blog.admin import BlogPostAdmin, BlogPostImageInline, CategoryAdmin, TagAdmin
@@ -371,6 +372,19 @@ class BlogAdminTests(TestCase):
         html = model_admin.public_link(self.post)
         self.assertIn(self.post.get_absolute_url(), html)
         self.assertIn("Yayını Gör", html)
+
+    def test_view_on_site(self):
+        model_admin = BlogPostAdmin(BlogPost, self.site)
+
+        self.assertEqual(
+            model_admin.view_on_site(self.post),
+            reverse("blog:post_preview", kwargs={"slug": self.post.slug}),
+        )
+
+        self.post.status = BlogPost.Status.PUBLISHED
+        self.post.save()
+
+        self.assertEqual(model_admin.view_on_site(self.post), self.post.get_absolute_url())
 
     def test_get_queryset_annotations(self):
         model_admin = BlogPostAdmin(BlogPost, self.site)

@@ -267,6 +267,11 @@ class BlogPostAdmin(admin.ModelAdmin):
     def comment_count(self, obj):
         return getattr(obj, "_comment_count", 0)
 
+    def view_on_site(self, obj: BlogPost) -> str:
+        if obj.status == BlogPost.Status.PUBLISHED:
+            return obj.get_absolute_url()
+        return reverse("blog:post_preview", kwargs={"slug": obj.slug})
+
     def public_link(self, obj: BlogPost) -> SafeString:
         if obj.status == BlogPost.Status.PUBLISHED:
             url = obj.get_absolute_url()
