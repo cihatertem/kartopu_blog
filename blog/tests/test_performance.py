@@ -3,7 +3,7 @@ from decimal import Decimal
 
 from django.contrib.auth import get_user_model
 from django.db import connection, reset_queries
-from django.test import TestCase, override_settings
+from django.test import TestCase
 
 from blog.templatetags import blog_extras
 from portfolio.models import (

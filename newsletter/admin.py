@@ -13,7 +13,6 @@ from .models import (
     Subscriber,
     SubscriberStatus,
 )
-from .services import send_announcement
 
 
 @admin.action(description="Seçili abonelikleri iptal et")

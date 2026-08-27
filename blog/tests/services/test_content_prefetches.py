@@ -1,4 +1,3 @@
-from django.db.models import Prefetch
 from django.test import SimpleTestCase
 
 from blog.services import get_content_prefetches_for_markers

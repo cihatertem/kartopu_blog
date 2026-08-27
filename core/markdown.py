@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import functools
 from urllib.parse import urlparse
 
 import bleach.linkifier

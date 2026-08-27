@@ -1,8 +1,7 @@
-from django.db.models.query import QuerySet
 from django.test import TestCase
 
 from blog.services import salary_savings_snapshot_queryset
-from portfolio.models import SalarySavingsFlow, SalarySavingsSnapshot
+from portfolio.models import SalarySavingsSnapshot
 
 
 class SalarySavingsSnapshotQuerysetTests(TestCase):

@@ -1,7 +1,6 @@
 import io
 import os
 import re
-from decimal import Decimal
 from typing import Any
 
 from django.conf import settings
@@ -30,7 +29,7 @@ from reportlab.platypus import (
     Image as RLImage,
 )
 
-from blog.models import BlogPost, BlogPostImage
+from blog.models import BlogPost
 from blog.services import (
     detect_content_markers,
     get_content_prefetches_for_markers,

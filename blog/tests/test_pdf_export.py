@@ -1,4 +1,3 @@
-import io
 from unittest.mock import MagicMock
 
 from django.contrib import messages
@@ -63,7 +62,9 @@ class PDFExportTestCase(TestCase):
         )
         self.inline_image = BlogPostImage.objects.create(
             post=self.published_post,
-            image=SimpleUploadedFile("test_inline.gif", small_gif, content_type="image/gif"),
+            image=SimpleUploadedFile(
+                "test_inline.gif", small_gif, content_type="image/gif"
+            ),
             caption="Inline Görsel Açıklaması",
             alt_text="Inline Görsel",
             order=1,
@@ -101,7 +102,9 @@ class PDFExportTestCase(TestCase):
 
     def test_generate_published_posts_pdf_empty_if_no_published(self):
         """Verify PDF generation when queryset contains only draft/archived posts."""
-        queryset = BlogPost.objects.filter(status__in=[BlogPost.Status.DRAFT, BlogPost.Status.ARCHIVED])
+        queryset = BlogPost.objects.filter(
+            status__in=[BlogPost.Status.DRAFT, BlogPost.Status.ARCHIVED]
+        )
         pdf_bytes = generate_published_posts_pdf(queryset)
 
         self.assertIsInstance(pdf_bytes, bytes)
@@ -112,7 +115,9 @@ class PDFExportTestCase(TestCase):
         model_admin = BlogPostAdmin(BlogPost, self.site)
         request = MockRequest(user=self.admin_user)
 
-        queryset = BlogPost.objects.filter(pk__in=[self.published_post.pk, self.draft_post.pk])
+        queryset = BlogPost.objects.filter(
+            pk__in=[self.published_post.pk, self.draft_post.pk]
+        )
         response = model_admin.export_published_posts_pdf(request, queryset)
 
         self.assertIsNotNone(response)
@@ -127,7 +132,9 @@ class PDFExportTestCase(TestCase):
         request = MockRequest(user=self.admin_user)
         model_admin.message_user = MagicMock()
 
-        queryset = BlogPost.objects.filter(pk__in=[self.draft_post.pk, self.archived_post.pk])
+        queryset = BlogPost.objects.filter(
+            pk__in=[self.draft_post.pk, self.archived_post.pk]
+        )
         response = model_admin.export_published_posts_pdf(request, queryset)
 
         self.assertIsNone(response)
@@ -199,14 +206,14 @@ class PDFExportTestCase(TestCase):
 
     def test_generate_published_posts_pdf_with_dividend_payment_item(self):
         """Verify that DividendSnapshotPaymentItem objects with total_net_amount render without AttributeError."""
+        from decimal import Decimal
+
         from portfolio.models import (
             Asset,
             DividendPayment,
             DividendSnapshot,
             DividendSnapshotPaymentItem,
         )
-
-        from decimal import Decimal
 
         asset = Asset.objects.create(symbol="USD", name="Dolar", asset_type="cash")
         snapshot = DividendSnapshot.objects.create(
@@ -251,6 +258,7 @@ class PDFExportTestCase(TestCase):
     def test_generate_published_posts_pdf_with_portfolio_snapshot_item(self):
         """Verify that PortfolioSnapshotItem objects with market_value render without AttributeError."""
         from decimal import Decimal
+
         from portfolio.models import (
             Asset,
             Portfolio,
