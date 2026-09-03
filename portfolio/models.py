@@ -11,6 +11,8 @@ from django.core.exceptions import ValidationError
 from django.db import models, transaction
 from django.db.models import (
     DecimalField,
+    ExpressionWrapper,
+    F,
     Prefetch,
     Q,
     QuerySet,
@@ -1319,6 +1321,64 @@ class PortfolioSnapshot(BaseSnapshot):
             for position in items_data
         ]
         cls._bulk_create_instances(PortfolioSnapshotItem, items)  # pyright: ignore[reportArgumentType]
+        cls._create_purchase_items(snapshot)
+
+    @classmethod
+    def _create_purchase_items(cls, snapshot: BaseSnapshot) -> None:
+        if snapshot.period != cls.Period.MONTHLY:  # pyright: ignore[reportAttributeAccessIssue]
+            return
+
+        snapshot_date = snapshot.snapshot_date
+        start_date = snapshot_date.replace(day=1)
+        end_date = snapshot_date.replace(
+            day=calendar.monthrange(snapshot_date.year, snapshot_date.month)[1]
+        )
+        purchase_totals = (
+            snapshot.portfolio.transactions.filter(  # pyright: ignore[reportAttributeAccessIssue]
+                transaction_type=PortfolioTransaction.TransactionType.BUY,
+                trade_date__range=(start_date, end_date),
+            )
+            .values("asset_id", "asset__currency")
+            .annotate(
+                total_amount=Sum(
+                    ExpressionWrapper(
+                        F("quantity") * F("price_per_unit"),
+                        output_field=DecimalField(
+                            max_digits=MAX_DIGITS,
+                            decimal_places=MAX_DECIMAL_PLACES,
+                        ),
+                    )
+                )
+            )
+        )
+        totals = list(purchase_totals)
+        source_currencies = {
+            total["asset__currency"]
+            for total in totals
+            if total["asset__currency"] != snapshot.portfolio.currency  # pyright: ignore[reportAttributeAccessIssue]
+        }
+        fx_rates = cls._get_cached_fx_rates(
+            source_currencies,
+            snapshot.portfolio.currency,  # pyright: ignore[reportAttributeAccessIssue]
+            snapshot_date,
+        )
+        items = []
+        for total in totals:
+            amount = total["total_amount"]
+            if amount is None:
+                continue
+            currency = total["asset__currency"]
+            if currency != snapshot.portfolio.currency:  # pyright: ignore[reportAttributeAccessIssue]
+                amount *= fx_rates[(currency, snapshot.portfolio.currency, snapshot_date)]  # pyright: ignore[reportAttributeAccessIssue]
+            if amount > 0:
+                items.append(
+                    PortfolioSnapshotPurchaseItem(
+                        snapshot=snapshot,  # pyright: ignore[arg-type]
+                        asset_id=total["asset_id"],
+                        total_amount=amount,
+                    )
+                )
+        cls._bulk_create_instances(PortfolioSnapshotPurchaseItem, items)
 
 
 class PortfolioSnapshotItem(UUIDModelMixin, TimeStampedModelMixin):
@@ -1356,6 +1416,32 @@ class PortfolioSnapshotItem(UUIDModelMixin, TimeStampedModelMixin):
     class Meta:  # pyright: ignore[reportIncompatibleVariableOverride]
         verbose_name = "Snapshot Kalemi"
         verbose_name_plural = "Snapshot Kalemleri"
+
+    def __str__(self) -> str:
+        return f"{self.snapshot} - {self.asset}"
+
+
+class PortfolioSnapshotPurchaseItem(UUIDModelMixin, TimeStampedModelMixin):
+    snapshot = models.ForeignKey(
+        PortfolioSnapshot,
+        on_delete=models.CASCADE,
+        related_name="purchase_items",
+    )
+    asset = models.ForeignKey(Asset, on_delete=models.PROTECT)
+    total_amount = models.DecimalField(
+        max_digits=MAX_DIGITS, decimal_places=MAX_DECIMAL_PLACES
+    )
+
+    class Meta:  # pyright: ignore[reportIncompatibleVariableOverride]
+        verbose_name = "Snapshot Alım Kalemi"
+        verbose_name_plural = "Snapshot Alım Kalemleri"
+        constraints = [
+            models.UniqueConstraint(
+                fields=("snapshot", "asset"),
+                name="unique_snapshot_purchase_item",
+            )
+        ]
+        indexes = [models.Index(fields=("snapshot", "asset"))]
 
     def __str__(self) -> str:
         return f"{self.snapshot} - {self.asset}"

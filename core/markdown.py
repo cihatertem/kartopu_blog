@@ -98,7 +98,7 @@ ALLOWED_ATTRIBUTES = {
     "code": ["class"],
     "span": ["class", "style", "id"],
     "pre": ["class"],
-    "div": ["class", "id", "style"],
+    "div": ["class", "id", "style", "role", "aria-label", "aria-live"],
     "article": ["class", "id", "style"],
     "section": [
         "class",
@@ -114,6 +114,7 @@ ALLOWED_ATTRIBUTES = {
         "data-portfolio-category-allocation",
         "data-dividend-allocation",
         "data-savings-rate-timeseries",
+        "data-treemap-items",
     ],
     "main": ["class", "id", "style"],
     "table": ["class", "id", "style"],

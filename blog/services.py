@@ -22,6 +22,7 @@ from portfolio.models import (
     PortfolioComparison,
     PortfolioSnapshot,
     PortfolioSnapshotItem,
+    PortfolioSnapshotPurchaseItem,
     SalarySavingsSnapshot,
 )
 
@@ -35,6 +36,7 @@ PORTFOLIO_SNAPSHOT_MARKERS = frozenset(
         "portfolio_charts",
         "portfolio_irr_charts",
         "portfolio_category_summary",
+        "portfolio_purchase_treemap",
     }
 )
 PORTFOLIO_COMPARISON_MARKERS = frozenset(
@@ -120,6 +122,7 @@ def portfolio_snapshot_queryset(
     *,
     include_items: bool = False,
     include_history: bool = False,
+    include_purchase_items: bool = False,
 ):
     qs = base_queryset if base_queryset is not None else PortfolioSnapshot.objects
     qs = qs.select_related("portfolio")
@@ -144,6 +147,13 @@ def portfolio_snapshot_queryset(
                     "period",
                 ).order_by("snapshot_date"),
                 to_attr="prefetched_snapshots",
+            )
+        )
+    if include_purchase_items:
+        prefetches.append(
+            Prefetch(
+                "purchase_items",
+                queryset=PortfolioSnapshotPurchaseItem.objects.select_related("asset"),
             )
         )
 
@@ -323,6 +333,7 @@ def get_content_prefetches_for_markers(markers: set[str]):
                     include_history=bool(
                         markers & {"portfolio_charts", "portfolio_irr_charts"}
                     ),
+                    include_purchase_items="portfolio_purchase_treemap" in markers,
                 ),
             )
         )

@@ -136,3 +136,9 @@ class MarkdownTests(TestCase):
         html = render_markdown(text)
         self.assertNotIn("javascript:", html)
         self.assertIn("<section>9</section>", html)
+
+    def test_render_markdown_strips_javascript_in_treemap_data_attributes(self):
+        text = '<section data-treemap-items="javascript:alert(1)">9</section>'
+        html = render_markdown(text)
+        self.assertNotIn("javascript:", html)
+        self.assertIn("<section>9</section>", html)

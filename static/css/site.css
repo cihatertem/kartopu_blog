@@ -1283,6 +1283,80 @@ select:focus {
   margin-top: 0;
 }
 
+.purchase-treemap {
+  margin: 1rem 0;
+  padding: 1rem;
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+  background: var(--color-surface);
+}
+
+.purchase-treemap--empty {
+  color: var(--color-muted);
+}
+
+.purchase-treemap__title {
+  margin-top: 0;
+}
+
+.purchase-treemap__canvas {
+  position: relative;
+  height: clamp(220px, 42vw, 360px);
+  overflow: hidden;
+  border-radius: 8px;
+}
+
+.purchase-treemap__tile {
+  position: absolute;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 0;
+  padding: 0.35rem;
+  overflow: hidden;
+  border: 1px solid rgb(255 255 255 / 70%);
+  color: #fff;
+  font: inherit;
+  font-size: clamp(0.7rem, 2vw, 1rem);
+  font-weight: 700;
+  line-height: 1;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.purchase-treemap__tile:focus-visible {
+  z-index: 1;
+  outline: 3px solid var(--color-text);
+  outline-offset: -3px;
+}
+
+.purchase-treemap__tooltip {
+  min-height: 1.5rem;
+  margin-top: 0.75rem;
+  color: var(--color-muted);
+  font-size: 0.9rem;
+  opacity: 0;
+}
+
+.purchase-treemap__tooltip.is-visible {
+  opacity: 1;
+}
+
+@media (max-width: 480px) {
+  .purchase-treemap {
+    padding: 0.75rem;
+  }
+
+  .purchase-treemap__canvas {
+    height: 240px;
+  }
+
+  .purchase-treemap__tile {
+    padding: 0.2rem;
+  }
+}
+
 .scroll-to-top {
   position: fixed;
   bottom: 2rem;

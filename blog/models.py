@@ -139,6 +139,7 @@ class BlogPost(
             "  {{ portfolio_charts:slug_or_hash }}<br>\n"
             "  {{ portfolio_irr_charts:slug_or_hash }}<br>\n"
             "  {{ portfolio_category_summary:slug_or_hash }}<br>\n"
+            "  {{ portfolio_purchase_treemap:slug_or_hash }}<br>\n"
             "  {{ portfolio_comparison_summary:slug_or_hash }}<br>\n"
             "  {{ portfolio_comparison_charts:slug_or_hash }}<br>\n"
             "  {{ cashflow_summary:slug_or_hash }}<br>\n"

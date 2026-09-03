@@ -7,6 +7,18 @@ document.addEventListener("DOMContentLoaded", function () {
         }
     };
     const isChartAvailable = () => typeof Chart !== "undefined";
+    const chartPalette = [
+        "#0d6e6e",
+        "#e76f51",
+        "#e9c46a",
+        "#457b9d",
+        "#8ab17d",
+        "#9b5de5",
+        "#f4a261",
+        "#264653",
+    ];
+    const getChartPalette = (length) =>
+        Array.from({ length }, (_, index) => chartPalette[index % chartPalette.length]);
     const getDoughnutLegendOptions = () => {
         const legend = { position: "bottom" };
         if (document.documentElement.getAttribute("data-theme") === "dark") {
@@ -250,6 +262,125 @@ document.addEventListener("DOMContentLoaded", function () {
     // -------------------------
     // PortfolioSnapshot charts
     // -------------------------
+    const worstTreemapRatio = (row, shortSide) => {
+        const rowArea = row.reduce((sum, item) => sum + item.area, 0);
+        const largest = Math.max(...row.map((item) => item.area));
+        const smallest = Math.min(...row.map((item) => item.area));
+        return Math.max(
+            (shortSide * shortSide * largest) / (rowArea * rowArea),
+            (rowArea * rowArea) / (shortSide * shortSide * smallest),
+        );
+    };
+
+    const layoutTreemapRow = (row, rect, tiles) => {
+        const rowArea = row.reduce((sum, item) => sum + item.area, 0);
+        if (rect.width >= rect.height) {
+            const rowHeight = rowArea / rect.width;
+            let x = rect.x;
+            row.forEach((item) => {
+                const width = item.area / rowHeight;
+                tiles.push({ item, x, y: rect.y, width, height: rowHeight });
+                x += width;
+            });
+            rect.y += rowHeight;
+            rect.height -= rowHeight;
+        } else {
+            const rowWidth = rowArea / rect.height;
+            let y = rect.y;
+            row.forEach((item) => {
+                const height = item.area / rowWidth;
+                tiles.push({ item, x: rect.x, y, width: rowWidth, height });
+                y += height;
+            });
+            rect.x += rowWidth;
+            rect.width -= rowWidth;
+        }
+    };
+
+    const getSquarifiedTreemap = (items, width, height) => {
+        const total = items.reduce((sum, item) => sum + item.amount, 0);
+        const remaining = items.map((item) => ({
+            ...item,
+            area: (item.amount / total) * width * height,
+        }));
+        const rect = { x: 0, y: 0, width, height };
+        const tiles = [];
+        let row = [];
+
+        while (remaining.length && rect.width > 0 && rect.height > 0) {
+            const next = remaining[0];
+            const shortSide = Math.min(rect.width, rect.height);
+            if (
+                !row.length ||
+                worstTreemapRatio([...row, next], shortSide) <=
+                    worstTreemapRatio(row, shortSide)
+            ) {
+                row.push(remaining.shift());
+            } else {
+                layoutTreemapRow(row, rect, tiles);
+                row = [];
+            }
+        }
+        if (row.length) {
+            layoutTreemapRow(row, rect, tiles);
+        }
+        return tiles;
+    };
+
+    document.querySelectorAll(".purchase-treemap").forEach((section) => {
+        const canvas = section.querySelector(".purchase-treemap__canvas");
+        const tooltip = section.querySelector(".purchase-treemap__tooltip");
+        if (!canvas || !tooltip) return;
+
+        let items;
+        try {
+            items = JSON.parse(section.dataset.treemapItems || "[]").filter(
+                (item) => Number.isFinite(Number(item.amount)) && Number(item.amount) > 0,
+            );
+        } catch {
+            return;
+        }
+        if (!items.length) return;
+
+        const render = () => {
+            const width = canvas.clientWidth;
+            const height = canvas.clientHeight;
+            if (!width || !height) return;
+            canvas.replaceChildren();
+            getSquarifiedTreemap(
+                items.map((item) => ({ ...item, amount: Number(item.amount) })),
+                width,
+                height,
+            ).forEach(({ item, x, y, width: tileWidth, height: tileHeight }, index) => {
+                const tile = document.createElement("button");
+                tile.type = "button";
+                tile.className = "purchase-treemap__tile";
+                tile.style.left = `${x}px`;
+                tile.style.top = `${y}px`;
+                tile.style.width = `${Math.max(0, tileWidth)}px`;
+                tile.style.height = `${Math.max(0, tileHeight)}px`;
+                tile.style.backgroundColor = chartPalette[index % chartPalette.length];
+                tile.textContent = item.symbol;
+                const showTooltip = () => {
+                    tooltip.textContent = `${item.symbol}: ${item.formatted_amount}`;
+                    tooltip.classList.add("is-visible");
+                };
+                tile.addEventListener("pointerenter", showTooltip);
+                tile.addEventListener("focus", showTooltip);
+                tile.addEventListener("click", showTooltip);
+                tile.addEventListener("pointerleave", () =>
+                    tooltip.classList.remove("is-visible"),
+                );
+                tile.addEventListener("blur", () =>
+                    tooltip.classList.remove("is-visible"),
+                );
+                canvas.appendChild(tile);
+            });
+        };
+        render();
+        new ResizeObserver(render).observe(canvas);
+    });
+
     document.querySelectorAll(".portfolio-charts").forEach((section) => {
         const fallbackSelector = ".portfolio-chart-fallback";
         if (!isChartAvailable()) {
@@ -281,7 +412,14 @@ document.addEventListener("DOMContentLoaded", function () {
                     type: "doughnut",
                     data: {
                         labels: allocationData.labels,
-                        datasets: [{ data: allocationData.values }],
+                        datasets: [
+                            {
+                                data: allocationData.values,
+                                backgroundColor: getChartPalette(
+                                    allocationData.values.length,
+                                ),
+                            },
+                        ],
                     },
                     options: {
                         responsive: true,
@@ -451,7 +589,14 @@ document.addEventListener("DOMContentLoaded", function () {
                         type: "doughnut",
                         data: {
                             labels: allocationData.labels,
-                            datasets: [{ data: allocationData.values }],
+                            datasets: [
+                                {
+                                    data: allocationData.values,
+                                    backgroundColor: getChartPalette(
+                                        allocationData.values.length,
+                                    ),
+                                },
+                            ],
                         },
                         options: {
                             responsive: true,
@@ -576,7 +721,14 @@ document.addEventListener("DOMContentLoaded", function () {
                     type: "doughnut",
                     data: {
                         labels: allocationData.labels,
-                        datasets: [{ data: allocationData.values }],
+                        datasets: [
+                            {
+                                data: allocationData.values,
+                                backgroundColor: getChartPalette(
+                                    allocationData.values.length,
+                                ),
+                            },
+                        ],
                     },
                     options: {
                         responsive: true,
@@ -814,7 +966,14 @@ document.addEventListener("DOMContentLoaded", function () {
                     type: "doughnut",
                     data: {
                         labels: allocationData.labels,
-                        datasets: [{ data: allocationData.values }],
+                        datasets: [
+                            {
+                                data: allocationData.values,
+                                backgroundColor: getChartPalette(
+                                    allocationData.values.length,
+                                ),
+                            },
+                        ],
                     },
                     options: {
                         responsive: true,

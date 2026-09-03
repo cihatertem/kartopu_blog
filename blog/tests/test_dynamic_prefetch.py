@@ -8,7 +8,7 @@ from django.utils import timezone
 from blog.models import BlogPost, Category
 from blog.services import detect_content_markers
 from blog.views import _get_post_for_detail
-from portfolio.models import Portfolio, PortfolioSnapshot
+from portfolio.models import Asset, Portfolio, PortfolioSnapshot, PortfolioSnapshotPurchaseItem
 
 User = get_user_model()
 
@@ -149,6 +149,50 @@ class DynamicPrefetchTest(TestCase):
 
         self.assertIn("items", fetched_snapshot._prefetched_objects_cache)
         self.assertTrue(hasattr(fetched_snapshot.portfolio, "prefetched_snapshots"))
+
+    def test_dynamic_prefetch_treemap_includes_only_purchase_items(self):
+        portfolio = Portfolio.objects.create(
+            name="Treemap Portfolio",
+            owner=self.user,
+            target_value=Decimal("10000.00"),
+        )
+        snapshot = PortfolioSnapshot.objects.create(
+            portfolio=portfolio,
+            total_value=Decimal("1000.00"),
+            total_cost=Decimal("800.00"),
+            target_value=Decimal("1200.00"),
+            total_return_pct=Decimal("0.25"),
+            period=PortfolioSnapshot.Period.MONTHLY,
+            snapshot_date=timezone.now().date(),
+        )
+        asset = Asset.objects.create(
+            name="Treemap Asset",
+            symbol="TREE",
+            asset_type=Asset.AssetType.STOCK,
+            current_price=Decimal("100"),
+            price_updated_at=timezone.now(),
+        )
+        PortfolioSnapshotPurchaseItem.objects.create(
+            snapshot=snapshot,
+            asset=asset,
+            total_amount=Decimal("100"),
+        )
+        post = BlogPost.objects.create(
+            author=self.user,
+            category=self.category,
+            title="Portfolio Treemap",
+            content="{{ portfolio_purchase_treemap:1 }}",
+            status=BlogPost.Status.PUBLISHED,
+        )
+        post.portfolio_snapshots.add(snapshot)
+
+        fetched_post = _get_post_for_detail(post.slug, include_unpublished=False)
+        fetched_snapshot = fetched_post._prefetched_objects_cache[
+            "portfolio_snapshots"
+        ][0]
+
+        self.assertIn("purchase_items", fetched_snapshot._prefetched_objects_cache)
+        self.assertNotIn("items", fetched_snapshot._prefetched_objects_cache)
 
     def test_no_unnecessary_prefetch(self):
         """Test that data is NOT prefetched if not in content."""

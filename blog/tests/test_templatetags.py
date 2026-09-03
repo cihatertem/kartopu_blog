@@ -23,6 +23,7 @@ from blog.templatetags.blog_extras import (
     _render_portfolio_charts_html,
     _render_portfolio_comparison_charts_html,
     _render_portfolio_irr_charts_html,
+    _render_portfolio_purchase_treemap_html,
     _render_portfolio_summary_html,
     _render_savings_rate_charts_html,
     _render_savings_rate_summary_html,
@@ -561,6 +562,36 @@ class TestRenderHTMLFunctions(TestCase):
         html = _render_dividend_comparison_html(c)
         self.assertIn("100.00", html)
 
+    def test_render_portfolio_purchase_treemap_html(self):
+        snapshot = DummySnapshot()
+        snapshot.purchase_items = MagicMock()
+        item = MagicMock()
+        item.asset.symbol = "NVDA"
+        item.total_amount = Decimal("12500")
+        snapshot.purchase_items.all.return_value = [item]
+        snapshot._prefetched_objects_cache = {"purchase_items": [item]}
+
+        html = _render_portfolio_purchase_treemap_html(snapshot)
+
+        self.assertIn("purchase-treemap", html)
+        self.assertIn('"symbol":"NVDA"', html)
+        self.assertIn('"amount":"12500"', html)
+        self.assertIn('"formatted_amount":"12.500 \\u20ba"', html)
+
+    def test_render_portfolio_purchase_treemap_empty_states(self):
+        self.assertIn(
+            "yalnız aylık",
+            _render_portfolio_purchase_treemap_html(None),
+        )
+        snapshot = DummySnapshot()
+        snapshot.purchase_items = MagicMock()
+        snapshot.purchase_items.all.return_value = []
+        snapshot._prefetched_objects_cache = {"purchase_items": []}
+        self.assertIn(
+            "alım işlemi bulunmuyor",
+            _render_portfolio_purchase_treemap_html(snapshot),
+        )
+
 
 class BlogExtrasFiltersTests(TestCase):
     def test_absolute_url(self):
@@ -814,6 +845,34 @@ class BlogExtrasFiltersTests(TestCase):
 
 
 class RenderPostBodyTests(TestCase):
+    def test_render_post_body_preserves_purchase_treemap_data_and_accessibility(self):
+        snapshot = DummySnapshot()
+        snapshot.slug = "portfolio-snapshot#oyy2vr"
+        snapshot.purchase_items = MagicMock()
+        purchase_item = MagicMock()
+        purchase_item.asset.symbol = "NVDA"
+        purchase_item.total_amount = Decimal("12500")
+        snapshot.purchase_items.all.return_value = [purchase_item]
+        snapshot._prefetched_objects_cache = {"purchase_items": [purchase_item]}
+
+        class MockPost:
+            content = "{{ portfolio_purchase_treemap:oyy2vr }}"
+            images = MagicMock()
+            images.all.return_value = []
+            portfolio_snapshots = MagicMock()
+            _prefetched_objects_cache = {"portfolio_snapshots": [snapshot]}
+
+        post = MockPost()
+
+        html = blog_extras.render_post_body({}, post)
+
+        self.assertIn('data-treemap-items=', html)
+        self.assertIn('&quot;symbol&quot;:&quot;NVDA&quot;', html)
+        self.assertIn('role="group"', html)
+        self.assertIn('aria-label="Aylık alım dağılımı"', html)
+        self.assertIn('role="status"', html)
+        self.assertIn('aria-live="polite"', html)
+
     def test_render_post_body_disclaimer(self):
         class MockPost:
             content = "Hello\n{{ legal_disclaimer }}\nWorld"

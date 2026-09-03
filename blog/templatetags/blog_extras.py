@@ -304,6 +304,43 @@ def _render_portfolio_charts_html(snapshot) -> str:
     )
 
 
+def _render_portfolio_purchase_treemap_html(snapshot) -> str:
+    if not snapshot or snapshot.period != "monthly":
+        return '<section class="purchase-treemap purchase-treemap--empty"><p>Bu grafik yalnız aylık portföy snapshotları için kullanılabilir.</p></section>'
+
+    if "purchase_items" not in getattr(snapshot, "_prefetched_objects_cache", {}):
+        prefetch_related_objects([snapshot], "purchase_items__asset")
+
+    items = sorted(
+        (
+            item
+            for item in snapshot.purchase_items.all()
+            if _safe_decimal(item.total_amount) > 0
+        ),
+        key=lambda item: item.total_amount,
+        reverse=True,
+    )
+    if not items:
+        return '<section class="purchase-treemap purchase-treemap--empty"><p>Bu ay için alım işlemi bulunmuyor.</p></section>'
+
+    currency = snapshot.portfolio.currency
+    treemap_items = [
+        {
+            "symbol": item.asset.symbol,
+            "amount": item.total_amount,
+            "formatted_amount": _format_currency(item.total_amount, currency),
+        }
+        for item in items
+    ]
+    return """
+<section class="purchase-treemap" data-treemap-items='{items_json}'>
+  <h4 class="purchase-treemap__title">Aylık Alım Dağılımı</h4>
+  <div class="purchase-treemap__canvas" aria-label="Aylık alım dağılımı" role="group"></div>
+  <div class="purchase-treemap__tooltip" role="status" aria-live="polite"></div>
+</section>
+""".format(items_json=_to_json_attribute(treemap_items))
+
+
 def _render_portfolio_category_summary_html(snapshot) -> str:
     if not snapshot:
         return ""
@@ -1268,6 +1305,14 @@ def portfolio_charts(context, index=None):
 
 
 @register.simple_tag(takes_context=True)
+def portfolio_purchase_treemap(context, index=None):
+    """Post içindeki aylık alım treemap alanını HTML olarak döndürür."""
+    post = context.get("post")
+    snapshot = _get_item_by_identifier(_get_portfolio_snapshots(post), index)
+    return mark_safe(_render_portfolio_purchase_treemap_html(snapshot))
+
+
+@register.simple_tag(takes_context=True)
 def portfolio_category_summary(context, index=None):
     """Post içindeki snapshot kategori özet donut grafiğini HTML olarak döndürür."""
     post = context.get("post")
@@ -1368,6 +1413,10 @@ def dividend_comparison(context, index=None):
 MARKER_MAP = {
     "portfolio_summary": (_get_portfolio_snapshots, _render_portfolio_summary_html),
     "portfolio_charts": (_get_portfolio_snapshots, _render_portfolio_charts_html),
+    "portfolio_purchase_treemap": (
+        _get_portfolio_snapshots,
+        _render_portfolio_purchase_treemap_html,
+    ),
     "portfolio_irr_charts": (
         _get_portfolio_snapshots,
         _render_portfolio_irr_charts_html,
@@ -1435,6 +1484,7 @@ def render_post_body(context, post):
       {{ image:1 }}  (1-based)
       {{ portfolio_summary:slug_or_hash }}
       {{ portfolio_charts:slug_or_hash }}
+      {{ portfolio_purchase_treemap:slug_or_hash }}
       {{ portfolio_category_summary:slug_or_hash }}
       {{ portfolio_comparison_summary:slug_or_hash }}
       {{ portfolio_comparison_charts:slug_or_hash }}
