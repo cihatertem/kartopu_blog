@@ -1,5 +1,6 @@
 from datetime import date
 from decimal import Decimal
+from io import StringIO
 from unittest.mock import patch
 
 from django.contrib.auth import get_user_model
@@ -167,8 +168,18 @@ class FillMissingPurchaseItemsCommandTests(TestCase):
         )
         transaction.portfolios.add(self.portfolio)
 
-        call_command("fill_missing_purchase_items")
-        call_command("fill_missing_purchase_items")
+        first_output = StringIO()
+        second_output = StringIO()
+
+        call_command("fill_missing_purchase_items", stdout=first_output)
+        call_command("fill_missing_purchase_items", stdout=second_output)
+
+        self.assertIn(
+            "Finished. Created purchase items for 1 snapshots.", first_output.getvalue()
+        )
+        self.assertIn(
+            "Finished. Created purchase items for 0 snapshots.", second_output.getvalue()
+        )
 
         self.assertEqual(monthly_snapshot.purchase_items.count(), 1)
         self.assertEqual(

@@ -13,6 +13,12 @@ from portfolio.models import Asset, Portfolio, PortfolioSnapshot, PortfolioTrans
 
 class PortfolioSnapshotPurchaseItemTests(TestCase):
     def setUp(self) -> None:
+        price_fetch_patcher = patch(
+            "portfolio.models.fetch_yahoo_finance_prices_bulk", return_value={}
+        )
+        price_fetch_patcher.start()
+        self.addCleanup(price_fetch_patcher.stop)
+
         self.user = get_user_model().objects.create_user(
             email="purchase-items@example.com",
             password="testpass123",
