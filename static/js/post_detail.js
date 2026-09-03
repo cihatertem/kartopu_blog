@@ -1,4 +1,100 @@
-document.addEventListener("DOMContentLoaded", function () {
+const worstTreemapRatio = (row, shortSide) => {
+    if (!row.length || shortSide <= 0) return Number.POSITIVE_INFINITY;
+
+    const rowArea = row.reduce((sum, item) => sum + item.area, 0);
+    const largest = Math.max(...row.map((item) => item.area));
+    const smallest = Math.min(...row.map((item) => item.area));
+    if (rowArea <= 0 || smallest <= 0) return Number.POSITIVE_INFINITY;
+
+    return Math.max(
+        (shortSide * shortSide * largest) / (rowArea * rowArea),
+        (rowArea * rowArea) / (shortSide * shortSide * smallest),
+    );
+};
+
+const layoutTreemapRow = (row, rect, tiles) => {
+    const rowArea = row.reduce((sum, item) => sum + item.area, 0);
+    if (!row.length || rowArea <= 0 || rect.width <= 0 || rect.height <= 0) return;
+
+    if (rect.width >= rect.height) {
+        const columnWidth = Math.min(rect.width, rowArea / rect.height);
+        let y = rect.y;
+        let remainingHeight = rect.height;
+        row.forEach((item, index) => {
+            const height =
+                index === row.length - 1
+                    ? remainingHeight
+                    : Math.min(remainingHeight, item.area / columnWidth);
+            tiles.push({ item, x: rect.x, y, width: columnWidth, height });
+            y += height;
+            remainingHeight = Math.max(0, remainingHeight - height);
+        });
+        rect.x += columnWidth;
+        rect.width = Math.max(0, rect.width - columnWidth);
+    } else {
+        const rowHeight = Math.min(rect.height, rowArea / rect.width);
+        let x = rect.x;
+        let remainingWidth = rect.width;
+        row.forEach((item, index) => {
+            const width =
+                index === row.length - 1
+                    ? remainingWidth
+                    : Math.min(remainingWidth, item.area / rowHeight);
+            tiles.push({ item, x, y: rect.y, width, height: rowHeight });
+            x += width;
+            remainingWidth = Math.max(0, remainingWidth - width);
+        });
+        rect.y += rowHeight;
+        rect.height = Math.max(0, rect.height - rowHeight);
+    }
+};
+
+const getSquarifiedTreemap = (items, width, height) => {
+    if (!Array.isArray(items) || width <= 0 || height <= 0) return [];
+
+    const positiveItems = items.filter(
+        (item) => Number.isFinite(item.amount) && item.amount > 0,
+    );
+    const total = positiveItems.reduce((sum, item) => sum + item.amount, 0);
+    if (!Number.isFinite(total) || total <= 0) return [];
+
+    const remaining = positiveItems.map((item) => ({
+        ...item,
+        area: (item.amount / total) * width * height,
+    }));
+    const rect = { x: 0, y: 0, width, height };
+    const tiles = [];
+    let row = [];
+
+    while (remaining.length && rect.width > 0 && rect.height > 0) {
+        const next = remaining[0];
+        const shortSide = Math.min(rect.width, rect.height);
+        if (
+            !row.length ||
+            worstTreemapRatio([...row, next], shortSide) <=
+                worstTreemapRatio(row, shortSide)
+        ) {
+            row.push(remaining.shift());
+        } else {
+            layoutTreemapRow(row, rect, tiles);
+            row = [];
+        }
+    }
+    if (row.length) {
+        layoutTreemapRow(row, rect, tiles);
+    }
+    return tiles;
+};
+
+if (typeof module !== "undefined" && module.exports) {
+    module.exports = {
+        getSquarifiedTreemap,
+        layoutTreemapRow,
+        worstTreemapRatio,
+    };
+}
+
+const initializePostDetail = () => {
     const urlParams = new URLSearchParams(window.location.search);
     const revealFallback = (section, selector) => {
         const fallback = section.querySelector(selector);
@@ -262,71 +358,6 @@ document.addEventListener("DOMContentLoaded", function () {
     // -------------------------
     // PortfolioSnapshot charts
     // -------------------------
-    const worstTreemapRatio = (row, shortSide) => {
-        const rowArea = row.reduce((sum, item) => sum + item.area, 0);
-        const largest = Math.max(...row.map((item) => item.area));
-        const smallest = Math.min(...row.map((item) => item.area));
-        return Math.max(
-            (shortSide * shortSide * largest) / (rowArea * rowArea),
-            (rowArea * rowArea) / (shortSide * shortSide * smallest),
-        );
-    };
-
-    const layoutTreemapRow = (row, rect, tiles) => {
-        const rowArea = row.reduce((sum, item) => sum + item.area, 0);
-        if (rect.width >= rect.height) {
-            const rowHeight = rowArea / rect.width;
-            let x = rect.x;
-            row.forEach((item) => {
-                const width = item.area / rowHeight;
-                tiles.push({ item, x, y: rect.y, width, height: rowHeight });
-                x += width;
-            });
-            rect.y += rowHeight;
-            rect.height -= rowHeight;
-        } else {
-            const rowWidth = rowArea / rect.height;
-            let y = rect.y;
-            row.forEach((item) => {
-                const height = item.area / rowWidth;
-                tiles.push({ item, x: rect.x, y, width: rowWidth, height });
-                y += height;
-            });
-            rect.x += rowWidth;
-            rect.width -= rowWidth;
-        }
-    };
-
-    const getSquarifiedTreemap = (items, width, height) => {
-        const total = items.reduce((sum, item) => sum + item.amount, 0);
-        const remaining = items.map((item) => ({
-            ...item,
-            area: (item.amount / total) * width * height,
-        }));
-        const rect = { x: 0, y: 0, width, height };
-        const tiles = [];
-        let row = [];
-
-        while (remaining.length && rect.width > 0 && rect.height > 0) {
-            const next = remaining[0];
-            const shortSide = Math.min(rect.width, rect.height);
-            if (
-                !row.length ||
-                worstTreemapRatio([...row, next], shortSide) <=
-                    worstTreemapRatio(row, shortSide)
-            ) {
-                row.push(remaining.shift());
-            } else {
-                layoutTreemapRow(row, rect, tiles);
-                row = [];
-            }
-        }
-        if (row.length) {
-            layoutTreemapRow(row, rect, tiles);
-        }
-        return tiles;
-    };
-
     document.querySelectorAll(".purchase-treemap").forEach((section) => {
         const canvas = section.querySelector(".purchase-treemap__canvas");
         const tooltip = section.querySelector(".purchase-treemap__tooltip");
@@ -1021,4 +1052,8 @@ document.addEventListener("DOMContentLoaded", function () {
             window.location.reload();
         }
     });
-});
+};
+
+if (typeof document !== "undefined") {
+    document.addEventListener("DOMContentLoaded", initializePostDetail);
+}
