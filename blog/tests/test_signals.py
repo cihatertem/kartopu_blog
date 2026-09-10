@@ -1,6 +1,7 @@
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock, call, patch
 
 from django.contrib.auth import get_user_model
+from django.db.models import Value
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import TestCase
 
@@ -402,9 +403,37 @@ class SearchVectorTriggerTests(TestCase):
         draft.refresh_from_db()
         self.assertIsNone(draft.search_vector)
 
+    @patch("blog.signals.BlogPost.objects.filter")
+    @patch("blog.signals.SearchVector")
+    @patch("blog.signals.connection")
+    def test_update_search_vector_includes_turkish_weighted_title(
+        self, mock_connection, mock_search_vector, mock_filter
+    ):
+        mock_connection.vendor = "postgresql"
+        post = BlogPost.objects.create(
+            title="Migros", author=self.user, slug="vector-title", status="published"
+        )
+        mock_search_vector.reset_mock()
+        mock_filter.reset_mock()
+        mock_filter.return_value.update.reset_mock()
+
+        update_search_vector(post)
+
+        mock_search_vector.assert_has_calls(
+            [
+                call(Value(""), weight="A", config="turkish"),
+                call("title", weight="B", config="turkish"),
+                call("excerpt", weight="C", config="turkish"),
+                call("content", weight="D", config="turkish"),
+            ],
+            any_order=True,
+        )
+        mock_filter.return_value.update.assert_called_once()
+
+    @patch("blog.signals.invalidate_search_cache")
     @patch("blog.signals.update_search_vector")
     def test_post_save_skips_rebuild_when_irrelevant_field_changes(
-        self, mock_update_search_vector
+        self, mock_update_search_vector, mock_invalidate_search_cache
     ):
         BlogPost.objects.create(
             title="Pub",
@@ -414,13 +443,16 @@ class SearchVectorTriggerTests(TestCase):
         )
         post = BlogPost.objects.get(slug="pub-post")
         mock_update_search_vector.reset_mock()
+        mock_invalidate_search_cache.reset_mock()
         post.is_featured = True
         post.save()
         mock_update_search_vector.assert_not_called()
+        mock_invalidate_search_cache.assert_not_called()
 
+    @patch("blog.signals.invalidate_search_cache")
     @patch("blog.signals.update_search_vector")
     def test_post_save_rebuilds_when_relevant_field_changes(
-        self, mock_update_search_vector
+        self, mock_update_search_vector, mock_invalidate_search_cache
     ):
         BlogPost.objects.create(
             title="Pub2",
@@ -430,9 +462,25 @@ class SearchVectorTriggerTests(TestCase):
         )
         post = BlogPost.objects.get(slug="pub-post-2")
         mock_update_search_vector.reset_mock()
+        mock_invalidate_search_cache.reset_mock()
         post.title = "Pub2 Updated"
         post.save()
         mock_update_search_vector.assert_called_once_with(post)
+        mock_invalidate_search_cache.assert_called_once()
+
+    @patch("blog.signals.invalidate_search_cache")
+    def test_draft_changes_do_not_invalidate_search_cache(
+        self, mock_invalidate_search_cache
+    ):
+        post = BlogPost.objects.create(
+            title="Draft", author=self.user, slug="draft-cache"
+        )
+        mock_invalidate_search_cache.reset_mock()
+
+        post.title = "Updated Draft"
+        post.save()
+
+        mock_invalidate_search_cache.assert_not_called()
 
 
 class BlogPostReactionSignalTests(TestCase):

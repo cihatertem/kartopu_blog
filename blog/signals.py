@@ -1,5 +1,6 @@
 import os
 import shutil
+from uuid import uuid4
 
 from django.conf import settings
 from django.contrib.postgres.search import SearchVector
@@ -16,6 +17,7 @@ from blog.cache_keys import (
     HOME_PAGE_KEY,
     NAV_ARCHIVES_KEY,
     NAV_KEYS,
+    SEARCH_CACHE_VERSION_KEY,
 )
 from core.decorators import log_exceptions
 
@@ -102,6 +104,10 @@ def invalidate_nav_cache():
     cache.delete_many(keys_to_delete)
 
 
+def invalidate_search_cache() -> None:
+    cache.set(SEARCH_CACHE_VERSION_KEY, uuid4().hex, timeout=None)
+
+
 def update_search_vector(post: BlogPost):
     if connection.vendor != "postgresql":
         return
@@ -148,10 +154,19 @@ def _should_rebuild_search_vector(
     return instance.search_vector_fields_changed()
 
 
+def _search_results_may_change(instance: BlogPost) -> bool:
+    return instance.status == BlogPost.Status.PUBLISHED or (
+        getattr(instance, "_loaded_search_values", {}).get("status")
+        == BlogPost.Status.PUBLISHED
+    )
+
+
 @receiver(post_save, sender=BlogPost)
 def post_changed_save(sender, instance: BlogPost, created=False, update_fields=None, **kwargs):
     if _should_rebuild_search_vector(instance, created, update_fields):
         update_search_vector(instance)
+        if _search_results_may_change(instance):
+            invalidate_search_cache()
     recalculate_popularity_score(instance.pk)
     cache.delete(f"{BLOG_POST_DETAIL_KEY_PREFIX}{instance.slug}")
     cache.delete(HOME_PAGE_KEY)
@@ -160,6 +175,8 @@ def post_changed_save(sender, instance: BlogPost, created=False, update_fields=N
 
 @receiver(post_delete, sender=BlogPost)
 def post_changed_delete(sender, instance: BlogPost, **kwargs):
+    if instance.status == BlogPost.Status.PUBLISHED:
+        invalidate_search_cache()
     cache.delete(f"{BLOG_POST_DETAIL_KEY_PREFIX}{instance.slug}")
     cache.delete(HOME_PAGE_KEY)
     invalidate_nav_cache()
@@ -169,6 +186,8 @@ def post_changed_delete(sender, instance: BlogPost, **kwargs):
 def post_tags_changed(sender, instance, action, **kwargs):
     if action in ("post_add", "post_remove", "post_clear"):
         update_search_vector(instance)
+        if instance.status == BlogPost.Status.PUBLISHED:
+            invalidate_search_cache()
         invalidate_nav_cache()
 
 

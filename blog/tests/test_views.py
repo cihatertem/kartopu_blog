@@ -1,21 +1,28 @@
+import hashlib
 import json
 import unittest
 from unittest.mock import MagicMock, patch
 
 from allauth.socialaccount.models import SocialAccount
 from django.contrib.auth import get_user_model
+from django.core.cache import cache
+from django.core.paginator import Paginator
 from django.db import connection
 from django.test import Client, RequestFactory, TestCase
 from django.urls import reverse
 from django.utils import timezone
 
+from blog.cache_keys import SEARCH_CACHE_VERSION_KEY
 from blog.models import BlogPost, BlogPostReaction, Category, Tag
+from blog.signals import invalidate_search_cache
 from blog.views import (
     _build_comment_context,
     _build_reaction_context,
     _extract_social_avatar_url,
     _normalize_avatar_url,
+    _perform_database_search,
     post_reaction,
+    published_posts_queryset,
 )
 
 User = get_user_model()
@@ -177,6 +184,59 @@ class BlogViewsTests(TestCase):
                 self.assertEqual(response.status_code, 200)
                 # It shouldn't evaluate FTS logic again
                 MockSearchQuery.assert_not_called()
+
+    def test_search_cache_version_change_bypasses_cached_results(self):
+        cache.clear()
+        cache.set(SEARCH_CACHE_VERSION_KEY, "old-version", timeout=None)
+        cache_key_source = "search:old-version:Published:1"
+        cache_key = "search_" + hashlib.sha256(
+            cache_key_source.encode("utf-8")
+        ).hexdigest()
+        cache.set(cache_key, (1, [self.published_post.pk]), timeout=3600)
+        url = reverse("blog:search_results")
+
+        response = self.client.get(url, {"q": "Published"}, follow=True)
+        self.assertEqual(response.status_code, 200)
+
+        invalidate_search_cache()
+        fresh_page = Paginator([self.published_post], 10).get_page(1)
+        with patch(
+            "blog.views._perform_database_search", return_value=fresh_page
+        ) as mock_search:
+            response = self.client.get(url, {"q": "Published"}, follow=True)
+
+        self.assertEqual(response.status_code, 200)
+        mock_search.assert_called_once()
+
+    @unittest.skipIf(
+        connection.vendor != "postgresql", "PostgreSQL required for FTS tests"
+    )
+    def test_rebuilt_vectors_match_current_migros_and_exclude_removed_yunsa(self):
+        from blog.signals import update_search_vector
+
+        post = BlogPost.objects.create(
+            title="Migros yatırım rehberi",
+            author=self.user,
+            slug="migros-yunsa-search",
+            content="Yünsa hissesi hakkında eski içerik.",
+            status=BlogPost.Status.PUBLISHED,
+        )
+        update_search_vector(post)
+        request = self.factory.get("/blog/ara/")
+        base_qs = published_posts_queryset(include_tags=False)
+
+        migros_page = _perform_database_search(
+            request, base_qs, "Migros", "test-search-migros"
+        )
+        self.assertIn(post.pk, [result.pk for result in migros_page.object_list])
+
+        BlogPost.objects.filter(pk=post.pk).update(content="Güncel içerik")
+        post.refresh_from_db()
+        update_search_vector(post)
+        yunsa_page = _perform_database_search(
+            request, base_qs, "Yünsa", "test-search-yunsa"
+        )
+        self.assertNotIn(post.pk, [result.pk for result in yunsa_page.object_list])
 
     @unittest.skipIf(
         connection.vendor != "postgresql", "PostgreSQL required for FTS tests"

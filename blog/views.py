@@ -14,7 +14,11 @@ from django.urls import reverse
 from django.utils.formats import date_format
 from django.views.decorators.http import require_POST
 
-from blog.cache_keys import BLOG_POST_DETAIL_KEY_PREFIX, BLOG_POST_REACTIONS_KEY_PREFIX
+from blog.cache_keys import (
+    BLOG_POST_DETAIL_KEY_PREFIX,
+    BLOG_POST_REACTIONS_KEY_PREFIX,
+    SEARCH_CACHE_VERSION_KEY,
+)
 from blog.models import (
     POPULARITY_VIEW_WEIGHT,
     BlogPost,
@@ -472,7 +476,8 @@ def search_results(request):
         page_obj = get_page_obj(request, qs, per_page=POST_PAGE_SIZE)
     else:
         # Generate cache key
-        cache_key_str = f"search:{normalized_q}:{page_num}"
+        search_cache_version = cache.get(SEARCH_CACHE_VERSION_KEY, 1)
+        cache_key_str = f"search:{search_cache_version}:{normalized_q}:{page_num}"
         cache_key = (
             "search_" + hashlib.sha256(cache_key_str.encode("utf-8")).hexdigest()
         )
