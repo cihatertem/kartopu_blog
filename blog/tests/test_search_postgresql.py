@@ -258,19 +258,20 @@ class PostgreSQLSearchTests(TestCase):
                     [singular.pk, plural.pk],
                 )
 
-    def test_turkish_casing_and_unicode_forms_preserve_distinct_letters(self) -> None:
-        letters = (("I", "ı"), ("İ", "i"), ("U", "u"), ("Ü", "ü"))
+    def test_turkish_casing_and_unicode_forms_match_seamlessly(self) -> None:
+        letter_groups = (("I", "ı", "İ", "i"), ("U", "u", "Ü", "ü"))
         forms = ("NFC", "NFD")
+        # Create posts for each representative upper letter in both NFC and NFD
         posts = self._create_posts(
-            *(unicodedata.normalize(form, upper) for upper, _ in letters for form in forms)
+            *(unicodedata.normalize(form, group[0]) for group in letter_groups for form in forms)
         )
         base_qs = published_posts_queryset(include_tags=False).filter(
             pk__in=[post.pk for post in posts]
         )
-        for index, variants in enumerate(letters):
+        for index, group in enumerate(letter_groups):
             start = index * len(forms)
             expected = [post.pk for post in posts[start:start + len(forms)]]
-            for variant in variants:
+            for variant in group:
                 for form in forms:
                     query = unicodedata.normalize(form, variant)
                     for mode in self.modes:
@@ -382,7 +383,7 @@ class PostgreSQLSearchTests(TestCase):
             self.assertEqual(cache.get("search_" + token), (1, [first.pk]))
             self.assertIn(
                 first.title,
-                cache.get(make_template_fragment_key("post_list_search_v2", [token])),
+                cache.get(make_template_fragment_key("post_list_search_v3", [token])),
             )
 
         BlogPost.objects.filter(pk=first.pk).update(content="freshword")

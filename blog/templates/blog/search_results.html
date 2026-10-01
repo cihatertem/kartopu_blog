@@ -25,7 +25,7 @@
 {% elif page_obj.object_list %}
   <p><strong>"{{ q }}"</strong> için {{ page_obj.paginator.count }} sonuç bulundu.</p>
 
-  {% cache 60 post_list_search_v2 search_cache_token %}
+  {% cache 60 post_list_search_v3 search_cache_token %}
     {% include "includes/post_list.html" with posts=page_obj.object_list %}
   {% endcache %}
 

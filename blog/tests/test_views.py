@@ -98,7 +98,7 @@ class SearchModeViewTests(TestCase):
             token = response.context["search_cache_token"]
             tokens.append(token)
             self.assertEqual(cache.get("search_" + token), (1, [post.pk]))
-            fragment = cache.get(make_template_fragment_key("post_list_search_v2", [token]))
+            fragment = cache.get(make_template_fragment_key("post_list_search_v3", [token]))
             self.assertIn(post.title, fragment)
             for other in self.posts:
                 if other != post:
@@ -136,9 +136,13 @@ class SearchModeViewTests(TestCase):
         response = self._request_page({"q": "MİGROS"}, self.posts[0])
         with patch("blog.views._perform_database_search") as search:
             equivalent = self.client.get(self.url, {"q": "  Migros  "})
+            equivalent_ascii = self.client.get(self.url, {"q": "MIGROS"})
+            equivalent_dotless = self.client.get(self.url, {"q": "mıgros"})
         search.assert_not_called()
         self.assertEqual(response.context["search_cache_token"], equivalent.context["search_cache_token"])
-        distinct = self._request_page({"q": "MIGROS"}, self.posts[1])
+        self.assertEqual(response.context["search_cache_token"], equivalent_ascii.context["search_cache_token"])
+        self.assertEqual(response.context["search_cache_token"], equivalent_dotless.context["search_cache_token"])
+        distinct = self._request_page({"q": "TÜPRAŞ"}, self.posts[1])
         self.assertNotEqual(response.context["search_cache_token"], distinct.context["search_cache_token"])
 
     def test_form_and_pagination_preserve_query_without_mode(self) -> None:

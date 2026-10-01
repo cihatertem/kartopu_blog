@@ -25,7 +25,7 @@ SITE_SETTINGS_KEY = "site_settings"
 BLOG_POST_DETAIL_KEY_PREFIX = "blog_post:detail:"
 BLOG_POST_REACTIONS_KEY_PREFIX = "blog_post:reactions:"
 SEARCH_CACHE_VERSION_KEY = "blog:search:version"
-SEARCH_CACHE_SCHEMA_VERSION = "v2"
+SEARCH_CACHE_SCHEMA_VERSION = "v3"
 
 # Reaction kaynaklı popülerlik yeniden hesaplaması için "kirli" (pending)
 # yazı id'lerini tutan kuyruk anahtarı. Reaction yüksek frekanslı olduğundan
