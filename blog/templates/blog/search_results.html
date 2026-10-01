@@ -18,6 +18,13 @@
 {% include "includes/breadcrumbs.html" %}
 
 <h1>Arama</h1>
+{% if mode == "stemmed" %}
+  <p><strong>Türkçe kök araması</strong>: Kelimeler köklerine indirgenir; daha geniş sonuçlar dönebilir.
+    Şirket adları da etkilenebilir: Yünsa, yalnız “y” içeren metinlerle eşleşebilir.</p>
+{% else %}
+  <p><strong>Kelime araması</strong>: Köklemesiz tam kelime eşleşmesi yapılır; alt dize araması değildir.
+    Ek almış kelimeler otomatik eşleştirilmez.</p>
+{% endif %}
 
 {% if q and not page_obj.object_list %}
   <p><strong>"{{ q }}"</strong> için sonuç bulunamadı.</p>
@@ -25,19 +32,19 @@
 {% elif page_obj.object_list %}
   <p><strong>"{{ q }}"</strong> için {{ page_obj.paginator.count }} sonuç bulundu.</p>
 
-  {% cache 60 post_list_search q page_obj.number %}
+  {% cache 60 post_list_search_v2 search_cache_token %}
     {% include "includes/post_list.html" with posts=page_obj.object_list %}
   {% endcache %}
 
   <nav class="pagination">
     {% if page_obj.has_previous %}
-      <a class="pagination__link" href="?page={{ page_obj.previous_page_number }}{% if q %}&q={{ q|urlencode }}{% endif %}">← Önceki</a>
+      <a class="pagination__link" href="?page={{ page_obj.previous_page_number }}&amp;mode={{ mode }}{% if q %}&amp;q={{ q|urlencode }}{% endif %}">← Önceki</a>
     {% endif %}
 
     <span> Sayfa {{ page_obj.number }} / {{ page_obj.paginator.num_pages }} </span>
 
     {% if page_obj.has_next %}
-      <a class="pagination__link" href="?page={{ page_obj.next_page_number }}{% if q %}&q={{ q|urlencode }}{% endif %}">Sonraki →</a>
+      <a class="pagination__link" href="?page={{ page_obj.next_page_number }}&amp;mode={{ mode }}{% if q %}&amp;q={{ q|urlencode }}{% endif %}">Sonraki →</a>
     {% endif %}
   </nav>
 

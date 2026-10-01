@@ -1,9 +1,13 @@
+from unittest import skipUnless
 from unittest.mock import MagicMock, call, patch
 
 from django.contrib.auth import get_user_model
-from django.db.models import Value
+from django.contrib.postgres.search import SearchVector
 from django.core.files.uploadedfile import SimpleUploadedFile
+from django.db import connection, transaction
+from django.db.models import Value
 from django.test import TestCase
+from django.test.utils import CaptureQueriesContext
 
 from blog.cache_keys import BLOG_POST_REACTIONS_KEY_PREFIX, NAV_ARCHIVES_KEY, NAV_KEYS
 from blog.models import BlogPost, BlogPostImage, BlogPostReaction, Category, Tag
@@ -392,43 +396,124 @@ class SearchVectorTriggerTests(TestCase):
         self.assertTrue(post.search_vector_fields_changed())
 
     @patch("blog.signals.connection")
-    def test_update_search_vector_skips_non_published(self, mock_connection):
+    def test_update_search_vector_skips_non_published(self, mock_connection) -> None:
         # postgresql gibi davranıp yine de taslakta DB'ye dokunmadığını doğrula
         mock_connection.vendor = "postgresql"
         draft = BlogPost.objects.create(
             title="Draft", author=self.user, slug="draft-skip"
         )
         # Erken dönüş sayesinde sqlite üzerinde SearchVector UPDATE'i denenmez.
-        update_search_vector(draft)
+        with self.assertNumQueries(0):
+            self.assertEqual(update_search_vector(draft), 0)
         draft.refresh_from_db()
         self.assertIsNone(draft.search_vector)
+        self.assertIsNone(draft.search_vector_exact)
 
     @patch("blog.signals.BlogPost.objects.filter")
-    @patch("blog.signals.SearchVector")
     @patch("blog.signals.connection")
-    def test_update_search_vector_includes_turkish_weighted_title(
-        self, mock_connection, mock_search_vector, mock_filter
-    ):
+    def test_update_search_vector_builds_both_vectors_in_one_update(
+        self, mock_connection: MagicMock, mock_filter: MagicMock
+    ) -> None:
+        from blog.search import normalize_search_expression
+
         mock_connection.vendor = "postgresql"
-        post = BlogPost.objects.create(
-            title="Migros", author=self.user, slug="vector-title", status="published"
+        post = MagicMock(pk=123, status=BlogPost.Status.PUBLISHED)
+        post.tags.values_list.return_value.iterator.return_value = iter(
+            ["İŞ BANKASI", "MİGROS"]
         )
-        mock_search_vector.reset_mock()
-        mock_filter.reset_mock()
-        mock_filter.return_value.update.reset_mock()
+        mock_filter.return_value.update.return_value = 1
 
-        update_search_vector(post)
+        with patch(
+            "blog.signals.normalize_search_expression",
+            wraps=normalize_search_expression,
+        ) as mock_normalize:
+            self.assertEqual(update_search_vector(post), 1)
 
-        mock_search_vector.assert_has_calls(
+        mock_normalize.assert_has_calls(
             [
-                call(Value(""), weight="A", config="turkish"),
-                call("title", weight="B", config="turkish"),
-                call("excerpt", weight="C", config="turkish"),
-                call("content", weight="D", config="turkish"),
-            ],
-            any_order=True,
+                call(Value("İŞ BANKASI MİGROS")),
+                call("title"),
+                call("excerpt"),
+                call("content"),
+            ]
+        )
+        self.assertEqual(mock_normalize.call_count, 4)
+        post.tags.values_list.assert_called_once_with("name", flat=True)
+        post.tags.values_list.return_value.iterator.assert_called_once_with()
+        mock_filter.assert_called_once_with(
+            pk=post.pk, status=BlogPost.Status.PUBLISHED
         )
         mock_filter.return_value.update.assert_called_once()
+        vectors = mock_filter.return_value.update.call_args.kwargs
+        self.assertEqual(set(vectors), {"search_vector", "search_vector_exact"})
+        for field, config in (
+            ("search_vector", "turkish"),
+            ("search_vector_exact", "simple"),
+        ):
+            with self.subTest(field=field):
+                expected = (
+                    SearchVector(
+                        normalize_search_expression(Value("İŞ BANKASI MİGROS")),
+                        weight="A", config=config,
+                    )
+                    + SearchVector(
+                        normalize_search_expression("title"), weight="B", config=config
+                    )
+                    + SearchVector(
+                        normalize_search_expression("excerpt"), weight="C", config=config
+                    )
+                    + SearchVector(
+                        normalize_search_expression("content"), weight="D", config=config
+                    )
+                )
+                self.assertEqual(vectors[field], expected)
+
+    @patch("blog.signals.BlogPost.objects.filter")
+    @patch("blog.signals.connection")
+    def test_update_search_vector_returns_zero_when_update_matches_no_rows(
+        self, mock_connection: MagicMock, mock_filter: MagicMock
+    ) -> None:
+        mock_connection.vendor = "postgresql"
+        post = MagicMock(pk=123, status=BlogPost.Status.PUBLISHED)
+        post.tags.values_list.return_value.iterator.return_value = iter([])
+        mock_filter.return_value.update.return_value = 0
+
+        self.assertEqual(update_search_vector(post), 0)
+        mock_filter.return_value.update.assert_called_once()
+
+    @patch("blog.signals.connection")
+    def test_update_search_vector_skips_non_postgresql(
+        self, mock_connection: MagicMock
+    ) -> None:
+        mock_connection.vendor = "sqlite"
+        post = MagicMock(pk=123, status=BlogPost.Status.PUBLISHED)
+
+        with self.assertNumQueries(0):
+            self.assertEqual(update_search_vector(post), 0)
+        post.tags.values_list.assert_not_called()
+
+    @skipUnless(connection.vendor == "postgresql", "PostgreSQL search vectors required")
+    def test_update_search_vector_real_rowcounts_and_single_update(self) -> None:
+        post = BlogPost.objects.create(
+            title="MİGROS", author=self.user, status=BlogPost.Status.PUBLISHED
+        )
+        post.tags.add(Tag.objects.create(name="İŞ BANKASI"))
+
+        with CaptureQueriesContext(connection) as queries:
+            self.assertEqual(update_search_vector(post), 1)
+        self.assertEqual(len(queries), 2)
+        updates = [query["sql"] for query in queries if query["sql"].startswith("UPDATE")]
+        self.assertEqual(len(updates), 1)
+        self.assertIn('"search_vector" =', updates[0])
+        self.assertIn('"search_vector_exact" =', updates[0])
+        post.refresh_from_db()
+        self.assertTrue(post.search_vector)
+        self.assertTrue(post.search_vector_exact)
+
+        BlogPost.objects.filter(pk=post.pk).update(status=BlogPost.Status.DRAFT)
+        self.assertEqual(update_search_vector(post), 0)
+        BlogPost.objects.filter(pk=post.pk).delete()
+        self.assertEqual(update_search_vector(post), 0)
 
     @patch("blog.signals.invalidate_search_cache")
     @patch("blog.signals.update_search_vector")
@@ -445,9 +530,15 @@ class SearchVectorTriggerTests(TestCase):
         mock_update_search_vector.reset_mock()
         mock_invalidate_search_cache.reset_mock()
         post.is_featured = True
-        post.save()
+        with self.captureOnCommitCallbacks(execute=True) as callbacks:
+            post.save()
         mock_update_search_vector.assert_not_called()
         mock_invalidate_search_cache.assert_not_called()
+        self.assertEqual(len(callbacks), 1)
+        self.assertEqual(
+            callbacks[0].__qualname__,
+            "notify_subscribers_on_publish.<locals>.<lambda>",
+        )
 
     @patch("blog.signals.invalidate_search_cache")
     @patch("blog.signals.update_search_vector")
@@ -464,9 +555,13 @@ class SearchVectorTriggerTests(TestCase):
         mock_update_search_vector.reset_mock()
         mock_invalidate_search_cache.reset_mock()
         post.title = "Pub2 Updated"
-        post.save()
+        with self.captureOnCommitCallbacks(execute=True) as callbacks:
+            post.save()
+            mock_invalidate_search_cache.assert_not_called()
         mock_update_search_vector.assert_called_once_with(post)
         mock_invalidate_search_cache.assert_called_once()
+        self.assertEqual(len(callbacks), 2)
+        self.assertEqual(callbacks.count(mock_invalidate_search_cache), 1)
 
     @patch("blog.signals.invalidate_search_cache")
     def test_draft_changes_do_not_invalidate_search_cache(
@@ -478,9 +573,183 @@ class SearchVectorTriggerTests(TestCase):
         mock_invalidate_search_cache.reset_mock()
 
         post.title = "Updated Draft"
-        post.save()
+        with self.captureOnCommitCallbacks(execute=True) as callbacks:
+            post.save()
 
         mock_invalidate_search_cache.assert_not_called()
+        self.assertEqual(callbacks, [])
+
+
+class SearchInvalidationCommitTests(TestCase):
+    def setUp(self) -> None:
+        self.user = User.objects.create_user(
+            email="search_commit@example.com", password="password"
+        )
+        self.post = BlogPost.objects.create(
+            title="Published", author=self.user, status=BlogPost.Status.PUBLISHED
+        )
+        self.draft = BlogPost.objects.create(title="Draft", author=self.user)
+        self.tag = Tag.objects.create(name="Search commit tag")
+
+    @patch("blog.signals.invalidate_search_cache")
+    def test_create_invalidates_only_published_on_commit(
+        self, mock_invalidate: MagicMock
+    ) -> None:
+        for status in (BlogPost.Status.DRAFT, BlogPost.Status.PUBLISHED):
+            with self.subTest(status=status):
+                mock_invalidate.reset_mock()
+                with self.captureOnCommitCallbacks(execute=True) as callbacks:
+                    BlogPost.objects.create(
+                        title=f"Create {status}", author=self.user, status=status
+                    )
+                    mock_invalidate.assert_not_called()
+                expected = int(status == BlogPost.Status.PUBLISHED)
+                self.assertEqual(len(callbacks), expected * 2)
+                self.assertEqual(callbacks.count(mock_invalidate), expected)
+                self.assertEqual(mock_invalidate.call_count, expected)
+
+    @patch("blog.signals.invalidate_search_cache")
+    def test_publish_and_unpublish_invalidate_on_commit(
+        self, mock_invalidate: MagicMock
+    ) -> None:
+        for update_fields in (None, {"status"}):
+            for status in (BlogPost.Status.PUBLISHED, BlogPost.Status.DRAFT):
+                with self.subTest(update_fields=update_fields, status=status):
+                    post = BlogPost.objects.get(pk=self.draft.pk)
+                    post.status = status
+                    mock_invalidate.reset_mock()
+                    with self.captureOnCommitCallbacks(execute=True) as callbacks:
+                        post.save(update_fields=update_fields)
+                        mock_invalidate.assert_not_called()
+                    expected = 2 if status == BlogPost.Status.PUBLISHED else 1
+                    self.assertEqual(len(callbacks), expected)
+                    self.assertEqual(callbacks.count(mock_invalidate), 1)
+                    mock_invalidate.assert_called_once_with()
+
+    @patch("blog.signals.invalidate_search_cache")
+    def test_relevant_changes_invalidate_on_commit(
+        self, mock_invalidate: MagicMock
+    ) -> None:
+        for field in ("title", "excerpt", "content"):
+            for targeted in (False, True):
+                with self.subTest(field=field, targeted=targeted):
+                    post = BlogPost.objects.get(pk=self.post.pk)
+                    setattr(post, field, f"Changed {field} {targeted}")
+                    mock_invalidate.reset_mock()
+                    with self.captureOnCommitCallbacks(execute=True) as callbacks:
+                        post.save(update_fields={field} if targeted else None)
+                        mock_invalidate.assert_not_called()
+                    self.assertEqual(len(callbacks), 2)
+                    self.assertEqual(callbacks.count(mock_invalidate), 1)
+                    mock_invalidate.assert_called_once_with()
+
+    @patch("blog.signals.invalidate_search_cache")
+    @patch("blog.signals.update_search_vector")
+    def test_unrelated_changes_do_not_register_callbacks(
+        self, mock_update: MagicMock, mock_invalidate: MagicMock
+    ) -> None:
+        for update_fields in (None, {"is_featured"}):
+            with self.subTest(update_fields=update_fields):
+                post = BlogPost.objects.get(pk=self.post.pk)
+                post.is_featured = not post.is_featured
+                with self.captureOnCommitCallbacks(execute=True) as callbacks:
+                    post.save(update_fields=update_fields)
+                self.assertEqual(len(callbacks), 1)
+                self.assertEqual(
+                    callbacks[0].__qualname__,
+                    "notify_subscribers_on_publish.<locals>.<lambda>",
+                )
+        mock_update.assert_not_called()
+        mock_invalidate.assert_not_called()
+
+    @patch("blog.signals.invalidate_search_cache")
+    def test_tag_add_remove_clear_invalidate_on_commit(
+        self, mock_invalidate: MagicMock
+    ) -> None:
+        for action in ("add", "remove", "clear"):
+            with self.subTest(action=action):
+                if action != "add":
+                    self.post.tags.add(self.tag)
+                mock_invalidate.reset_mock()
+                with self.captureOnCommitCallbacks(execute=True) as callbacks:
+                    if action == "clear":
+                        self.post.tags.clear()
+                    else:
+                        getattr(self.post.tags, action)(self.tag)
+                    mock_invalidate.assert_not_called()
+                self.assertEqual(len(callbacks), 1)
+                mock_invalidate.assert_called_once_with()
+
+    @patch("blog.signals.invalidate_search_cache")
+    def test_delete_invalidates_only_published_on_commit(
+        self, mock_invalidate: MagicMock
+    ) -> None:
+        for post in (self.draft, self.post):
+            with self.subTest(status=post.status):
+                mock_invalidate.reset_mock()
+                with self.captureOnCommitCallbacks(execute=True) as callbacks:
+                    post.delete()
+                    mock_invalidate.assert_not_called()
+                expected = int(post.status == BlogPost.Status.PUBLISHED)
+                self.assertEqual(len(callbacks), expected)
+                self.assertEqual(mock_invalidate.call_count, expected)
+
+    @patch("blog.signals.invalidate_search_cache")
+    def test_draft_save_and_tags_do_not_register_callbacks(
+        self, mock_invalidate: MagicMock
+    ) -> None:
+        with self.captureOnCommitCallbacks(execute=True) as callbacks:
+            self.draft.title = "Draft changed"
+            self.draft.save(update_fields={"title"})
+            self.draft.tags.add(self.tag)
+            self.draft.tags.remove(self.tag)
+            self.draft.tags.add(self.tag)
+            self.draft.tags.clear()
+        self.assertEqual(callbacks, [])
+        mock_invalidate.assert_not_called()
+
+    @patch("blog.signals.invalidate_search_cache")
+    def test_rollback_discards_search_invalidation(
+        self, mock_invalidate: MagicMock
+    ) -> None:
+        self.post.tags.add(self.tag)
+        for action in (
+            "create", "publish", "unpublish", "content", "add", "remove", "clear", "delete"
+        ):
+            with self.subTest(action=action):
+                post = BlogPost.objects.get(
+                    pk=self.draft.pk if action == "publish" else self.post.pk
+                )
+                mock_invalidate.reset_mock()
+                with self.captureOnCommitCallbacks(execute=True) as callbacks:
+                    with self.assertRaisesMessage(RuntimeError, "rollback"):
+                        with transaction.atomic():
+                            if action == "create":
+                                BlogPost.objects.create(
+                                    title="Rollback", author=self.user,
+                                    status=BlogPost.Status.PUBLISHED,
+                                )
+                            elif action in ("publish", "unpublish"):
+                                post.status = (
+                                    BlogPost.Status.PUBLISHED if action == "publish"
+                                    else BlogPost.Status.DRAFT
+                                )
+                                post.save(update_fields={"status"})
+                            elif action == "content":
+                                post.content = "Rolled back content"
+                                post.save(update_fields={"content"})
+                            elif action == "add":
+                                post.tags.add(Tag.objects.create(name="Rollback tag"))
+                            elif action == "remove":
+                                post.tags.remove(self.tag)
+                            elif action == "clear":
+                                post.tags.clear()
+                            else:
+                                post.delete()
+                            mock_invalidate.assert_not_called()
+                            raise RuntimeError("rollback")
+                self.assertEqual(callbacks, [])
+                mock_invalidate.assert_not_called()
 
 
 class BlogPostReactionSignalTests(TestCase):

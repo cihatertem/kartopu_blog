@@ -17,6 +17,7 @@ from django.views.decorators.http import require_POST
 from blog.cache_keys import (
     BLOG_POST_DETAIL_KEY_PREFIX,
     BLOG_POST_REACTIONS_KEY_PREFIX,
+    SEARCH_CACHE_SCHEMA_VERSION,
     SEARCH_CACHE_VERSION_KEY,
 )
 from blog.models import (
@@ -26,6 +27,7 @@ from blog.models import (
     Category,
     Tag,
 )
+from blog.search import SEARCH_MODES, normalize_search_mode, normalize_search_text
 from blog.services import (
     detect_content_markers,
     get_content_prefetches_for_dependencies,
@@ -443,17 +445,20 @@ def _get_cached_search_results(base_qs, cached_data, page_num):
     return page_obj
 
 
-def _perform_database_search(request, base_qs, normalized_q, cache_key):
+def _perform_database_search(
+    request, base_qs, normalized_q: str, cache_key: str, *, mode: str = "exact"
+):
+    vector_field, config = SEARCH_MODES[normalize_search_mode(mode)]
     query = SearchQuery(
         normalized_q,
         search_type="websearch",
-        config="turkish",
+        config=config,
     )
 
     qs = (
-        base_qs.annotate(rank=SearchRank("search_vector", query))
-        .filter(search_vector=query, rank__isnull=False, rank__gt=0)
-        .order_by("-rank", "-published_at")
+        base_qs.annotate(rank=SearchRank(F(vector_field), query))
+        .filter(**{vector_field: query})
+        .order_by("-rank", "-published_at", "-pk")
     )
 
     page_obj = get_page_obj(request, qs, per_page=POST_PAGE_SIZE)
@@ -466,8 +471,16 @@ def _perform_database_search(request, base_qs, normalized_q, cache_key):
 
 def search_results(request):
     q = (request.GET.get("q") or "").strip()
-    normalized_q = helpers.normalize_search_query(q)
+    normalized_q = normalize_search_text(q)
+    mode = normalize_search_mode(request.GET.get("mode"))
     page_num = request.GET.get("page", "1")
+    search_cache_version = cache.get(SEARCH_CACHE_VERSION_KEY, 1)
+    cache_key_str = (
+        f"{SEARCH_CACHE_SCHEMA_VERSION}:{search_cache_version}:"
+        f"{mode}:{normalized_q}:{page_num}"
+    )
+    search_cache_token = hashlib.sha256(cache_key_str.encode("utf-8")).hexdigest()
+    cache_key = "search_" + search_cache_token
 
     base_qs = published_posts_queryset(include_tags=False)
 
@@ -475,20 +488,13 @@ def search_results(request):
         qs = base_qs.none()
         page_obj = get_page_obj(request, qs, per_page=POST_PAGE_SIZE)
     else:
-        # Generate cache key
-        search_cache_version = cache.get(SEARCH_CACHE_VERSION_KEY, 1)
-        cache_key_str = f"search:{search_cache_version}:{normalized_q}:{page_num}"
-        cache_key = (
-            "search_" + hashlib.sha256(cache_key_str.encode("utf-8")).hexdigest()
-        )
-
         cached_data = cache.get(cache_key)
 
         if cached_data:
             page_obj = _get_cached_search_results(base_qs, cached_data, page_num)
         else:
             page_obj = _perform_database_search(
-                request, base_qs, normalized_q, cache_key
+                request, base_qs, normalized_q, cache_key, mode=mode
             )
 
     breadcrumbs = [
@@ -502,6 +508,8 @@ def search_results(request):
         {
             "page_obj": page_obj,
             "q": q,
+            "mode": mode,
+            "search_cache_token": search_cache_token,
             "active_nav": "blog",
             "breadcrumbs": breadcrumbs,
             "active_archive_key": "",

@@ -6,7 +6,7 @@ from django.conf import settings
 from django.contrib.postgres.search import SearchVector
 from django.core.cache import cache
 from django.core.files.storage import default_storage
-from django.db import connection
+from django.db import connection, transaction
 from django.db.models import Value
 from django.db.models.signals import m2m_changed, post_delete, post_save
 from django.dispatch import receiver
@@ -23,6 +23,7 @@ from core.decorators import log_exceptions
 
 from .models import BlogPost, BlogPostImage, BlogPostReaction, Category, Tag
 from .popularity_queue import mark_popularity_dirty
+from .search import normalize_search_expression
 from .services import recalculate_popularity_score
 
 
@@ -108,23 +109,34 @@ def invalidate_search_cache() -> None:
     cache.set(SEARCH_CACHE_VERSION_KEY, uuid4().hex, timeout=None)
 
 
-def update_search_vector(post: BlogPost):
+def update_search_vector(post: BlogPost) -> int:
     if connection.vendor != "postgresql":
-        return
+        return 0
 
     # Arama yalnız yayınlanmış yazıları döner (bkz. published_posts_queryset);
     # taslak/arşiv kayıtlarda GIN vektörü üretmek boşa CPU/DB maliyetidir.
     if post.status != BlogPost.Status.PUBLISHED:
-        return
+        return 0
 
     tags_str = " ".join(post.tags.values_list("name", flat=True).iterator())
-    vector = (
-        SearchVector(Value(tags_str), weight="A", config="turkish")
-        + SearchVector("title", weight="B", config="turkish")
-        + SearchVector("excerpt", weight="C", config="turkish")
-        + SearchVector("content", weight="D", config="turkish")
-    )
-    BlogPost.objects.filter(pk=post.pk).update(search_vector=vector)
+    tags = normalize_search_expression(Value(tags_str))
+    title = normalize_search_expression("title")
+    excerpt = normalize_search_expression("excerpt")
+    content = normalize_search_expression("content")
+    vectors = {}
+    for field, config in (
+        ("search_vector", "turkish"),
+        ("search_vector_exact", "simple"),
+    ):
+        vectors[field] = (
+            SearchVector(tags, weight="A", config=config)
+            + SearchVector(title, weight="B", config=config)
+            + SearchVector(excerpt, weight="C", config=config)
+            + SearchVector(content, weight="D", config=config)
+        )
+    return BlogPost.objects.filter(
+        pk=post.pk, status=BlogPost.Status.PUBLISHED
+    ).update(**vectors)
 
 
 @receiver(post_save, sender=Category)
@@ -166,7 +178,7 @@ def post_changed_save(sender, instance: BlogPost, created=False, update_fields=N
     if _should_rebuild_search_vector(instance, created, update_fields):
         update_search_vector(instance)
         if _search_results_may_change(instance):
-            invalidate_search_cache()
+            transaction.on_commit(invalidate_search_cache, using=kwargs.get("using"))
     recalculate_popularity_score(instance.pk)
     cache.delete(f"{BLOG_POST_DETAIL_KEY_PREFIX}{instance.slug}")
     cache.delete(HOME_PAGE_KEY)
@@ -176,7 +188,7 @@ def post_changed_save(sender, instance: BlogPost, created=False, update_fields=N
 @receiver(post_delete, sender=BlogPost)
 def post_changed_delete(sender, instance: BlogPost, **kwargs):
     if instance.status == BlogPost.Status.PUBLISHED:
-        invalidate_search_cache()
+        transaction.on_commit(invalidate_search_cache, using=kwargs.get("using"))
     cache.delete(f"{BLOG_POST_DETAIL_KEY_PREFIX}{instance.slug}")
     cache.delete(HOME_PAGE_KEY)
     invalidate_nav_cache()
@@ -187,7 +199,7 @@ def post_tags_changed(sender, instance, action, **kwargs):
     if action in ("post_add", "post_remove", "post_clear"):
         update_search_vector(instance)
         if instance.status == BlogPost.Status.PUBLISHED:
-            invalidate_search_cache()
+            transaction.on_commit(invalidate_search_cache, using=kwargs.get("using"))
         invalidate_nav_cache()
 
 

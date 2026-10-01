@@ -1,5 +1,5 @@
 # ---------- BASE STAGE ----------
-FROM python:3.14.7-slim AS base
+FROM python:3.14-slim AS base
 
 LABEL maintainer="Cihat Ertem <cihatertem@gmail.com>"
 
@@ -9,11 +9,12 @@ ENV PYTHONUNBUFFERED=1 \
     HOME=/app \
     XDG_CACHE_HOME=/var/cache/app
 
+# Non-root kullanıcı ve base önbellek dizini yapılandırması
 RUN groupadd -g 1000 -r app \
     && useradd \
     -d /app \
     -u 1000 \
-    --no-create-home\
+    --no-create-home \
     --shell "/sbin/nologin" \
     --no-log-init \
     -r -g app app \
@@ -65,12 +66,12 @@ ENV PATH="/opt/venv/bin:$PATH" \
 
 COPY pyproject.toml uv.lock ./
 
-# Sadece bağımlılıklar değiştiyse tekrar senkronize et
-RUN uv sync --frozen --no-cache
+RUN uv sync --frozen --no-cache --active
 
 COPY . .
 
-RUN chown -R app:app /app /opt /var/cache/uv
+RUN chown -R app:app /app
+RUN chown -R app:app /var/cache/uv
 
 USER app
 
@@ -88,8 +89,11 @@ COPY --from=builder /opt/venv /opt/venv
 
 COPY . .
 
-RUN mkdir -p /app/staticfiles /app/media \
-    && chown -R app:app /app
+# STATIC/MEDIA DİZİNLERİ VE YFINANCE MULTI-WORKER RACE CONDITION ÖNLEYİCİ:
+# Gunicorn gthread worker'larının başlangıçta /var/cache/app/py-yfinance dizinini
+# aynı anda oluşturmaya çalışıp [Errno 17] ile çökmesini ve önbelleği kapatmasını önler.
+RUN mkdir -p /app/staticfiles /app/media /var/cache/app/py-yfinance \
+    && chown -R app:app /app /var/cache/app
 
 USER app
 

@@ -8,12 +8,16 @@ from django.contrib.auth import get_user_model
 from django.core.cache import cache
 from django.core.paginator import Paginator
 from django.db import connection
+from django.db.models import F
+from django.template.loader import render_to_string
+from django.core.cache.utils import make_template_fragment_key
 from django.test import Client, RequestFactory, TestCase
 from django.urls import reverse
 from django.utils import timezone
 
-from blog.cache_keys import SEARCH_CACHE_VERSION_KEY
+from blog.cache_keys import SEARCH_CACHE_SCHEMA_VERSION, SEARCH_CACHE_VERSION_KEY
 from blog.models import BlogPost, BlogPostReaction, Category, Tag
+from blog.search import normalize_search_text
 from blog.signals import invalidate_search_cache
 from blog.views import (
     _build_comment_context,
@@ -26,6 +30,126 @@ from blog.views import (
 )
 
 User = get_user_model()
+
+
+class SearchModeViewTests(TestCase):
+    @classmethod
+    def setUpTestData(cls) -> None:
+        author = User.objects.create_user(email="search-modes@example.invalid")
+        cls.posts = BlogPost.objects.bulk_create([
+            BlogPost(
+                author=author, title=f"Cache result {number}", slug=f"cache-result-{number}",
+                content="", status=BlogPost.Status.PUBLISHED, published_at=timezone.now(),
+            )
+            for number in range(3)
+        ])
+
+    def setUp(self) -> None:
+        cache.clear()
+        self.addCleanup(cache.clear)
+        self.url = reverse("blog:search_results")
+
+    def _request_page(self, params: dict, post: BlogPost):
+        page = Paginator([post], 10).get_page(1)
+        with patch("blog.views.get_page_obj", return_value=page):
+            return self.client.get(self.url, params)
+
+    def test_default_and_invalid_modes_use_exact_without_fallback(self) -> None:
+        for mode in (None, "", "bogus", "search_vector", "STEMMED"):
+            cache.clear()
+            params = {"q": "missing"}
+            if mode is not None:
+                params["mode"] = mode
+            with patch("blog.views._perform_database_search") as search:
+                search.return_value = Paginator([], 10).get_page(1)
+                response = self.client.get(self.url, params)
+            self.assertEqual(response.context["mode"], "exact")
+            search.assert_called_once()
+            self.assertEqual(search.call_args.kwargs, {"mode": "exact"})
+            self.assertContains(response, "Kelime araması")
+
+    def test_each_mode_uses_only_its_allowlisted_vector_and_config(self) -> None:
+        for mode, field, config in (
+            ("exact", "search_vector_exact", "simple"),
+            ("stemmed", "search_vector", "turkish"),
+            ("invalid", "search_vector_exact", "simple"),
+        ):
+            base_qs = MagicMock()
+            with patch("blog.views.SearchRank") as rank, patch(
+                "blog.views.SearchQuery"
+            ) as query, patch("blog.views.get_page_obj") as page:
+                page.return_value.object_list = []
+                page.return_value.paginator.count = 0
+                _perform_database_search(
+                    RequestFactory().get("/"), base_qs, "yünsa", "mode-test", mode=mode
+                )
+            query.assert_called_once_with("yünsa", search_type="websearch", config=config)
+            rank.assert_called_once_with(F(field), query.return_value)
+            base_qs.annotate.return_value.filter.assert_called_once_with(**{field: query.return_value})
+
+    def test_rendered_id_and_fragment_caches_separate_modes_and_versions(self) -> None:
+        tokens = []
+        for mode, version, post in (
+            ("exact", "first", self.posts[0]),
+            ("stemmed", "first", self.posts[1]),
+            ("exact", "second", self.posts[2]),
+        ):
+            cache.set(SEARCH_CACHE_VERSION_KEY, version, timeout=None)
+            params = {"q": "YÜNSA", "mode": mode}
+            response = self._request_page(params, post)
+            token = response.context["search_cache_token"]
+            tokens.append(token)
+            self.assertEqual(cache.get("search_" + token), (1, [post.pk]))
+            fragment = cache.get(make_template_fragment_key("post_list_search_v2", [token]))
+            self.assertIn(post.title, fragment)
+            for other in self.posts:
+                if other != post:
+                    self.assertNotIn(other.title, fragment)
+            with patch("blog.views._perform_database_search") as search:
+                cached = self.client.get(self.url, params)
+            search.assert_not_called()
+            self.assertEqual([p.pk for p in cached.context["page_obj"]], [post.pk])
+            main = cached.content.decode().split("<main>")[1].split("</main>")[0]
+            self.assertIn(post.title, main)
+            for other in self.posts:
+                if other != post:
+                    self.assertNotIn(other.title, main)
+        self.assertEqual(len(set(tokens)), 3)
+
+    def test_query_and_page_are_part_of_both_cache_identities(self) -> None:
+        tokens = []
+        for params, post in zip(
+            ({"q": "one"}, {"q": "two"}, {"q": "one", "page": "2"}), self.posts
+        ):
+            response = self._request_page(params, post)
+            tokens.append(response.context["search_cache_token"])
+            main = response.content.decode().split("<main>")[1].split("</main>")[0]
+            self.assertIn(post.title, main)
+        self.assertEqual(len(set(tokens)), 3)
+
+    def test_normalized_equivalent_queries_reuse_cache(self) -> None:
+        response = self._request_page({"q": "MİGROS"}, self.posts[0])
+        with patch("blog.views._perform_database_search") as search:
+            equivalent = self.client.get(self.url, {"q": "  Migros  "})
+        search.assert_not_called()
+        self.assertEqual(response.context["search_cache_token"], equivalent.context["search_cache_token"])
+        distinct = self._request_page({"q": "MIGROS"}, self.posts[1])
+        self.assertNotEqual(response.context["search_cache_token"], distinct.context["search_cache_token"])
+
+    def test_form_and_pagination_preserve_query_and_validated_mode(self) -> None:
+        query = '"Yünsa" OR migros'
+        for mode in ("exact", "stemmed"):
+            cache.clear()
+            page = Paginator([self.posts[0]] * 21, 10).get_page(2)
+            with patch("blog.views.get_page_obj", return_value=page):
+                response = self.client.get(self.url, {"q": query, "mode": mode, "page": "2"})
+            self.assertContains(response, f'?page=1&amp;mode={mode}&amp;q=%22Y%C3%BCnsa%22%20OR%20migros')
+            self.assertContains(response, f'?page=3&amp;mode={mode}&amp;q=%22Y%C3%BCnsa%22%20OR%20migros')
+            form = render_to_string("includes/sidebar_search.html", {"q": query, "mode": mode})
+            self.assertIn(f'value="{mode}" selected', form)
+            self.assertIn('value="&quot;Yünsa&quot; OR migros"', form)
+            self.assertIn('for="sidebar-search-mode"', form)
+        self.assertIn('value="exact" selected', render_to_string("includes/sidebar_search.html"))
 
 
 class BlogViewsTests(TestCase):
@@ -138,6 +262,24 @@ class BlogViewsTests(TestCase):
                 response = self.client.get(url, {"q": "Published"}, follow=True)
                 self.assertEqual(response.status_code, 200)
 
+    def test_database_search_uses_vector_rank_and_match_only(self) -> None:
+        base_qs = MagicMock()
+        page = Paginator([self.published_post], 10).get_page(1)
+        with patch("blog.views.SearchRank") as rank, patch(
+            "blog.views.SearchQuery"
+        ) as query, patch("blog.views.get_page_obj", return_value=page):
+            _perform_database_search(
+                self.factory.get("/", {"q": "-excluded"}),
+                base_qs, "-excluded", "rank-regression",
+            )
+        rank.assert_called_once_with(F("search_vector_exact"), query.return_value)
+        base_qs.annotate.return_value.filter.assert_called_once_with(
+            search_vector_exact=query.return_value
+        )
+        base_qs.annotate.return_value.filter.return_value.order_by.assert_called_once_with(
+            "-rank", "-published_at", "-pk"
+        )
+
     def test_search_results_websearch_and_cache(self):
         from unittest.mock import MagicMock, patch
 
@@ -169,7 +311,7 @@ class BlogViewsTests(TestCase):
 
                     # Ensure SearchQuery was called with the exact input string and websearch type
                     MockSearchQuery.assert_called_with(
-                        q, search_type="websearch", config="turkish"
+                        normalize_search_text(q), search_type="websearch", config="simple"
                     )
 
             # Now test cache hits and assertNumQueries
@@ -188,7 +330,7 @@ class BlogViewsTests(TestCase):
     def test_search_cache_version_change_bypasses_cached_results(self):
         cache.clear()
         cache.set(SEARCH_CACHE_VERSION_KEY, "old-version", timeout=None)
-        cache_key_source = "search:old-version:Published:1"
+        cache_key_source = f"{SEARCH_CACHE_SCHEMA_VERSION}:old-version:exact:published:1"
         cache_key = "search_" + hashlib.sha256(
             cache_key_source.encode("utf-8")
         ).hexdigest()
@@ -245,13 +387,8 @@ class BlogViewsTests(TestCase):
     def test_search_results_integration(self, mock_search_rank):
         from django.db.models import IntegerField, Value
 
-        # Mock Postgres-specific search functions to return simple values
-        # so SQLite can execute the query without raising exceptions.
-        # This allows us to run the actual _perform_database_search function!
-
-        # We need SearchRank to simulate matched ranks. We use an IntegerField value
-        # that will be > 0 so that `.filter(rank__isnull=False, rank__gt=0)` passes.
-        mock_search_rank.return_value = Value(1, output_field=IntegerField())
+        # A zero rank must not remove valid vector matches.
+        mock_search_rank.return_value = Value(0, output_field=IntegerField())
 
         url = reverse("blog:search_results")
 
@@ -265,7 +402,7 @@ class BlogViewsTests(TestCase):
             published_at=timezone.now() - timezone.timedelta(days=1),
         )
 
-        response = self.client.get(url, {"q": "published testing"}, follow=True)
+        response = self.client.get(url, {"q": "published OR testing"}, follow=True)
         self.assertEqual(response.status_code, 200)
         self.assertIn(self.published_post, response.context["page_obj"].object_list)
         self.assertIn(post2, response.context["page_obj"].object_list)

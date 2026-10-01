@@ -306,6 +306,7 @@ class BlogPost(
     )
 
     search_vector = SearchVectorField(null=True, blank=True)
+    search_vector_exact = SearchVectorField(null=True, blank=True)
 
     class Meta:  # pyright: ignore[reportIncompatibleVariableOverride]
         ordering = ["-published_at", "-created_at"]
@@ -316,6 +317,7 @@ class BlogPost(
             models.Index(fields=["slug"]),
             models.Index(fields=["status", "published_at"]),
             GinIndex(fields=["search_vector"], name="blogpost_fts_gin"),
+            GinIndex(fields=["search_vector_exact"], name="blogpost_fts_exact_gin"),
         )
 
     @classmethod
