@@ -1,7 +1,10 @@
 from __future__ import annotations
 
+from contextlib import redirect_stderr, redirect_stdout
 from datetime import date
 from decimal import Decimal
+from io import StringIO
+from unittest.mock import patch
 
 from django.contrib.auth import get_user_model
 from django.template import Context, Template
@@ -25,6 +28,12 @@ from portfolio.models import (
 
 class ChartExclusionTests(TestCase):
     def setUp(self) -> None:
+        price_patcher = patch(
+            "portfolio.models.fetch_yahoo_finance_price", return_value=None
+        )
+        self.mock_fetch_price = price_patcher.start()
+        self.addCleanup(price_patcher.stop)
+
         user_model = get_user_model()
         self.user = user_model.objects.create_user(
             email="charts@example.com",
@@ -129,18 +138,23 @@ class ChartExclusionTests(TestCase):
             target_value=Decimal("100000"),
             total_return_pct=Decimal("0"),
         )
-        asset = Asset.objects.create(
-            name="Selected Asset", symbol="SEL", asset_type=Asset.AssetType.STOCK
-        )
-        self._create_portfolio_item(selected_snapshot, asset, Decimal("1000"))
+        output = StringIO()
+        with redirect_stdout(output), redirect_stderr(output):
+            asset = Asset.objects.create(
+                name="Selected Asset", symbol="SEL", asset_type=Asset.AssetType.STOCK
+            )
+            self._create_portfolio_item(selected_snapshot, asset, Decimal("1000"))
 
-        rendered = self._render_post(
-            "Portfolio Timeseries",
-            "{{ portfolio_charts }}",
-            "portfolio_snapshots",
-            selected_snapshot,
-        )
+            rendered = self._render_post(
+                "Portfolio Timeseries",
+                "{{ portfolio_charts }}",
+                "portfolio_snapshots",
+                selected_snapshot,
+            )
 
+        self.mock_fetch_price.assert_called_once_with("SEL", price_date=None)
+        self.assertNotIn("HTTP Error 404", output.getvalue())
+        self.assertNotIn("quoteSummary", output.getvalue())
         self.assertIn(past_snapshot.snapshot_date.isoformat(), rendered)
         self.assertIn(selected_snapshot.snapshot_date.isoformat(), rendered)
         self.assertNotIn("2025-03-01", rendered)
@@ -269,29 +283,35 @@ class ChartExclusionTests(TestCase):
             snapshot_date=date(2025, 12, 31),
             total_amount=Decimal("1000"),
         )
-        asset_nonzero = Asset.objects.create(
-            name="Apple", symbol="APPL", asset_type=Asset.AssetType.STOCK
-        )
-        asset_zero = Asset.objects.create(
-            name="Meta", symbol="META", asset_type=Asset.AssetType.STOCK
-        )
+        output = StringIO()
+        with redirect_stdout(output), redirect_stderr(output):
+            asset_nonzero = Asset.objects.create(
+                name="Apple", symbol="APPL", asset_type=Asset.AssetType.STOCK
+            )
+            asset_zero = Asset.objects.create(
+                name="Meta", symbol="META", asset_type=Asset.AssetType.STOCK
+            )
 
-        DividendSnapshotAssetItem.objects.create(
-            snapshot=snapshot,
-            asset=asset_nonzero,
-            total_amount=Decimal("1000"),
-            allocation_pct=Decimal("1"),
-        )
-        DividendSnapshotAssetItem.objects.create(
-            snapshot=snapshot,
-            asset=asset_zero,
-            total_amount=Decimal("0"),
-            allocation_pct=Decimal("0"),
-        )
+            DividendSnapshotAssetItem.objects.create(
+                snapshot=snapshot,
+                asset=asset_nonzero,
+                total_amount=Decimal("1000"),
+                allocation_pct=Decimal("1"),
+            )
+            DividendSnapshotAssetItem.objects.create(
+                snapshot=snapshot,
+                asset=asset_zero,
+                total_amount=Decimal("0"),
+                allocation_pct=Decimal("0"),
+            )
 
-        rendered = self._render_post(
-            "Dividend Charts", "{{ dividend_charts }}", "dividend_snapshots", snapshot
-        )
+            rendered = self._render_post(
+                "Dividend Charts", "{{ dividend_charts }}", "dividend_snapshots", snapshot
+            )
 
+        self.mock_fetch_price.assert_any_call("APPL", price_date=None)
+        self.mock_fetch_price.assert_any_call("META", price_date=None)
+        self.assertNotIn("HTTP Error 404", output.getvalue())
+        self.assertNotIn("quoteSummary", output.getvalue())
         self.assertIn("APPL", rendered)
         self.assertNotIn("META", rendered)
