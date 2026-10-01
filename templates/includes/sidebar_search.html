@@ -11,11 +11,6 @@
       value="{{ q|default:'' }}"
       class="input-field"
     />
-    <label for="sidebar-search-mode">Arama türü</label>
-    <select id="sidebar-search-mode" name="mode" class="input-field">
-      <option value="exact"{% if mode != "stemmed" %} selected{% endif %}>Kelime araması</option>
-      <option value="stemmed"{% if mode == "stemmed" %} selected{% endif %}>Türkçe kök araması</option>
-    </select>
-    <button type="submit" class="btn">Ara</button>
+    <button type="submit" class="button button--primary">Ara</button>
   </form>
 </section>

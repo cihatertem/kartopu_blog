@@ -93,16 +93,19 @@ Geliştirme için yerel ortamı aşağıdaki komutla ayağa kaldırabilirsiniz:
 docker compose up --build
 ```
 
-## Arama Bakımı ve Çift İndekse Geçiş
+## Arama Altyapısı ve Sadeleştirilmiş Kullanıcı Deneyimi
 
-Varsayılan **Kelime araması** (`mode=exact`, PostgreSQL `simple`) köklemesiz tam
-token eşleşmesidir; alt dize araması değildir. **Türkçe kök araması**
-(`mode=stemmed`, `turkish`) ekleri köklerine indirger ve daha geniş sonuçlar
-döndürebilir: örneğin `Yünsa`, yalnız `y` içeren yazılarla da eşleşebilir.
-Sonuçlar birleştirilmez ve boş sonuçta diğer moda geçilmez. İki modda da NFC ve
-Türkçe küçük harf dönüşümü uygulanır: `MİGROS/Migros/migros` eşdeğerdir;
-`MIGROS` farklıdır. `I/ı`, `İ/i` ve `u/ü` ayrımları korunur. Başlık, etiket,
-özet ve içerik aranır; tırnaklı ifade, `OR` ve `-kelime` operatörleri kullanılabilir.
+Arama kutusu son kullanıcı için tek ve sade bir girdi alanından oluşur; arama
+türü veya mod seçimi gerektirmez. Kullanıcı arama terimini Türkçe karakterlerle
+(`yünsa`, `şirket`, `ışık`, `mİgros`) veya Türkçe karakter kullanmadan (`yunsa`,
+`sirket`, `isik`, `migros`, `MIGROS`) yazsa da sistem otomatik varyant eşleştirmesi
+sayesinde doğru sonuçlara ulaşır.
+
+Arka planda PostgreSQL `simple` sözlüğü ve `search_vector_exact` GIN indeksi
+üzerinden tam kelime ve websearch operatörleri (`"ifade"`, `OR`, `-hariç`)
+çalıştırılır; `turkish` Snowball kökleyicisinin `Yünsa` gibi kelimeleri tek harfe
+indirgemesi sonucu oluşan sahte eşleşmeler engellenir. Başlık, etiket, özet ve
+içerik ağırlıklı olarak taranır ve en alakalı sonuçlar üstte listelenir.
 
 Bu geçişi düşük trafikte, kısa bir **bakım penceresinde** uygulayın. Aşağıdaki
 komutlar işletim rehberidir; üretimde otomatik çalıştırılmaz:
@@ -131,9 +134,9 @@ komutlar işletim rehberidir; üretimde otomatik çalıştırılmaz:
      AND (search_vector IS NULL OR search_vector_exact IS NULL);
    ```
 
-   Sonuç sıfır olmalı. `Migros 2026 3 Aylık Finansal Sonuçları`, `MİGROS`,
-   `Yünsa` ve negatif terimli örnekleri **iki modda** kontrol edin; kaldırılmış
-   token'ların artık eşleşmediğini ve sayfalamada seçimin korunduğunu doğrulayın.
+   Sonuç sıfır olmalı. `Migros 2026 3 Aylık Finansal Sonuçları`, `MİGROS`/`migros`,
+   `Yünsa`/`yunsa` ve negatif terimli örnekleri kontrol edin; Türkçe ve ASCII aramaların
+   aynı doğru sonuçlara gittiğini ve sayfalamanın korunduğunu doğrulayın.
    Etiket/özet/içerik eşleşmeleri de geçerlidir; sabit bir canlı sonuç sayısı beklemeyin.
 6. Doğrulamadan sonra trafiği ve düzenlemeleri açın.
 

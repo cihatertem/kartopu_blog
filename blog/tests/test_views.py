@@ -54,8 +54,8 @@ class SearchModeViewTests(TestCase):
         with patch("blog.views.get_page_obj", return_value=page):
             return self.client.get(self.url, params)
 
-    def test_default_and_invalid_modes_use_exact_without_fallback(self) -> None:
-        for mode in (None, "", "bogus", "search_vector", "STEMMED"):
+    def test_default_and_any_modes_use_unified_search(self) -> None:
+        for mode in (None, "", "bogus", "search_vector", "STEMMED", "stemmed", "exact"):
             cache.clear()
             params = {"q": "missing"}
             if mode is not None:
@@ -63,39 +63,37 @@ class SearchModeViewTests(TestCase):
             with patch("blog.views._perform_database_search") as search:
                 search.return_value = Paginator([], 10).get_page(1)
                 response = self.client.get(self.url, params)
-            self.assertEqual(response.context["mode"], "exact")
             search.assert_called_once()
             self.assertEqual(search.call_args.kwargs, {"mode": "exact"})
-            self.assertContains(response, "Kelime araması")
+            # No technical mode explanations should appear on screen
+            self.assertNotContains(response, "Kelime araması:")
+            self.assertNotContains(response, "Türkçe kök araması")
 
-    def test_each_mode_uses_only_its_allowlisted_vector_and_config(self) -> None:
-        for mode, field, config in (
-            ("exact", "search_vector_exact", "simple"),
-            ("stemmed", "search_vector", "turkish"),
-            ("invalid", "search_vector_exact", "simple"),
-        ):
-            base_qs = MagicMock()
-            with patch("blog.views.SearchRank") as rank, patch(
-                "blog.views.SearchQuery"
-            ) as query, patch("blog.views.get_page_obj") as page:
-                page.return_value.object_list = []
-                page.return_value.paginator.count = 0
-                _perform_database_search(
-                    RequestFactory().get("/"), base_qs, "yünsa", "mode-test", mode=mode
-                )
-            query.assert_called_once_with("yünsa", search_type="websearch", config=config)
-            rank.assert_called_once_with(F(field), query.return_value)
-            base_qs.annotate.return_value.filter.assert_called_once_with(**{field: query.return_value})
+    def test_database_search_uses_search_vector_exact_and_simple(self) -> None:
+        base_qs = MagicMock()
+        with patch("blog.views.SearchRank") as rank, patch(
+            "blog.views.build_search_query"
+        ) as mock_build, patch("blog.views.get_page_obj") as page:
+            page.return_value.object_list = []
+            page.return_value.paginator.count = 0
+            _perform_database_search(
+                RequestFactory().get("/"), base_qs, "yünsa", "mode-test"
+            )
+        mock_build.assert_called_once_with("yünsa", config="simple")
+        rank.assert_called_once_with(F("search_vector_exact"), mock_build.return_value)
+        base_qs.annotate.return_value.filter.assert_called_once_with(
+            search_vector_exact=mock_build.return_value
+        )
 
-    def test_rendered_id_and_fragment_caches_separate_modes_and_versions(self) -> None:
+    def test_rendered_id_and_fragment_caches_separate_queries_and_versions(self) -> None:
         tokens = []
-        for mode, version, post in (
-            ("exact", "first", self.posts[0]),
-            ("stemmed", "first", self.posts[1]),
-            ("exact", "second", self.posts[2]),
+        for query, version, post in (
+            ("YÜNSA", "first", self.posts[0]),
+            ("MİGROS", "first", self.posts[1]),
+            ("YÜNSA", "second", self.posts[2]),
         ):
             cache.set(SEARCH_CACHE_VERSION_KEY, version, timeout=None)
-            params = {"q": "YÜNSA", "mode": mode}
+            params = {"q": query}
             response = self._request_page(params, post)
             token = response.context["search_cache_token"]
             tokens.append(token)
@@ -115,6 +113,13 @@ class SearchModeViewTests(TestCase):
                 if other != post:
                     self.assertNotIn(other.title, main)
         self.assertEqual(len(set(tokens)), 3)
+
+    def test_legacy_mode_parameters_converge_to_same_cache(self) -> None:
+        response = self._request_page({"q": "YÜNSA", "mode": "exact"}, self.posts[0])
+        with patch("blog.views._perform_database_search") as search:
+            cached = self.client.get(self.url, {"q": "YÜNSA", "mode": "stemmed"})
+        search.assert_not_called()
+        self.assertEqual(response.context["search_cache_token"], cached.context["search_cache_token"])
 
     def test_query_and_page_are_part_of_both_cache_identities(self) -> None:
         tokens = []
@@ -136,20 +141,19 @@ class SearchModeViewTests(TestCase):
         distinct = self._request_page({"q": "MIGROS"}, self.posts[1])
         self.assertNotEqual(response.context["search_cache_token"], distinct.context["search_cache_token"])
 
-    def test_form_and_pagination_preserve_query_and_validated_mode(self) -> None:
+    def test_form_and_pagination_preserve_query_without_mode(self) -> None:
         query = '"Yünsa" OR migros'
-        for mode in ("exact", "stemmed"):
-            cache.clear()
-            page = Paginator([self.posts[0]] * 21, 10).get_page(2)
-            with patch("blog.views.get_page_obj", return_value=page):
-                response = self.client.get(self.url, {"q": query, "mode": mode, "page": "2"})
-            self.assertContains(response, f'?page=1&amp;mode={mode}&amp;q=%22Y%C3%BCnsa%22%20OR%20migros')
-            self.assertContains(response, f'?page=3&amp;mode={mode}&amp;q=%22Y%C3%BCnsa%22%20OR%20migros')
-            form = render_to_string("includes/sidebar_search.html", {"q": query, "mode": mode})
-            self.assertIn(f'value="{mode}" selected', form)
-            self.assertIn('value="&quot;Yünsa&quot; OR migros"', form)
-            self.assertIn('for="sidebar-search-mode"', form)
-        self.assertIn('value="exact" selected', render_to_string("includes/sidebar_search.html"))
+        page = Paginator([self.posts[0]] * 21, 10).get_page(2)
+        with patch("blog.views.get_page_obj", return_value=page):
+            response = self.client.get(self.url, {"q": query, "page": "2"})
+        self.assertContains(response, '?page=1&amp;q=%22Y%C3%BCnsa%22%20OR%20migros')
+        self.assertContains(response, '?page=3&amp;q=%22Y%C3%BCnsa%22%20OR%20migros')
+        self.assertNotContains(response, 'mode=')
+        form = render_to_string("includes/sidebar_search.html", {"q": query})
+        self.assertIn('value="&quot;Yünsa&quot; OR migros"', form)
+        self.assertIn('for="sidebar-search-query"', form)
+        self.assertNotIn('sidebar-search-mode', form)
+        self.assertNotIn('<select', form)
 
 
 class BlogViewsTests(TestCase):
@@ -266,15 +270,16 @@ class BlogViewsTests(TestCase):
         base_qs = MagicMock()
         page = Paginator([self.published_post], 10).get_page(1)
         with patch("blog.views.SearchRank") as rank, patch(
-            "blog.views.SearchQuery"
-        ) as query, patch("blog.views.get_page_obj", return_value=page):
+            "blog.views.build_search_query"
+        ) as mock_build, patch("blog.views.get_page_obj", return_value=page):
             _perform_database_search(
                 self.factory.get("/", {"q": "-excluded"}),
                 base_qs, "-excluded", "rank-regression",
             )
-        rank.assert_called_once_with(F("search_vector_exact"), query.return_value)
+        mock_build.assert_called_once_with("-excluded", config="simple")
+        rank.assert_called_once_with(F("search_vector_exact"), mock_build.return_value)
         base_qs.annotate.return_value.filter.assert_called_once_with(
-            search_vector_exact=query.return_value
+            search_vector_exact=mock_build.return_value
         )
         base_qs.annotate.return_value.filter.return_value.order_by.assert_called_once_with(
             "-rank", "-published_at", "-pk"
@@ -298,7 +303,7 @@ class BlogViewsTests(TestCase):
         url = reverse("blog:search_results")
 
         for q in queries:
-            with patch("blog.views.SearchQuery") as MockSearchQuery:
+            with patch("blog.views.build_search_query") as mock_build:
                 with patch("blog.views.get_page_obj") as mock_get_page_obj:
                     # Mocking page_obj to return a dummy paginated list of our published post
                     mock_page = MagicMock()
@@ -309,23 +314,17 @@ class BlogViewsTests(TestCase):
                     response = self.client.get(url, {"q": q}, follow=True)
                     self.assertEqual(response.status_code, 200)
 
-                    # Ensure SearchQuery was called with the exact input string and websearch type
-                    MockSearchQuery.assert_called_with(
-                        normalize_search_text(q), search_type="websearch", config="simple"
+                    # Ensure build_search_query was called with normalized query string and simple config
+                    mock_build.assert_called_with(
+                        normalize_search_text(q), config="simple"
                     )
 
-            # Now test cache hits and assertNumQueries
-            with patch("blog.views.SearchQuery") as MockSearchQuery:
-                # Mock published_posts_queryset to prevent executing any further query logic
-                # 1 query for base_qs.in_bulk(post_ids)
-                # plus other queries required for template rendering (e.g., seo data, global site context)
-                # But it shouldn't execute FTS SearchRank queries.
-                # Let's mock the render to only count view queries if we strictly want 1,
-                # or just assert NumQueries doesn't include the FTS search query by asserting MockSearchQuery is not called
+            # Now test cache hits and assert build_search_query is not called again
+            with patch("blog.views.build_search_query") as mock_build:
                 response = self.client.get(url, {"q": q}, follow=True)
                 self.assertEqual(response.status_code, 200)
                 # It shouldn't evaluate FTS logic again
-                MockSearchQuery.assert_not_called()
+                mock_build.assert_not_called()
 
     def test_search_cache_version_change_bypasses_cached_results(self):
         cache.clear()

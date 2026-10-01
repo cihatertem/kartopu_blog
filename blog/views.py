@@ -27,7 +27,13 @@ from blog.models import (
     Category,
     Tag,
 )
-from blog.search import SEARCH_MODES, normalize_search_mode, normalize_search_text
+from blog.search import (
+    DEFAULT_SEARCH_MODE,
+    SEARCH_MODES,
+    build_search_query,
+    normalize_search_mode,
+    normalize_search_text,
+)
 from blog.services import (
     detect_content_markers,
     get_content_prefetches_for_dependencies,
@@ -449,11 +455,7 @@ def _perform_database_search(
     request, base_qs, normalized_q: str, cache_key: str, *, mode: str = "exact"
 ):
     vector_field, config = SEARCH_MODES[normalize_search_mode(mode)]
-    query = SearchQuery(
-        normalized_q,
-        search_type="websearch",
-        config=config,
-    )
+    query = build_search_query(normalized_q, config=config)
 
     qs = (
         base_qs.annotate(rank=SearchRank(F(vector_field), query))
@@ -472,12 +474,11 @@ def _perform_database_search(
 def search_results(request):
     q = (request.GET.get("q") or "").strip()
     normalized_q = normalize_search_text(q)
-    mode = normalize_search_mode(request.GET.get("mode"))
     page_num = request.GET.get("page", "1")
     search_cache_version = cache.get(SEARCH_CACHE_VERSION_KEY, 1)
     cache_key_str = (
         f"{SEARCH_CACHE_SCHEMA_VERSION}:{search_cache_version}:"
-        f"{mode}:{normalized_q}:{page_num}"
+        f"{DEFAULT_SEARCH_MODE}:{normalized_q}:{page_num}"
     )
     search_cache_token = hashlib.sha256(cache_key_str.encode("utf-8")).hexdigest()
     cache_key = "search_" + search_cache_token
@@ -494,7 +495,7 @@ def search_results(request):
             page_obj = _get_cached_search_results(base_qs, cached_data, page_num)
         else:
             page_obj = _perform_database_search(
-                request, base_qs, normalized_q, cache_key, mode=mode
+                request, base_qs, normalized_q, cache_key, mode=DEFAULT_SEARCH_MODE
             )
 
     breadcrumbs = [
@@ -508,7 +509,6 @@ def search_results(request):
         {
             "page_obj": page_obj,
             "q": q,
-            "mode": mode,
             "search_cache_token": search_cache_token,
             "active_nav": "blog",
             "breadcrumbs": breadcrumbs,
