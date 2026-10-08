@@ -132,3 +132,84 @@ class PortfolioTransactionTests(TestCase):
         )
         mock_refresh_price.assert_called_once()
         self.assertIsNotNone(tx.pk)
+
+    def test_transaction_quantity_up_to_10_decimal_places(self):
+        # 10 decimal places should be valid
+        tx_valid = PortfolioTransaction(
+            asset=self.asset,
+            transaction_type=PortfolioTransaction.TransactionType.BUY,
+            trade_date=datetime.date(2024, 1, 1),
+            quantity=Decimal("10.1234567891"),
+            price_per_unit=Decimal("100"),
+        )
+        try:
+            tx_valid.full_clean()
+        except ValidationError as e:
+            self.fail(f"10 decimal places should be valid for quantity: {e}")
+
+        # 11 decimal places should raise ValidationError
+        tx_invalid = PortfolioTransaction(
+            asset=self.asset,
+            transaction_type=PortfolioTransaction.TransactionType.BUY,
+            trade_date=datetime.date(2024, 1, 1),
+            quantity=Decimal("10.12345678912"),
+            price_per_unit=Decimal("100"),
+        )
+        with self.assertRaises(ValidationError) as ctx:
+            tx_invalid.full_clean()
+        self.assertIn("quantity", ctx.exception.message_dict)
+
+    def test_transaction_rate_up_to_10_decimal_places(self):
+        # 10 decimal places should be valid for capital_increase_rate_pct
+        tx_valid = PortfolioTransaction(
+            asset=self.asset,
+            transaction_type=PortfolioTransaction.TransactionType.BONUS_CAPITAL_INCREASE,
+            trade_date=datetime.date(2024, 1, 1),
+            quantity=Decimal("0"),
+            price_per_unit=Decimal("0"),
+            capital_increase_rate_pct=Decimal("50.1234567891"),
+        )
+        try:
+            tx_valid.full_clean()
+        except ValidationError as e:
+            self.fail(f"10 decimal places should be valid for capital_increase_rate_pct: {e}")
+
+        # 11 decimal places should raise ValidationError
+        tx_invalid = PortfolioTransaction(
+            asset=self.asset,
+            transaction_type=PortfolioTransaction.TransactionType.BONUS_CAPITAL_INCREASE,
+            trade_date=datetime.date(2024, 1, 1),
+            quantity=Decimal("0"),
+            price_per_unit=Decimal("0"),
+            capital_increase_rate_pct=Decimal("50.12345678912"),
+        )
+        with self.assertRaises(ValidationError) as ctx:
+            tx_invalid.full_clean()
+        self.assertIn("capital_increase_rate_pct", ctx.exception.message_dict)
+
+    def test_transaction_price_up_to_10_decimal_places(self):
+        # 10 decimal places should be valid for price_per_unit
+        tx_valid = PortfolioTransaction(
+            asset=self.asset,
+            transaction_type=PortfolioTransaction.TransactionType.BUY,
+            trade_date=datetime.date(2024, 1, 1),
+            quantity=Decimal("1"),
+            price_per_unit=Decimal("100.1234567891"),
+        )
+        try:
+            tx_valid.full_clean()
+        except ValidationError as e:
+            self.fail(f"10 decimal places should be valid for price_per_unit: {e}")
+
+        # 11 decimal places should raise ValidationError
+        tx_invalid = PortfolioTransaction(
+            asset=self.asset,
+            transaction_type=PortfolioTransaction.TransactionType.BUY,
+            trade_date=datetime.date(2024, 1, 1),
+            quantity=Decimal("1"),
+            price_per_unit=Decimal("100.12345678912"),
+        )
+        with self.assertRaises(ValidationError) as ctx:
+            tx_invalid.full_clean()
+        self.assertIn("price_per_unit", ctx.exception.message_dict)
+
