@@ -188,13 +188,14 @@ class BaseSnapshot(SlugMixin, UUIDModelMixin, TimeStampedModelMixin):
             return fx_rates
 
         uncached_pairs: list[tuple[str, str]] = []
-        cache_key_map = {
-            cls._get_fx_cache_key(source_currency, target_currency, rate_date): (
-                source_currency,
-                (source_currency, target_currency, rate_date),
-            )
-            for source_currency in source_currencies
-        }
+        cache_key_map = {}
+        for source_currency in source_currencies:
+            currency_pair = (source_currency, target_currency, rate_date)
+            if source_currency == target_currency:
+                fx_rates[currency_pair] = Decimal("1")
+                continue
+            cache_key = cls._get_fx_cache_key(source_currency, target_currency, rate_date)
+            cache_key_map[cache_key] = (source_currency, currency_pair)
 
         cached_rates = cache.get_many(cache_key_map)
         for cache_key, (source_currency, currency_pair) in cache_key_map.items():
@@ -494,33 +495,56 @@ class ExchangeRate(UUIDModelMixin, TimeStampedModelMixin):
                 base_currency=base_currency,
                 target_currency=target_currency,
             )
-            if normalized_as_of is not None:
-                record = qs.filter(rate_date__lte=normalized_as_of).order_by("-rate_date").first()
-                if record:
-                    return record.rate
-
-            record = qs.order_by("-rate_date").first()
-            if record:
-                return record.rate
-
             inverse_qs = cls.objects.filter(
                 base_currency=target_currency,
                 target_currency=base_currency,
             )
+
             if normalized_as_of is not None:
-                inv_record = inverse_qs.filter(rate_date__lte=normalized_as_of).order_by("-rate_date").first()
+                record = (
+                    qs.filter(rate_date__lte=normalized_as_of)
+                    .order_by("-rate_date")
+                    .first()
+                )
+                if record:
+                    return record.rate
+
+                inv_record = (
+                    inverse_qs.filter(rate_date__lte=normalized_as_of)
+                    .order_by("-rate_date")
+                    .first()
+                )
                 if inv_record and inv_record.rate > 0:
                     return Decimal("1") / inv_record.rate
+            else:
+                record = qs.order_by("-rate_date").first()
+                if record:
+                    return record.rate
 
-            inv_record = inverse_qs.order_by("-rate_date").first()
-            if inv_record and inv_record.rate > 0:
-                return Decimal("1") / inv_record.rate
+                inv_record = inverse_qs.order_by("-rate_date").first()
+                if inv_record and inv_record.rate > 0:
+                    return Decimal("1") / inv_record.rate
         except Exception:
             logger.exception(
                 "Error querying last known FX rate from database for %s/%s",
                 base_currency,
                 target_currency,
             )
+
+        if normalized_as_of is not None:
+            cached_date = cache.get(
+                f"fx_rate_{base_currency}_{target_currency}_{normalized_as_of.isoformat()}"
+            )
+            if cached_date is not None and isinstance(cached_date, Decimal) and cached_date > 0:
+                return cached_date
+
+            cached_date_inv = cache.get(
+                f"fx_rate_{target_currency}_{base_currency}_{normalized_as_of.isoformat()}"
+            )
+            if cached_date_inv is not None and isinstance(cached_date_inv, Decimal) and cached_date_inv > 0:
+                return Decimal("1") / cached_date_inv
+
+            return None
 
         cached_valid = cache.get(f"fx_rate_latest_valid_{base_currency}_{target_currency}")
         if cached_valid is not None and isinstance(cached_valid, Decimal) and cached_valid > 0:
@@ -2468,6 +2492,12 @@ class DividendPayment(UUIDModelMixin, TimeStampedModelMixin):
                         )
                         fx_rate = last_known
                     else:
+                        logger.warning(
+                            "No valid FX rate found for %s/%s on %s. Falling back to 1.",
+                            base_currency,
+                            currency,
+                            self.payment_date,
+                        )
                         fx_rate = Decimal("1")
 
             per_share = self.net_dividend_per_share * fx_rate

@@ -26,6 +26,20 @@ CACHES = {
     }
 }
 
+# Silence log output during test runs while keeping assertLogs functional
+LOGGING = {
+    "version": 1,
+    "disable_existing_loggers": False,
+    "handlers": {
+        "null": {
+            "class": "logging.NullHandler",
+        },
+    },
+    "root": {
+        "handlers": ["null"],
+    },
+}
+
 # Bypass migrations that use PostgreSQL-specific features
 MIGRATION_MODULES = {
     "blog": None,

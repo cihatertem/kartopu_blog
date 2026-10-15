@@ -132,6 +132,12 @@ class ExchangeRateFallbackTests(TestCase):
         )
         self.assertEqual(rate, Decimal("30.20"))
 
+        # Prior to both dates -> must return None (no future rates leak)
+        rate = ExchangeRate.get_last_known_rate(
+            "USD", "TRY", as_of_date=date(2023, 12, 31)
+        )
+        self.assertIsNone(rate)
+
         # No as_of_date -> gets latest
         rate = ExchangeRate.get_last_known_rate("USD", "TRY", as_of_date=None)
         self.assertEqual(rate, Decimal("30.20"))
