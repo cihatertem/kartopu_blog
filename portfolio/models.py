@@ -4,6 +4,7 @@ import calendar
 from dataclasses import dataclass
 from datetime import date
 from decimal import Decimal
+import logging
 
 from django.conf import settings
 from django.core.cache import cache
@@ -47,6 +48,8 @@ MAX_DECIMAL_PLACES_FOR_QUANTITY = 10
 MAX_DECIMAL_PLACES_FOR_RATE = 10
 CACHE_TIMEOUT = 600  # 10 minutes
 BULK_CREATE_BATCH_SIZE = 500
+
+logger = logging.getLogger(__name__)
 
 
 def _get_prefetched_relation(instance: models.Model, relation_name: str):
@@ -203,6 +206,7 @@ class BaseSnapshot(SlugMixin, UUIDModelMixin, TimeStampedModelMixin):
         if uncached_pairs:
             fetched_rates = fetch_fx_rates_bulk(uncached_pairs, rate_date=rate_date)
             new_cache_data = {}
+            rates_to_record = {}
             for source_currency, target_currency in uncached_pairs:
                 currency_pair = (source_currency, target_currency, rate_date)
                 cache_key = cls._get_fx_cache_key(
@@ -210,12 +214,36 @@ class BaseSnapshot(SlugMixin, UUIDModelMixin, TimeStampedModelMixin):
                     target_currency,
                     rate_date,
                 )
-                fx_rate = (fetched_rates or {}).get(
-                    (source_currency, target_currency),  # pyright: ignore[reportArgumentType]
-                    Decimal("1"),
-                )
+                fx_rate = (fetched_rates or {}).get((source_currency, target_currency))  # pyright: ignore[reportCallIssue]
+                if fx_rate is not None and fx_rate > 0:
+                    rates_to_record[currency_pair] = fx_rate
+                else:
+                    last_known = ExchangeRate.get_last_known_rate(
+                        source_currency, target_currency, as_of_date=rate_date
+                    )
+                    if last_known is not None:
+                        logger.warning(
+                            "FX rate for %s/%s on %s could not be fetched. Using last known rate: %s",
+                            source_currency,
+                            target_currency,
+                            rate_date or "latest",
+                            last_known,
+                        )
+                        fx_rate = last_known
+                    else:
+                        logger.warning(
+                            "No valid FX rate found for %s/%s on %s. Falling back to 1.",
+                            source_currency,
+                            target_currency,
+                            rate_date or "latest",
+                        )
+                        fx_rate = Decimal("1")
+
                 new_cache_data[cache_key] = fx_rate
                 fx_rates[currency_pair] = fx_rate  # pyright: ignore[reportArgumentType]
+
+            if rates_to_record:
+                ExchangeRate.record_rates_bulk(rates_to_record)
 
             if new_cache_data:
                 cache.set_many(
@@ -314,6 +342,195 @@ class Asset(UUIDModelMixin, TimeStampedModelMixin):
             self.refresh_price()
 
         super().save(*args, **kwargs)  # pyright: ignore[reportArgumentType]
+
+
+class ExchangeRate(UUIDModelMixin, TimeStampedModelMixin):
+    base_currency = models.CharField(
+        max_length=10,
+        choices=Asset.Currency.choices,
+    )
+    target_currency = models.CharField(
+        max_length=10,
+        choices=Asset.Currency.choices,
+    )
+    rate_date = models.DateField(db_index=True)
+    rate = models.DecimalField(
+        max_digits=MAX_DIGITS,
+        decimal_places=MAX_DECIMAL_PLACES,
+    )
+
+    class Meta:  # pyright: ignore[reportIncompatibleVariableOverride]
+        verbose_name = "Döviz Kuru"
+        verbose_name_plural = "Döviz Kurları"
+        constraints = [
+            models.UniqueConstraint(
+                fields=("base_currency", "target_currency", "rate_date"),
+                name="unique_fx_rate_pair_date",
+            )
+        ]
+        indexes = [
+            models.Index(
+                fields=["base_currency", "target_currency", "-rate_date"],
+                name="portfolio_fx_pair_date_idx",
+            ),
+        ]
+        ordering = ("-rate_date",)
+
+    def __str__(self) -> str:
+        return f"{self.base_currency}/{self.target_currency} ({self.rate_date}): {self.rate}"
+
+    @staticmethod
+    def _normalize_date(d: date | str | None) -> date | None:
+        if d is None:
+            return None
+        if isinstance(d, str):
+            return date.fromisoformat(d)
+        return d
+
+    @classmethod
+    def record_rate(
+        cls,
+        base_currency: str,
+        target_currency: str,
+        rate: Decimal,
+        rate_date: date | str | None = None,
+    ) -> "ExchangeRate | None":
+        if (
+            not base_currency
+            or not target_currency
+            or base_currency == target_currency
+            or rate <= 0
+        ):
+            return None
+        effective_date = cls._normalize_date(rate_date) or timezone.now().date()
+        try:
+            obj, _ = cls.objects.update_or_create(
+                base_currency=base_currency,
+                target_currency=target_currency,
+                rate_date=effective_date,
+                defaults={"rate": rate},
+            )
+            cache_key = f"fx_rate_{base_currency}_{target_currency}_{effective_date.isoformat()}"
+            cache.set(
+                cache_key,
+                rate,
+                timeout=getattr(settings, "CACHE_TIMEOUT", CACHE_TIMEOUT),
+            )
+            cache.set(
+                f"fx_rate_latest_valid_{base_currency}_{target_currency}",
+                rate,
+                timeout=None,
+            )
+            return obj
+        except Exception:
+            logger.exception(
+                "Failed to record FX rate for %s/%s on %s",
+                base_currency,
+                target_currency,
+                effective_date,
+            )
+            return None
+
+    @classmethod
+    def record_rates_bulk(
+        cls,
+        rates: dict[tuple[str, str, date | None], Decimal] | dict[tuple[str, str, date], Decimal],
+    ) -> None:
+        if not rates:
+            return
+        now_date = timezone.now().date()
+        instances_to_create = []
+        cache_data = {}
+        for (base, target, rate_date), rate in rates.items():
+            if not base or not target or base == target or rate <= 0:
+                continue
+            effective_date = cls._normalize_date(rate_date) or now_date
+            instances_to_create.append(
+                cls(
+                    base_currency=base,
+                    target_currency=target,
+                    rate_date=effective_date,
+                    rate=rate,
+                )
+            )
+            cache_key = f"fx_rate_{base}_{target}_{effective_date.isoformat()}"
+            cache_data[cache_key] = rate
+            cache_data[f"fx_rate_latest_valid_{base}_{target}"] = rate
+
+        if instances_to_create:
+            try:
+                cls.objects.bulk_create(
+                    instances_to_create,
+                    batch_size=BULK_CREATE_BATCH_SIZE,
+                    update_conflicts=True,
+                    unique_fields=["base_currency", "target_currency", "rate_date"],
+                    update_fields=["rate", "updated_at"],
+                )
+            except Exception:
+                logger.exception("Failed to bulk record FX rates")
+
+        if cache_data:
+            cache.set_many(
+                cache_data,
+                timeout=getattr(settings, "CACHE_TIMEOUT", CACHE_TIMEOUT),
+            )
+
+    @classmethod
+    def get_last_known_rate(
+        cls,
+        base_currency: str,
+        target_currency: str,
+        as_of_date: date | str | None = None,
+    ) -> Decimal | None:
+        if not base_currency or not target_currency:
+            return None
+        if base_currency == target_currency:
+            return Decimal("1")
+
+        normalized_as_of = cls._normalize_date(as_of_date)
+
+        try:
+            qs = cls.objects.filter(
+                base_currency=base_currency,
+                target_currency=target_currency,
+            )
+            if normalized_as_of is not None:
+                record = qs.filter(rate_date__lte=normalized_as_of).order_by("-rate_date").first()
+                if record:
+                    return record.rate
+
+            record = qs.order_by("-rate_date").first()
+            if record:
+                return record.rate
+
+            inverse_qs = cls.objects.filter(
+                base_currency=target_currency,
+                target_currency=base_currency,
+            )
+            if normalized_as_of is not None:
+                inv_record = inverse_qs.filter(rate_date__lte=normalized_as_of).order_by("-rate_date").first()
+                if inv_record and inv_record.rate > 0:
+                    return Decimal("1") / inv_record.rate
+
+            inv_record = inverse_qs.order_by("-rate_date").first()
+            if inv_record and inv_record.rate > 0:
+                return Decimal("1") / inv_record.rate
+        except Exception:
+            logger.exception(
+                "Error querying last known FX rate from database for %s/%s",
+                base_currency,
+                target_currency,
+            )
+
+        cached_valid = cache.get(f"fx_rate_latest_valid_{base_currency}_{target_currency}")
+        if cached_valid is not None and isinstance(cached_valid, Decimal) and cached_valid > 0:
+            return cached_valid
+
+        cached_inv = cache.get(f"fx_rate_latest_valid_{target_currency}_{base_currency}")
+        if cached_inv is not None and isinstance(cached_inv, Decimal) and cached_inv > 0:
+            return Decimal("1") / cached_inv
+
+        return None
 
 
 class PortfolioComparison(SlugMixin, UUIDModelMixin, TimeStampedModelMixin):
@@ -421,7 +638,38 @@ class Portfolio(UUIDModelMixin, TimeStampedModelMixin):
                 target_currency,
                 rate_date=rate_date,
             )
-            final_rate = fx_rate if fx_rate is not None else Decimal("1")
+            if fx_rate is not None and fx_rate > 0:
+                final_rate = fx_rate
+                ExchangeRate.record_rate(
+                    base_currency,
+                    target_currency,
+                    fx_rate,
+                    rate_date=rate_date,
+                )
+            else:
+                last_known = ExchangeRate.get_last_known_rate(
+                    base_currency,
+                    target_currency,
+                    as_of_date=rate_date,
+                )
+                if last_known is not None:
+                    logger.warning(
+                        "FX rate for %s/%s on %s could not be fetched. Using last known rate: %s",
+                        base_currency,
+                        target_currency,
+                        rate_date or "latest",
+                        last_known,
+                    )
+                    final_rate = last_known
+                else:
+                    logger.warning(
+                        "No valid FX rate found for %s/%s on %s. Falling back to 1.",
+                        base_currency,
+                        target_currency,
+                        rate_date or "latest",
+                    )
+                    final_rate = Decimal("1")
+
             fx_rates[currency_pair] = final_rate
             cache.set(
                 cache_key,
@@ -490,13 +738,41 @@ class Portfolio(UUIDModelMixin, TimeStampedModelMixin):
 
         fetched_rates = fetch_multiple_fx_rates_bulk(uncached_pairs_by_date)
         cache_data = {}
+        rates_to_record = {}
         for rate_date, pairs in uncached_pairs_by_date.items():
             for pair in pairs:
                 currency_pair = (pair[0], pair[1], rate_date)
                 cache_key = f"fx_rate_{pair[0]}_{pair[1]}_{rate_date.isoformat() if rate_date else 'latest'}"
-                fx_rate = fetched_rates.get(currency_pair, Decimal("1"))  # pyright: ignore
+                fx_rate = (fetched_rates or {}).get(currency_pair)  # pyright: ignore[reportCallIssue]
+                if fx_rate is not None and fx_rate > 0:
+                    rates_to_record[currency_pair] = fx_rate
+                else:
+                    last_known = ExchangeRate.get_last_known_rate(
+                        pair[0], pair[1], as_of_date=rate_date
+                    )
+                    if last_known is not None:
+                        logger.warning(
+                            "Bulk FX rate for %s/%s on %s could not be fetched. Using last known rate: %s",
+                            pair[0],
+                            pair[1],
+                            rate_date or "latest",
+                            last_known,
+                        )
+                        fx_rate = last_known
+                    else:
+                        logger.warning(
+                            "No valid FX rate found for %s/%s on %s. Falling back to 1.",
+                            pair[0],
+                            pair[1],
+                            rate_date or "latest",
+                        )
+                        fx_rate = Decimal("1")
+
                 cache_data[cache_key] = fx_rate
                 fx_rates[currency_pair] = fx_rate  # pyright: ignore[reportArgumentType]
+
+        if rates_to_record:
+            ExchangeRate.record_rates_bulk(rates_to_record)
 
         if cache_data:
             cache.set_many(
@@ -1603,7 +1879,15 @@ class CashFlowSnapshot(BaseSnapshot):
 
             if entry_currency not in rate_by_currency:
                 currency_pair = (entry_currency, cashflow_currency, snapshot_date)
-                rate_by_currency[entry_currency] = fx_rates.get(currency_pair, one)  # pyright: ignore[reportCallIssue, reportArgumentType]
+                if currency_pair in fx_rates:
+                    rate_by_currency[entry_currency] = fx_rates[currency_pair]
+                else:
+                    last_known = ExchangeRate.get_last_known_rate(
+                        entry_currency, cashflow_currency, as_of_date=snapshot_date
+                    )
+                    rate_by_currency[entry_currency] = (
+                        last_known if last_known is not None else one
+                    )
 
             category = str(entry["category"])
             converted_amount = amount * rate_by_currency[entry_currency]  # pyright: ignore[reportOperatorIssue]
@@ -2161,12 +2445,30 @@ class DividendPayment(UUIDModelMixin, TimeStampedModelMixin):
                 pairs_to_fetch, rate_date=self.payment_date
             )
 
+        rates_to_record = {}
         dividends_to_create_or_update = []
         for currency, _ in currency_choices:
             if currency == base_currency:
                 fx_rate = Decimal("1")
             else:
-                fx_rate = fetched_rates.get((base_currency, currency)) or Decimal("1")  # pyright: ignore[reportCallIssue]
+                fx_rate = (fetched_rates or {}).get((base_currency, currency))  # pyright: ignore[reportCallIssue]
+                if fx_rate is not None and fx_rate > 0:
+                    rates_to_record[(base_currency, currency, self.payment_date)] = fx_rate
+                else:
+                    last_known = ExchangeRate.get_last_known_rate(
+                        base_currency, currency, as_of_date=self.payment_date
+                    )
+                    if last_known is not None:
+                        logger.warning(
+                            "Dividend sync FX rate for %s/%s on %s could not be fetched. Using last known rate: %s",
+                            base_currency,
+                            currency,
+                            self.payment_date,
+                            last_known,
+                        )
+                        fx_rate = last_known
+                    else:
+                        fx_rate = Decimal("1")
 
             per_share = self.net_dividend_per_share * fx_rate
             total_converted = total_amount * fx_rate
@@ -2178,6 +2480,9 @@ class DividendPayment(UUIDModelMixin, TimeStampedModelMixin):
                     total_net_amount=total_converted,
                 )
             )
+
+        if rates_to_record:
+            ExchangeRate.record_rates_bulk(rates_to_record)
 
         if dividends_to_create_or_update:
             Dividend.objects.bulk_create(
@@ -2385,7 +2690,14 @@ class DividendSnapshot(BaseSnapshot):
                     context.currency,
                     context.snapshot_date,
                 )
-                fx_rate = context.fx_rates.get(currency_pair, Decimal("1"))  # pyright: ignore[reportCallIssue, reportArgumentType]
+                fx_rate = context.fx_rates.get(currency_pair)
+                if fx_rate is None:
+                    last_known = ExchangeRate.get_last_known_rate(
+                        payment.asset.currency,
+                        context.currency,
+                        as_of_date=context.snapshot_date,
+                    )
+                    fx_rate = last_known if last_known is not None else Decimal("1")
             per_share = payment.net_dividend_per_share * fx_rate  # pyright: ignore[reportOperatorIssue]
             total_payment = payment.total_net_amount * fx_rate
         return per_share, total_payment

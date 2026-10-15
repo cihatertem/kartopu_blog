@@ -15,6 +15,7 @@ from portfolio.models import (
     DividendSnapshot,
     DividendSnapshotAssetItem,
     DividendSnapshotPaymentItem,
+    ExchangeRate,
     Portfolio,
     PortfolioComparison,
     PortfolioSnapshot,
@@ -114,6 +115,21 @@ class AssetAdmin(admin.ModelAdmin):
     search_fields = ("name", "symbol")
     list_filter = ("asset_type", "currency")
     readonly_fields = ("price_updated_at",)
+
+
+@admin.register(ExchangeRate)
+class ExchangeRateAdmin(admin.ModelAdmin):
+    list_display = (
+        "base_currency",
+        "target_currency",
+        "rate_date",
+        "rate",
+        "updated_at",
+    )
+    list_filter = ("base_currency", "target_currency")
+    search_fields = ("base_currency", "target_currency")
+    date_hierarchy = "rate_date"
+    ordering = ("-rate_date",)
 
 
 @admin.register(Portfolio)
