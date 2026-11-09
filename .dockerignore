@@ -74,3 +74,7 @@ bakim.html
 test.sh
 start_dev.sh
 .codex
+.junie/
+.agents/
+.gemini/
+skills/

@@ -43,3 +43,6 @@ kartopu_local_backup.sql
 .codex
 /.junie/plans/portfolio-performans-yol-haritasi.md
 /.junie/
+.agents/
+.gemini/
+skills/

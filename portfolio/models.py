@@ -1,10 +1,10 @@
 from __future__ import annotations
 
 import calendar
+import logging
 from dataclasses import dataclass
 from datetime import date
 from decimal import Decimal
-import logging
 
 from django.conf import settings
 from django.core.cache import cache
@@ -194,7 +194,9 @@ class BaseSnapshot(SlugMixin, UUIDModelMixin, TimeStampedModelMixin):
             if source_currency == target_currency:
                 fx_rates[currency_pair] = Decimal("1")
                 continue
-            cache_key = cls._get_fx_cache_key(source_currency, target_currency, rate_date)
+            cache_key = cls._get_fx_cache_key(
+                source_currency, target_currency, rate_date
+            )
             cache_key_map[cache_key] = (source_currency, currency_pair)
 
         cached_rates = cache.get_many(cache_key_map)
@@ -435,7 +437,8 @@ class ExchangeRate(UUIDModelMixin, TimeStampedModelMixin):
     @classmethod
     def record_rates_bulk(
         cls,
-        rates: dict[tuple[str, str, date | None], Decimal] | dict[tuple[str, str, date], Decimal],
+        rates: dict[tuple[str, str, date | None], Decimal]
+        | dict[tuple[str, str, date], Decimal],
     ) -> None:
         if not rates:
             return
@@ -535,23 +538,43 @@ class ExchangeRate(UUIDModelMixin, TimeStampedModelMixin):
             cached_date = cache.get(
                 f"fx_rate_{base_currency}_{target_currency}_{normalized_as_of.isoformat()}"
             )
-            if cached_date is not None and isinstance(cached_date, Decimal) and cached_date > 0:
+            if (
+                cached_date is not None
+                and isinstance(cached_date, Decimal)
+                and cached_date > 0
+            ):
                 return cached_date
 
             cached_date_inv = cache.get(
                 f"fx_rate_{target_currency}_{base_currency}_{normalized_as_of.isoformat()}"
             )
-            if cached_date_inv is not None and isinstance(cached_date_inv, Decimal) and cached_date_inv > 0:
+            if (
+                cached_date_inv is not None
+                and isinstance(cached_date_inv, Decimal)
+                and cached_date_inv > 0
+            ):
                 return Decimal("1") / cached_date_inv
 
             return None
 
-        cached_valid = cache.get(f"fx_rate_latest_valid_{base_currency}_{target_currency}")
-        if cached_valid is not None and isinstance(cached_valid, Decimal) and cached_valid > 0:
+        cached_valid = cache.get(
+            f"fx_rate_latest_valid_{base_currency}_{target_currency}"
+        )
+        if (
+            cached_valid is not None
+            and isinstance(cached_valid, Decimal)
+            and cached_valid > 0
+        ):
             return cached_valid
 
-        cached_inv = cache.get(f"fx_rate_latest_valid_{target_currency}_{base_currency}")
-        if cached_inv is not None and isinstance(cached_inv, Decimal) and cached_inv > 0:
+        cached_inv = cache.get(
+            f"fx_rate_latest_valid_{target_currency}_{base_currency}"
+        )
+        if (
+            cached_inv is not None
+            and isinstance(cached_inv, Decimal)
+            and cached_inv > 0
+        ):
             return Decimal("1") / cached_inv
 
         return None
@@ -1669,7 +1692,9 @@ class PortfolioSnapshot(BaseSnapshot):
                 continue
             currency = total["asset__currency"]
             if currency != snapshot.portfolio.currency:  # pyright: ignore[reportAttributeAccessIssue]
-                amount *= fx_rates[(currency, snapshot.portfolio.currency, snapshot_date)]  # pyright: ignore[reportAttributeAccessIssue]
+                amount *= fx_rates[
+                    (currency, snapshot.portfolio.currency, snapshot_date)
+                ]  # pyright: ignore[reportAttributeAccessIssue]
             if amount > 0:
                 items.append(
                     PortfolioSnapshotPurchaseItem(
@@ -1780,6 +1805,7 @@ class CashFlowEntry(UUIDModelMixin, TimeStampedModelMixin):
         INTEREST = "interest", "Faiz/Nema"
         EUROBOND_COUPON = "eurobond_coupon", "Eurobond Kupon"
         CREDIT_CARD_BONUS = "credit_card_bonus", "Kredi Kartı Bonus"
+        OPTIONS = "options", "Opsiyon İşlemleri"
         OTHER = "other", "Diğer"
 
     cashflows = models.ManyToManyField(
@@ -2477,7 +2503,9 @@ class DividendPayment(UUIDModelMixin, TimeStampedModelMixin):
             else:
                 fx_rate = (fetched_rates or {}).get((base_currency, currency))  # pyright: ignore[reportCallIssue]
                 if fx_rate is not None and fx_rate > 0:
-                    rates_to_record[(base_currency, currency, self.payment_date)] = fx_rate
+                    rates_to_record[(base_currency, currency, self.payment_date)] = (
+                        fx_rate
+                    )
                 else:
                     last_known = ExchangeRate.get_last_known_rate(
                         base_currency, currency, as_of_date=self.payment_date
