@@ -855,6 +855,15 @@ class Portfolio(UUIDModelMixin, TimeStampedModelMixin):
         )
 
     @staticmethod
+    def _apply_dividend_reinvest(
+        transaction: "PortfolioTransaction",
+        quantity: Decimal,
+        cost_basis: Decimal,
+        value_adjustment: Decimal,
+    ) -> tuple[Decimal, Decimal, Decimal]:
+        return quantity + transaction.quantity, cost_basis, value_adjustment
+
+    @staticmethod
     def _apply_bonus_capital_increase(
         increase_quantity: Decimal,
         quantity: Decimal,
@@ -917,6 +926,10 @@ class Portfolio(UUIDModelMixin, TimeStampedModelMixin):
             case PortfolioTransaction.TransactionType.BUY:
                 return self._apply_buy(
                     transaction, quantity, cost_basis, value_adjustment, fx_rate
+                )
+            case PortfolioTransaction.TransactionType.DIVIDEND_REINVEST:
+                return self._apply_dividend_reinvest(
+                    transaction, quantity, cost_basis, value_adjustment
                 )
             case PortfolioTransaction.TransactionType.BONUS_CAPITAL_INCREASE:
                 return self._apply_bonus_capital_increase(
@@ -1288,7 +1301,10 @@ class Portfolio(UUIDModelMixin, TimeStampedModelMixin):
         elif tx.transaction_type == PortfolioTransaction.TransactionType.SELL:
             tx_cash_flows.append((tx.trade_date, amount))
 
-        if tx.transaction_type == PortfolioTransaction.TransactionType.BUY:
+        if tx.transaction_type in (
+            PortfolioTransaction.TransactionType.BUY,
+            PortfolioTransaction.TransactionType.DIVIDEND_REINVEST,
+        ):
             current_quantity += tx.quantity
         elif tx.transaction_type == PortfolioTransaction.TransactionType.SELL:
             current_quantity -= tx.quantity
@@ -1391,6 +1407,7 @@ class PortfolioTransaction(UUIDModelMixin, TimeStampedModelMixin):
         BUY = "buy", "Alım"
         SELL = "sell", "Satış"
         DIVIDEND = "dividend", "Temettü"
+        DIVIDEND_REINVEST = "dividend_reinvest", "Temettü Geri Alımı"
         COUPON = "coupon", "Kupon Ödemesi"
         BONUS_CAPITAL_INCREASE = "bonus_ci", "Bedelsiz Sermaye Artırımı"
         RIGHTS_EXERCISED = "rights_use", "Bedelli (Rüçhan Kullanıldı)"
@@ -1439,6 +1456,13 @@ class PortfolioTransaction(UUIDModelMixin, TimeStampedModelMixin):
             "quantity: 0 (bu akışta adet oranla arka planda hesaplanıyor)<br>\n"
             "price_per_unit: bedelliye katılım birim fiyatı (şirketin açıkladığı rüçhan kullanım fiyatı)<br>\n"
             "trade_date: bedelli tarihi<br>\n"
+            "asset / portfolios: ilgili X varlığı ve portföyünüz<br>\n"
+            "---<br>\n"
+            "transaction_type: Temettü Geri Alımı<br>\n"
+            "capital_increase_rate_pct: boş bırakılır<br>\n"
+            "quantity: temettü ile alınan lot adedi<br>\n"
+            "price_per_unit: alım birim fiyatı (veya 0; cepten ana para çıkmadığı için maliyete eklenmez)<br>\n"
+            "trade_date: geri alım tarihi<br>\n"
             "asset / portfolios: ilgili X varlığı ve portföyünüz<br>\n"
         ),
     )

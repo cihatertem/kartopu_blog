@@ -83,6 +83,30 @@ class PortfolioCorporateActionTests(TestCase):
         self.assertEqual(position["cost_basis"], Decimal("1000"))
         self.assertEqual(position["average_cost"], Decimal("5"))
 
+    def test_dividend_reinvest_updates_quantity_and_lowers_average_cost_without_changing_cost_basis(
+        self,
+    ) -> None:
+        self._create_transaction(
+            transaction_type=PortfolioTransaction.TransactionType.BUY,
+            quantity="100",
+            price_per_unit="10",
+            trade_date=date(2025, 1, 1),
+        )
+        self._create_transaction(
+            transaction_type=PortfolioTransaction.TransactionType.DIVIDEND_REINVEST,
+            quantity="25",
+            price_per_unit="10",
+            trade_date=date(2025, 2, 1),
+        )
+
+        position = self.portfolio.get_positions()[0]
+
+        self.assertEqual(position["quantity"], Decimal("125"))
+        self.assertEqual(position["cost_basis"], Decimal("1000"))
+        self.assertEqual(position["average_cost"], Decimal("8"))
+        self.assertEqual(position["market_value"], Decimal("1250"))
+        self.assertEqual(position["gain_loss"], Decimal("250"))
+
     def test_paid_capital_increase_with_rights_exercised_increases_cost_basis(
         self,
     ) -> None:

@@ -114,6 +114,40 @@ class PortfolioCalculateIRRTests(TestCase):
         self.assertIsNotNone(irr)
         self.assertAlmostEqual(float(irr), 19.9, places=1)
 
+    def test_calculate_irr_with_dividend_reinvest_and_subsequent_rights_exercised(
+        self,
+    ) -> None:
+        PortfolioTransaction.objects.create(
+            asset=self.asset_try,
+            transaction_type=PortfolioTransaction.TransactionType.BUY,
+            trade_date=date(2024, 1, 1),
+            quantity=Decimal("10"),
+            price_per_unit=Decimal("100"),  # Outflow 1000
+        ).portfolios.add(self.portfolio)
+
+        PortfolioTransaction.objects.create(
+            asset=self.asset_try,
+            transaction_type=PortfolioTransaction.TransactionType.DIVIDEND_REINVEST,
+            trade_date=date(2024, 4, 1),
+            quantity=Decimal("2"),  # Current quantity becomes 12, no cash outflow
+            price_per_unit=Decimal("100"),
+        ).portfolios.add(self.portfolio)
+
+        PortfolioTransaction.objects.create(
+            asset=self.asset_try,
+            transaction_type=PortfolioTransaction.TransactionType.RIGHTS_EXERCISED,
+            trade_date=date(2024, 7, 1),
+            quantity=Decimal("0"),
+            capital_increase_rate_pct=Decimal("50"),  # 50% of 12 shares = 6 new shares
+            price_per_unit=Decimal("20"),  # 6 shares * 20 = 120 additional outflow
+        ).portfolios.add(self.portfolio)
+
+        irr = self.portfolio.calculate_irr(
+            as_of_date=date(2025, 1, 1), current_value=Decimal("1300")
+        )
+        self.assertIsNotNone(irr)
+        self.assertAlmostEqual(float(irr), 17.0, places=1)
+
     def test_calculate_irr_with_rights_exercised(self) -> None:
         PortfolioTransaction.objects.create(
             asset=self.asset_try,
