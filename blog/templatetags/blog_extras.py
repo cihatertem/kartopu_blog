@@ -1,3 +1,4 @@
+import datetime
 import json
 import re
 from decimal import Decimal, InvalidOperation
@@ -595,10 +596,26 @@ def _get_dividend_comparisons(post):
     )
 
 
+def _format_snapshot_date(snapshot_date) -> str:
+    if hasattr(snapshot_date, "strftime"):
+        return escape(snapshot_date.strftime("%d.%m.%Y"))
+    if isinstance(snapshot_date, str):
+        try:
+            parsed = datetime.date.fromisoformat(snapshot_date)
+            return escape(parsed.strftime("%d.%m.%Y"))
+        except ValueError:
+            pass
+    return escape(str(snapshot_date))
+
+
+def _format_tr_percentage(value) -> str:
+    return escape(f"%{float(value):.2f}").replace(".", ",")
+
+
 def _get_portfolio_target_ratio_html(target_ratio) -> str:
     if target_ratio is None:
         return ""
-    return f"<li><strong>Hedef Gerçekleşme (%):</strong> {escape(f'{float(target_ratio):.2f}')}</li>"
+    return f"<li>Hedef Gerçekleşme: {_format_tr_percentage(target_ratio)}</li>"
 
 
 def _render_portfolio_comparison_column(
@@ -611,15 +628,16 @@ def _render_portfolio_comparison_column(
     currency,
 ) -> str:
     return f"""
-      <div>
-        <p class="summary-meta"><strong>Tarih:</strong> {label}
-          <span class="text-muted">({period})</span>
+      <div class="comparison-col">
+        <p class="comparison-col__date"><strong>{label}</strong>
+          <span class="comparison-col__period">({period})</span>
         </p>
-        <ul class="summary-list">
-          <li><strong>Toplam Değer:</strong> {_format_currency(value, currency)}</li>
-          <li><strong>Toplam Maliyet:</strong> {_format_currency(cost, currency)}</li>
+        <p class="comparison-col__label">Toplam Değer</p>
+        <p class="comparison-col__value">{_format_currency(value, currency)}</p>
+        <ul class="summary-list comparison-col__list">
+          <li>Toplam Maliyet: {_format_currency(cost, currency)}</li>
           {target_ratio_html}
-          <li><strong>Toplam Getiri (%):</strong> {escape(f"{float(return_pct):.2f}")}</li>
+          <li>Toplam Getiri: {_format_tr_percentage(return_pct)}</li>
         </ul>
       </div>
 """.strip()
@@ -651,8 +669,8 @@ def _calculate_portfolio_comparison_metrics(comparison) -> dict:
     base = comparison.base_snapshot
     compare = comparison.compare_snapshot
 
-    base_label = escape(str(base.snapshot_date))
-    compare_label = escape(str(compare.snapshot_date))
+    base_label = _format_snapshot_date(base.snapshot_date)
+    compare_label = _format_snapshot_date(compare.snapshot_date)
     base_period = escape(
         base.get_period_display() if hasattr(base, "get_period_display") else ""
     )
@@ -697,6 +715,18 @@ def _calculate_portfolio_comparison_metrics(comparison) -> dict:
 
     cost_free_return_str = escape(f"~%{float(cost_free_return):.2f}").replace(".", ",")
 
+    if value_delta < 0:
+        value_delta_tone_class = "comparison-metric__value--negative"
+        value_delta_icon_html = '<span class="comparison-metric__icon comparison-metric__icon--down" aria-hidden="true"></span>'
+    else:
+        value_delta_tone_class = "comparison-metric__value--positive"
+        value_delta_icon_html = '<span class="comparison-metric__icon comparison-metric__icon--up" aria-hidden="true"></span>'
+
+    if cost_free_return < 0:
+        cost_free_return_tone_class = "comparison-metric__value--negative"
+    else:
+        cost_free_return_tone_class = "comparison-metric__value--positive"
+
     base_col_html = _render_portfolio_comparison_column(
         base_label,
         base_period,
@@ -721,7 +751,11 @@ def _calculate_portfolio_comparison_metrics(comparison) -> dict:
         "compare_col_html": compare_col_html,
         "portfolio_currency": portfolio_currency,
         "value_delta": value_delta,
+        "value_delta_tone_class": value_delta_tone_class,
+        "value_delta_icon_html": value_delta_icon_html,
+        "cost_free_return": cost_free_return,
         "cost_free_return_str": cost_free_return_str,
+        "cost_free_return_tone_class": cost_free_return_tone_class,
         "return_html": return_html,
         "target_ratio_delta_html": target_ratio_delta_html,
     }
@@ -732,18 +766,30 @@ def _render_portfolio_comparison_summary_html(comparison) -> str:
         return ""
 
     metrics = _calculate_portfolio_comparison_metrics(comparison)
+    value_delta_display = _format_currency(
+        metrics["value_delta"], metrics["portfolio_currency"]
+    )
 
     html = f"""
 <section class="portfolio-comparison">
-  <h4>Portföy Karşılaştırması</h4>
-  <div class="summary-card">
+  <h4 class="portfolio-comparison__subtitle">Portföy Karşılaştırması</h4>
+  <div class="summary-card portfolio-comparison__card">
     <div class="comparison-grid">
       {metrics["base_col_html"]}
       {metrics["compare_col_html"]}
     </div>
-    <div class="comparison-footer">
-      <p class="summary-meta summary-meta--tight"><strong>Değişim:</strong> Toplam Değer {_format_currency(metrics["value_delta"], metrics["portfolio_currency"])} ({metrics["cost_free_return_str"]}),
-        {metrics["return_html"]}{metrics["target_ratio_delta_html"]}</p>
+    <div class="comparison-divider">
+      <span class="comparison-divider__badge">DEĞİŞİM VE GETİRİ</span>
+    </div>
+    <div class="comparison-grid comparison-metrics">
+      <div class="comparison-metric">
+        <p class="comparison-metric__label">Piyasa Değeri Değişimi</p>
+        <p class="comparison-metric__value {metrics["value_delta_tone_class"]}">{metrics["value_delta_icon_html"]}{value_delta_display}</p>
+      </div>
+      <div class="comparison-metric">
+        <p class="comparison-metric__label">Arındırılmış Yatırım Getirisi</p>
+        <p class="comparison-metric__value {metrics["cost_free_return_tone_class"]}">{metrics["cost_free_return_str"]}</p>
+      </div>
     </div>
   </div>
 </section>

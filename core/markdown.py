@@ -96,7 +96,7 @@ ALLOWED_ATTRIBUTES = {
     "a": ["href", "title", "rel", "id"],
     "img": ["src", "alt", "title", "loading", "sizes", "srcset", "id"],
     "code": ["class"],
-    "span": ["class", "style", "id"],
+    "span": ["class", "style", "id", "aria-hidden"],
     "pre": ["class"],
     "div": ["class", "id", "style", "role", "aria-label", "aria-live"],
     "article": ["class", "id", "style"],
