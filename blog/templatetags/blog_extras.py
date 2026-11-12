@@ -33,6 +33,64 @@ GENERIC_PATTERN = re.compile(
     r"\{\{\s*(?P<tag>[a-zA-Z0-9_]+)(?::(?P<arg>[^\s\}]+))?\s*\}\}"
 )
 
+DIVIDEND_MONTHS: tuple[tuple[int, str, str], ...] = (
+    (1, "Oca", "Ocak"),
+    (2, "Şub", "Şubat"),
+    (3, "Mar", "Mart"),
+    (4, "Nis", "Nisan"),
+    (5, "May", "Mayıs"),
+    (6, "Haz", "Haziran"),
+    (7, "Tem", "Temmuz"),
+    (8, "Ağu", "Ağustos"),
+    (9, "Eyl", "Eylül"),
+    (10, "Eki", "Ekim"),
+    (11, "Kas", "Kasım"),
+    (12, "Ara", "Aralık"),
+)
+
+_DIVIDEND_SEARCH_TRANSLATION = str.maketrans(
+    {
+        "İ": "i",
+        "I": "i",
+        "ı": "i",
+        "Ş": "s",
+        "ş": "s",
+        "Ğ": "g",
+        "ğ": "g",
+        "Ü": "u",
+        "ü": "u",
+        "Ö": "o",
+        "ö": "o",
+        "Ç": "c",
+        "ç": "c",
+    }
+)
+
+
+def _normalize_dividend_search_text(value: str | None) -> str:
+    if not value:
+        return ""
+    return (
+        str(value)
+        .translate(_DIVIDEND_SEARCH_TRANSLATION)
+        .lower()
+        .replace("\u0307", "")
+        .strip()
+    )
+
+
+def _extract_payment_month(payment_date) -> int:
+    if hasattr(payment_date, "month"):
+        month = int(payment_date.month)
+        return month if 1 <= month <= 12 else 1
+    if isinstance(payment_date, str):
+        try:
+            parsed = datetime.date.fromisoformat(payment_date[:10])
+            return parsed.month
+        except ValueError:
+            return 1
+    return 1
+
 
 def _to_json_attribute(obj) -> str:
     """Safe JSON string serialization for HTML data attributes without HTML entity escaping."""
@@ -1216,18 +1274,89 @@ def _render_dividend_summary_html(snapshot) -> str:
     total_amount = _format_currency(snapshot.total_amount, snapshot.currency)
     year = escape(str(snapshot.year))
     currency = escape(snapshot.currency)
+    currency_symbol = _currency_symbol(snapshot.currency)
 
     payment_items = sorted(
         snapshot.payment_items.all(),
         key=lambda x: x.payment_date,
     )
 
+    month_totals: dict[int, Decimal] = {m: Decimal("0") for m, _, _ in DIVIDEND_MONTHS}
+    month_counts: dict[int, int] = {m: 0 for m, _, _ in DIVIDEND_MONTHS}
+    raw_rows: list[dict[str, object]] = []
+
+    for item in payment_items:
+        item_month = _extract_payment_month(getattr(item, "payment_date", None))
+        item_amount = _safe_decimal(getattr(item, "total_net_amount", Decimal("0")))
+        month_totals[item_month] += item_amount
+        month_counts[item_month] += 1
+
+        asset = getattr(item, "asset", None)
+        asset_name = getattr(asset, "name", "") or ""
+        raw_symbol = getattr(asset, "symbol", "") or ""
+        base_symbol = raw_symbol.split(".", 1)[0] if raw_symbol else ""
+        norm_name = _normalize_dividend_search_text(asset_name)
+        norm_symbol = _normalize_dividend_search_text(base_symbol)
+        if norm_symbol and norm_symbol not in norm_name:
+            search_key = f"{norm_name} {norm_symbol}".strip()
+        else:
+            search_key = norm_name
+
+        raw_rows.append(
+            {
+                "item": item,
+                "asset_name": asset_name,
+                "search_key": search_key,
+                "month": item_month,
+                "amount_raw": f"{item_amount:.2f}",
+            }
+        )
+
+    months_with_payments = [m for m, count in month_counts.items() if count > 0]
+    selected_month = max(months_with_payments) if months_with_payments else 1
+    max_month_total = max(month_totals.values(), default=Decimal("0"))
+
+    monthly_bars = []
+    for month_num, short_name, full_name in DIVIDEND_MONTHS:
+        amount = month_totals[month_num]
+        has_payments = month_counts[month_num] > 0
+        if max_month_total > 0 and amount > 0:
+            height_pct = max(
+                12,
+                min(100, int(round((amount / max_month_total) * Decimal("100")))),
+            )
+        else:
+            height_pct = 4
+        monthly_bars.append(
+            {
+                "month": month_num,
+                "short_name": short_name,
+                "full_name": full_name,
+                "total_amount": f"{amount:.2f}",
+                "formatted_total": _format_currency(amount, snapshot.currency),
+                "height_pct": height_pct,
+                "has_payments": has_payments,
+                "is_selected": month_num == selected_month,
+            }
+        )
+
+    for row in raw_rows:
+        row["is_visible"] = row["month"] == selected_month
+
+    selected_month_bar = monthly_bars[selected_month - 1]
+
     context = {
         "snapshot": snapshot,
         "total_amount": total_amount,
         "year": year,
         "currency": currency,
+        "currency_symbol": currency_symbol,
         "payment_items": payment_items,
+        "payment_rows": raw_rows,
+        "monthly_bars": monthly_bars,
+        "selected_month": selected_month,
+        "selected_month_full_name": selected_month_bar["full_name"],
+        "has_selected_month_payments": selected_month_bar["has_payments"],
     }
 
     return render_to_string("includes/dividend_summary.html", context)

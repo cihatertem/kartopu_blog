@@ -1,18 +1,31 @@
 {% load blog_extras cache %}
-
-{% cache 86400 dividend_summary_html snapshot.id request.LANGUAGE_CODE %}
-<section class="dividend-summary">
-  <div class="summary-card dividend-summary__meta-card">
-    <p class="summary-meta"><strong>Yıl:</strong> {{ year }}</p>
-    <p class="summary-meta summary-meta--spaced"><strong>Para Birimi:</strong> {{ currency }}</p>
-    <p class="summary-meta summary-meta--tight"><strong>Toplam Temettü:</strong> {{ total_amount }}</p>
+{% cache 86400 dividend_summary_html_v2 snapshot.id request.LANGUAGE_CODE %}
+<section class="dividend-summary" data-dividend-selected-month="{{ selected_month }}" data-dividend-currency-symbol="{{ currency_symbol }}">
+  <div class="dividend-summary__header">
+    <div class="dividend-summary__heading">
+      <h4 class="dividend-summary__title">{{ year }} Temettü Nakit Akışı</h4>
+      <p class="dividend-summary__meta"><strong>Yıl:</strong> {{ year }} · <strong>Para Birimi:</strong> {{ currency }} · <strong>Toplam Temettü:</strong> {{ total_amount }}</p>
+    </div>
+    <div class="dividend-summary__search">
+      <input type="search" class="dividend-summary__search-input" data-dividend-search placeholder="Hisse ara..." aria-label="Hisse ara" autocomplete="off">
+      <span class="dividend-summary__search-icon" aria-hidden="true"></span>
+    </div>
   </div>
-  <div class="summary-card">
-    <p class="summary-meta"><strong>Yıl:</strong> {{ year }}</p>
-    <p class="summary-meta summary-meta--spaced"><strong>Para Birimi:</strong> {{ currency }}</p>
-    <p class="summary-meta summary-meta--tight"><strong>Toplam Temettü:</strong> {{ total_amount }}</p>
-
-    <div class="table-scroll dividend-summary__table">
+  <div class="summary-card dividend-summary__card">
+    <div class="dividend-summary__chart" role="group" aria-label="Aylık temettü nakit akışı">
+      {% for bar in monthly_bars %}
+      <button type="button" class="dividend-summary__bar {% if bar.is_selected %}is-selected{% endif %} {% if not bar.has_payments %}is-empty{% endif %}" data-month="{{ bar.month }}" data-month-name="{{ bar.full_name }}" data-month-total="{{ bar.total_amount }}" data-formatted-total="{{ bar.formatted_total }}" data-default-height="{{ bar.height_pct }}" aria-pressed="{% if bar.is_selected %}true{% else %}false{% endif %}" aria-label="{{ bar.full_name }}: {{ bar.formatted_total }}">
+        <span class="dividend-summary__bar-track">
+          <span class="dividend-summary__bar-fill goal-widget__fill--{{ bar.height_pct }}">
+            <span class="dividend-summary__bar-tooltip" data-dividend-tooltip>{{ bar.full_name }}: {{ bar.formatted_total }}</span>
+          </span>
+        </span>
+        <span class="dividend-summary__bar-label">{{ bar.short_name }}</span>
+      </button>
+      {% endfor %}
+    </div>
+    <p class="dividend-summary__period-title" data-dividend-period-title>{{ selected_month_full_name }} Ayı Temettüleri</p>
+    <div class="table-scroll dividend-summary__table {% if not has_selected_month_payments %}is-hidden{% endif %}">
       <table class="data-table data-table--wide">
         <thead>
           <tr>
@@ -25,46 +38,47 @@
           </tr>
         </thead>
         <tbody>
-          {% for item in payment_items %}
-          <tr>
-            <td class="data-table__cell">{{ item.asset.name }}</td>
-            <td class="data-table__cell data-table__cell--hide-mobile">{{ item.payment_date|date:"Y-m-d" }}</td>
-            <td class="data-table__cell">{{ item.per_share_net_amount|format_currency:currency }}</td>
-            <td class="data-table__cell">{{ item.dividend_yield_on_payment_price|to_float|mul100|floatformat:2 }}%</td>
-            <td class="data-table__cell data-table__cell--hide-mobile">{{ item.dividend_yield_on_average_cost|to_float|mul100|floatformat:2 }}%</td>
-            <td class="data-table__cell">{{ item.total_net_amount|format_currency:currency }}</td>
+          {% for row in payment_rows %}
+          <tr class="{% if not row.is_visible %}is-hidden{% endif %}" data-dividend-row data-month="{{ row.month }}" data-asset-name="{{ row.asset_name }}" data-asset-search="{{ row.search_key }}" data-amount="{{ row.amount_raw }}">
+            <td class="data-table__cell">{{ row.item.asset.name }}</td>
+            <td class="data-table__cell data-table__cell--hide-mobile">{{ row.item.payment_date|date:"Y-m-d" }}</td>
+            <td class="data-table__cell">{{ row.item.per_share_net_amount|format_currency:currency }}</td>
+            <td class="data-table__cell">{{ row.item.dividend_yield_on_payment_price|to_float|mul100|floatformat:2 }}%</td>
+            <td class="data-table__cell data-table__cell--hide-mobile">{{ row.item.dividend_yield_on_average_cost|to_float|mul100|floatformat:2 }}%</td>
+            <td class="data-table__cell">{{ row.item.total_net_amount|format_currency:currency }}</td>
           </tr>
           {% endfor %}
         </tbody>
       </table>
     </div>
-  </div>
-  <div class="dividend-summary__cards">
-    {% for item in payment_items %}
-    <div class="dividend-summary-card">
-      <div class="dividend-summary-card__header">{{ item.asset.name }}</div>
-      <div class="dividend-summary-card__row">
-        <span>Ödeme Tarihi</span>
-        <strong>{{ item.payment_date|date:"Y-m-d" }}</strong>
+    <div class="dividend-summary__cards {% if not has_selected_month_payments %}is-hidden{% endif %}">
+      {% for row in payment_rows %}
+      <div class="dividend-summary-card {% if not row.is_visible %}is-hidden{% endif %}" data-dividend-card data-month="{{ row.month }}" data-asset-name="{{ row.asset_name }}" data-asset-search="{{ row.search_key }}" data-amount="{{ row.amount_raw }}">
+        <div class="dividend-summary-card__header">{{ row.item.asset.name }}</div>
+        <div class="dividend-summary-card__row">
+          <span>Ödeme Tarihi</span>
+          <strong>{{ row.item.payment_date|date:"Y-m-d" }}</strong>
+        </div>
+        <div class="dividend-summary-card__row">
+          <span>Hisse Başına Net Temettü</span>
+          <strong>{{ row.item.per_share_net_amount|format_currency:currency }}</strong>
+        </div>
+        <div class="dividend-summary-card__row">
+          <span>Ödeme Günü Temettü Verimi</span>
+          <strong>{{ row.item.dividend_yield_on_payment_price|to_float|mul100|floatformat:2 }}%</strong>
+        </div>
+        <div class="dividend-summary-card__row">
+          <span>Ortalama Maliyet Temettü Verimi</span>
+          <strong>{{ row.item.dividend_yield_on_average_cost|to_float|mul100|floatformat:2 }}%</strong>
+        </div>
+        <div class="dividend-summary-card__row dividend-summary-card__row--total">
+          <span>Toplam Net Temettü</span>
+          <strong>{{ row.item.total_net_amount|format_currency:currency }}</strong>
+        </div>
       </div>
-      <div class="dividend-summary-card__row">
-        <span>Hisse Başına Net Temettü</span>
-        <strong>{{ item.per_share_net_amount|format_currency:currency }}</strong>
-      </div>
-      <div class="dividend-summary-card__row">
-        <span>Ödeme Günü Temettü Verimi</span>
-        <strong>{{ item.dividend_yield_on_payment_price|to_float|mul100|floatformat:2 }}%</strong>
-      </div>
-      <div class="dividend-summary-card__row">
-        <span>Ortalama Maliyet Temettü Verimi</span>
-        <strong>{{ item.dividend_yield_on_average_cost|to_float|mul100|floatformat:2 }}%</strong>
-      </div>
-      <div class="dividend-summary-card__row dividend-summary-card__row--total">
-        <span>Toplam Net Temettü</span>
-        <strong>{{ item.total_net_amount|format_currency:currency }}</strong>
-      </div>
+      {% endfor %}
     </div>
-    {% endfor %}
+    <p class="dividend-summary__empty {% if has_selected_month_payments %}is-hidden{% endif %}" data-dividend-empty>Bu ay için temettü ödemesi bulunmuyor.</p>
   </div>
 </section>
 {% endcache %}

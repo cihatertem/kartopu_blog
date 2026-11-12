@@ -142,3 +142,20 @@ class MarkdownTests(TestCase):
         html = render_markdown(text)
         self.assertNotIn("javascript:", html)
         self.assertIn("<section>9</section>", html)
+
+    def test_render_markdown_preserves_dividend_summary_controls(self):
+        text = (
+            '<section class="dividend-summary" data-dividend-selected-month="4" '
+            'data-dividend-currency-symbol="₺">'
+            '<input type="search" data-dividend-search placeholder="Hisse ara...">'
+            '<button type="button" data-month="4" data-month-name="Nisan" '
+            'data-month-total="100.00" data-formatted-total="100 ₺" '
+            'data-default-height="100" aria-pressed="true">'
+            "<span data-dividend-tooltip>Nisan: 100 ₺</span></button>"
+            "</section>"
+        )
+        html = render_markdown(text)
+        self.assertIn('data-dividend-selected-month="4"', html)
+        self.assertIn('data-dividend-search=""', html)
+        self.assertIn('data-month="4"', html)
+        self.assertIn('data-dividend-tooltip=""', html)

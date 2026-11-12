@@ -1145,6 +1145,279 @@ select:focus {
   box-shadow: var(--shadow-soft);
 }
 
+.dividend-summary {
+  margin: 1.25rem 0;
+}
+
+.dividend-summary__header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.85rem;
+  margin-bottom: 0.85rem;
+}
+
+.dividend-summary__heading {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+
+.dividend-summary__title {
+  margin: 0;
+  color: var(--color-text);
+  font-size: clamp(1.2rem, 2.2vw, 1.5rem);
+  font-weight: 800;
+  line-height: 1.2;
+}
+
+.dividend-summary__meta {
+  margin: 0;
+  color: var(--color-muted);
+  font-size: 0.9rem;
+}
+
+.dividend-summary__search {
+  position: relative;
+  width: min(100%, 240px);
+}
+
+.dividend-summary__search-input {
+  width: 100%;
+  padding: 0.45rem 2.15rem 0.45rem 0.75rem;
+  border-radius: 10px;
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
+  color: var(--color-text);
+  font: inherit;
+  font-size: 0.9rem;
+  box-sizing: border-box;
+  transition:
+    border-color 0.2s ease,
+    box-shadow 0.2s ease;
+}
+
+.dividend-summary__search-input::placeholder {
+  color: var(--color-muted);
+}
+
+.dividend-summary__search-input:focus {
+  outline: 2px solid var(--color-primary-soft);
+  border-color: var(--color-primary);
+}
+
+.dividend-summary__search-icon {
+  position: absolute;
+  top: 50%;
+  right: 0.65rem;
+  transform: translateY(-50%);
+  width: 1rem;
+  height: 1rem;
+  pointer-events: none;
+  background-color: var(--color-muted);
+  -webkit-mask-repeat: no-repeat;
+  mask-repeat: no-repeat;
+  -webkit-mask-position: center;
+  mask-position: center;
+  -webkit-mask-size: contain;
+  mask-size: contain;
+  -webkit-mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='11' cy='11' r='8'/%3E%3Cline x1='21' y1='21' x2='16.65' y2='16.65'/%3E%3C/svg%3E");
+  mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='11' cy='11' r='8'/%3E%3Cline x1='21' y1='21' x2='16.65' y2='16.65'/%3E%3C/svg%3E");
+}
+
+.dividend-summary__card {
+  padding: 1.5rem 1.35rem 1.25rem;
+  border-radius: 16px;
+}
+
+.dividend-summary__chart {
+  display: grid;
+  grid-template-columns: repeat(12, minmax(0, 1fr));
+  gap: clamp(0.25rem, 1.2vw, 0.85rem);
+  align-items: end;
+  padding: 2.35rem 0.25rem 0.75rem;
+}
+
+.dividend-summary__bar {
+  appearance: none;
+  border: 0;
+  background: transparent;
+  padding: 0;
+  margin: 0;
+  font: inherit;
+  color: inherit;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.55rem;
+  cursor: pointer;
+}
+
+.dividend-summary__bar:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 4px;
+  border-radius: 8px;
+}
+
+.dividend-summary__bar-track {
+  position: relative;
+  width: 100%;
+  max-width: 48px;
+  height: 185px;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+}
+
+.dividend-summary__bar-fill {
+  position: relative;
+  display: block;
+  width: 100%;
+  height: var(--goal-fill-width, 4%);
+  min-height: 6px;
+  border-radius: 6px 6px 2px 2px;
+  background: #8499b1;
+  transition:
+    height 0.25s ease,
+    background-color 0.2s ease,
+    opacity 0.2s ease;
+}
+
+[data-theme="dark"] .dividend-summary__bar-fill {
+  background: #5a728d;
+}
+
+.dividend-summary__bar:hover .dividend-summary__bar-fill {
+  background: #6d85a0;
+}
+
+[data-theme="dark"] .dividend-summary__bar:hover .dividend-summary__bar-fill {
+  background: #738da9;
+}
+
+.dividend-summary__bar.is-empty .dividend-summary__bar-fill {
+  opacity: 0.45;
+}
+
+.dividend-summary__bar.is-selected .dividend-summary__bar-fill,
+.dividend-summary__bar.is-search-match .dividend-summary__bar-fill {
+  background: #0b6634;
+  opacity: 1;
+}
+
+[data-theme="dark"] .dividend-summary__bar.is-selected .dividend-summary__bar-fill,
+[data-theme="dark"] .dividend-summary__bar.is-search-match .dividend-summary__bar-fill {
+  background: #15803d;
+}
+
+.dividend-summary__bar-tooltip {
+  position: absolute;
+  bottom: calc(100% + 10px);
+  left: 50%;
+  transform: translateX(-50%) translateY(4px);
+  background: var(--color-surface);
+  color: var(--color-text);
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  padding: 0.3rem 0.6rem;
+  font-size: 0.78rem;
+  font-weight: 600;
+  line-height: 1.25;
+  white-space: nowrap;
+  box-shadow: 0 6px 16px rgba(15, 23, 42, 0.12);
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  z-index: 5;
+  transition:
+    opacity 0.18s ease,
+    transform 0.18s ease,
+    visibility 0.18s ease;
+}
+
+.dividend-summary__bar-tooltip::after {
+  content: "";
+  position: absolute;
+  top: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  border-width: 5px 5px 0 5px;
+  border-style: solid;
+  border-color: var(--color-surface) transparent transparent transparent;
+}
+
+.dividend-summary__bar.is-selected .dividend-summary__bar-tooltip,
+.dividend-summary__bar:hover .dividend-summary__bar-tooltip,
+.dividend-summary__bar:focus-visible .dividend-summary__bar-tooltip {
+  opacity: 1;
+  visibility: visible;
+  transform: translateX(-50%) translateY(0);
+}
+
+.dividend-summary__bar:first-child .dividend-summary__bar-tooltip {
+  left: 0;
+  transform: translateX(0) translateY(4px);
+}
+
+.dividend-summary__bar:first-child .dividend-summary__bar-tooltip::after {
+  left: 16px;
+}
+
+.dividend-summary__bar:first-child.is-selected .dividend-summary__bar-tooltip,
+.dividend-summary__bar:first-child:hover .dividend-summary__bar-tooltip,
+.dividend-summary__bar:first-child:focus-visible .dividend-summary__bar-tooltip {
+  transform: translateX(0) translateY(0);
+}
+
+.dividend-summary__bar:last-child .dividend-summary__bar-tooltip {
+  left: auto;
+  right: 0;
+  transform: translateX(0) translateY(4px);
+}
+
+.dividend-summary__bar:last-child .dividend-summary__bar-tooltip::after {
+  left: auto;
+  right: 12px;
+  transform: none;
+}
+
+.dividend-summary__bar:last-child.is-selected .dividend-summary__bar-tooltip,
+.dividend-summary__bar:last-child:hover .dividend-summary__bar-tooltip,
+.dividend-summary__bar:last-child:focus-visible .dividend-summary__bar-tooltip {
+  transform: translateX(0) translateY(0);
+}
+
+.dividend-summary__bar-label {
+  font-size: 0.85rem;
+  color: var(--color-muted);
+  font-weight: 500;
+  line-height: 1.1;
+}
+
+.dividend-summary__bar.is-selected .dividend-summary__bar-label,
+.dividend-summary__bar.is-search-match .dividend-summary__bar-label {
+  color: var(--color-text);
+  font-weight: 700;
+}
+
+.dividend-summary__period-title {
+  margin: 0.65rem 0 0.5rem;
+  color: var(--color-text);
+  font-size: 1rem;
+  font-weight: 600;
+}
+
+.dividend-summary__empty {
+  margin: 0.75rem 0 0.25rem;
+  padding: 0.9rem 1rem;
+  border-radius: 10px;
+  border: 1px dashed var(--color-border);
+  color: var(--color-muted);
+  font-size: 0.95rem;
+  text-align: center;
+}
+
 .dividend-summary__meta-card {
   display: none;
 }
@@ -1152,6 +1425,7 @@ select:focus {
 .dividend-summary__cards {
   display: none;
   gap: 0.75rem;
+  margin-top: 0.75rem;
 }
 
 .dividend-summary-card {
@@ -1608,28 +1882,16 @@ body.has-legal-disclaimer .scroll-to-top {
     justify-content: center;
   }
 
-  .dividend-summary__meta-card {
-    display: block;
-  }
-
-  .dividend-summary .summary-meta {
-    display: none;
-  }
-
-  .dividend-summary__meta-card .summary-meta {
-    display: block;
-  }
-
   .dividend-summary__table {
     display: none;
   }
 
-  .dividend-summary > .summary-card:not(.dividend-summary__meta-card) {
-    display: none;
+  .dividend-summary__cards:not(.is-hidden) {
+    display: grid;
   }
 
-  .dividend-summary__cards {
-    display: grid;
+  .dividend-summary__bar-track {
+    height: 140px;
   }
 }
 
@@ -1650,6 +1912,18 @@ body.has-legal-disclaimer .scroll-to-top {
   .data-table__header--hide-mobile,
   .data-table__cell--hide-mobile {
     display: none;
+  }
+
+  .dividend-summary__search {
+    width: 100%;
+  }
+
+  .dividend-summary__card {
+    padding: 1.15rem 0.85rem 1rem;
+  }
+
+  .dividend-summary__bar-label {
+    font-size: 0.72rem;
   }
 
   .button {

@@ -14,7 +14,8 @@ const worstTreemapRatio = (row, shortSide) => {
 
 const layoutTreemapRow = (row, rect, tiles) => {
     const rowArea = row.reduce((sum, item) => sum + item.area, 0);
-    if (!row.length || rowArea <= 0 || rect.width <= 0 || rect.height <= 0) return;
+    if (!row.length || rowArea <= 0 || rect.width <= 0 || rect.height <= 0)
+        return;
 
     if (rect.width >= rect.height) {
         const columnWidth = Math.min(rect.width, rowArea / rect.height);
@@ -86,10 +87,285 @@ const getSquarifiedTreemap = (items, width, height) => {
     return tiles;
 };
 
+const DIVIDEND_CHAR_MAP = {
+    İ: "i",
+    I: "i",
+    ı: "i",
+    Ş: "s",
+    ş: "s",
+    Ğ: "g",
+    ğ: "g",
+    Ü: "u",
+    ü: "u",
+    Ö: "o",
+    ö: "o",
+    Ç: "c",
+    ç: "c",
+};
+
+const normalizeDividendSearch = (value) => {
+    if (!value) return "";
+    return String(value)
+        .replace(/[İIıŞşĞğÜüÖöÇç]/g, (ch) => DIVIDEND_CHAR_MAP[ch] || ch)
+        .toLowerCase()
+        .replace(/\u0307/g, "")
+        .replace(/\.(?:de|ist|is)\b/g, "")
+        .trim();
+};
+
+const formatDividendCurrency = (amount, currencySymbol = "₺") => {
+    const num = Number(amount);
+    const safeNum = Number.isFinite(num) ? num : 0;
+    const isWhole = Math.abs(safeNum - Math.round(safeNum)) < 1e-6;
+    const fixed = isWhole
+        ? String(Math.round(Math.abs(safeNum)))
+        : Math.abs(safeNum).toFixed(2);
+    const [intPart, decPart] = fixed.split(".");
+    const formattedInt = intPart.replace(/\B(?=(\d{3})+(?!\d))/g, ".");
+    const sign = safeNum < 0 ? "-" : "";
+    const numberStr = decPart
+        ? `${sign}${formattedInt},${decPart}`
+        : `${sign}${formattedInt}`;
+    return currencySymbol ? `${numberStr} ${currencySymbol}` : numberStr;
+};
+
+const setBarHeightPct = (fillEl, heightPct) => {
+    if (!fillEl) return;
+    const clamped = Math.max(
+        0,
+        Math.min(100, Math.round(Number(heightPct) || 0)),
+    );
+    Array.from(fillEl.classList).forEach((cls) => {
+        if (cls.startsWith("goal-widget__fill--")) {
+            fillEl.classList.remove(cls);
+        }
+    });
+    fillEl.classList.add(`goal-widget__fill--${clamped}`);
+};
+
+const initializeDividendSummaries = (root = document) => {
+    if (!root || typeof root.querySelectorAll !== "function") return;
+
+    root.querySelectorAll(".dividend-summary").forEach((section) => {
+        const bars = Array.from(
+            section.querySelectorAll(".dividend-summary__bar[data-month]"),
+        );
+        const rows = Array.from(
+            section.querySelectorAll("[data-dividend-row]"),
+        );
+        const cards = Array.from(
+            section.querySelectorAll("[data-dividend-card]"),
+        );
+        const searchInput = section.querySelector("[data-dividend-search]");
+        const periodTitle = section.querySelector(
+            "[data-dividend-period-title]",
+        );
+        const tableContainer = section.querySelector(
+            ".dividend-summary__table",
+        );
+        const cardsContainer = section.querySelector(
+            ".dividend-summary__cards",
+        );
+        const emptyMessage = section.querySelector("[data-dividend-empty]");
+
+        if (!bars.length) return;
+
+        const currencySymbol = section.dataset.dividendCurrencySymbol || "₺";
+        let selectedMonth =
+            Number(section.dataset.dividendSelectedMonth) ||
+            Number(
+                bars.find((bar) => bar.classList.contains("is-selected"))
+                    ?.dataset.month,
+            ) ||
+            1;
+
+        const applyState = () => {
+            const rawQuery = searchInput ? searchInput.value : "";
+            const query = normalizeDividendSearch(rawQuery);
+            const isSearching = query.length > 0;
+
+            let visibleCount = 0;
+            const filteredMonthTotals = new Map();
+
+            rows.forEach((row) => {
+                const rowMonth = Number(row.dataset.month);
+                const rowSearch =
+                    row.dataset.assetSearch ||
+                    normalizeDividendSearch(row.dataset.assetName || "");
+                const rowAmount = Number(row.dataset.amount) || 0;
+                const matchesSearch = !isSearching || rowSearch.includes(query);
+
+                if (isSearching && matchesSearch) {
+                    filteredMonthTotals.set(
+                        rowMonth,
+                        (filteredMonthTotals.get(rowMonth) || 0) + rowAmount,
+                    );
+                }
+
+                const isVisible = isSearching
+                    ? matchesSearch
+                    : rowMonth === selectedMonth;
+                row.classList.toggle("is-hidden", !isVisible);
+                if (isVisible) {
+                    visibleCount += 1;
+                }
+            });
+
+            cards.forEach((card) => {
+                const cardMonth = Number(card.dataset.month);
+                const cardSearch =
+                    card.dataset.assetSearch ||
+                    normalizeDividendSearch(card.dataset.assetName || "");
+                const matchesSearch =
+                    !isSearching || cardSearch.includes(query);
+                const isVisible = isSearching
+                    ? matchesSearch
+                    : cardMonth === selectedMonth;
+                card.classList.toggle("is-hidden", !isVisible);
+            });
+
+            if (isSearching) {
+                const maxFilteredTotal = Math.max(
+                    0,
+                    ...Array.from(filteredMonthTotals.values()),
+                );
+                bars.forEach((bar) => {
+                    const month = Number(bar.dataset.month);
+                    const monthName = bar.dataset.monthName || "";
+                    const amount = filteredMonthTotals.get(month) || 0;
+                    const hasMatch = amount > 0;
+                    const formatted = formatDividendCurrency(
+                        amount,
+                        currencySymbol,
+                    );
+                    const heightPct =
+                        maxFilteredTotal > 0 && hasMatch
+                            ? Math.max(
+                                  12,
+                                  Math.min(
+                                      100,
+                                      Math.round(
+                                          (amount / maxFilteredTotal) * 100,
+                                      ),
+                                  ),
+                              )
+                            : 4;
+
+                    bar.classList.toggle("is-selected", false);
+                    bar.classList.toggle("is-search-match", hasMatch);
+                    bar.classList.toggle("is-empty", !hasMatch);
+                    bar.setAttribute("aria-pressed", "false");
+                    bar.setAttribute(
+                        "aria-label",
+                        `${monthName}: ${formatted}`,
+                    );
+
+                    const fillEl = bar.querySelector(
+                        ".dividend-summary__bar-fill",
+                    );
+                    setBarHeightPct(fillEl, heightPct);
+
+                    const tooltipEl = bar.querySelector(
+                        "[data-dividend-tooltip]",
+                    );
+                    if (tooltipEl) {
+                        tooltipEl.textContent = `${monthName}: ${formatted}`;
+                    }
+                });
+
+                if (periodTitle) {
+                    periodTitle.textContent = `Arama Sonuçları (${rawQuery.trim()})`;
+                }
+            } else {
+                let selectedMonthName = "";
+                bars.forEach((bar) => {
+                    const month = Number(bar.dataset.month);
+                    const monthName = bar.dataset.monthName || "";
+                    const totalAmount = Number(bar.dataset.monthTotal) || 0;
+                    const formatted =
+                        bar.dataset.formattedTotal ||
+                        formatDividendCurrency(totalAmount, currencySymbol);
+                    const defaultHeight =
+                        Number(bar.dataset.defaultHeight) || 4;
+                    const isSelected = month === selectedMonth;
+
+                    if (isSelected) {
+                        selectedMonthName = monthName;
+                    }
+
+                    bar.classList.toggle("is-selected", isSelected);
+                    bar.classList.toggle("is-search-match", false);
+                    bar.classList.toggle("is-empty", totalAmount <= 0);
+                    bar.setAttribute(
+                        "aria-pressed",
+                        isSelected ? "true" : "false",
+                    );
+                    bar.setAttribute(
+                        "aria-label",
+                        `${monthName}: ${formatted}`,
+                    );
+
+                    const fillEl = bar.querySelector(
+                        ".dividend-summary__bar-fill",
+                    );
+                    setBarHeightPct(fillEl, defaultHeight);
+
+                    const tooltipEl = bar.querySelector(
+                        "[data-dividend-tooltip]",
+                    );
+                    if (tooltipEl) {
+                        tooltipEl.textContent = `${monthName}: ${formatted}`;
+                    }
+                });
+
+                if (periodTitle && selectedMonthName) {
+                    periodTitle.textContent = `${selectedMonthName} Ayı Temettüleri`;
+                }
+            }
+
+            const hasVisibleItems = visibleCount > 0;
+            if (tableContainer) {
+                tableContainer.classList.toggle("is-hidden", !hasVisibleItems);
+            }
+            if (cardsContainer) {
+                cardsContainer.classList.toggle("is-hidden", !hasVisibleItems);
+            }
+            if (emptyMessage) {
+                emptyMessage.classList.toggle("is-hidden", hasVisibleItems);
+                emptyMessage.textContent = isSearching
+                    ? "Aramanızla eşleşen temettü ödemesi bulunamadı."
+                    : "Bu ay için temettü ödemesi bulunmuyor.";
+            }
+        };
+
+        bars.forEach((bar) => {
+            bar.addEventListener("click", () => {
+                const clickedMonth = Number(bar.dataset.month);
+                if (!clickedMonth) return;
+                selectedMonth = clickedMonth;
+                section.dataset.dividendSelectedMonth = String(clickedMonth);
+                if (searchInput && searchInput.value) {
+                    searchInput.value = "";
+                }
+                applyState();
+            });
+        });
+
+        if (searchInput) {
+            searchInput.addEventListener("input", applyState);
+        }
+
+        applyState();
+    });
+};
+
 if (typeof module !== "undefined" && module.exports) {
     module.exports = {
+        formatDividendCurrency,
         getSquarifiedTreemap,
+        initializeDividendSummaries,
         layoutTreemapRow,
+        normalizeDividendSearch,
         worstTreemapRatio,
     };
 }
@@ -114,7 +390,10 @@ const initializePostDetail = () => {
         "#264653",
     ];
     const getChartPalette = (length) =>
-        Array.from({ length }, (_, index) => chartPalette[index % chartPalette.length]);
+        Array.from(
+            { length },
+            (_, index) => chartPalette[index % chartPalette.length],
+        );
     const getDoughnutLegendOptions = () => {
         const legend = { position: "bottom" };
         if (document.documentElement.getAttribute("data-theme") === "dark") {
@@ -356,6 +635,11 @@ const initializePostDetail = () => {
     }
 
     // -------------------------
+    // Dividend summary interactive chart & search
+    // -------------------------
+    initializeDividendSummaries(document);
+
+    // -------------------------
     // PortfolioSnapshot charts
     // -------------------------
     document.querySelectorAll(".purchase-treemap").forEach((section) => {
@@ -366,7 +650,9 @@ const initializePostDetail = () => {
         let items;
         try {
             items = JSON.parse(section.dataset.treemapItems || "[]").filter(
-                (item) => Number.isFinite(Number(item.amount)) && Number(item.amount) > 0,
+                (item) =>
+                    Number.isFinite(Number(item.amount)) &&
+                    Number(item.amount) > 0,
             );
         } catch {
             return;
@@ -382,31 +668,37 @@ const initializePostDetail = () => {
                 items.map((item) => ({ ...item, amount: Number(item.amount) })),
                 width,
                 height,
-            ).forEach(({ item, x, y, width: tileWidth, height: tileHeight }, index) => {
-                const tile = document.createElement("button");
-                tile.type = "button";
-                tile.className = "purchase-treemap__tile";
-                tile.style.left = `${x}px`;
-                tile.style.top = `${y}px`;
-                tile.style.width = `${Math.max(0, tileWidth)}px`;
-                tile.style.height = `${Math.max(0, tileHeight)}px`;
-                tile.style.backgroundColor = chartPalette[index % chartPalette.length];
-                tile.textContent = item.symbol;
-                const showTooltip = () => {
-                    tooltip.textContent = `${item.symbol}: ${item.formatted_amount}`;
-                    tooltip.classList.add("is-visible");
-                };
-                tile.addEventListener("pointerenter", showTooltip);
-                tile.addEventListener("focus", showTooltip);
-                tile.addEventListener("click", showTooltip);
-                tile.addEventListener("pointerleave", () =>
-                    tooltip.classList.remove("is-visible"),
-                );
-                tile.addEventListener("blur", () =>
-                    tooltip.classList.remove("is-visible"),
-                );
-                canvas.appendChild(tile);
-            });
+            ).forEach(
+                (
+                    { item, x, y, width: tileWidth, height: tileHeight },
+                    index,
+                ) => {
+                    const tile = document.createElement("button");
+                    tile.type = "button";
+                    tile.className = "purchase-treemap__tile";
+                    tile.style.left = `${x}px`;
+                    tile.style.top = `${y}px`;
+                    tile.style.width = `${Math.max(0, tileWidth)}px`;
+                    tile.style.height = `${Math.max(0, tileHeight)}px`;
+                    tile.style.backgroundColor =
+                        chartPalette[index % chartPalette.length];
+                    tile.textContent = item.symbol;
+                    const showTooltip = () => {
+                        tooltip.textContent = `${item.symbol}: ${item.formatted_amount}`;
+                        tooltip.classList.add("is-visible");
+                    };
+                    tile.addEventListener("pointerenter", showTooltip);
+                    tile.addEventListener("focus", showTooltip);
+                    tile.addEventListener("click", showTooltip);
+                    tile.addEventListener("pointerleave", () =>
+                        tooltip.classList.remove("is-visible"),
+                    );
+                    tile.addEventListener("blur", () =>
+                        tooltip.classList.remove("is-visible"),
+                    );
+                    canvas.appendChild(tile);
+                },
+            );
         };
         render();
         new ResizeObserver(render).observe(canvas);

@@ -534,9 +534,36 @@ class TestRenderHTMLFunctions(TestCase):
 
     def test_render_dividend_summary_html(self):
         self.assertEqual(_render_dividend_summary_html(None), "")
-        s = DummySnapshot(total_amount="200", year=2025, currency="USD")
+
+        class PaymentItem:
+            def __init__(self, name, symbol, payment_date, total_net_amount):
+                self.asset = MagicMock()
+                self.asset.name = name
+                self.asset.symbol = symbol
+                self.payment_date = payment_date
+                self.per_share_net_amount = Decimal("87.50")
+                self.dividend_yield_on_payment_price = Decimal("0.0416")
+                self.dividend_yield_on_average_cost = Decimal("0.0497")
+                self.total_net_amount = Decimal(total_net_amount)
+
+        items = [
+            PaymentItem("CLEBI", "CLEBI.IS", datetime.date(2026, 4, 24), "3762.50"),
+            PaymentItem("ASTOR", "ASTOR.IS", datetime.date(2026, 10, 15), "1607.04"),
+        ]
+        s = DummySnapshot(
+            total_amount="5369.54",
+            year=2026,
+            currency="TRY",
+            payment_items=items,
+        )
         html = _render_dividend_summary_html(s)
-        self.assertIn("2025", html)
+        self.assertIn("2026 Temettü Nakit Akışı", html)
+        self.assertIn('data-dividend-selected-month="10"', html)
+        self.assertIn("Ekim Ayı Temettüleri", html)
+        self.assertIn('data-asset-search="clebi"', html)
+        self.assertIn('data-dividend-search', html)
+        self.assertIn("Nisan: 3.762,50 ₺", html)
+        self.assertIn("Ekim: 1.607,04 ₺", html)
 
     def test_render_dividend_charts_html(self):
         self.assertEqual(_render_dividend_charts_html(None), "")
@@ -872,6 +899,42 @@ class RenderPostBodyTests(TestCase):
         self.assertIn('aria-label="Aylık alım dağılımı"', html)
         self.assertIn('role="status"', html)
         self.assertIn('aria-live="polite"', html)
+
+    def test_render_post_body_preserves_dividend_summary_interactive_markup(self):
+        class PaymentItem:
+            def __init__(self):
+                self.asset = MagicMock()
+                self.asset.name = "CLEBI"
+                self.asset.symbol = "CLEBI.IS"
+                self.payment_date = datetime.date(2026, 4, 24)
+                self.per_share_net_amount = Decimal("87.50")
+                self.dividend_yield_on_payment_price = Decimal("0.0416")
+                self.dividend_yield_on_average_cost = Decimal("0.0497")
+                self.total_net_amount = Decimal("3762.50")
+
+        snapshot = DummySnapshot(
+            total_amount="3762.50",
+            year=2026,
+            currency="TRY",
+            payment_items=[PaymentItem()],
+        )
+        snapshot.id = 999991
+        snapshot.slug = "dividend-snapshot#2026"
+
+        class MockPost:
+            content = "{{ dividend_summary:1 }}"
+            images = MagicMock()
+            images.all.return_value = []
+            dividend_snapshots = MagicMock()
+            _prefetched_objects_cache = {"dividend_snapshots": [snapshot]}
+
+        html = blog_extras.render_post_body({}, MockPost())
+        self.assertIn('data-dividend-selected-month="4"', html)
+        self.assertIn('data-dividend-search', html)
+        self.assertIn('data-month="4"', html)
+        self.assertIn('data-asset-search="clebi"', html)
+        self.assertIn('data-dividend-period-title', html)
+        self.assertIn("Nisan Ayı Temettüleri", html)
 
     def test_render_post_body_disclaimer(self):
         class MockPost:
