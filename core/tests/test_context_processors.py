@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import date, datetime
 from decimal import Decimal
 from unittest import mock
 
@@ -9,6 +9,7 @@ from django.urls import resolve
 from django.utils import timezone
 
 from blog.cache_keys import (
+    DIVIDEND_WIDGET_KEY,
     GOAL_WIDGET_KEY,
     NAV_CATEGORIES_KEY,
     NAV_POPULAR_POSTS_KEY,
@@ -22,10 +23,14 @@ from comments.models import Comment
 from core.context_processors import (
     CACHE_TIMEOUT,
     CACHE_TIMEOUT_JITTER,
+    DIVIDEND_WIDGET_2025_TRY_TOTAL,
+    DIVIDEND_WIDGET_2025_USD_TOTAL,
+    DIVIDEND_WIDGET_EMPTY_CACHE_VALUE,
+    DIVIDEND_WIDGET_TEMPLATE_NAME,
     GOAL_WIDGET_EMPTY_CACHE_VALUE,
     _cache_timeout_with_jitter,
     _calculate_tag_cloud_sizes,
-    _get_or_set_with_stampede_lock,
+    _get_dividend_widget_snapshot,
     _get_goal_widget_snapshot,
     _get_has_pending_messages_or_comments,
     _get_nav_archives,
@@ -34,6 +39,7 @@ from core.context_processors import (
     _get_nav_portfolio_posts,
     _get_nav_recent_posts,
     _get_nav_tags,
+    _get_or_set_with_stampede_lock,
     breadcrumbs_context,
     categories_tags_context,
     google_analytics_context,
@@ -42,7 +48,7 @@ from core.context_processors import (
     site_settings_context,
 )
 from core.models import ContactMessage, SidebarWidget, SiteSettings
-from portfolio.models import Portfolio, PortfolioSnapshot
+from portfolio.models import DividendSnapshot, Portfolio, PortfolioSnapshot
 
 User = get_user_model()
 
@@ -293,6 +299,173 @@ class ContextProcessorsTests(TestCase):
 
         self.assertIsNone(cache.get(GOAL_WIDGET_KEY))
 
+    def test_get_dividend_widget_snapshot_uses_2025_try_fallback_when_previous_not_selected(
+        self,
+    ):
+        curr_snap = DividendSnapshot.objects.create(
+            year=2026,
+            currency="TRY",
+            total_amount=Decimal("25000.00"),
+            snapshot_date=date(2026, 11, 16),
+        )
+        SidebarWidget.objects.create(
+            title="Temettü Geliri",
+            template_name=DIVIDEND_WIDGET_TEMPLATE_NAME,
+            current_dividend_snapshot=curr_snap,
+            previous_dividend_snapshot=None,
+            is_active=True,
+            order=2,
+        )
+        cache.clear()
+
+        with self.assertNumQueries(1):
+            data = _get_dividend_widget_snapshot()
+
+        self.assertIsNotNone(data)
+        self.assertEqual(data["year"], 2026)
+        self.assertEqual(data["currency"], "TRY")
+        self.assertEqual(data["currency_symbol"], "₺")
+        self.assertEqual(data["current_value"], Decimal("25000.00"))
+        self.assertEqual(data["current_display"], "25.000,00 ₺")
+        self.assertEqual(data["previous_year"], 2025)
+        self.assertEqual(data["previous_value"], DIVIDEND_WIDGET_2025_TRY_TOTAL)
+        self.assertEqual(data["previous_display"], "19.967,52 ₺")
+        self.assertEqual(data["change_pct_display"], "+%25,2")
+        self.assertTrue(data["is_positive"])
+
+    def test_get_dividend_widget_snapshot_uses_2025_usd_fallback_when_previous_not_selected(
+        self,
+    ):
+        curr_snap = DividendSnapshot.objects.create(
+            year=2026,
+            currency="USD",
+            total_amount=Decimal("600.48"),
+            snapshot_date=date(2026, 11, 16),
+        )
+        SidebarWidget.objects.create(
+            title="Temettü Geliri",
+            template_name=DIVIDEND_WIDGET_TEMPLATE_NAME,
+            current_dividend_snapshot=curr_snap,
+            previous_dividend_snapshot=None,
+            is_active=True,
+            order=2,
+        )
+        cache.clear()
+
+        data = _get_dividend_widget_snapshot()
+
+        self.assertIsNotNone(data)
+        self.assertEqual(data["currency"], "USD")
+        self.assertEqual(data["currency_symbol"], "$")
+        self.assertEqual(data["current_display"], "600,48 $")
+        self.assertEqual(data["previous_year"], 2025)
+        self.assertEqual(data["previous_value"], DIVIDEND_WIDGET_2025_USD_TOTAL)
+        self.assertEqual(data["previous_display"], "522,16 $")
+        self.assertEqual(data["change_pct_display"], "+%15,0")
+        self.assertTrue(data["is_positive"])
+
+    def test_get_dividend_widget_snapshot_uses_selected_previous_snapshot_from_2027(
+        self,
+    ):
+        snap_2026 = DividendSnapshot.objects.create(
+            year=2026,
+            currency="USD",
+            total_amount=Decimal("2810.40"),
+            snapshot_date=date(2026, 12, 31),
+        )
+        snap_2027 = DividendSnapshot.objects.create(
+            year=2027,
+            currency="USD",
+            total_amount=Decimal("3245.80"),
+            snapshot_date=date(2027, 11, 16),
+        )
+        SidebarWidget.objects.create(
+            title="Temettü Geliri",
+            template_name=DIVIDEND_WIDGET_TEMPLATE_NAME,
+            current_dividend_snapshot=snap_2027,
+            previous_dividend_snapshot=snap_2026,
+            is_active=True,
+            order=2,
+        )
+        cache.clear()
+
+        data = _get_dividend_widget_snapshot()
+
+        self.assertIsNotNone(data)
+        self.assertEqual(data["year"], 2027)
+        self.assertEqual(data["current_display"], "3.245,80 $")
+        self.assertEqual(data["previous_year"], 2026)
+        self.assertEqual(data["previous_display"], "2.810,40 $")
+        self.assertEqual(data["change_pct_display"], "+%15,5")
+        self.assertEqual(data["change_arrow"], "↗")
+        self.assertTrue(data["is_positive"])
+
+    def test_get_dividend_widget_snapshot_caching_and_invalidation(self):
+        curr_snap = DividendSnapshot.objects.create(
+            year=2026,
+            currency="TRY",
+            total_amount=Decimal("25000.00"),
+            snapshot_date=date(2026, 11, 16),
+        )
+        widget = SidebarWidget.objects.create(
+            title="Temettü Geliri",
+            template_name=DIVIDEND_WIDGET_TEMPLATE_NAME,
+            current_dividend_snapshot=curr_snap,
+            is_active=True,
+            order=2,
+        )
+        cache.clear()
+
+        data1 = _get_dividend_widget_snapshot()
+        self.assertEqual(cache.get(DIVIDEND_WIDGET_KEY), data1)
+
+        # Direct DB update without signals should serve cached value
+        DividendSnapshot.objects.filter(pk=curr_snap.pk).update(
+            total_amount=Decimal("30000.00")
+        )
+        with self.assertNumQueries(0):
+            data2 = _get_dividend_widget_snapshot()
+        self.assertEqual(data2["current_value"], Decimal("25000.00"))
+
+        # Saving DividendSnapshot invalidates cache
+        curr_snap.total_amount = Decimal("30000.00")
+        curr_snap.save()
+        self.assertIsNone(cache.get(DIVIDEND_WIDGET_KEY))
+
+        data3 = _get_dividend_widget_snapshot()
+        self.assertEqual(data3["current_value"], Decimal("30000.00"))
+
+        # Saving SidebarWidget (changing selected snapshot) invalidates cache
+        new_snap = DividendSnapshot.objects.create(
+            year=2026,
+            currency="USD",
+            total_amount=Decimal("1000.00"),
+            snapshot_date=date(2026, 12, 1),
+        )
+        _get_dividend_widget_snapshot()
+        self.assertIsNotNone(cache.get(DIVIDEND_WIDGET_KEY))
+
+        widget.current_dividend_snapshot = new_snap
+        widget.save()
+        self.assertIsNone(cache.get(DIVIDEND_WIDGET_KEY))
+
+        data4 = _get_dividend_widget_snapshot()
+        self.assertEqual(data4["currency"], "USD")
+        self.assertEqual(data4["current_value"], Decimal("1000.00"))
+
+    def test_get_dividend_widget_snapshot_caches_empty_result(self):
+        DividendSnapshot.objects.all().delete()
+        cache.clear()
+
+        snapshot = _get_dividend_widget_snapshot()
+        self.assertIsNone(snapshot)
+        self.assertEqual(
+            cache.get(DIVIDEND_WIDGET_KEY), DIVIDEND_WIDGET_EMPTY_CACHE_VALUE
+        )
+
+        with self.assertNumQueries(0):
+            self.assertIsNone(_get_dividend_widget_snapshot())
+
     def test_get_has_pending_messages_or_comments_only_unread_message(self):
         request = self.factory.get("/")
         request.user = self.staff_user
@@ -391,6 +564,7 @@ class ContextProcessorsTests(TestCase):
         self.assertIn("nav_popular_posts", context)
         self.assertIn("nav_portfolio_posts", context)
         self.assertIn("goal_widget_snapshot", context)
+        self.assertIn("dividend_widget_snapshot", context)
         self.assertIn("has_pending_messages_or_comments", context)
 
     @override_settings(GOOGLE_ANALYTICS_ID="UA-12345678-1")

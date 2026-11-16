@@ -1,4 +1,5 @@
 from datetime import datetime
+from decimal import Decimal
 from unittest.mock import patch
 from zoneinfo import ZoneInfo
 
@@ -18,6 +19,7 @@ from core.models import (
     about_image_upload_path,
     site_settings_og_image_upload_path,
 )
+from portfolio.models import DividendSnapshot
 
 
 class SiteSettingsOgImageUploadPathTest(SimpleTestCase):
@@ -55,6 +57,9 @@ class SiteSettingsTest(TestCase):
         SiteSettings.objects.all().delete()
 
     def test_singleton(self):
+        SiteSettings.objects.create()
+
+    def test_singleton_raises_validation_error(self):
         SiteSettings.objects.create()
 
         with self.assertRaises(ValidationError):
@@ -203,3 +208,42 @@ class SidebarWidgetTest(TestCase):
             title="Sidebar", template_name="test.html"
         )
         self.assertEqual(str(widget), "Sidebar")
+
+    def test_clean_raises_when_dividend_snapshot_currencies_differ(self):
+        try_snap = DividendSnapshot.objects.create(
+            year=2026,
+            currency="TRY",
+            total_amount=Decimal("25000.00"),
+        )
+        usd_snap = DividendSnapshot.objects.create(
+            year=2025,
+            currency="USD",
+            total_amount=Decimal("500.00"),
+        )
+        widget = SidebarWidget(
+            title="Temettü",
+            template_name="includes/sidebar_dividend_widget.html",
+            current_dividend_snapshot=try_snap,
+            previous_dividend_snapshot=usd_snap,
+        )
+        with self.assertRaises(ValidationError):
+            widget.full_clean()
+
+    def test_clean_passes_when_dividend_snapshot_currencies_match(self):
+        snap_2026 = DividendSnapshot.objects.create(
+            year=2026,
+            currency="USD",
+            total_amount=Decimal("800.00"),
+        )
+        snap_2027 = DividendSnapshot.objects.create(
+            year=2027,
+            currency="USD",
+            total_amount=Decimal("1000.00"),
+        )
+        widget = SidebarWidget(
+            title="Temettü",
+            template_name="includes/sidebar_dividend_widget.html",
+            current_dividend_snapshot=snap_2027,
+            previous_dividend_snapshot=snap_2026,
+        )
+        widget.full_clean()

@@ -170,8 +170,23 @@ class AboutPageAdmin(admin.ModelAdmin):
 
 @admin.register(SidebarWidget)
 class SidebarWidgetAdmin(admin.ModelAdmin):
-    list_display = ("title", "template_name", "order", "is_active")
+    list_display = (
+        "title",
+        "template_name",
+        "current_dividend_snapshot",
+        "previous_dividend_snapshot",
+        "order",
+        "is_active",
+    )
     list_editable = ("order", "is_active")
+    list_select_related = (
+        "current_dividend_snapshot",
+        "previous_dividend_snapshot",
+    )
+    autocomplete_fields = (
+        "current_dividend_snapshot",
+        "previous_dividend_snapshot",
+    )
     ordering = ("order",)
 
     def has_add_permission(self, request) -> bool:

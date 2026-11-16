@@ -14,6 +14,7 @@ from django.utils.formats import date_format
 from django.utils.translation import get_language
 
 from blog.cache_keys import (
+    DIVIDEND_WIDGET_KEY,
     GOAL_WIDGET_KEY,
     NAV_ARCHIVES_KEY,
     NAV_CATEGORIES_KEY,
@@ -26,7 +27,7 @@ from blog.cache_keys import (
 )
 from blog.models import BlogPost, Category, Tag
 from comments.models import Comment
-from portfolio.models import PortfolioSnapshot
+from portfolio.models import DividendSnapshot, PortfolioSnapshot
 
 from .models import ContactMessage, SidebarWidget, SiteSettings
 from .tag_colors import get_tag_color_class
@@ -44,6 +45,22 @@ STAMPEDE_POLL_INTERVAL = 0.1
 STAFF_PENDING_CACHE_TIMEOUT = 300  # 5 minutes
 GOAL_WIDGET_EMPTY_CACHE_VALUE = "__empty_goal_widget_snapshot__"
 GOAL_WIDGET_CACHE_MISS_VALUE = "__missing_goal_widget_snapshot__"
+
+DIVIDEND_WIDGET_TEMPLATE_NAME = "includes/sidebar_dividend_widget.html"
+DIVIDEND_WIDGET_DEFAULT_PREVIOUS_YEAR = 2025
+DIVIDEND_WIDGET_2025_TRY_TOTAL = Decimal("19967.52")
+DIVIDEND_WIDGET_2025_USD_TOTAL = Decimal("522.16")
+DIVIDEND_WIDGET_2025_TOTALS: dict[str, Decimal] = {
+    "TRY": DIVIDEND_WIDGET_2025_TRY_TOTAL,
+    "USD": DIVIDEND_WIDGET_2025_USD_TOTAL,
+}
+DIVIDEND_WIDGET_CURRENCY_SYMBOLS: dict[str, str] = {
+    "TRY": "₺",
+    "USD": "$",
+    "EUR": "€",
+}
+DIVIDEND_WIDGET_EMPTY_CACHE_VALUE = "__empty_dividend_widget_snapshot__"
+DIVIDEND_WIDGET_CACHE_MISS_VALUE = "__missing_dividend_widget_snapshot__"
 
 
 def _cache_timeout_with_jitter() -> int:
@@ -371,6 +388,145 @@ def _get_goal_widget_snapshot(cached_data=None):
     return goal_widget_snapshot
 
 
+def _format_dividend_widget_currency(amount: Decimal, currency: str) -> str:
+    quantized = amount.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+    formatted = (
+        f"{quantized:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
+    )
+    symbol = DIVIDEND_WIDGET_CURRENCY_SYMBOLS.get(currency, currency)
+    return f"{formatted} {symbol}".rstrip()
+
+
+def _build_dividend_widget_snapshot(
+    current_snapshot: DividendSnapshot,
+    previous_snapshot: DividendSnapshot | None = None,
+) -> dict[str, object]:
+    currency = current_snapshot.currency
+    currency_symbol = DIVIDEND_WIDGET_CURRENCY_SYMBOLS.get(currency, currency)
+    current_amount = current_snapshot.total_amount or Decimal("0")
+
+    if previous_snapshot is not None and previous_snapshot.currency == currency:
+        previous_year = previous_snapshot.year
+        previous_amount = previous_snapshot.total_amount or Decimal("0")
+    else:
+        previous_year = DIVIDEND_WIDGET_DEFAULT_PREVIOUS_YEAR
+        previous_amount = DIVIDEND_WIDGET_2025_TOTALS.get(
+            currency, DIVIDEND_WIDGET_2025_TRY_TOTAL
+        )
+
+    if previous_amount > 0:
+        change_pct = ((current_amount - previous_amount) / previous_amount) * Decimal(
+            "100"
+        )
+    else:
+        change_pct = Decimal("0")
+
+    quantized_pct = change_pct.quantize(Decimal("0.1"), rounding=ROUND_HALF_UP)
+    abs_pct_str = f"{abs(quantized_pct):.1f}".replace(".", ",")
+    if quantized_pct > 0:
+        change_pct_display = f"+%{abs_pct_str}"
+        change_arrow = "↗"
+        change_direction = "up"
+        is_positive = True
+    elif quantized_pct < 0:
+        change_pct_display = f"-%{abs_pct_str}"
+        change_arrow = "↘"
+        change_direction = "down"
+        is_positive = False
+    else:
+        change_pct_display = f"%{abs_pct_str}"
+        change_arrow = "→"
+        change_direction = "neutral"
+        is_positive = True
+
+    return {
+        "year": current_snapshot.year,
+        "currency": currency,
+        "currency_symbol": currency_symbol,
+        "current_value": current_amount,
+        "current_display": _format_dividend_widget_currency(current_amount, currency),
+        "previous_year": previous_year,
+        "previous_value": previous_amount,
+        "previous_display": _format_dividend_widget_currency(previous_amount, currency),
+        "change_pct": quantized_pct,
+        "change_pct_display": change_pct_display,
+        "change_arrow": change_arrow,
+        "change_direction": change_direction,
+        "is_positive": is_positive,
+        "snapshot_date": current_snapshot.snapshot_date,
+        "snapshot_date_display": date_format(current_snapshot.snapshot_date, "j F Y"),
+    }
+
+
+def _get_dividend_widget_snapshot(cached_data=None):
+    if cached_data is not None:
+        dividend_widget_snapshot = cached_data.get(
+            DIVIDEND_WIDGET_KEY, DIVIDEND_WIDGET_CACHE_MISS_VALUE
+        )
+    else:
+        dividend_widget_snapshot = cache.get(
+            DIVIDEND_WIDGET_KEY, DIVIDEND_WIDGET_CACHE_MISS_VALUE
+        )
+
+    if dividend_widget_snapshot != DIVIDEND_WIDGET_CACHE_MISS_VALUE:
+        if dividend_widget_snapshot == DIVIDEND_WIDGET_EMPTY_CACHE_VALUE:
+            return None
+        return dividend_widget_snapshot
+
+    widget = (
+        SidebarWidget.objects.select_related(
+            "current_dividend_snapshot",
+            "previous_dividend_snapshot",
+        )
+        .only(
+            "id",
+            "template_name",
+            "current_dividend_snapshot__id",
+            "current_dividend_snapshot__year",
+            "current_dividend_snapshot__currency",
+            "current_dividend_snapshot__total_amount",
+            "current_dividend_snapshot__snapshot_date",
+            "previous_dividend_snapshot__id",
+            "previous_dividend_snapshot__year",
+            "previous_dividend_snapshot__currency",
+            "previous_dividend_snapshot__total_amount",
+            "previous_dividend_snapshot__snapshot_date",
+        )
+        .filter(
+            Q(template_name=DIVIDEND_WIDGET_TEMPLATE_NAME)
+            | Q(current_dividend_snapshot__isnull=False)
+        )
+        .order_by("order")
+        .first()
+    )
+
+    current_snapshot = widget.current_dividend_snapshot if widget else None
+    previous_snapshot = widget.previous_dividend_snapshot if widget else None
+
+    if current_snapshot is None:
+        current_snapshot = (
+            DividendSnapshot.objects.only(
+                "id", "year", "currency", "total_amount", "snapshot_date"
+            )
+            .order_by("-year", "-snapshot_date", "-created_at")
+            .first()
+        )
+
+    dividend_widget_snapshot = None
+    if current_snapshot is not None:
+        dividend_widget_snapshot = _build_dividend_widget_snapshot(
+            current_snapshot, previous_snapshot
+        )
+
+    cache_value = (
+        dividend_widget_snapshot
+        if dividend_widget_snapshot is not None
+        else DIVIDEND_WIDGET_EMPTY_CACHE_VALUE
+    )
+    cache.set(DIVIDEND_WIDGET_KEY, cache_value, timeout=CACHE_TIMEOUT)
+    return dividend_widget_snapshot
+
+
 def _get_has_pending_messages_or_comments(request, cached_data=None):
     if not (request.user.is_authenticated and request.user.is_staff):
         return False
@@ -404,6 +560,7 @@ def categories_tags_context(request):
         NAV_POPULAR_POSTS_KEY,
         NAV_PORTFOLIO_POSTS_KEY,
         GOAL_WIDGET_KEY,
+        DIVIDEND_WIDGET_KEY,
     ]
 
     if request.user.is_authenticated and request.user.is_staff:
@@ -422,6 +579,7 @@ def categories_tags_context(request):
         "nav_popular_posts": _get_nav_popular_posts(cached_data),
         "nav_portfolio_posts": _get_nav_portfolio_posts(cached_data),
         "goal_widget_snapshot": _get_goal_widget_snapshot(cached_data),
+        "dividend_widget_snapshot": _get_dividend_widget_snapshot(cached_data),
         "has_pending_messages_or_comments": _get_has_pending_messages_or_comments(
             request, cached_data
         ),

@@ -1,0 +1,31 @@
+{% load cache %}
+{% cache 600 sidebar_dividend_widget %}
+<section class="sidebar-card dividend-widget">
+  {% if dividend_widget_snapshot %}
+    <div class="dividend-widget__header">
+      <h3 class="sidebar-title dividend-widget__title">Temettü Geliri</h3>
+      <span class="dividend-widget__currency-badge" aria-hidden="true">{{ dividend_widget_snapshot.currency_symbol }}</span>
+    </div>
+    <p class="dividend-widget__eyebrow">{{ dividend_widget_snapshot.year }} TOPLAM TEMETTÜ</p>
+    <p class="dividend-widget__amount">{{ dividend_widget_snapshot.current_display }}</p>
+    <p class="dividend-widget__previous">({{ dividend_widget_snapshot.previous_year }}: {{ dividend_widget_snapshot.previous_display }})</p>
+    <div class="dividend-widget__divider"></div>
+    <div class="dividend-widget__comparison">
+      <span class="dividend-widget__comparison-label">Geçen yıla göre</span>
+      <span class="dividend-widget__badge {% if dividend_widget_snapshot.is_positive %}dividend-widget__badge--positive{% else %}dividend-widget__badge--negative{% endif %}">
+        <span aria-hidden="true">{{ dividend_widget_snapshot.change_arrow }}</span>
+        <span>{{ dividend_widget_snapshot.change_pct_display }}</span>
+      </span>
+    </div>
+    <p class="dividend-widget__footer">{{ dividend_widget_snapshot.snapshot_date_display }} itibarıyla</p>
+  {% else %}
+    <div class="dividend-widget__header">
+      <h3 class="sidebar-title dividend-widget__title">Temettü Geliri</h3>
+      <span class="dividend-widget__currency-badge" aria-hidden="true">₺</span>
+    </div>
+    <p class="dividend-widget__eyebrow">2025 TOPLAM TEMETTÜ</p>
+    <p class="dividend-widget__amount">19.967,52 ₺</p>
+    <p class="dividend-widget__previous">(2025: 522,16 $)</p>
+  {% endif %}
+</section>
+{% endcache %}

@@ -279,6 +279,27 @@ class SidebarWidget(
     )
     is_active = models.BooleanField(default=True, verbose_name="Aktif")
     order = models.PositiveIntegerField(default=0, verbose_name="Sıralama")
+    current_dividend_snapshot = models.ForeignKey(
+        "portfolio.DividendSnapshot",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="current_sidebar_widgets",
+        verbose_name="Şimdiki Yıl Temettü Snapshot",
+        help_text="Temettü widget'ında cari yıl için gösterilecek snapshot.",
+    )
+    previous_dividend_snapshot = models.ForeignKey(
+        "portfolio.DividendSnapshot",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="previous_sidebar_widgets",
+        verbose_name="Önceki Yıl Temettü Snapshot",
+        help_text=(
+            "Temettü widget'ında önceki yıl için gösterilecek snapshot. "
+            "Seçilmezse 2025 yılı verisi cari yılın para birimine göre kullanılır."
+        ),
+    )
 
     class Meta:  # pyright: ignore[reportIncompatibleVariableOverride]
         ordering = ["order"]
@@ -287,6 +308,18 @@ class SidebarWidget(
 
     def __str__(self) -> str:
         return str(self.title)
+
+    def clean(self) -> None:
+        super().clean()
+        if (
+            self.current_dividend_snapshot
+            and self.previous_dividend_snapshot
+            and self.current_dividend_snapshot.currency
+            != self.previous_dividend_snapshot.currency
+        ):
+            raise ValidationError(
+                "Seçilen temettü snapshotlarının para birimleri aynı olmalıdır."
+            )
 
     def save(self, *args: object, **kwargs: object) -> None:
         super().save(*args, **kwargs)  # pyright: ignore[reportArgumentType]

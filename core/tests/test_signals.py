@@ -1,12 +1,21 @@
-from unittest.mock import patch
+from decimal import Decimal
+from unittest.mock import call, patch
 
 from django.contrib.auth import get_user_model
 from django.core.cache import cache
+from django.core.cache.utils import make_template_fragment_key
 from django.test import TestCase
 
-from blog.cache_keys import GOAL_WIDGET_KEY, SIDEBAR_WIDGETS_KEY, SITE_SETTINGS_KEY
+from blog.cache_keys import (
+    DIVIDEND_WIDGET_KEY,
+    GOAL_WIDGET_KEY,
+    SIDEBAR_WIDGETS_KEY,
+    SITE_SETTINGS_KEY,
+)
+from core.context_processors import DIVIDEND_WIDGET_TEMPLATE_NAME
 from core.models import SidebarWidget, SiteSettings
-from portfolio.models import Portfolio, PortfolioSnapshot
+from core.signals import DIVIDEND_WIDGET_FRAGMENT_CACHE_NAME
+from portfolio.models import DividendSnapshot, Portfolio, PortfolioSnapshot
 
 User = get_user_model()
 
@@ -60,6 +69,49 @@ class SignalTests(TestCase):
         mock_cache_delete.reset_mock()  # Reset because save also triggers delete
         widget.delete()
         mock_cache_delete.assert_called_once_with(SIDEBAR_WIDGETS_KEY)
+
+    @patch("core.signals.cache.delete")
+    def test_dividend_sidebar_widget_post_save_invalidates_dividend_cache(
+        self, mock_cache_delete
+    ):
+        SidebarWidget.objects.create(
+            title="Temettü Geliri",
+            template_name=DIVIDEND_WIDGET_TEMPLATE_NAME,
+        )
+        fragment_key = make_template_fragment_key(DIVIDEND_WIDGET_FRAGMENT_CACHE_NAME)
+        mock_cache_delete.assert_has_calls(
+            [
+                call(SIDEBAR_WIDGETS_KEY),
+                call(DIVIDEND_WIDGET_KEY),
+                call(fragment_key),
+            ]
+        )
+
+    @patch("core.signals.cache.delete")
+    def test_dividend_snapshot_save_and_delete_invalidate_dividend_widget_cache(
+        self, mock_cache_delete
+    ):
+        fragment_key = make_template_fragment_key(DIVIDEND_WIDGET_FRAGMENT_CACHE_NAME)
+        snapshot = DividendSnapshot.objects.create(
+            year=2026,
+            currency="USD",
+            total_amount=Decimal("3245.80"),
+        )
+        mock_cache_delete.assert_has_calls(
+            [
+                call(DIVIDEND_WIDGET_KEY),
+                call(fragment_key),
+            ]
+        )
+
+        mock_cache_delete.reset_mock()
+        snapshot.delete()
+        mock_cache_delete.assert_has_calls(
+            [
+                call(DIVIDEND_WIDGET_KEY),
+                call(fragment_key),
+            ]
+        )
 
     @patch("core.signals.cache.delete")
     def test_site_settings_post_save_invalidates_cache(self, mock_cache_delete):
